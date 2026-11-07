@@ -12,8 +12,11 @@
 
 name: CI
 
+# Pushes to main run CI; branches are covered by their pull request, so a
+# push to a PR branch starts one run, not two.
 on:
   push:
+    branches: [main]
   pull_request:
 
 concurrency:
