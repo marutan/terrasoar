@@ -27,7 +27,8 @@ env:
   # Versions installed with aqtinstall. Keep in step with docs/building.md.
   QT5_VERSION: "5.15.2"
   QT6_VERSION: "6.8.3"
-  # Apt packages for the third-party libraries on Linux.
+  # Apt packages for the third-party libraries on Linux (installed fresh
+  # each run; the slow dependency build is on Windows, cached via vcpkg).
   LINUX_DEPS: >-
     libgdal-dev libproj-dev libgeos-dev libsqlite3-dev
     libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
@@ -74,10 +75,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: ${{ env.LINUX_DEPS }}
-          version: deps-v1
+        # Plain apt-get, not an apt-cache action: those restore files without
+        # running maintainer scripts, which leaves libblas.so.3/liblapack.so.3
+        # (Debian alternatives) missing and GDAL's dependencies unlinkable.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -118,9 +121,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache third-party libraries
+      # Restore and save are separate steps so the (long) vcpkg build is
+      # cached as soon as it finishes, even if a later step fails.
+      - name: Restore third-party libraries
         id: deps-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: vcpkg_installed
           key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-v1
@@ -133,6 +138,13 @@ jobs:
             --triplet $env:VCPKG_TRIPLET `
             --x-install-root="$env:VCPKG_INSTALLED" `
             gdal proj geos sqlite3
+
+      - name: Save third-party libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: vcpkg_installed
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -177,10 +189,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: ${{ env.LINUX_DEPS }}
-          version: deps-v1
+        # Plain apt-get, not an apt-cache action: those restore files without
+        # running maintainer scripts, which leaves libblas.so.3/liblapack.so.3
+        # (Debian alternatives) missing and GDAL's dependencies unlinkable.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4

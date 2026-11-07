@@ -41,6 +41,21 @@ DEFINES += \
 gcc|clang {
     QMAKE_CXXFLAGS_WARN_ON += -Wpedantic -Wshadow -Wnon-virtual-dtor
 }
+# qmake passes Qt's headers with -I, so the compiler checks them with our
+# warning flags; Clang's -Wpedantic then rejects Qt 6.8's [[nodiscard("…")]]
+# under C++17. Marking Qt's include directories as system headers keeps
+# warnings for our own code only (for a directory given both ways, -isystem
+# wins).
+gcc|clang {
+    TS_QT_HEADERS = $$[QT_INSTALL_HEADERS]
+    QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_QT_HEADERS)
+    for (module, $$list(QtCore QtGui QtWidgets QtOpenGL QtOpenGLWidgets \
+                        QtTest QtDBus)) {
+        exists($$TS_QT_HEADERS/$$module): \
+            QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_QT_HEADERS/$$module)
+    }
+}
+
 # Qt 6's QSKIP/QFAIL-style macros are variadic and are used with no extra
 # arguments; Clang's -Wpedantic flags that in Qt's macro, not our code.
 clang: QMAKE_CXXFLAGS_WARN_ON += -Wno-gnu-zero-variadic-macro-arguments
