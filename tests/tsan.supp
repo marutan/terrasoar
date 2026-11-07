@@ -1,0 +1,18 @@
+# ThreadSanitizer suppressions for the TSan CI job.
+#
+# Only third-party code that is not built with -fsanitize=thread may be
+# listed here, each with a reason. Never suppress a report in Terra Soar's
+# own code: fix it.
+#
+# Format: https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+
+# Mesa's llvmpipe worker threads (software OpenGL, uninstrumented).
+race:libLLVM
+race:swrast_dri.so
+race:libgallium
+
+# GDAL's driver registration (GDALAllRegister, run once from
+# ts::initialiseGdal() under std::call_once) takes its own CPL mutexes in
+# an order TSan reports as a lock-order inversion. Both locks are internal to
+# GDAL and taken on one thread; libgdal is not instrumented.
+deadlock:libgdal.so

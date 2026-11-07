@@ -1,0 +1,30 @@
+# Build output (shadow builds go under build/; Doxygen writes build/docs)
+/build/
+/build-*/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+moc_*.cpp
+moc_predefs.h
+qrc_*.cpp
+ui_*.h
+*.qm
+Makefile
+Makefile.Debug
+Makefile.Release
+.qmake.stash
+target_wrapper.*
+
+# Tools and editors
+__pycache__/
+*.pyc
+*.pro.user
+*.pro.user.*
+.vscode/
+.idea/
+compile_commands.json
+.cache/

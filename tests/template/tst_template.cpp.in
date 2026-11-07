@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+#include <QtTest>
+
+#include "concurrency.h"
+
+/** Unit tests for ts/@SUBSECTION@. */
+class @CLASS@ : public QObject
+{
+  Q_OBJECT
+
+private slots:
+  // Behaviour: one slot per case; data-driven cases use a _data() slot.
+  void placeholder() { QVERIFY(true); }
+
+  // Thread safety: every reentrant class gets a test where many threads use
+  // their own instances; every thread-safe class one where they share an
+  // instance. Both run under ThreadSanitizer in CI.
+  void concurrentOwnInstances()
+  {
+    const int failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [](int) { return true; });
+    QCOMPARE(failures, 0);
+  }
+
+  // Performance: hot paths get a QBENCHMARK; CI compares the results with
+  // the stored baselines.
+  void benchmarkPlaceholder()
+  {
+    QBENCHMARK
+    {
+      // Code under measurement.
+    }
+  }
+};
+
+QTEST_GUILESS_MAIN(@CLASS@)
+#include "tst_@SUBSECTION@.moc"

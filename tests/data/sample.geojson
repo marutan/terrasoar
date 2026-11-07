@@ -1,0 +1,19 @@
+{
+  "type": "FeatureCollection",
+  "name": "sample",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "Greenwich" },
+      "geometry": { "type": "Point", "coordinates": [0.0, 51.4779] }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "Unit square at the origin" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
+      }
+    }
+  ]
+}

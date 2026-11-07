@@ -1,0 +1,57 @@
+Terra Soar — third-party notices
+================================
+
+Terra Soar itself is licensed under the GNU General Public License,
+version 2 or (at your option) any later version (see COPYING).
+
+It uses the following third-party components. Each keeps its own licence;
+the full licence texts are included with the respective libraries and, in
+binary packages, under licenses/ next to this file.
+
+Libraries linked by Terra Soar
+------------------------------
+
+Qt 5.15 / Qt 6 (Core, Gui, Widgets, OpenGL, OpenGLWidgets, Test)
+  The Qt Company Ltd. and other contributors
+  Licence: GNU LGPL v3 (also available under GPL v2/v3)
+  https://www.qt.io/
+
+GDAL/OGR
+  Frank Warmerdam, Even Rouault and others
+  Licence: MIT/X style
+  https://gdal.org/
+
+PROJ
+  Frank Warmerdam, Kristian Evers, Even Rouault and others
+  Licence: MIT/X style
+  https://proj.org/
+
+GEOS (C API)
+  Martin Davis, Paul Ramsey, Sandro Santilli and others
+  Licence: GNU LGPL v2.1 or later
+  https://libgeos.org/
+
+SQLite
+  D. Richard Hipp and others
+  Licence: public domain
+  https://sqlite.org/
+
+Runtime components bundled in Windows packages
+----------------------------------------------
+
+Qt software OpenGL fallback (opengl32sw.dll, Qt 5 builds)
+  A Mesa llvmpipe build shipped with Qt
+  Licence: MIT (Mesa); LLVM: Apache 2.0 with LLVM exception
+
+Data
+----
+
+No third-party data is bundled yet. The base pack (Phase 3) will add
+WVS, Blue Marble and others; each dataset will be listed here with its
+source, licence and required attribution.
+
+Build-time tools (not distributed)
+----------------------------------
+
+clang-format (Apache 2.0 with LLVM exception), Doxygen (GPL v2),
+Qt Linguist tools (GPL v3), Python 3 (PSF licence).

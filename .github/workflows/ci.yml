@@ -1,0 +1,202 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Fast checks on every push and pull request:
+#   - style checks (clang-format 18, include order, `auto`, translations,
+#     Doxygen warnings)
+#   - build + `make check` on Linux (GCC, Clang) and Windows (MSVC), each
+#     with Qt 5.15 and Qt 6, warnings as errors
+#   - ThreadSanitizer build of the unit and stress tests
+#
+# The full suite (performance baselines, docs artefact, release packages)
+# runs in nightly.yml.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Versions installed with aqtinstall. Keep in step with docs/building.md.
+  QT5_VERSION: "5.15.2"
+  QT6_VERSION: "6.8.3"
+  # Apt packages for the third-party libraries on Linux.
+  LINUX_DEPS: >-
+    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev
+    libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+    xvfb
+
+jobs:
+  checks:
+    name: Style checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-format-18 doxygen graphviz qt6-l10n-tools
+
+      - name: Run checks
+        env:
+          CLANG_FORMAT: clang-format-18
+          LUPDATE: /usr/lib/qt6/bin/lupdate
+        run: python3 tools/checks/run_all.py
+
+      - name: Upload Doxygen warnings
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: doxygen-warnings
+          path: build/docs/doxygen-warnings.log
+          if-no-files-found: ignore
+
+  linux:
+    name: Linux ${{ matrix.compiler }} / Qt ${{ matrix.qt }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        qt: [5, 6]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: ${{ env.LINUX_DEPS }}
+          version: deps-v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt == 5 && env.QT5_VERSION || env.QT6_VERSION }}
+          cache: true
+
+      - name: Configure
+        run: |
+          mkdir build-ci && cd build-ci
+          SPEC=linux-g++
+          [ "${{ matrix.compiler }}" = clang ] && SPEC=linux-clang
+          qmake -spec "$SPEC" ../terrasoar.pro CONFIG+=werror
+
+      - name: Build
+        run: make -C build-ci -j"$(nproc)"
+
+      - name: Test
+        # A virtual X server gives the GL tests a real (llvmpipe) context;
+        # every other test uses the offscreen platform itself.
+        env:
+          TS_REQUIRE_GL: "1"
+          TS_EXPECT_SOFTWARE_GL: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          QT_QPA_PLATFORM: xcb
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" make -C build-ci check
+
+  windows:
+    name: Windows MSVC / Qt ${{ matrix.qt }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        qt: [5, 6]
+    env:
+      VCPKG_TRIPLET: x64-windows
+      VCPKG_INSTALLED: ${{ github.workspace }}\vcpkg_installed
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache third-party libraries
+        id: deps-cache
+        uses: actions/cache@v4
+        with:
+          path: vcpkg_installed
+          key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-v1
+
+      - name: Build third-party libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            --triplet $env:VCPKG_TRIPLET `
+            --x-install-root="$env:VCPKG_INSTALLED" `
+            gdal proj geos sqlite3
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt == 5 && env.QT5_VERSION || env.QT6_VERSION }}
+          arch: ${{ matrix.qt == 5 && 'win64_msvc2019_64' || 'win64_msvc2022_64' }}
+          cache: true
+
+      - uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install jom
+        shell: pwsh
+        run: choco install jom -y --no-progress
+
+      - name: Configure
+        shell: cmd
+        run: |
+          mkdir build-ci && cd build-ci
+          qmake ..\terrasoar.pro CONFIG+=werror CONFIG+=release ^
+            DEPS_ROOT=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%
+
+      - name: Build
+        shell: cmd
+        run: cd build-ci && jom
+
+      - name: Test
+        shell: cmd
+        env:
+          # Windows runners have no GPU: the GL tests use the bundled
+          # software OpenGL (opengl32sw.dll on Qt 5). Qt 6 has no bundled
+          # fallback yet (a Mesa build is planned), so only Qt 5 requires GL.
+          TS_REQUIRE_GL: ${{ matrix.qt == 5 && '1' || '0' }}
+          QT_OPENGL: software
+        run: |
+          set PATH=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%\bin;%PATH%
+          cd build-ci && jom check
+
+  tsan:
+    name: ThreadSanitizer (Linux Clang / Qt 6)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: ${{ env.LINUX_DEPS }}
+          version: deps-v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Configure
+        run: |
+          mkdir build-tsan && cd build-tsan
+          qmake -spec linux-clang ../terrasoar.pro CONFIG+=tsan
+
+      - name: Build
+        run: make -C build-tsan -j"$(nproc)"
+
+      - name: Test
+        env:
+          TSAN_OPTIONS: >-
+            halt_on_error=1 second_deadlock_stack=1
+            suppressions=${{ github.workspace }}/tests/tsan.supp
+          QT_QPA_PLATFORM: offscreen
+        run: make -C build-tsan check

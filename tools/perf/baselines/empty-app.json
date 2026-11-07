@@ -1,0 +1,15 @@
+{
+  "compiler": "GCC 13.3.0",
+  "idle_cpu_percent": 0.005890935171532511,
+  "idle_cpu_s": 0.00016799999999999454,
+  "idle_resident_bytes": 36339712,
+  "idle_s": 2.851839226,
+  "peak_resident_bytes": 36339712,
+  "platform": "offscreen",
+  "qt_runtime_version": "6.4.2",
+  "resident_bytes": 36208640,
+  "runs": 3,
+  "startup_cpu_s": 0.045877999999999995,
+  "startup_ms": 36.998241,
+  "version": "0.0.1"
+}

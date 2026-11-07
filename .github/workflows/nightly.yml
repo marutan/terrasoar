@@ -1,0 +1,142 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Full suite: nightly, on release tags and on demand.
+#   - everything in ci.yml (reused via workflow_call is not needed: the
+#     fast jobs already run on every push to the tagged commit)
+#   - performance and memory checks against the stored baselines, on Mesa
+#     llvmpipe, plus an optional self-hosted run on the reference PC
+#   - Doxygen API docs as an artefact
+#   - on tags: source tarball published to GitHub Releases
+#
+# Golden-image, scripted-flight and install tests join this workflow in the
+# phases that introduce them (see docs/testing.md).
+
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      reference-pc:
+        description: Also run on the self-hosted reference PC
+        type: boolean
+        default: false
+
+env:
+  QT6_VERSION: "6.8.3"
+  LINUX_DEPS: >-
+    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev
+    libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+    xvfb
+
+jobs:
+  performance:
+    name: Performance (Mesa llvmpipe)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: ${{ env.LINUX_DEPS }}
+          version: deps-v1
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Build
+        run: |
+          mkdir build-perf && cd build-perf
+          qmake ../terrasoar.pro CONFIG+=release
+          make -j"$(nproc)"
+
+      - name: Benchmarks
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          mkdir -p perf-results
+          for t in build-perf/tests/*/tst_*; do
+            [ -x "$t" ] || continue
+            "$t" -o "perf-results/$(basename "$t").xml,xml" \
+                 -o -,txt -minimumvalue 10
+          done
+
+      - name: Start-up, memory and idle CPU
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          xvfb-run -a -s "-screen 0 1280x1024x24" \
+            python3 tools/perf/measure_startup.py build-perf/app/terrasoar \
+              --platform xcb --runs 5 --idle-seconds 10 \
+              --baseline tools/perf/baselines/ci-linux-llvmpipe.json \
+              --output perf-results/startup.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: perf-results
+          path: perf-results
+
+  reference-pc:
+    name: Performance (reference PC)
+    if: github.event_name == 'workflow_dispatch' && inputs.reference-pc
+    runs-on: [self-hosted, reference-pc]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          mkdir -p build-ref && cd build-ref
+          qmake ../terrasoar.pro CONFIG+=release
+          make -j3
+      - name: Start-up, memory and idle CPU
+        run: |
+          python3 tools/perf/measure_startup.py build-ref/app/terrasoar \
+            --platform xcb --runs 5 --idle-seconds 10 \
+            --baseline tools/perf/baselines/reference-pc.json
+
+  docs:
+    name: API documentation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Doxygen
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends doxygen graphviz
+      - name: Build docs
+        run: python3 tools/checks/check_doxygen.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-docs
+          path: build/docs/api
+
+  release:
+    name: Publish release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [performance, docs]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Source tarball
+        run: |
+          NAME="terrasoar-${GITHUB_REF_NAME#v}"
+          git archive --format=tar.gz --prefix="$NAME/" \
+            -o "$NAME.tar.gz" "$GITHUB_REF_NAME"
+          sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            terrasoar-*.tar.gz terrasoar-*.tar.gz.sha256
