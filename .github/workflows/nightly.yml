@@ -39,7 +39,7 @@ jobs:
     name: Performance (Mesa llvmpipe)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install dependencies
         # Plain apt-get, not an apt-cache action: those restore files without
@@ -82,7 +82,7 @@ jobs:
               --baseline tools/perf/baselines/ci-linux-llvmpipe.json \
               --output perf-results/startup.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: perf-results
@@ -93,7 +93,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.reference-pc
     runs-on: [self-hosted, reference-pc]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build
         run: |
           mkdir -p build-ref && cd build-ref
@@ -109,14 +109,14 @@ jobs:
     name: API documentation
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install Doxygen
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends doxygen graphviz
       - name: Build docs
         run: python3 tools/checks/check_doxygen.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: api-docs
           path: build/docs/api
@@ -129,7 +129,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Source tarball
         run: |
           NAME="terrasoar-${GITHUB_REF_NAME#v}"
