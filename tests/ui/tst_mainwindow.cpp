@@ -5,9 +5,12 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMouseEvent>
 #include <QPointer>
+#include <QWheelEvent>
 #include <QtTest>
 
+#include "globeview.h"
 #include "mainwindow.h"
 #include "ts/i18n/pseudotranslator.h"
 
@@ -22,6 +25,34 @@ QString withoutMnemonic(QString text)
   return text;
 }
 
+/**
+ * True for Qt's own menus, such as the menu bar's overflow ("»") menu that
+ * appears while the window is laid out: no object name and no title. All
+ * our menus have object names.
+ */
+bool isQtInternalMenu(const QMenu* menu)
+{
+  return menu != nullptr && menu->objectName().isEmpty() &&
+         menu->title().isEmpty();
+}
+
+/** Object name, or class and parent chain for unnamed (Qt-internal) ones. */
+QString describe(const QObject* object)
+{
+  if (!object->objectName().isEmpty()) {
+    return object->objectName();
+  }
+  QString chain = QString::fromLatin1(object->metaObject()->className());
+  for (const QObject* parent = object->parent(); parent != nullptr;
+       parent = parent->parent()) {
+    chain += QStringLiteral(" in ") +
+             (parent->objectName().isEmpty()
+                  ? QString::fromLatin1(parent->metaObject()->className())
+                  : parent->objectName());
+  }
+  return chain;
+}
+
 /** Every user-visible string of @p window, labelled for error messages. */
 QList<QPair<QString, QString>> visibleTexts(QMainWindow& window)
 {
@@ -29,11 +60,13 @@ QList<QPair<QString, QString>> visibleTexts(QMainWindow& window)
   texts << qMakePair(QStringLiteral("window title"), window.windowTitle());
   const QList<QAction*> actions = window.findChildren<QAction*>();
   for (QAction* action : actions) {
-    if (action->isSeparator()) {
+    if (action->isSeparator() || isQtInternalMenu(action->menu())) {
       continue;
     }
     const QString name =
-        action->objectName().isEmpty() ? action->text() : action->objectName();
+        action->objectName().isEmpty() && !action->text().isEmpty()
+            ? action->text()
+            : describe(action);
     texts << qMakePair(name + QStringLiteral(" text"), action->text());
     if (!action->statusTip().isEmpty()) {
       texts << qMakePair(name + QStringLiteral(" status tip"),
@@ -46,12 +79,15 @@ QList<QPair<QString, QString>> visibleTexts(QMainWindow& window)
   }
   const QList<QMenu*> menus = window.findChildren<QMenu*>();
   for (QMenu* menu : menus) {
+    if (isQtInternalMenu(menu)) {
+      continue;
+    }
     texts << qMakePair(menu->objectName() + QStringLiteral(" title"),
                        menu->title());
   }
   const QList<QLabel*> labels = window.findChildren<QLabel*>();
   for (QLabel* label : labels) {
-    texts << qMakePair(label->objectName() + QStringLiteral(" text"),
+    texts << qMakePair(describe(label) + QStringLiteral(" text"),
                        label->text());
   }
   return texts;
@@ -66,6 +102,22 @@ void verifyAllPseudo(QMainWindow& window)
              qPrintable(QStringLiteral("untranslated %1: \"%2\"")
                             .arg(text.first, text.second)));
   }
+}
+
+/** Sends a mouse event of @p type at @p position with @p buttons held. */
+void sendMouse(QWidget* widget, QEvent::Type type, QPointF position,
+               Qt::MouseButton button, Qt::MouseButtons buttons)
+{
+  QMouseEvent event(type, position,
+                    QPointF(widget->mapToGlobal(position.toPoint())), button,
+                    buttons, Qt::NoModifier);
+  QCoreApplication::sendEvent(widget, &event);
+}
+
+/** Returns the window's globe view, skipping the test without OpenGL. */
+ts::GlobeView* globeOf(ts::MainWindow& window)
+{
+  return window.findChild<ts::GlobeView*>(QStringLiteral("globeView"));
 }
 
 } // namespace
@@ -183,6 +235,141 @@ private slots:
       }
     }
     QCoreApplication::removeTranslator(&translator);
+  }
+
+  // --- Globe view (needs OpenGL; skipped without it) ------------------------
+
+  void globeViewOrFallback()
+  {
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QVERIFY(globe == nullptr);
+      QLabel* label = window.findChild<QLabel*>(QStringLiteral("noGlobeLabel"));
+      if (label == nullptr) {
+        QFAIL("no noGlobeLabel");
+      }
+      QVERIFY(label->text().contains(QStringLiteral("OpenGL 3.3")));
+      return;
+    }
+    if (globe == nullptr) {
+      QFAIL("no globe view although OpenGL is available");
+    }
+    QTRY_VERIFY(globe->framesRendered() > 0);
+    QVERIFY2(globe->errorString().isEmpty(), qPrintable(globe->errorString()));
+  }
+
+  void dragPansAndWheelZooms()
+  {
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
+    const ts::CameraPose before = globe->controller().camera().pose();
+    sendMouse(globe, QEvent::MouseButtonPress, centre, Qt::LeftButton,
+              Qt::LeftButton);
+    sendMouse(globe, QEvent::MouseMove, centre + QPointF(-60.0, 0.0),
+              Qt::NoButton, Qt::LeftButton);
+    sendMouse(globe, QEvent::MouseButtonRelease, centre + QPointF(-60.0, 0.0),
+              Qt::LeftButton, Qt::NoButton);
+    // Dragging left moves the view east.
+    QVERIFY(globe->controller().camera().pose().targetLonDeg >
+            before.targetLonDeg + 1.0);
+
+    const double rangeBefore = globe->controller().camera().pose().rangeM;
+    QWheelEvent wheel(centre, QPointF(globe->mapToGlobal(centre.toPoint())),
+                      QPoint(), QPoint(0, 240), Qt::NoButton, Qt::NoModifier,
+                      Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(globe, &wheel);
+    QVERIFY(globe->controller().camera().pose().rangeM < 0.7 * rangeBefore);
+  }
+
+  void statusBarShowsPointerAndEye()
+  {
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
+    QLabel* eye = window.findChild<QLabel*>(QStringLiteral("eyeLabel"));
+    if (pointer == nullptr || eye == nullptr) {
+      QFAIL("status bar labels missing");
+    }
+    QCOMPARE(pointer->text(), QStringLiteral("Pointer not on the globe"));
+    // The centre of the start view is 20° N, 10° E.
+    sendMouse(globe, QEvent::MouseMove,
+              QPointF(globe->width() / 2.0, globe->height() / 2.0),
+              Qt::NoButton, Qt::NoButton);
+    QVERIFY2(pointer->text().contains(QStringLiteral("° N")) &&
+                 pointer->text().contains(QStringLiteral("° E")),
+             qPrintable(pointer->text()));
+    QTRY_VERIFY(eye->text().startsWith(QStringLiteral("Eye height ")));
+    QVERIFY2(eye->text().endsWith(QStringLiteral(" km")),
+             qPrintable(eye->text()));
+    sendMouse(globe, QEvent::MouseMove, QPointF(2.0, 2.0), Qt::NoButton,
+              Qt::NoButton);
+    QCOMPARE(pointer->text(), QStringLiteral("Pointer not on the globe"));
+  }
+
+  void overlayAndResetView()
+  {
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QAction* overlay =
+        window.findChild<QAction*>(QStringLiteral("debugOverlayAction"));
+    QAction* reset =
+        window.findChild<QAction*>(QStringLiteral("resetViewAction"));
+    if (overlay == nullptr || reset == nullptr) {
+      QFAIL("view actions missing");
+    }
+    QVERIFY(!globe->isDebugOverlayVisible());
+    overlay->trigger();
+    QVERIFY(globe->isDebugOverlayVisible());
+    const int frames = globe->framesRendered();
+    QTRY_VERIFY(globe->framesRendered() > frames);
+
+    // Move away, then Reset View flies home.
+    globe->flyTo(ts::CameraPose{-33.9, 151.2, 1.0e5, 30.0, 40.0}, 0.2);
+    QTRY_VERIFY(!globe->controller().isAnimating());
+    reset->trigger();
+    QVERIFY(globe->controller().isAnimating());
+    QTRY_VERIFY_WITH_TIMEOUT(!globe->controller().isAnimating(), 10000);
+    const ts::CameraPose home = ts::GlobeView::homePose();
+    const ts::CameraPose& pose = globe->controller().camera().pose();
+    QCOMPARE(pose.targetLatDeg, home.targetLatDeg);
+    QCOMPARE(pose.targetLonDeg, home.targetLonDeg);
+    QCOMPARE(pose.rangeM, home.rangeM);
+  }
+
+  void idleViewStopsDrawing()
+  {
+    // Render on demand: once nothing moves, no more frames are drawn.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QTRY_VERIFY(globe->framesRendered() > 0);
+    QTest::qWait(200);
+    const int frames = globe->framesRendered();
+    QTest::qWait(500);
+    QCOMPARE(globe->framesRendered(), frames);
   }
 };
 

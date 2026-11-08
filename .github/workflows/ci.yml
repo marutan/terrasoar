@@ -115,7 +115,16 @@ jobs:
           TS_EXPECT_SOFTWARE_GL: "1"
           LIBGL_ALWAYS_SOFTWARE: "1"
           QT_QPA_PLATFORM: xcb
+          TS_GOLDEN_OUTPUT: ${{ github.workspace }}/golden-output
         run: xvfb-run -a -s "-screen 0 1280x1024x24" make -C build-ci check
+
+      # Rendered and difference images of golden-image tests that failed.
+      - name: Upload golden-image differences
+        if: failure() && hashFiles('golden-output/*.png') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-output-linux-${{ matrix.compiler }}-qt${{ matrix.qt }}
+          path: golden-output
 
   windows:
     name: Windows MSVC / Qt ${{ matrix.qt }}
@@ -217,6 +226,7 @@ jobs:
           TS_EXPECT_SOFTWARE_GL: "1"
           QT_OPENGL: software
           GALLIUM_DRIVER: llvmpipe
+          TS_GOLDEN_OUTPUT: ${{ github.workspace }}\golden-output
           # Qt Test's console output doesn't reach the log on Windows, so
           # each test also writes its results to a file (printed below).
           TESTARGS: "-o -,txt -o testresults.txt,txt"
@@ -235,6 +245,13 @@ jobs:
               "===== $($_.Directory.Name)"
               Get-Content $_.FullName
             }
+
+      - name: Upload golden-image differences
+        if: failure() && hashFiles('golden-output/*.png') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-output-windows-qt${{ matrix.qt }}
+          path: golden-output
 
   tsan:
     name: ThreadSanitizer (Linux Clang / Qt 6)
@@ -298,12 +315,17 @@ jobs:
         run: make -C build-asan -j"$(nproc)"
 
       - name: Test
-        # Offscreen, as in the TSan job: Mesa's llvmpipe isn't instrumented.
+        # Under Xvfb with llvmpipe, so the renderer and globe view run
+        # instrumented too. Mesa itself isn't instrumented, which ASan and
+        # UBSan don't need (TSan does, so that job stays offscreen).
         env:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-          QT_QPA_PLATFORM: offscreen
-        run: make -C build-asan check
+          TS_REQUIRE_GL: "1"
+          TS_EXPECT_SOFTWARE_GL: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          QT_QPA_PLATFORM: xcb
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" make -C build-asan check
 
   analysis:
     name: Static analysis (Linux Clang / Qt 6)
