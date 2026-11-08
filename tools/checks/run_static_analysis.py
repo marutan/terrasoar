@@ -170,17 +170,30 @@ def compile_database(build_dir):
     """Merges the -MJ fragments into compile_commands.json; returns entries
     for our own sources."""
     entries = {}
-    for fragment in glob.glob(os.path.join(build_dir, "**", "*.o.json"), recursive=True):
+    fragments = glob.glob(os.path.join(build_dir, "**", "*.o.json"), recursive=True)
+    for fragment in fragments:
         with open(fragment, encoding="utf-8") as handle:
             text = handle.read().strip().rstrip(",")
         if not text:
             continue
         entry = json.loads(text)
+        # With the build inside the source tree, qmake passes sources
+        # relative to the build directory ("../../core/src/x.cpp"). Make them
+        # absolute, in the arguments too, so the entry stands on its own.
+        source = entry["file"]
+        if not os.path.isabs(source):
+            absolute = os.path.normpath(os.path.join(entry["directory"], source))
+            entry["arguments"] = [absolute if argument == source else argument
+                                  for argument in entry["arguments"]]
+            entry["file"] = absolute
         if is_ours(entry["file"], build_dir):
             entries[os.path.realpath(entry["file"])] = entry
-    if not entries:
+    if not fragments:
         sys.exit(f"No compile-database fragments in {build_dir}; "
                  "was it built with CONFIG+=compiledb?")
+    if not entries:
+        sys.exit(f"{len(fragments)} compile-database fragment(s) in {build_dir}, "
+                 "but none for our own sources.")
     ordered = [entries[key] for key in sorted(entries)]
     with open(os.path.join(build_dir, "compile_commands.json"), "w",
               encoding="utf-8") as handle:
