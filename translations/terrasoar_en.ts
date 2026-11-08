@@ -63,6 +63,17 @@
         </message>
     </context>
     <context>
+        <name>ts::BuiltinLayers</name>
+        <message>
+            <source>Checkerboard</source>
+            <translation>Checkerboard</translation>
+        </message>
+        <message>
+            <source>White, 50 %</source>
+            <translation>White, 50 %</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::GeoFormat</name>
         <message>
             <source>%1° S</source>
@@ -169,6 +180,91 @@
         </message>
     </context>
     <context>
+        <name>ts::LayerDefinition</name>
+        <message>
+            <source>A layer definition has no id.</source>
+            <translation>A layer definition has no id.</translation>
+        </message>
+        <message>
+            <source>Layer definition %1 has an unknown type "%2".</source>
+            <translation>Layer definition %1 has an unknown type "%2".</translation>
+        </message>
+        <message>
+            <source>Layer definition %1 has an unknown origin "%2".</source>
+            <translation>Layer definition %1 has an unknown origin "%2".</translation>
+        </message>
+        <message>
+            <source>Layer definition %1 has no source kind.</source>
+            <translation>Layer definition %1 has no source kind.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::LayerTreeDock</name>
+        <message>
+            <source>Layers</source>
+            <translation>Layers</translation>
+        </message>
+        <message>
+            <source>Add &amp;Layer</source>
+            <translation>Add &amp;Layer</translation>
+        </message>
+        <message>
+            <source>Add Layer</source>
+            <translation>Add Layer</translation>
+        </message>
+        <message>
+            <source>Add &amp;Collection</source>
+            <translation>Add &amp;Collection</translation>
+        </message>
+        <message>
+            <source>&amp;Remove</source>
+            <translation>&amp;Remove</translation>
+        </message>
+        <message>
+            <source>&amp;Opacity:</source>
+            <translation>&amp;Opacity:</translation>
+        </message>
+        <message>
+            <source>Composite as &amp;group</source>
+            <translation>Composite as &amp;group</translation>
+        </message>
+        <message>
+            <source>Draw the collection's layers together and fade them as one image. Costs an extra full-screen pass.</source>
+            <translation>Draw the collection's layers together and fade them as one image. Costs an extra full-screen pass.</translation>
+        </message>
+        <message>
+            <source>Not available with software rendering: the collection's opacity multiplies into its layers instead.</source>
+            <translation>Not available with software rendering: the collection's opacity multiplies into its layers instead.</translation>
+        </message>
+        <message>
+            <source>Solid Colour…</source>
+            <translation>Solid Colour…</translation>
+        </message>
+        <message>
+            <source>%1 %</source>
+            <translation>%1 %</translation>
+        </message>
+        <message>
+            <source>Layer Colour</source>
+            <translation>Layer Colour</translation>
+        </message>
+        <message>
+            <source>Colour %1</source>
+            <translation>Colour %1</translation>
+        </message>
+        <message>
+            <source>New Collection</source>
+            <translation>New Collection</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::LayerTreeModel</name>
+        <message>
+            <source>Unknown layer tree entry "%1".</source>
+            <translation>Unknown layer tree entry "%1".</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::MainWindow</name>
         <message>
             <source>&amp;File</source>
@@ -251,24 +347,78 @@
             <translation>Eye height %1</translation>
         </message>
         <message>
-            <source>&amp;Imagery</source>
-            <translation>&amp;Imagery</translation>
+            <source>&amp;Open Project…</source>
+            <translation>&amp;Open Project…</translation>
         </message>
         <message>
-            <source>&amp;None</source>
-            <translation>&amp;None</translation>
+            <source>Replace the layers and view with a saved project</source>
+            <translation>Replace the layers and view with a saved project</translation>
         </message>
         <message>
-            <source>Show the plain globe</source>
-            <translation>Show the plain globe</translation>
+            <source>&amp;Save Project</source>
+            <translation>&amp;Save Project</translation>
         </message>
         <message>
-            <source>&amp;Checkerboard</source>
-            <translation>&amp;Checkerboard</translation>
+            <source>Save the layers and view</source>
+            <translation>Save the layers and view</translation>
         </message>
         <message>
-            <source>Show a test pattern that labels every tile</source>
-            <translation>Show a test pattern that labels every tile</translation>
+            <source>Save Project &amp;As…</source>
+            <translation>Save Project &amp;As…</translation>
+        </message>
+        <message>
+            <source>Save the layers and view to a new file</source>
+            <translation>Save the layers and view to a new file</translation>
+        </message>
+        <message>
+            <source>Open Project</source>
+            <translation>Open Project</translation>
+        </message>
+        <message>
+            <source>Terra Soar projects (*.terrasoar);;All files (*)</source>
+            <translation>Terra Soar projects (*.terrasoar);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Save Project</source>
+            <translation>Save Project</translation>
+        </message>
+        <message>
+            <source>Terra Soar projects (*.terrasoar)</source>
+            <translation>Terra Soar projects (*.terrasoar)</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ProjectFile</name>
+        <message>
+            <source>The file is not valid JSON: %1</source>
+            <translation>The file is not valid JSON: %1</translation>
+        </message>
+        <message>
+            <source>The file is not a project.</source>
+            <translation>The file is not a project.</translation>
+        </message>
+        <message>
+            <source>The project has no version.</source>
+            <translation>The project has no version.</translation>
+        </message>
+        <message>
+            <source>The project was saved by a newer version of the program (format %1; this one reads up to %2).</source>
+            <translation>The project was saved by a newer version of the program (format %1; this one reads up to %2).</translation>
+        </message>
+        <message>
+            <source>Could not write %1: %2</source>
+            <translation>Could not write %1: %2</translation>
+        </message>
+        <message>
+            <source>Could not read %1: %2</source>
+            <translation>Could not read %1: %2</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ProviderRegistry</name>
+        <message>
+            <source>Unknown or invalid imagery source: %1</source>
+            <translation>Unknown or invalid imagery source: %1</translation>
         </message>
     </context>
     <context>

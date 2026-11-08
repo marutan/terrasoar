@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <QAction>
 #include <QApplication>
+#include <QFile>
 #include <QFontMetrics>
+#include <QJsonArray>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
 #include <QPointer>
+#include <QPushButton>
+#include <QSlider>
+#include <QTemporaryDir>
+#include <QTreeView>
 #include <QWheelEvent>
 #include <QtTest>
 
 #include "globeview.h"
 #include "mainwindow.h"
 #include "ts/i18n/pseudotranslator.h"
+#include "ts/layers/layertreemodel.h"
 
 namespace
 {
@@ -206,7 +213,11 @@ private slots:
       if (!label->isVisible() || label->wordWrap()) {
         continue;
       }
-      const int needed = label->fontMetrics().horizontalAdvance(label->text());
+      // With a buddy, '&' marks a shortcut and isn't shown.
+      const QString shown = label->buddy() != nullptr
+                                ? withoutMnemonic(label->text())
+                                : label->text();
+      const int needed = label->fontMetrics().horizontalAdvance(shown);
       QVERIFY2(label->contentsRect().width() >= needed,
                qPrintable(QStringLiteral("%1 is %2 px wide, needs %3")
                               .arg(label->objectName())
@@ -361,31 +372,92 @@ private slots:
     QCOMPARE(pose.rangeM, home.rangeM);
   }
 
-  void imageryMenu()
+  void layerDock()
   {
     ts::MainWindow window;
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::LayerTreeModel* model = window.layerModel();
+    QTreeView* view =
+        window.findChild<QTreeView*>(QStringLiteral("layerTreeView"));
+    QSlider* slider =
+        window.findChild<QSlider*>(QStringLiteral("opacitySlider"));
+    QPushButton* addCollection =
+        window.findChild<QPushButton*>(QStringLiteral("addCollectionButton"));
+    QPushButton* remove =
+        window.findChild<QPushButton*>(QStringLiteral("removeLayerButton"));
+    if (view == nullptr || slider == nullptr || addCollection == nullptr ||
+        remove == nullptr) {
+      QFAIL("layer dock widgets missing");
+    }
+    // A new project shows the checkerboard.
+    QCOMPARE(model->rowCount(), 1);
     ts::GlobeView* globe = globeOf(window);
-    if (globe == nullptr) {
-      QSKIP("No OpenGL view on this platform.");
+    if (globe != nullptr) {
+      QCOMPARE(globe->imageryLayerCount(), 1);
     }
-    QAction* none =
-        window.findChild<QAction*>(QStringLiteral("noImageryAction"));
-    QAction* checkerboard =
-        window.findChild<QAction*>(QStringLiteral("checkerboardAction"));
-    if (none == nullptr || checkerboard == nullptr) {
-      QFAIL("imagery actions missing");
+    // Hiding it takes it off the globe at once (the next frame).
+    const QModelIndex layer = model->index(0, 0);
+    model->setData(layer, Qt::Unchecked, Qt::CheckStateRole);
+    if (globe != nullptr) {
+      QCOMPARE(globe->imageryLayerCount(), 0);
     }
-    // The checkerboard is shown from the start.
-    QVERIFY(checkerboard->isChecked());
-    QVERIFY(globe->imageryProvider() != nullptr);
-    none->trigger();
-    QVERIFY(globe->imageryProvider() == nullptr);
-    QVERIFY(!checkerboard->isChecked());
-    checkerboard->trigger();
-    QVERIFY(globe->imageryProvider() != nullptr);
-    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    model->setData(layer, Qt::Checked, Qt::CheckStateRole);
+    // The slider sets the selected entry's opacity.
+    view->setCurrentIndex(layer);
+    slider->setValue(40);
+    QCOMPARE(model->data(layer, ts::LayerTreeModel::OpacityRole).toDouble(),
+             0.4);
+    // A collection goes above the selected layer; remove takes it away.
+    addCollection->click();
+    QCOMPARE(model->rowCount(), 2);
+    QVERIFY(
+        model->data(model->index(0, 0), ts::LayerTreeModel::IsCollectionRole)
+            .toBool());
+    view->setCurrentIndex(model->index(0, 0));
+    remove->click();
+    QCOMPARE(model->rowCount(), 1);
+  }
+
+  void projectSaveAndOpen()
+  {
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("test.terrasoar"));
+    QJsonArray saved;
+    {
+      ts::MainWindow window;
+      ts::LayerTreeModel* model = window.layerModel();
+      const QModelIndex collection =
+          model->addCollection(QStringLiteral("Overlays"));
+      model->setData(collection, 0.5, ts::LayerTreeModel::OpacityRole);
+      ts::GlobeView* globe = globeOf(window);
+      if (globe != nullptr) {
+        globe->setPose(ts::CameraPose{51.5, -0.1, 2.0e5, 30.0, 40.0});
+      }
+      QString error;
+      QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+      QCOMPARE(window.projectPath(), path);
+      saved = model->toJson();
+    }
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openProject(path, &error), qPrintable(error));
+    QCOMPARE(window.layerModel()->toJson(), saved);
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      const ts::CameraPose& pose = globe->controller().camera().pose();
+      QCOMPARE(pose.targetLatDeg, 51.5);
+      QCOMPARE(pose.rangeM, 2.0e5);
+    }
+    // A damaged file leaves the project as it was.
+    QFile broken(directory.filePath(QStringLiteral("broken.terrasoar")));
+    QVERIFY(broken.open(QIODevice::WriteOnly));
+    broken.write("{ not json");
+    broken.close();
+    QVERIFY(!window.openProject(broken.fileName(), &error));
+    QVERIFY(!error.isEmpty());
+    QCOMPARE(window.layerModel()->toJson(), saved);
   }
 
   void idleViewStopsDrawing()

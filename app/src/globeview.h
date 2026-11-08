@@ -15,6 +15,7 @@
 #include <QTimer>
 
 #include "ts/camera/cameracontroller.h"
+#include "ts/globe/layerstackdraws.h"
 #include "ts/perf/frametimestats.h"
 #include "ts/render/framepacer.h"
 #include "ts/render/renderdevice.h"
@@ -28,7 +29,6 @@ namespace ts
 
 class GlRenderDevice;
 class GlobeRenderer;
-class ImageryProvider;
 
 /**
  * Shows the globe and turns mouse and keyboard input into camera motion.
@@ -79,14 +79,26 @@ public:
   /** Returns true if the debug overlay is shown. */
   bool isDebugOverlayVisible() const { return m_overlayVisible; }
 
-  /** Sets the imagery drawn on the globe, or null for the plain globe. */
-  void setImageryProvider(std::shared_ptr<ImageryProvider> provider);
+  /**
+   * Sets the imagery layers drawn on the globe (from the layer tree, see
+   * imageryDrawsForStack()). Shown in the next frame.
+   */
+  void setImageryDraws(const ImageryDraws& draws);
 
-  /** Returns the imagery drawn on the globe. */
-  const std::shared_ptr<ImageryProvider>& imageryProvider() const
+  /** Returns the number of imagery layers drawn. */
+  int imageryLayerCount() const
   {
-    return m_imagery;
+    return static_cast<int>(m_draws.layers.size());
   }
+
+  /**
+   * Returns false where composite groups fall back to multiplied opacity
+   * (software rendering), true otherwise.
+   */
+  bool isGroupCompositingAvailable() const;
+
+  /** Moves the camera to @p pose at once, stopping any motion. */
+  void setPose(const CameraPose& pose);
 
   /**
    * Returns true while tiles are loading or waiting for upload (frames
@@ -162,7 +174,7 @@ private:
   QMetaObject::Connection m_contextConnection;
   std::unique_ptr<GlRenderDevice> m_device;
   std::unique_ptr<GlobeRenderer> m_globe;
-  std::shared_ptr<ImageryProvider> m_imagery;
+  ImageryDraws m_draws;
   RenderDeviceInfo m_deviceInfo;
   QString m_error;
 

@@ -4,9 +4,9 @@
 #include <memory>
 
 #include <QAction>
-#include <QActionGroup>
 #include <QApplication>
 #include <QEvent>
+#include <QFileDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLocale>
@@ -17,16 +17,22 @@
 #include <QWidget>
 
 #include "globeview.h"
+#include "layertreedock.h"
 #include "ts/base/buildinfo.h"
 #include "ts/geo/geoformat.h"
-#include "ts/providers/testproviders.h"
+#include "ts/globe/layerstackdraws.h"
+#include "ts/layers/layertreemodel.h"
+#include "ts/layers/projectfile.h"
+#include "ts/providers/providerregistry.h"
 
 namespace ts
 {
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), m_statusLabel(new QLabel(this)),
-      m_pointerLabel(new QLabel(this)), m_eyeLabel(new QLabel(this))
+      m_pointerLabel(new QLabel(this)), m_eyeLabel(new QLabel(this)),
+      m_layers(new LayerTreeModel(this)),
+      m_registry(std::make_unique<ProviderRegistry>())
 {
   setObjectName(QStringLiteral("mainWindow"));
   if (GlobeView::isOpenGlAvailable()) {
@@ -47,6 +53,23 @@ MainWindow::MainWindow(QWidget* parent)
     setCentralWidget(m_noGlobeLabel);
     m_eyeHeightM = GlobeView::homePose().rangeM;
   }
+
+  // A new project starts with the test imagery; real sources come with
+  // the base pack (Phase 3).
+  for (const LayerDefinition& definition : builtinLayerDefinitions()) {
+    if (definition.id == QLatin1String("builtin:checkerboard")) {
+      m_layers->addLayer(definition);
+    }
+  }
+  m_layerDock = new LayerTreeDock(m_layers, this);
+  addDockWidget(Qt::LeftDockWidgetArea, m_layerDock);
+  connect(m_layers, &LayerTreeModel::layerStackChanged, this,
+          &MainWindow::refreshLayers);
+  if (m_globeView) {
+    m_layerDock->setGroupCompositingAvailable(
+        m_globeView->isGroupCompositingAvailable());
+  }
+  refreshLayers();
 
   m_statusLabel->setObjectName(QStringLiteral("statusLabel"));
   statusBar()->addWidget(m_statusLabel, 1);
@@ -93,22 +116,21 @@ void MainWindow::createActions()
     m_resetViewAction->setEnabled(false);
   }
 
-  // Test imagery until the layer tree (Phase 2b) manages sources.
-  QActionGroup* imagery = new QActionGroup(this);
-  m_noImageryAction = new QAction(imagery);
-  m_noImageryAction->setObjectName(QStringLiteral("noImageryAction"));
-  m_noImageryAction->setCheckable(true);
-  m_checkerboardAction = new QAction(imagery);
-  m_checkerboardAction->setObjectName(QStringLiteral("checkerboardAction"));
-  m_checkerboardAction->setCheckable(true);
-  m_checkerboardAction->setChecked(true);
-  if (m_globeView) {
-    connect(imagery, &QActionGroup::triggered, this,
-            &MainWindow::selectImagery);
-    selectImagery(m_checkerboardAction);
-  } else {
-    imagery->setEnabled(false);
-  }
+  m_openAction = new QAction(this);
+  m_openAction->setObjectName(QStringLiteral("openProjectAction"));
+  m_openAction->setShortcut(QKeySequence::Open);
+  connect(m_openAction, &QAction::triggered, this,
+          &MainWindow::openProjectDialog);
+  m_saveAction = new QAction(this);
+  m_saveAction->setObjectName(QStringLiteral("saveProjectAction"));
+  m_saveAction->setShortcut(QKeySequence::Save);
+  connect(m_saveAction, &QAction::triggered, this,
+          [this]() { saveProjectDialog(false); });
+  m_saveAsAction = new QAction(this);
+  m_saveAsAction->setObjectName(QStringLiteral("saveProjectAsAction"));
+  m_saveAsAction->setShortcut(QKeySequence::SaveAs);
+  connect(m_saveAsAction, &QAction::triggered, this,
+          [this]() { saveProjectDialog(true); });
 
   m_aboutAction = new QAction(this);
   m_aboutAction->setObjectName(QStringLiteral("aboutAction"));
@@ -125,15 +147,18 @@ void MainWindow::createMenus()
 {
   m_fileMenu = menuBar()->addMenu(QString());
   m_fileMenu->setObjectName(QStringLiteral("fileMenu"));
+  m_fileMenu->addAction(m_openAction);
+  m_fileMenu->addAction(m_saveAction);
+  m_fileMenu->addAction(m_saveAsAction);
+  m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_quitAction);
 
   m_viewMenu = menuBar()->addMenu(QString());
   m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
   m_viewMenu->addAction(m_resetViewAction);
-  m_imageryMenu = m_viewMenu->addMenu(QString());
-  m_imageryMenu->setObjectName(QStringLiteral("imageryMenu"));
-  m_imageryMenu->addAction(m_noImageryAction);
-  m_imageryMenu->addAction(m_checkerboardAction);
+  QAction* layers = m_layerDock->toggleViewAction();
+  layers->setObjectName(QStringLiteral("layersDockAction"));
+  m_viewMenu->addAction(layers);
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_debugOverlayAction);
 
@@ -153,12 +178,13 @@ void MainWindow::retranslateUi()
   m_quitAction->setStatusTip(tr("Close the program"));
   m_resetViewAction->setText(tr("&Reset View"));
   m_resetViewAction->setStatusTip(tr("Fly back to the start view"));
-  m_imageryMenu->setTitle(tr("&Imagery"));
-  m_noImageryAction->setText(tr("&None"));
-  m_noImageryAction->setStatusTip(tr("Show the plain globe"));
-  m_checkerboardAction->setText(tr("&Checkerboard"));
-  m_checkerboardAction->setStatusTip(
-      tr("Show a test pattern that labels every tile"));
+  m_openAction->setText(tr("&Open Project…"));
+  m_openAction->setStatusTip(
+      tr("Replace the layers and view with a saved project"));
+  m_saveAction->setText(tr("&Save Project"));
+  m_saveAction->setStatusTip(tr("Save the layers and view"));
+  m_saveAsAction->setText(tr("Save Project &As…"));
+  m_saveAsAction->setStatusTip(tr("Save the layers and view to a new file"));
   m_debugOverlayAction->setText(tr("&Debug Overlay"));
   m_debugOverlayAction->setStatusTip(
       tr("Show frame times and the camera position over the globe"));
@@ -189,13 +215,76 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
               : tr("Pointer not on the globe"));
 }
 
-void MainWindow::selectImagery(QAction* action)
+void MainWindow::refreshLayers()
 {
-  if (action == m_checkerboardAction) {
-    m_globeView->setImageryProvider(
-        std::make_shared<CheckerboardImageryProvider>());
-  } else {
-    m_globeView->setImageryProvider(nullptr);
+  if (!m_globeView) {
+    return;
+  }
+  QStringList errors;
+  m_globeView->setImageryDraws(
+      imageryDrawsForStack(m_layers->layerStack(), *m_registry, &errors));
+  if (!errors.isEmpty()) {
+    statusBar()->showMessage(errors.join(QLatin1Char(' ')), 10000);
+  }
+}
+
+bool MainWindow::openProject(const QString& path, QString* errorString)
+{
+  const std::optional<Project> project = loadProject(path, errorString);
+  if (!project || !m_layers->fromJson(project->layers, errorString)) {
+    return false;
+  }
+  if (m_globeView) {
+    m_globeView->setPose(project->camera);
+  }
+  m_projectPath = path;
+  return true;
+}
+
+bool MainWindow::saveProject(const QString& path, QString* errorString)
+{
+  Project project;
+  project.camera = m_globeView ? m_globeView->controller().camera().pose()
+                               : GlobeView::homePose();
+  project.layers = m_layers->toJson();
+  if (!ts::saveProject(path, project, errorString)) {
+    return false;
+  }
+  m_projectPath = path;
+  return true;
+}
+
+void MainWindow::openProjectDialog()
+{
+  const QString path = QFileDialog::getOpenFileName(
+      this, tr("Open Project"), m_projectPath,
+      tr("Terra Soar projects (*.terrasoar);;All files (*)"));
+  if (path.isEmpty()) {
+    return;
+  }
+  QString error;
+  if (!openProject(path, &error)) {
+    QMessageBox::warning(this, tr("Open Project"), error);
+  }
+}
+
+void MainWindow::saveProjectDialog(bool askForPath)
+{
+  QString path = m_projectPath;
+  if (askForPath || path.isEmpty()) {
+    path =
+        QFileDialog::getSaveFileName(this, tr("Save Project"), m_projectPath,
+                                     tr("Terra Soar projects (*.terrasoar)"));
+    if (path.isEmpty()) {
+      return;
+    }
+    if (!path.endsWith(QLatin1String(".terrasoar"))) {
+      path += QStringLiteral(".terrasoar");
+    }
+  }
+  QString error;
+  if (!saveProject(path, &error)) {
+    QMessageBox::warning(this, tr("Save Project"), error);
   }
 }
 

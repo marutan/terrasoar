@@ -48,6 +48,8 @@ struct TileLoaderSettings {
   std::size_t cacheBytes = std::size_t{48} * 1024 * 1024;
   /** Grid segments of the tile meshes. */
   int meshSegments = TileMesh::defaultSegments;
+  /** False to load images only (the renderer builds meshes itself). */
+  bool buildMeshes = true;
 };
 
 /**

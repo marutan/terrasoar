@@ -269,9 +269,17 @@ public:
   GlRenderTarget(GlFunctions& gl, int width, int height)
       : RenderTarget(QSize(width, height)), m_gl(gl)
   {
-    m_gl.glGenRenderbuffers(1, &m_color);
-    m_gl.glBindRenderbuffer(GL_RENDERBUFFER, m_color);
-    m_gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+    // Colour in a texture, so it can be drawn from (layer groups).
+    m_gl.glGenTextures(1, &m_color);
+    m_gl.glBindTexture(GL_TEXTURE_2D, m_color);
+    m_gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
+                      GL_UNSIGNED_BYTE, nullptr);
+    m_gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    m_gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    m_gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    m_gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    m_gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    m_gl.glBindTexture(GL_TEXTURE_2D, 0);
     m_gl.glGenRenderbuffers(1, &m_depth);
     m_gl.glBindRenderbuffer(GL_RENDERBUFFER, m_depth);
     m_gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width,
@@ -282,8 +290,8 @@ public:
     m_gl.glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previous);
     m_gl.glGenFramebuffers(1, &m_framebuffer);
     m_gl.glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
-    m_gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                   GL_RENDERBUFFER, m_color);
+    m_gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                GL_TEXTURE_2D, m_color, 0);
     m_gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
                                    GL_RENDERBUFFER, m_depth);
     // Known only once the attachments exist:
@@ -297,7 +305,7 @@ public:
   {
     m_gl.glDeleteFramebuffers(1, &m_framebuffer);
     m_gl.glDeleteRenderbuffers(1, &m_depth);
-    m_gl.glDeleteRenderbuffers(1, &m_color);
+    m_gl.glDeleteTextures(1, &m_color);
   }
 
   GlRenderTarget(const GlRenderTarget&) = delete;
@@ -306,6 +314,7 @@ public:
   GlRenderTarget& operator=(GlRenderTarget&&) = delete;
 
   bool isComplete() const { return m_complete; }
+  GLuint colorTexture() const { return m_color; }
   GLuint framebuffer() const { return m_framebuffer; }
 
 private:
@@ -687,6 +696,18 @@ void GlRenderDevice::setTexture(int unit, const GpuTexture& texture)
   }
   m_gl->glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(unit));
   m_gl->glBindTexture(GL_TEXTURE_2D, gl->id());
+  m_gl->glActiveTexture(GL_TEXTURE0);
+}
+
+void GlRenderDevice::setRenderTargetTexture(int unit,
+                                            const RenderTarget& target)
+{
+  const GlRenderTarget* gl = dynamic_cast<const GlRenderTarget*>(&target);
+  if (!gl || unit < 0) {
+    return;
+  }
+  m_gl->glActiveTexture(GL_TEXTURE0 + static_cast<GLenum>(unit));
+  m_gl->glBindTexture(GL_TEXTURE_2D, gl->colorTexture());
   m_gl->glActiveTexture(GL_TEXTURE0);
 }
 
