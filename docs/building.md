@@ -16,6 +16,7 @@ passing tests.
 | SQLite | ≥ 3.31 | |
 | Python | ≥ 3.8 | Style checks, translation and performance scripts |
 | clang-format | 18 | Only for the style checks; CI pins this version |
+| clang-tidy, clazy, cppcheck | 18, 1.11, 2.13 | Only for the static analysis (Linux); the Ubuntu 24.04 versions, which CI uses |
 | Doxygen + Graphviz | ≥ 1.9 | Only for the API docs |
 
 CI uses Qt 5.15.2 and Qt 6.8.3 (see `.github/workflows/ci.yml`).
@@ -34,6 +35,9 @@ sudo apt install build-essential python3 \
 sudo apt install qt6-base-dev libqt6opengl6-dev qt6-l10n-tools
 # … or Qt 5
 sudo apt install qtbase5-dev qttools5-dev-tools
+
+# Static analysis (optional; needs Qt 6 and Clang)
+sudo apt install clang clang-tidy-18 clazy cppcheck
 ```
 
 `qt6-l10n-tools` / `qttools5-dev-tools` provide `lupdate` and `lrelease`.
@@ -109,7 +113,9 @@ Pass these to qmake as `CONFIG+=<option>`:
 | `werror` | Warnings are errors (CI uses this) |
 | `debug` / `release` | Build type |
 | `tsan` | ThreadSanitizer build (Linux, GCC or Clang); leaves out the smoke tests, see [testing.md](testing.md) |
-| `asan` | AddressSanitizer + UBSan build |
+| `asan` | AddressSanitizer + UBSan build; undefined behaviour stops the program |
+| `compiledb` | Clang only: each object also writes a compile-database fragment (`-MJ`), for the static analysis |
+| `msvc_analyze` | MSVC only: code analysis (`/analyze`) of our own code; with `werror` its warnings are errors |
 | `coverage` | gcov / llvm-cov instrumentation |
 
 Use `-spec linux-clang` to build with Clang on Linux.
@@ -124,6 +130,7 @@ Run from the build directory:
 | `make check` | Runs every test (see [testing.md](testing.md)) |
 | `make lupdate` | Refreshes `translations/terrasoar_en.ts` from the sources |
 | `make docs` | Builds the API docs into `build/docs/api` |
+| `make analyze` | Static analysis: clang-tidy, clazy and cppcheck (Linux), see below |
 
 The style checks run from the repository root:
 
@@ -133,6 +140,32 @@ python3 tools/checks/run_all.py
 
 Set `CLANG_FORMAT`, `LUPDATE`, `QMAKE` or `DOXYGEN` to choose a particular
 binary, e.g. `CLANG_FORMAT=clang-format-18`.
+
+## Static analysis
+
+`make analyze` (from any build directory) or the script itself runs the
+same static analysis as CI:
+
+```sh
+python3 tools/checks/run_static_analysis.py              # whole tree
+python3 tools/checks/run_static_analysis.py --changed    # only what differs from origin/main
+python3 tools/checks/run_static_analysis.py --self-test  # do the tools still work?
+python3 tools/checks/run_static_analysis.py --tools clang-tidy
+```
+
+It builds the project with Qt 6 and Clang (`CONFIG+=compiledb`) in its own
+directory (`build-analyze/`, or `analyze/` under the build directory for
+`make analyze`), then runs each tool on our sources. It needs Qt 6, Clang
+and the three tools; set `QMAKE`, `CLANG_TIDY`, `CLAZY` or `CPPCHECK` to
+pick particular binaries. Any finding fails it. To fix or suppress one, see
+[coding-standards.md](coding-standards.md#warnings-and-static-analysis).
+
+clazy is built against its own LLVM version. If it reports missing built-in
+headers such as `stddef.h`, point it at that LLVM's resource directory:
+
+```sh
+export CLAZY_RESOURCE_DIR="$(clang-15 -print-resource-dir)"
+```
 
 ## Running without a display or GPU
 

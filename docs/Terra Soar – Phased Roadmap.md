@@ -151,12 +151,12 @@ Goal: every build, local and CI, compiles with a full warning set, and static an
 - Further warnings once the code base is clean with them: `-Wconversion`, `-Wsign-conversion`, `-Wold-style-cast`, `-Woverloaded-virtual`, `-Wnull-dereference`, `-Wdouble-promotion`, `-Wformat=2`, `-Wimplicit-fallthrough`
 - Qt and third-party headers (GDAL, PROJ, GEOS, SQLite) passed as system includes (`-isystem`, MSVC `/external:I` with `/external:W0`), so warnings and analysis cover only our own code
 - `CONFIG+=werror` stays on in CI; local builds show the same warnings but don't fail on them
-- Static analysis tools, each with its config checked in at the repo root and pinned to one version in CI:
+- Static analysis tools, each with its config checked in (`.clang-tidy` at the repo root; clazy and cppcheck settings in `tools/checks/run_static_analysis.py`) and pinned to one version in CI:
   - **clang-tidy** (`.clang-tidy`): `bugprone-*`, `concurrency-*`, `cert-*`, `performance-*`, `portability-*`, and selected `cppcoreguidelines-*`, `modernize-*` and `readability-*` checks; `WarningsAsErrors: '*'`
   - **clazy** for Qt-specific problems (detached containers, connect mistakes, `QString` misuse, non-pod globals), at level 1 plus chosen level 2 checks
   - **cppcheck** with `--enable=warning,performance,portability --inline-suppr --error-exitcode=1`
   - **MSVC `/analyze`** in one Windows build
-- `compile_commands.json` produced for the analysis builds (`bear -- make` on Linux; Qt 6 qmake's own output where available)
+- `compile_commands.json` produced for the analysis builds (Clang's `-MJ` through `CONFIG+=compiledb`, so no extra tool is needed)
 - `tools/checks/run_static_analysis.py`: runs clang-tidy, clazy and cppcheck on the whole tree, or only on changed files (`--changed`); used both locally and in CI
 - `make analyze` target, so a developer runs the same checks as CI with one command
 - Suppression rule: only inline (`// NOLINT(check-name): reason`, `// cppcheck-suppress id`), always with a reason; no global disables without a note in `docs/coding-standards.md`
