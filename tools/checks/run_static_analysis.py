@@ -58,8 +58,9 @@ CLAZY_CHECKS = "level0,level1,level2,no-qstring-ref"
 CLAZY_TEST_CHECKS = ",no-ctor-missing-parent-argument"
 
 # cppcheck settings (from the Phase 0.5 plan). cppcheck gets our own include
-# directories only: it knows Qt through --library=qt, and parsing Qt's real
-# headers fails (they #error without the compiler's predefined macros).
+# directories only, not Qt's or the build tree's: it knows Qt through
+# --library=qt, and Qt's real headers and moc's generated files #error
+# without the compiler's predefined macros and Qt's internals.
 # Suppressions in our code are inline only (--inline-suppr).
 CPPCHECK_ARGS = [
     "--enable=warning,performance,portability",
@@ -304,38 +305,25 @@ def run_cppcheck(build_dir, files, jobs):
         json.dump(entries, handle, indent=1)
     command = [cppcheck, f"--project={database}",
                f"--cppcheck-build-dir={cache}", f"-j{jobs}", *CPPCHECK_ARGS]
-    revision = moc_revision(build_dir)
-    if revision:
-        # Test files include their generated .moc, which #errors unless Qt's
-        # headers defined this; cppcheck doesn't read Qt's headers.
-        command.append(f"-DQ_MOC_OUTPUT_REVISION={revision}")
     command += [f"--file-filter={path}" for path in files]
     result = run(command, cwd=ROOT)
     return [result.stdout + result.stderr], cppcheck
 
 
-def moc_revision(build_dir):
-    """The Q_MOC_OUTPUT_REVISION moc wrote into the build tree, or None."""
-    pattern = re.compile(r"Q_MOC_OUTPUT_REVISION != (\d+)")
-    for name in (glob.glob(os.path.join(build_dir, "**", "*.moc"), recursive=True) +
-                 glob.glob(os.path.join(build_dir, "**", "moc_*.cpp"), recursive=True)):
-        with open(name, encoding="utf-8", errors="replace") as handle:
-            match = pattern.search(handle.read())
-        if match:
-            return match.group(1)
-    return None
-
-
 def own_includes_only(arguments, directory, build_dir):
-    """Keeps only our own include directories (in the repo or the build tree)
-    in a compile command, for cppcheck. Qt and the other libraries can be
-    anywhere (/usr, or Qt's own install directory in CI), so anything else
-    is dropped, including every -isystem."""
-    roots = (os.path.realpath(ROOT) + os.sep, os.path.realpath(build_dir) + os.sep)
+    """Keeps only our own include directories (in the repo, not the build
+    tree) in a compile command, for cppcheck. Qt and the other libraries can
+    be anywhere (/usr, or Qt's own install directory in CI), so anything
+    else is dropped, including every -isystem. The build tree is dropped
+    too: moc's generated files there need Qt's own headers (Qt 6.8's #error
+    without qtmochelpers.h), so their #include is left unresolved, which
+    cppcheck handles."""
+    root = os.path.realpath(ROOT) + os.sep
+    build = os.path.realpath(build_dir) + os.sep
 
     def own(path):
-        path = os.path.realpath(os.path.join(directory, path))
-        return (path + os.sep).startswith(roots)
+        path = os.path.realpath(os.path.join(directory, path)) + os.sep
+        return path.startswith(root) and not path.startswith(build)
 
     kept = []
     skip = False
