@@ -30,6 +30,7 @@ HEADERS += \
     include/ts/geo/wgs84.h \
     include/ts/gl/glprobe.h \
     include/ts/globe/globerenderer.h \
+    include/ts/globe/tilerenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
     include/ts/maths/angles.h \
@@ -49,7 +50,8 @@ HEADERS += \
     include/ts/tiling/tilekey.h \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
-    include/ts/tiling/tileselector.h
+    include/ts/tiling/tileselector.h \
+    src/globe/globeuniforms.h
 
 SOURCES += \
     src/base/buildinfo.cpp \
@@ -66,6 +68,7 @@ SOURCES += \
     src/geo/geoformat.cpp \
     src/gl/glprobe.cpp \
     src/globe/globerenderer.cpp \
+    src/globe/tilerenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
     src/maths/mat4.cpp \
