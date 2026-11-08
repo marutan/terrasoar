@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -99,7 +101,7 @@ private slots:
   {
     const ts::ProcessStats stats = ts::currentProcessStats();
     QVERIFY(stats.valid);
-    QVERIFY(stats.residentBytes > 1024U * 1024U);
+    QVERIFY(stats.residentBytes > std::uint64_t{1024} * 1024U);
     QVERIFY(stats.peakResidentBytes >= stats.residentBytes);
     QVERIFY(stats.cpuTimeS >= 0.0);
   }
@@ -107,7 +109,7 @@ private slots:
   void processStatsSeesAllocation()
   {
     const ts::ProcessStats before = ts::currentProcessStats();
-    const std::size_t size = 64U * 1024U * 1024U;
+    const std::size_t size = std::size_t{64} * 1024U * 1024U;
     std::vector<char> block(size);
     // Touch every page so it becomes resident.
     std::memset(block.data(), 1, block.size());

@@ -15,10 +15,10 @@ namespace ts
 {
 
 /** Base name of the translation files: terrasoar_<locale>.qm. */
-inline constexpr char translationBaseName[] = "terrasoar";
+inline constexpr const char* translationBaseName = "terrasoar";
 
 /** Resource directory the build embeds the .qm files in. */
-inline constexpr char translationResourceDir[] = ":/i18n";
+inline constexpr const char* translationResourceDir = ":/i18n";
 
 /**
  * Loads the translation for @p locale from @p directory into

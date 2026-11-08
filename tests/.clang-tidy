@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Test code uses the root .clang-tidy, with one change.
+---
+InheritParentConfig: true
+# Qt Test runs private slots of a QObject; they can't be static.
+Checks: >
+  -readability-convert-member-functions-to-static
+...

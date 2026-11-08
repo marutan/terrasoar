@@ -94,6 +94,15 @@ werror {
 
 # --- Optional instrumented builds ---------------------------------------------
 
+# CONFIG+=compiledb (Clang): every object also writes a compile-database
+# fragment, <object>.json, which tools/checks/run_static_analysis.py merges
+# into compile_commands.json for clang-tidy and clazy. `$@` is make's
+# target, so the fragment sits next to its object file.
+compiledb {
+    !clang: error("CONFIG+=compiledb needs Clang (qmake -spec linux-clang).")
+    QMAKE_CXXFLAGS += -MJ $@.json
+}
+
 # CONFIG+=tsan: ThreadSanitizer build (Linux, GCC or Clang).
 tsan {
     QMAKE_CXXFLAGS += -fsanitize=thread -fno-omit-frame-pointer -g -O1
