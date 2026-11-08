@@ -12,6 +12,8 @@
 #include "ts/geo/ellipsoid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/globe/globerenderer.h"
+#include "ts/globe/tilerenderer.h"
+#include "ts/providers/testproviders.h"
 
 namespace
 {
@@ -177,6 +179,56 @@ private slots:
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
+  void checkerboardGolden_data()
+  {
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<double>("tiltDeg");
+    QTest::newRow("checkerboard-globe") << 20.0 << 10.0 << 1.6e7 << 0.0;
+    QTest::newRow("checkerboard-tilted") << 48.0 << 10.0 << 2.0e6 << 50.0;
+    QTest::newRow("checkerboard-pole") << 89.0 << 0.0 << 6.0e6 << 20.0;
+  }
+
+  void checkerboardGolden()
+  {
+    // The globe drawn from the tile quadtree with the checkerboard test
+    // imagery, once every wanted tile has loaded.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(double, tiltDeg);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg});
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>());
+    QImage image;
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          image = render(camera);
+          return !m_renderer->isBusy();
+        },
+        30000));
+    // Once more, now that every tile is uploaded.
+    image = render(camera);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(nullptr);
+    qInfo("%d tiles drawn, deepest level %d", tiles.rendered,
+          tiles.deepestLevel);
+    QVERIFY(tiles.rendered > 0);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
   void silhouetteMatchesPicking()
   {
     // Every pixel the CPU picking hits shows the globe and every pixel it
@@ -315,6 +367,30 @@ private slots:
     }
     QVERIFY(std::abs(centre->x() - imageWidthPx) < 0.5);
     QVERIFY(std::abs(centre->y() - imageHeightPx) < 0.5);
+  }
+
+  void benchmarkTiledFrame()
+  {
+    // A tilted view over Europe with every checkerboard tile loaded.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{48.0, 10.0, 2.0e5, 30.0, 70.0});
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>());
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          render(camera);
+          return !m_renderer->isBusy();
+        },
+        30000));
+    QVERIFY(m_renderer->tileStatistics().rendered > 20);
+    QBENCHMARK
+    {
+      render(camera);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(nullptr);
   }
 
   void benchmarkFrame()

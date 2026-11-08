@@ -50,6 +50,7 @@ private:
   void showAbout();
   void showPointerPosition(bool onGlobe, double latDeg, double lonDeg);
   void showEyeHeight(double eyeHeightM);
+  void selectImagery(QAction* action);
 
   /** The globe, or null where the platform has no OpenGL. */
   GlobeView* m_globeView = nullptr;
@@ -61,6 +62,9 @@ private:
   QAction* m_quitAction = nullptr;
   QAction* m_debugOverlayAction = nullptr;
   QAction* m_resetViewAction = nullptr;
+  QMenu* m_imageryMenu = nullptr;
+  QAction* m_noImageryAction = nullptr;
+  QAction* m_checkerboardAction = nullptr;
   QAction* m_aboutAction = nullptr;
   QAction* m_aboutQtAction = nullptr;
   QLabel* m_statusLabel = nullptr;

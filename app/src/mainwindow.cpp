@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mainwindow.h"
 
+#include <memory>
+
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QEvent>
 #include <QKeySequence>
@@ -16,6 +19,7 @@
 #include "globeview.h"
 #include "ts/base/buildinfo.h"
 #include "ts/geo/geoformat.h"
+#include "ts/providers/testproviders.h"
 
 namespace ts
 {
@@ -89,6 +93,23 @@ void MainWindow::createActions()
     m_resetViewAction->setEnabled(false);
   }
 
+  // Test imagery until the layer tree (Phase 2b) manages sources.
+  QActionGroup* imagery = new QActionGroup(this);
+  m_noImageryAction = new QAction(imagery);
+  m_noImageryAction->setObjectName(QStringLiteral("noImageryAction"));
+  m_noImageryAction->setCheckable(true);
+  m_checkerboardAction = new QAction(imagery);
+  m_checkerboardAction->setObjectName(QStringLiteral("checkerboardAction"));
+  m_checkerboardAction->setCheckable(true);
+  m_checkerboardAction->setChecked(true);
+  if (m_globeView) {
+    connect(imagery, &QActionGroup::triggered, this,
+            &MainWindow::selectImagery);
+    selectImagery(m_checkerboardAction);
+  } else {
+    imagery->setEnabled(false);
+  }
+
   m_aboutAction = new QAction(this);
   m_aboutAction->setObjectName(QStringLiteral("aboutAction"));
   m_aboutAction->setMenuRole(QAction::AboutRole);
@@ -109,6 +130,10 @@ void MainWindow::createMenus()
   m_viewMenu = menuBar()->addMenu(QString());
   m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
   m_viewMenu->addAction(m_resetViewAction);
+  m_imageryMenu = m_viewMenu->addMenu(QString());
+  m_imageryMenu->setObjectName(QStringLiteral("imageryMenu"));
+  m_imageryMenu->addAction(m_noImageryAction);
+  m_imageryMenu->addAction(m_checkerboardAction);
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_debugOverlayAction);
 
@@ -128,6 +153,12 @@ void MainWindow::retranslateUi()
   m_quitAction->setStatusTip(tr("Close the program"));
   m_resetViewAction->setText(tr("&Reset View"));
   m_resetViewAction->setStatusTip(tr("Fly back to the start view"));
+  m_imageryMenu->setTitle(tr("&Imagery"));
+  m_noImageryAction->setText(tr("&None"));
+  m_noImageryAction->setStatusTip(tr("Show the plain globe"));
+  m_checkerboardAction->setText(tr("&Checkerboard"));
+  m_checkerboardAction->setStatusTip(
+      tr("Show a test pattern that labels every tile"));
   m_debugOverlayAction->setText(tr("&Debug Overlay"));
   m_debugOverlayAction->setStatusTip(
       tr("Show frame times and the camera position over the globe"));
@@ -156,6 +187,16 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
       onGlobe ? tr("%1  %2").arg(formatLatitude(latDeg, locale),
                                  formatLongitude(lonDeg, locale))
               : tr("Pointer not on the globe"));
+}
+
+void MainWindow::selectImagery(QAction* action)
+{
+  if (action == m_checkerboardAction) {
+    m_globeView->setImageryProvider(
+        std::make_shared<CheckerboardImageryProvider>());
+  } else {
+    m_globeView->setImageryProvider(nullptr);
+  }
 }
 
 void MainWindow::showEyeHeight(double eyeHeightM)

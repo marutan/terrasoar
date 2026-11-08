@@ -6,8 +6,11 @@
 
 #include "ts/camera/camera.h"
 #include "ts/geo/wgs84.h"
+#include "ts/globe/tilerenderer.h"
 #include "ts/maths/mat4.h"
 #include "ts/maths/splitdouble.h"
+
+#include "globeuniforms.h"
 
 namespace ts
 {
@@ -15,48 +18,13 @@ namespace ts
 namespace
 {
 
-using Float4 = std::array<float, 4>;
-
-/** Uniform block "Frame" (std140), shared by every shader. Binding 0. */
-struct FrameBlock {
-  /** Projection × view rotation: eye-relative ECEF offsets to clip space. */
-  std::array<float, 16> viewProjection{};
-  /** Eye position, high floats (xyz). */
-  Float4 eyeHigh{};
-  /** Eye position, low floats (xyz). */
-  Float4 eyeLow{};
-  /** Viewport width, height (device px), 1/width, 1/height. */
-  Float4 viewport{};
-  /** 1 / log2(far + 1), device pixel ratio, tan(vertical fov / 2), unused. */
-  Float4 depthParams{};
-};
-
-/** Uniform block "Globe" (std140). Binding 1. */
-struct GlobeBlock {
-  /** View direction (xyz), unused (w). */
-  Float4 camForward{};
-  /** Screen right (xyz), tan(horizontal fov / 2) (w). */
-  Float4 camRight{};
-  /** Screen up (xyz), tan(vertical fov / 2) (w). */
-  Float4 camUp{};
-  /** Eye / (a, a, b) (xyz); |that|² − 1 computed in double (w). */
-  Float4 eyeScaled{};
-  /** a, a / b, 1 / a², 1 / b². */
-  Float4 ellipsoid{};
-  /** Eye in metres (xyz; float, only for normals). */
-  Float4 eyeMetres{};
-  /** Unit direction towards the light (xyz). */
-  Float4 lightDir{};
-  /** Surface colour (rgb). */
-  Float4 surfaceColor{};
-  /** Graticule colour (rgb). */
-  Float4 gridColor{};
-  /** Line width (device px), graticule opacity, unused, unused. */
-  Float4 gridParams{};
-};
-
-static_assert(sizeof(FrameBlock) == 128, "std140 layout of Frame");
-static_assert(sizeof(GlobeBlock) == 160, "std140 layout of Globe");
+using globe_detail::Float4;
+using globe_detail::frameBinding;
+using globe_detail::FrameBlock;
+using globe_detail::frameBlockGlsl;
+using globe_detail::globeBinding;
+using globe_detail::GlobeBlock;
+using globe_detail::globeBlockGlsl;
 
 /** One marker instance in the vertex buffer. */
 struct MarkerInstance {
@@ -67,34 +35,6 @@ struct MarkerInstance {
 };
 
 static_assert(sizeof(MarkerInstance) == 32, "marker instance stride");
-
-constexpr int frameBinding = 0;
-constexpr int globeBinding = 1;
-
-const char* const frameBlockGlsl = R"(
-layout(std140) uniform Frame {
-  mat4 viewProjection;
-  vec4 eyeHigh;
-  vec4 eyeLow;
-  vec4 viewport;
-  vec4 depthParams;
-};
-)";
-
-const char* const globeBlockGlsl = R"(
-layout(std140) uniform Globe {
-  vec4 camForward;
-  vec4 camRight;
-  vec4 camUp;
-  vec4 eyeScaled;
-  vec4 ellipsoid;
-  vec4 eyeMetres;
-  vec4 lightDir;
-  vec4 surfaceColor;
-  vec4 gridColor;
-  vec4 gridParams;
-};
-)";
 
 // A triangle covering the viewport; each pixel gets its view ray.
 const char* const globeVertexGlsl = R"(
@@ -186,7 +126,9 @@ void main()
   vec3 color = surfaceColor.rgb * (0.30 + 0.70 * diffuse) * (0.85 + 0.15 * facing);
   color = mix(color, gridColor.rgb, grid);
   fragColor = vec4(color * coverage, coverage);
-  float w = tM * dot(d, camForward.xyz);
+  // 1 % farther than the surface: a tile's flat triangles lie a little
+  // below the curved surface and must still pass the depth test.
+  float w = 1.01 * tM * dot(d, camForward.xyz);
   gl_FragDepth = clamp(log2(1.0 + max(w, 0.0)) * depthParams.x, 0.0, 1.0);
 }
 )";
@@ -297,7 +239,17 @@ struct GlobeRenderer::Resources {
   int markerCount = 0;
 };
 
-GlobeRenderer::GlobeRenderer(RenderDevice& device) : m_device(device) {}
+GlobeRenderer::GlobeRenderer(RenderDevice& device)
+    : GlobeRenderer(device, TileRendererSettings())
+{
+}
+
+GlobeRenderer::GlobeRenderer(RenderDevice& device,
+                             const TileRendererSettings& tileSettings)
+    : m_device(device),
+      m_tileSettings(std::make_unique<TileRendererSettings>(tileSettings))
+{
+}
 
 GlobeRenderer::~GlobeRenderer() = default;
 
@@ -372,6 +324,12 @@ bool GlobeRenderer::initialise(QString* errorString)
     }
     return false;
   }
+  std::unique_ptr<TileRenderer> tiles =
+      std::make_unique<TileRenderer>(m_device, *m_tileSettings);
+  if (!tiles->initialise(errorString)) {
+    return false;
+  }
+  m_tiles = std::move(tiles);
   m_resources = std::move(r);
   m_markersDirty = true;
   return true;
@@ -380,6 +338,31 @@ bool GlobeRenderer::initialise(QString* errorString)
 void GlobeRenderer::setStyle(const GlobeStyle& style)
 {
   m_style = style;
+}
+
+void GlobeRenderer::setImageryProvider(
+    std::shared_ptr<ImageryProvider> provider)
+{
+  if (m_tiles) {
+    m_tiles->setImageryProvider(std::move(provider));
+  }
+}
+
+void GlobeRenderer::setTilesReadyCallback(std::function<void()> callback)
+{
+  if (m_tiles) {
+    m_tiles->setTilesReadyCallback(std::move(callback));
+  }
+}
+
+bool GlobeRenderer::isBusy() const
+{
+  return m_tiles && m_tiles->isBusy();
+}
+
+TileStatistics GlobeRenderer::tileStatistics() const
+{
+  return m_tiles ? m_tiles->statistics() : TileStatistics();
 }
 
 void GlobeRenderer::setMarkers(const std::vector<GlobeMarker>& markers)
@@ -465,6 +448,9 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
                          devicePixelRatio),
       static_cast<float>(graticuleOpacity), 0.0F, 0.0F};
 
+  if (m_tiles) {
+    m_tiles->prepare(camera);
+  }
   r.uniforms->update(0, &frame, sizeof(frame));
   r.uniforms->update(r.globeOffset, &globe, sizeof(globe));
 
@@ -480,6 +466,9 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
 
   m_device.setPipeline(*r.globePipeline);
   m_device.draw(3, 0, 1);
+  if (m_tiles) {
+    m_tiles->draw();
+  }
 
   if (r.markerCount > 0 && r.markerInstances) {
     m_device.setPipeline(*r.markerPipeline);

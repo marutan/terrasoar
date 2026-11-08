@@ -63,7 +63,9 @@ application as a whole.
 | `tests/geo` | WGS 84, geodetic ↔ ECEF round trips and against PROJ, normals, ray picking, geodesics and rhumb lines against reference data |
 | `tests/render` | (GPU) The OpenGL 3.3 backend: draws, viewport orientation, instancing, uniform offsets, textures, depth, blending, error reporting |
 | `tests/camera` | Pose limits, frames, pixel ↔ ray ↔ globe round trips, pan and zoom keep the point under the pointer, frame-rate independence at 10/20/60/144 fps, inertia, flights, stalls |
-| `tests/globe` | (GPU) Golden images, silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
+| `tests/tiling` | Tile keys, bounds and parent/child at the antimeridian and poles, meshes (positions, skirts, winding), selection (coverage without overlap, culling, expected tile sets, refinement order), LRU cache, loader (cancellation, cache, a many-tile stress test while the camera moves) |
+| `tests/providers` | Solid-colour and checkerboard test imagery: sizes, determinism, labels, cancellation, a shared instance on many threads |
+| `tests/globe` | (GPU) Golden images (plain and checkerboard globe), silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
 | `tests/smoke` | Launches the built `terrasoar`: clean start and exit (headless), pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering, the globe window on the real platform |
 | `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
 

@@ -8,6 +8,7 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -20,6 +21,10 @@ namespace ts
 {
 
 class Camera;
+class ImageryProvider;
+class TileRenderer;
+struct TileRendererSettings;
+struct TileStatistics;
 
 /**
  * A round marker drawn at a fixed point, with a size in pixels.
@@ -77,6 +82,9 @@ public:
   /** Creates a renderer drawing through @p device, which must outlive it. */
   explicit GlobeRenderer(RenderDevice& device);
 
+  /** Same, with tile budgets and quality from @p tileSettings. */
+  GlobeRenderer(RenderDevice& device, const TileRendererSettings& tileSettings);
+
   /** Releases the GPU resources; the device's context must be current. */
   ~GlobeRenderer();
 
@@ -104,6 +112,27 @@ public:
   void setMarkers(const std::vector<GlobeMarker>& markers);
 
   /**
+   * Sets the imagery drawn on the globe from the tile quadtree, or null
+   * for the plain globe. Only after initialise().
+   */
+  void setImageryProvider(std::shared_ptr<ImageryProvider> provider);
+
+  /**
+   * Sets the function called (on a worker thread) when imagery tiles
+   * finish loading, so the application can schedule a frame.
+   */
+  void setTilesReadyCallback(std::function<void()> callback);
+
+  /**
+   * Returns true while frames are needed without input because tiles are
+   * still loading or waiting for upload.
+   */
+  bool isBusy() const;
+
+  /** Returns what the tile renderer did in the last frame. */
+  TileStatistics tileStatistics() const;
+
+  /**
    * Draws a frame as seen by @p camera into @p pass (whose clear colour is
    * replaced by the style's background).
    *
@@ -119,6 +148,8 @@ private:
 
   RenderDevice& m_device;
   std::unique_ptr<Resources> m_resources;
+  std::unique_ptr<TileRendererSettings> m_tileSettings;
+  std::unique_ptr<TileRenderer> m_tiles;
   GlobeStyle m_style;
   std::vector<GlobeMarker> m_markers;
   bool m_markersDirty = true;

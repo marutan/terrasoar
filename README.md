@@ -8,7 +8,9 @@ Terra Soar is in early development. Following the
 [roadmap](docs/Terra%20Soar%20–%20Phased%20Roadmap.md), it shows a shaded
 WGS 84 globe with a graticule that you can pan, turn, tilt and zoom (down
 to a metre above the surface), with the latitude and longitude under the
-pointer in the status bar. Imagery and map layers come next.
+pointer in the status bar. The surface is drawn from a geographic tile
+quadtree, for now with a test pattern (View → Imagery); real imagery and
+map layers come next.
 
 ## Building
 
@@ -33,7 +35,8 @@ full instructions for each OS.
 - [Testing](docs/testing.md)
 - Design notes: [coordinates](docs/design/coordinates.md),
   [renderer backend](docs/design/renderer-backend.md),
-  [camera and precision](docs/design/camera-and-precision.md)
+  [camera and precision](docs/design/camera-and-precision.md),
+  [tiling](docs/design/tiling.md), [providers](docs/design/providers.md)
 - API reference: `make docs` (or `doxygen Doxyfile`), then open
   `build/docs/api/index.html`
 

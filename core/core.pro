@@ -30,6 +30,7 @@ HEADERS += \
     include/ts/geo/wgs84.h \
     include/ts/gl/glprobe.h \
     include/ts/globe/globerenderer.h \
+    include/ts/globe/tilerenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
     include/ts/maths/angles.h \
@@ -40,9 +41,17 @@ HEADERS += \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
     include/ts/perf/processstats.h \
+    include/ts/providers/testproviders.h \
+    include/ts/providers/tileprovider.h \
     include/ts/render/framepacer.h \
     include/ts/render/glrenderdevice.h \
-    include/ts/render/renderdevice.h
+    include/ts/render/renderdevice.h \
+    include/ts/tiling/lrucache.h \
+    include/ts/tiling/tilekey.h \
+    include/ts/tiling/tileloader.h \
+    include/ts/tiling/tilemesh.h \
+    include/ts/tiling/tileselector.h \
+    src/globe/globeuniforms.h
 
 SOURCES += \
     src/base/buildinfo.cpp \
@@ -59,10 +68,17 @@ SOURCES += \
     src/geo/geoformat.cpp \
     src/gl/glprobe.cpp \
     src/globe/globerenderer.cpp \
+    src/globe/tilerenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
     src/perf/processstats.cpp \
+    src/providers/testproviders.cpp \
+    src/providers/tileprovider.cpp \
     src/render/framepacer.cpp \
-    src/render/glrenderdevice.cpp
+    src/render/glrenderdevice.cpp \
+    src/tiling/tilekey.cpp \
+    src/tiling/tileloader.cpp \
+    src/tiling/tilemesh.cpp \
+    src/tiling/tileselector.cpp
