@@ -163,6 +163,10 @@
             <translation>The globe needs OpenGL 3.3, which is not available:
 %1</translation>
         </message>
+        <message>
+            <source>Tiles: %1 drawn (deepest level %2), %3 on the GPU (%4 MB), %5 wanted</source>
+            <translation>Tiles: %1 drawn (deepest level %2), %3 on the GPU (%4 MB), %5 wanted</translation>
+        </message>
     </context>
     <context>
         <name>ts::MainWindow</name>
@@ -245,6 +249,37 @@
         <message>
             <source>Eye height %1</source>
             <translation>Eye height %1</translation>
+        </message>
+        <message>
+            <source>&amp;Imagery</source>
+            <translation>&amp;Imagery</translation>
+        </message>
+        <message>
+            <source>&amp;None</source>
+            <translation>&amp;None</translation>
+        </message>
+        <message>
+            <source>Show the plain globe</source>
+            <translation>Show the plain globe</translation>
+        </message>
+        <message>
+            <source>&amp;Checkerboard</source>
+            <translation>&amp;Checkerboard</translation>
+        </message>
+        <message>
+            <source>Show a test pattern that labels every tile</source>
+            <translation>Show a test pattern that labels every tile</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::TestProviders</name>
+        <message>
+            <source>Solid colour %1</source>
+            <translation>Solid colour %1</translation>
+        </message>
+        <message>
+            <source>Checkerboard</source>
+            <translation>Checkerboard</translation>
         </message>
     </context>
 </TS>

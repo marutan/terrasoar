@@ -19,6 +19,8 @@
 
 #include "ts/geo/geoformat.h"
 #include "ts/globe/globerenderer.h"
+#include "ts/globe/tilerenderer.h"
+#include "ts/providers/tileprovider.h"
 #include "ts/render/glrenderdevice.h"
 
 namespace ts
@@ -155,6 +157,22 @@ void GlobeView::goHome()
   flyTo(homePose(), 0.0);
 }
 
+void GlobeView::setImageryProvider(std::shared_ptr<ImageryProvider> provider)
+{
+  m_imagery = std::move(provider);
+  if (m_globe) {
+    makeCurrent();
+    m_globe->setImageryProvider(m_imagery);
+    doneCurrent();
+  }
+  update();
+}
+
+bool GlobeView::isLoadingTiles() const
+{
+  return m_globe && m_globe->isBusy();
+}
+
 void GlobeView::flyTo(const CameraPose& pose, double durationS)
 {
   m_controller.flyTo(pose, durationS);
@@ -183,7 +201,16 @@ void GlobeView::initializeGL()
     qWarning("Globe view: %s", qPrintable(m_error));
     m_globe.reset();
     m_device.reset();
+    return;
   }
+  // Called on a loader thread: hand over to the GUI thread. With the view
+  // as context, the call is dropped if the view is gone by then (the
+  // loader is stopped before that anyway, in releaseGl()).
+  m_globe->setTilesReadyCallback([this]() {
+    QMetaObject::invokeMethod(
+        this, [this]() { requestFrame(); }, Qt::QueuedConnection);
+  });
+  m_globe->setImageryProvider(m_imagery);
 }
 
 void GlobeView::releaseGl()
@@ -230,7 +257,7 @@ void GlobeView::paintGL()
   }
   emit cameraChanged(m_controller.camera().eyeGeodetic().heightM);
   updatePointerReadout();
-  if (m_controller.isAnimating()) {
+  if (m_controller.isAnimating() || m_globe->isBusy()) {
     requestFrame();
   }
 }
@@ -413,6 +440,18 @@ void GlobeView::drawOverlay()
                  .arg(locale.toString(m_intervalStats.meanFps(), 'f', 1));
   }
   lines << tr("Frames drawn: %1").arg(locale.toString(m_framesRendered));
+  if (m_globe) {
+    const TileStatistics tiles = m_globe->tileStatistics();
+    lines << tr("Tiles: %1 drawn (deepest level %2), %3 on the GPU (%4 MB), "
+                "%5 wanted")
+                 .arg(locale.toString(tiles.rendered),
+                      locale.toString(tiles.deepestLevel),
+                      locale.toString(tiles.resident),
+                      locale.toString(static_cast<double>(tiles.gpuBytes) /
+                                          (1024.0 * 1024.0),
+                                      'f', 1),
+                      locale.toString(tiles.requested));
+  }
   lines << tr("Target: %1, %2")
                .arg(formatLatitude(pose.targetLatDeg, locale),
                     formatLongitude(pose.targetLonDeg, locale));

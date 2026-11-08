@@ -28,6 +28,7 @@ namespace ts
 
 class GlRenderDevice;
 class GlobeRenderer;
+class ImageryProvider;
 
 /**
  * Shows the globe and turns mouse and keyboard input into camera motion.
@@ -77,6 +78,21 @@ public:
 
   /** Returns true if the debug overlay is shown. */
   bool isDebugOverlayVisible() const { return m_overlayVisible; }
+
+  /** Sets the imagery drawn on the globe, or null for the plain globe. */
+  void setImageryProvider(std::shared_ptr<ImageryProvider> provider);
+
+  /** Returns the imagery drawn on the globe. */
+  const std::shared_ptr<ImageryProvider>& imageryProvider() const
+  {
+    return m_imagery;
+  }
+
+  /**
+   * Returns true while tiles are loading or waiting for upload (frames
+   * keep coming until they are done).
+   */
+  bool isLoadingTiles() const;
 
   /** Flies back to homePose(). */
   void goHome();
@@ -146,6 +162,7 @@ private:
   QMetaObject::Connection m_contextConnection;
   std::unique_ptr<GlRenderDevice> m_device;
   std::unique_ptr<GlobeRenderer> m_globe;
+  std::shared_ptr<ImageryProvider> m_imagery;
   RenderDeviceInfo m_deviceInfo;
   QString m_error;
 

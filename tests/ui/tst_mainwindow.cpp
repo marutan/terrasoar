@@ -361,6 +361,33 @@ private slots:
     QCOMPARE(pose.rangeM, home.rangeM);
   }
 
+  void imageryMenu()
+  {
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QAction* none =
+        window.findChild<QAction*>(QStringLiteral("noImageryAction"));
+    QAction* checkerboard =
+        window.findChild<QAction*>(QStringLiteral("checkerboardAction"));
+    if (none == nullptr || checkerboard == nullptr) {
+      QFAIL("imagery actions missing");
+    }
+    // The checkerboard is shown from the start.
+    QVERIFY(checkerboard->isChecked());
+    QVERIFY(globe->imageryProvider() != nullptr);
+    none->trigger();
+    QVERIFY(globe->imageryProvider() == nullptr);
+    QVERIFY(!checkerboard->isChecked());
+    checkerboard->trigger();
+    QVERIFY(globe->imageryProvider() != nullptr);
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+  }
+
   void idleViewStopsDrawing()
   {
     // Render on demand: once nothing moves, no more frames are drawn.
@@ -373,6 +400,8 @@ private slots:
     }
     QVERIFY(
         QTest::qWaitFor([&]() { return globe->framesRendered() > 0; }, 5000));
+    // The checkerboard imagery loads first; frames keep coming until then.
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
     QTest::qWait(200);
     const int frames = globe->framesRendered();
     QTest::qWait(500);
