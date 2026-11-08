@@ -56,11 +56,13 @@ Subsections so far:
 | `deps` | Owning handles for GDAL datasets, PROJ contexts, GEOS contexts and SQLite connections; library versions |
 | `geo` | WGS 84 constants, geodetic ↔ ECEF, normals and local frames, ray–ellipsoid picking, geodesics (`docs/design/coordinates.md`) |
 | `gl` | OpenGL capability probe, software-renderer detection |
-| `globe` | The globe renderer: ray-cast WGS 84 ellipsoid with graticule, markers relative to the eye |
+| `globe` | The globe renderer: ray-cast WGS 84 ellipsoid with graticule, imagery tiles, markers relative to the eye |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `perf` | Frame-time statistics, process memory and CPU readings |
+| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`) and generated test imagery (`docs/design/providers.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
+| `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 
 ### app (`terrasoar`)
 
