@@ -12,7 +12,8 @@ SUBDIRS = \
     perf \
     i18n \
     gl \
-    ui
+    ui \
+    maths
 
 # The smoke tests launch the application with QProcess, whose vfork-based
 # start-up the ThreadSanitizer runtime cannot follow (it aborts with a CHECK

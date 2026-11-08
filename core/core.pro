@@ -24,6 +24,11 @@ HEADERS += \
     include/ts/gl/glprobe.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
+    include/ts/maths/angles.h \
+    include/ts/maths/mat4.h \
+    include/ts/maths/ray.h \
+    include/ts/maths/vec3.h \
+    include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
     include/ts/perf/processstats.h
 
@@ -37,5 +42,6 @@ SOURCES += \
     src/gl/glprobe.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
+    src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
     src/perf/processstats.cpp
