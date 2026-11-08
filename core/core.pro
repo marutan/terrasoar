@@ -24,6 +24,7 @@ HEADERS += \
     include/ts/geo/ellipsoid.h \
     include/ts/geo/geodesic.h \
     include/ts/geo/geodetic.h \
+    include/ts/geo/geoformat.h \
     include/ts/geo/wgs84.h \
     include/ts/gl/glprobe.h \
     include/ts/i18n/pseudotranslator.h \
@@ -31,6 +32,7 @@ HEADERS += \
     include/ts/maths/angles.h \
     include/ts/maths/mat4.h \
     include/ts/maths/ray.h \
+    include/ts/maths/splitdouble.h \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
@@ -46,6 +48,7 @@ SOURCES += \
     src/geo/ellipsoid.cpp \
     src/geo/geodesic.cpp \
     src/geo/geodetic.cpp \
+    src/geo/geoformat.cpp \
     src/gl/glprobe.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \

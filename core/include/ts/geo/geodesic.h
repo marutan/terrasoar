@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /**
  * @file
- * Geodesics on the WGS 84 ellipsoid: distances, azimuths and destinations.
+ * Geodesics and rhumb lines on the WGS 84 ellipsoid: distances, azimuths
+ * and destinations.
  */
 #ifndef TS_GEO_GEODESIC_H
 #define TS_GEO_GEODESIC_H
@@ -62,6 +63,33 @@ GeodesicInverse geodesicInverse(double lat1Deg, double lon1Deg, double lat2Deg,
  */
 GeodesicDirect geodesicDirect(double latDeg, double lonDeg, double azimuthDeg,
                               double distanceM);
+
+/**
+ * Returns where a rhumb line (loxodrome: constant azimuth) ends that starts
+ * at (@p latDeg, @p lonDeg) with azimuth @p azimuthDeg and runs for
+ * @p distanceM metres on WGS 84.
+ *
+ * Unlike a geodesic, a rhumb line split into pieces with the same azimuth
+ * is still the same line, so moving in a fixed compass direction in many
+ * small steps ends where one step of the summed length does. The camera
+ * relies on this for frame-rate-independent panning. A line that would
+ * cross a pole stops at it. GeographicLib's Rhumb class, accurate to about
+ * 10 nanometres; the end point's azimuth2Deg is @p azimuthDeg.
+ *
+ * @threadsafe
+ */
+GeodesicDirect rhumbDirect(double latDeg, double lonDeg, double azimuthDeg,
+                           double distanceM);
+
+/**
+ * Returns the rhumb line between (@p lat1Deg, @p lon1Deg) and
+ * (@p lat2Deg, @p lon2Deg) on WGS 84: its length and its (constant)
+ * azimuth, in both azimuth fields.
+ *
+ * @threadsafe
+ */
+GeodesicInverse rhumbInverse(double lat1Deg, double lon1Deg, double lat2Deg,
+                             double lon2Deg);
 
 } // namespace ts
 
