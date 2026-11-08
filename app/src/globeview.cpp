@@ -157,14 +157,25 @@ void GlobeView::goHome()
   flyTo(homePose(), 0.0);
 }
 
-void GlobeView::setImageryProvider(std::shared_ptr<ImageryProvider> provider)
+void GlobeView::setImageryDraws(const ImageryDraws& draws)
 {
-  m_imagery = std::move(provider);
+  m_draws = draws;
   if (m_globe) {
     makeCurrent();
-    m_globe->setImageryProvider(m_imagery);
+    m_globe->setImageryLayers(m_draws.layers, m_draws.groupAlphas);
     doneCurrent();
   }
+  update();
+}
+
+bool GlobeView::isGroupCompositingAvailable() const
+{
+  return !m_deviceInfo.softwareRenderer;
+}
+
+void GlobeView::setPose(const CameraPose& pose)
+{
+  m_controller.setPose(pose);
   update();
 }
 
@@ -210,7 +221,10 @@ void GlobeView::initializeGL()
     QMetaObject::invokeMethod(
         this, [this]() { requestFrame(); }, Qt::QueuedConnection);
   });
-  m_globe->setImageryProvider(m_imagery);
+  // Compositing a group costs a full-screen buffer and pass; software
+  // rasterisers multiply the group's opacity into its layers instead.
+  m_globe->setGroupCompositing(isGroupCompositingAvailable());
+  m_globe->setImageryLayers(m_draws.layers, m_draws.groupAlphas);
 }
 
 void GlobeView::releaseGl()
