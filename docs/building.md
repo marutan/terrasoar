@@ -14,6 +14,7 @@ passing tests.
 | PROJ | ≥ 8 | |
 | GEOS | ≥ 3.10 | C API (`geos_c`) |
 | SQLite | ≥ 3.31 | |
+| GeographicLib | ≥ 1.52 | C++ library; geodesic distances and azimuths |
 | Python | ≥ 3.8 | Style checks, translation and performance scripts |
 | clang-format | 18 | Only for the style checks; CI pins this version |
 | clang-tidy, clazy, cppcheck | 18, 1.11, 2.13 | Only for the static analysis (Linux); the Ubuntu 24.04 versions, which CI uses |
@@ -27,7 +28,7 @@ CI uses Qt 5.15.2 and Qt 6.8.3 (see `.github/workflows/ci.yml`).
 
 ```sh
 sudo apt install build-essential python3 \
-    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev \
+    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev libgeographiclib-dev \
     libgl1-mesa-dev libgl1-mesa-dri \
     clang-format-18 doxygen graphviz
 
@@ -48,7 +49,7 @@ into the application.
 
 ```sh
 sudo dnf install gcc-c++ python3 gdal-devel proj-devel geos-devel \
-    sqlite-devel mesa-libGL-devel mesa-dri-drivers clang-tools-extra doxygen \
+    sqlite-devel GeographicLib-devel mesa-libGL-devel mesa-dri-drivers clang-tools-extra doxygen \
     qt6-qtbase-devel qt6-linguist
 ```
 
@@ -82,7 +83,7 @@ libraries it calls into, not the hundred or so that GDAL depends on.
 
    ```bat
    vcpkg install --triplet x64-windows --x-install-root=C:\deps-vcpkg ^
-       gdal proj geos sqlite3
+       gdal proj geos sqlite3 geographiclib
    ```
 
    Any prefix with `include\`, `lib\` and `bin\` works; that directory is
@@ -99,8 +100,9 @@ libraries it calls into, not the hundred or so that GDAL depends on.
 
    `DEPS_ROOT` may also be set as an environment variable. If your import
    libraries have other names, override them with `GDAL_LIB`, `PROJ_LIB`,
-   `GEOS_LIB` and `SQLITE_LIB` (defaults `gdal`, `proj`, `geos_c`,
-   `sqlite3`).
+   `GEOS_LIB`, `SQLITE_LIB` and `GEOGRAPHICLIB_LIB` (defaults `gdal`,
+   `proj`, `geos_c`, `sqlite3`, and `GeographicLib-i` when that import
+   library exists, as in vcpkg's DLL build, otherwise `GeographicLib`).
 5. Before running, put `%DEPS_ROOT%\bin` and Qt's `bin` on `PATH` (or run
    `windeployqt app\release\terrasoar.exe`).
 

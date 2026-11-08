@@ -135,19 +135,23 @@ private slots:
   void versions()
   {
     const ts::DependencyVersions versions = ts::dependencyVersions();
-    qInfo("GDAL %s, PROJ %s, GEOS %s, SQLite %s", qPrintable(versions.gdal),
-          qPrintable(versions.proj), qPrintable(versions.geos),
-          qPrintable(versions.sqlite));
+    qInfo("GDAL %s, PROJ %s, GEOS %s, SQLite %s, GeographicLib %s",
+          qPrintable(versions.gdal), qPrintable(versions.proj),
+          qPrintable(versions.geos), qPrintable(versions.sqlite),
+          qPrintable(versions.geographicLib));
     QVERIFY(!versions.gdal.isEmpty());
     QVERIFY(!versions.proj.isEmpty());
     QVERIFY(!versions.geos.isEmpty());
     QVERIFY(!versions.sqlite.isEmpty());
+    QVERIFY(!versions.geographicLib.isEmpty());
     // Minimum versions in docs/building.md.
     QVERIFY(QVersionNumber::fromString(versions.gdal) >= QVersionNumber(3, 4));
     QVERIFY(QVersionNumber::fromString(versions.proj) >= QVersionNumber(8));
     QVERIFY(QVersionNumber::fromString(versions.geos) >= QVersionNumber(3, 10));
     QVERIFY(QVersionNumber::fromString(versions.sqlite) >=
             QVersionNumber(3, 31));
+    QVERIFY(QVersionNumber::fromString(versions.geographicLib) >=
+            QVersionNumber(1, 52));
   }
 
   void gdalOpensSampleGeoJson()

@@ -21,9 +21,18 @@ HEADERS += \
     include/ts/deps/geoscontext.h \
     include/ts/deps/projcontext.h \
     include/ts/deps/sqliteconnection.h \
+    include/ts/geo/ellipsoid.h \
+    include/ts/geo/geodesic.h \
+    include/ts/geo/geodetic.h \
+    include/ts/geo/wgs84.h \
     include/ts/gl/glprobe.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
+    include/ts/maths/angles.h \
+    include/ts/maths/mat4.h \
+    include/ts/maths/ray.h \
+    include/ts/maths/vec3.h \
+    include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
     include/ts/perf/processstats.h
 
@@ -34,8 +43,12 @@ SOURCES += \
     src/deps/geoscontext.cpp \
     src/deps/projcontext.cpp \
     src/deps/sqliteconnection.cpp \
+    src/geo/ellipsoid.cpp \
+    src/geo/geodesic.cpp \
+    src/geo/geodetic.cpp \
     src/gl/glprobe.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
+    src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
     src/perf/processstats.cpp
