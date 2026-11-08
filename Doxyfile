@@ -1,0 +1,48 @@
+# Doxygen configuration for the Terra Soar API documentation.
+#   doxygen Doxyfile       (or `make docs`)
+# Output goes to build/docs/api; warnings fail the run.
+
+PROJECT_NAME           = "Terra Soar"
+PROJECT_NUMBER         = 0.0.1
+PROJECT_BRIEF          = "3D globe and 2D map viewer"
+OUTPUT_DIRECTORY       = build/docs
+HTML_OUTPUT            = api
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+
+INPUT                  = core/include app/src docs/api-mainpage.md
+FILE_PATTERNS          = *.h *.md
+RECURSIVE              = YES
+USE_MDFILE_AS_MAINPAGE = docs/api-mainpage.md
+STRIP_FROM_PATH        = .
+STRIP_FROM_INC_PATH    = core/include app/src
+
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_ANON_NSPACES   = NO
+HIDE_UNDOC_MEMBERS     = NO
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+MARKDOWN_SUPPORT       = YES
+BUILTIN_STL_SUPPORT    = YES
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+PREDEFINED             = Q_OBJECT= Q_GADGET= "Q_DECL_OVERRIDE=override" \
+                         "signals=public" "slots="
+
+# Every public item must be documented, and every warning is an error.
+QUIET                  = YES
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_IF_INCOMPLETE_DOC = YES
+WARN_NO_PARAMDOC       = NO
+WARN_AS_ERROR          = FAIL_ON_WARNINGS
+WARN_LOGFILE           = build/docs/doxygen-warnings.log
+
+# Thread-safety levels; every public class states one of them.
+ALIASES += "reentrant=@par Thread safety^^Reentrant: safe when each thread uses its own instances.^^"
+ALIASES += "threadsafe=@par Thread safety^^Thread-safe: one instance may be shared between threads.^^"
+ALIASES += "guithread=@par Thread safety^^GUI thread only.^^"

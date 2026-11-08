@@ -1,0 +1,27 @@
+# Terra Soar code style: 2-space indent, 80 columns, Linux braces.
+# CI pins clang-format to version 18 (see .github/workflows/ci.yml).
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++17
+IndentWidth: 2
+ContinuationIndentWidth: 4
+ColumnLimit: 80
+UseTab: Never
+BreakBeforeBraces: Linux
+AccessModifierOffset: -2
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+AlwaysBreakTemplateDeclarations: Yes
+PointerAlignment: Left
+ReferenceAlignment: Left
+NamespaceIndentation: None
+FixNamespaceComments: true
+# Include order is project-specific and checked by
+# tools/checks/check_include_order.py; clang-format only sorts inside each
+# blank-line-separated block.
+IncludeBlocks: Preserve
+SortIncludes: CaseSensitive
+...

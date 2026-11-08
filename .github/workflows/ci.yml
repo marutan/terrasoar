@@ -1,0 +1,293 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Fast checks on every push and pull request:
+#   - style checks (clang-format 18, include order, `auto`, translations,
+#     Doxygen warnings)
+#   - build + `make check` on Linux (GCC, Clang) and Windows (MSVC), each
+#     with Qt 5.15 and Qt 6, warnings as errors
+#   - ThreadSanitizer build of the unit and stress tests
+#
+# The full suite (performance baselines, docs artefact, release packages)
+# runs in nightly.yml.
+
+name: CI
+
+# Pushes to main run CI; branches are covered by their pull request, so a
+# push to a PR branch starts one run, not two.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Versions installed with aqtinstall. Keep in step with docs/building.md.
+  QT5_VERSION: "5.15.2"
+  QT6_VERSION: "6.8.3"
+  # Mesa llvmpipe for software OpenGL on Windows, from
+  # github.com/pal1000/mesa-dist-win. The MinGW build, because 26.2.6's MSVC
+  # build has no working software OpenGL (see its release notes). Keep in
+  # step with docs/building.md.
+  MESA_VERSION: "26.2.6"
+  MESA_SHA256: "da0f71d9181b672c1918f3c342f11118c687f6059a46b16502845160733cc388"
+  # Apt packages for the third-party libraries on Linux (installed fresh
+  # each run; the slow dependency build is on Windows, cached via vcpkg).
+  LINUX_DEPS: >-
+    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev
+    libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+    xvfb
+
+jobs:
+  checks:
+    name: Style checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            clang-format-18 doxygen graphviz qt6-l10n-tools
+
+      - name: Run checks
+        env:
+          CLANG_FORMAT: clang-format-18
+          LUPDATE: /usr/lib/qt6/bin/lupdate
+        run: python3 tools/checks/run_all.py
+
+      - name: Upload Doxygen warnings
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: doxygen-warnings
+          path: build/docs/doxygen-warnings.log
+          if-no-files-found: ignore
+
+  linux:
+    name: Linux ${{ matrix.compiler }} / Qt ${{ matrix.qt }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        qt: [5, 6]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        # Plain apt-get, not an apt-cache action: those restore files without
+        # running maintainer scripts, which leaves libblas.so.3/liblapack.so.3
+        # (Debian alternatives) missing and GDAL's dependencies unlinkable.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt == 5 && env.QT5_VERSION || env.QT6_VERSION }}
+          cache: true
+
+      - name: Configure
+        run: |
+          mkdir build-ci && cd build-ci
+          SPEC=linux-g++
+          [ "${{ matrix.compiler }}" = clang ] && SPEC=linux-clang
+          qmake -spec "$SPEC" ../terrasoar.pro CONFIG+=werror
+
+      - name: Build
+        run: make -C build-ci -j"$(nproc)"
+
+      - name: Test
+        # A virtual X server gives the GL tests a real (llvmpipe) context;
+        # every other test uses the offscreen platform itself.
+        env:
+          TS_REQUIRE_GL: "1"
+          TS_EXPECT_SOFTWARE_GL: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          QT_QPA_PLATFORM: xcb
+        run: xvfb-run -a -s "-screen 0 1280x1024x24" make -C build-ci check
+
+  windows:
+    name: Windows MSVC / Qt ${{ matrix.qt }}
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        qt: [5, 6]
+    env:
+      VCPKG_TRIPLET: x64-windows
+      VCPKG_INSTALLED: ${{ github.workspace }}\vcpkg_installed
+    steps:
+      - uses: actions/checkout@v7
+
+      # Restore and save are separate steps so the (long) vcpkg build is
+      # cached as soon as it finishes, even if a later step fails.
+      - name: Restore third-party libraries
+        id: deps-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: vcpkg_installed
+          key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-v1
+
+      - name: Build third-party libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            --triplet $env:VCPKG_TRIPLET `
+            --x-install-root="$env:VCPKG_INSTALLED" `
+            gdal proj geos sqlite3
+
+      - name: Save third-party libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: vcpkg_installed
+          key: ${{ steps.deps-cache.outputs.cache-primary-key }}
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qt == 5 && env.QT5_VERSION || env.QT6_VERSION }}
+          arch: ${{ matrix.qt == 5 && 'win64_msvc2019_64' || 'win64_msvc2022_64' }}
+          cache: true
+
+      # Load the MSVC x64 build environment (what vcvars64.bat sets) into
+      # later steps. Done here rather than with ilammy/msvc-dev-cmd, which
+      # has no Node 24 release.
+      - name: Set up MSVC environment
+        shell: pwsh
+        run: |
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} `
+            'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products * -property installationPath `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64
+          if (-not $vs) { throw 'No Visual Studio with the x64 C++ tools' }
+          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
+          $vars = cmd /c "`"$vcvars`" >nul && set"
+          if ($LASTEXITCODE -ne 0) { throw "$vcvars failed" }
+          foreach ($line in $vars) {
+            if ($line -notmatch '^([^=]+)=(.*)$') { continue }
+            $name, $value = $Matches[1], $Matches[2]
+            if ($name -match '^(GITHUB_|RUNNER_)') { continue }
+            if ($name -eq 'Path') {
+              # New directories go through GITHUB_PATH, which prepends each
+              # line in turn: write them last to first to keep vcvars' order.
+              $old = $env:Path -split ';'
+              $new = @($value -split ';' | Where-Object { $_ -and $_ -notin $old })
+              [array]::Reverse($new)
+              $new | Out-File $env:GITHUB_PATH -Append -Encoding utf8
+              continue
+            }
+            # Only what vcvars added or changed.
+            if ([Environment]::GetEnvironmentVariable($name) -ne $value) {
+              "$name=$value" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+            }
+          }
+
+      - name: Install jom
+        shell: pwsh
+        run: choco install jom -y --no-progress
+
+      - name: Configure
+        shell: cmd
+        run: |
+          mkdir build-ci && cd build-ci
+          qmake ..\terrasoar.pro CONFIG+=werror CONFIG+=release ^
+            DEPS_ROOT=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%
+
+      - name: Build
+        shell: cmd
+        run: cd build-ci && jom
+
+      # Windows runners have no GPU. With QT_OPENGL=software, Qt loads
+      # opengl32sw.dll from its bin directory; install Mesa llvmpipe as that
+      # file. Qt 5's own opengl32sw.dll (Mesa 12, 2016) only gives OpenGL 3.0,
+      # and Qt 6 ships none.
+      - name: Install Mesa software OpenGL
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $name = "mesa3d-$env:MESA_VERSION-release-mingw.7z"
+          gh release download $env:MESA_VERSION -R pal1000/mesa-dist-win `
+            -p $name -D $env:RUNNER_TEMP
+          $archive = Join-Path $env:RUNNER_TEMP $name
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:MESA_SHA256) {
+            throw "SHA-256 of $name is $hash, expected $env:MESA_SHA256"
+          }
+          $out = Join-Path $env:RUNNER_TEMP mesa
+          7z e -y "-o$out" $archive x64/opengl32.dll x64/libgallium_wgl.dll
+          if ($LASTEXITCODE -ne 0) { throw "7z failed" }
+          $bin = Join-Path $env:QT_ROOT_DIR bin
+          Copy-Item (Join-Path $out opengl32.dll) `
+            (Join-Path $bin opengl32sw.dll) -Force
+          Copy-Item (Join-Path $out libgallium_wgl.dll) $bin -Force
+
+      - name: Test
+        shell: cmd
+        env:
+          TS_REQUIRE_GL: "1"
+          TS_EXPECT_SOFTWARE_GL: "1"
+          QT_OPENGL: software
+          GALLIUM_DRIVER: llvmpipe
+          # Qt Test's console output doesn't reach the log on Windows, so
+          # each test also writes its results to a file (printed below).
+          TESTARGS: "-o -,txt -o testresults.txt,txt"
+        run: |
+          set PATH=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%\bin;%PATH%
+          cd build-ci && jom check
+
+      - name: Show test results
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem build-ci\tests -Recurse -Filter testresults.txt |
+            ForEach-Object {
+              "===== $($_.Directory.Name)"
+              Get-Content $_.FullName
+            }
+
+  tsan:
+    name: ThreadSanitizer (Linux Clang / Qt 6)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        # Plain apt-get, not an apt-cache action: those restore files without
+        # running maintainer scripts, which leaves libblas.so.3/liblapack.so.3
+        # (Debian alternatives) missing and GDAL's dependencies unlinkable.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Configure
+        run: |
+          mkdir build-tsan && cd build-tsan
+          qmake -spec linux-clang ../terrasoar.pro CONFIG+=tsan
+
+      - name: Build
+        run: make -C build-tsan -j"$(nproc)"
+
+      - name: Test
+        env:
+          TSAN_OPTIONS: >-
+            halt_on_error=1 second_deadlock_stack=1
+            suppressions=${{ github.workspace }}/tests/tsan.supp
+          QT_QPA_PLATFORM: offscreen
+        run: make -C build-tsan check

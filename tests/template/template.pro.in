@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Unit tests for ts/@SUBSECTION@.
+
+include($$PWD/../tests.pri)
+
+TARGET = tst_@SUBSECTION@
+SOURCES += tst_@SUBSECTION@.cpp
