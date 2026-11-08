@@ -6,6 +6,9 @@
 #   - build + `make check` on Linux (GCC, Clang) and Windows (MSVC), each
 #     with Qt 5.15 and Qt 6, warnings as errors
 #   - ThreadSanitizer build of the unit and stress tests
+#   - AddressSanitizer + UBSan build of the unit tests
+#   - static analysis (clang-tidy, clazy, cppcheck) of the changed files,
+#     and a self-test that each tool still reports known-bad code
 #
 # The full suite (performance baselines, docs artefact, release packages)
 # runs in nightly.yml.
@@ -159,38 +162,9 @@ jobs:
           arch: ${{ matrix.qt == 5 && 'win64_msvc2019_64' || 'win64_msvc2022_64' }}
           cache: true
 
-      # Load the MSVC x64 build environment (what vcvars64.bat sets) into
-      # later steps. Done here rather than with ilammy/msvc-dev-cmd, which
-      # has no Node 24 release.
+      # vcvars64.bat's environment for the later steps (see the action).
       - name: Set up MSVC environment
-        shell: pwsh
-        run: |
-          $vswhere = Join-Path ${env:ProgramFiles(x86)} `
-            'Microsoft Visual Studio\Installer\vswhere.exe'
-          $vs = & $vswhere -latest -products * -property installationPath `
-            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64
-          if (-not $vs) { throw 'No Visual Studio with the x64 C++ tools' }
-          $vcvars = Join-Path $vs 'VC\Auxiliary\Build\vcvars64.bat'
-          $vars = cmd /c "`"$vcvars`" >nul && set"
-          if ($LASTEXITCODE -ne 0) { throw "$vcvars failed" }
-          foreach ($line in $vars) {
-            if ($line -notmatch '^([^=]+)=(.*)$') { continue }
-            $name, $value = $Matches[1], $Matches[2]
-            if ($name -match '^(GITHUB_|RUNNER_)') { continue }
-            if ($name -eq 'Path') {
-              # New directories go through GITHUB_PATH, which prepends each
-              # line in turn: write them last to first to keep vcvars' order.
-              $old = $env:Path -split ';'
-              $new = @($value -split ';' | Where-Object { $_ -and $_ -notin $old })
-              [array]::Reverse($new)
-              $new | Out-File $env:GITHUB_PATH -Append -Encoding utf8
-              continue
-            }
-            # Only what vcvars added or changed.
-            if ([Environment]::GetEnvironmentVariable($name) -ne $value) {
-              "$name=$value" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
-            }
-          }
+        uses: ./.github/actions/msvc-env
 
       - name: Install jom
         shell: pwsh
@@ -294,3 +268,102 @@ jobs:
             suppressions=${{ github.workspace }}/tests/tsan.supp
           QT_QPA_PLATFORM: offscreen
         run: make -C build-tsan check
+
+  asan:
+    name: AddressSanitizer + UBSan (Linux Clang / Qt 6)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Configure
+        run: |
+          mkdir build-asan && cd build-asan
+          qmake -spec linux-clang ../terrasoar.pro CONFIG+=asan
+
+      - name: Build
+        run: make -C build-asan -j"$(nproc)"
+
+      - name: Test
+        # Offscreen, as in the TSan job: Mesa's llvmpipe isn't instrumented.
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          QT_QPA_PLATFORM: offscreen
+        run: make -C build-asan check
+
+  analysis:
+    name: Static analysis (Linux Clang / Qt 6)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # --changed compares with the base branch.
+          fetch-depth: 0
+
+      - name: Install dependencies and tools
+        # clang-tidy 18, clazy 1.11 and cppcheck 2.13: the Ubuntu 24.04
+        # versions, the same as docs/building.md asks for.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS \
+            clang-tidy-18 clazy cppcheck
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Tool versions
+        # clazy is built with LLVM 15; point it at clang-15's built-in headers.
+        run: |
+          clang-tidy-18 --version | head -2
+          clazy-standalone --version | head -2
+          cppcheck --version
+          echo "CLAZY_RESOURCE_DIR=$(clang-15 -print-resource-dir)" >> "$GITHUB_ENV"
+
+      - name: Build for analysis
+        env:
+          QMAKE: qmake
+        run: |
+          python3 tools/checks/run_static_analysis.py --build-dir build-analyze \
+            --build-only
+
+      - name: Self-test
+        # Each tool must still report the known-bad code in
+        # tests/static_analysis/, so a broken tool or config can't pass.
+        run: |
+          python3 tools/checks/run_static_analysis.py --build-dir build-analyze \
+            --no-build --self-test
+
+      - name: Analyse changed files (pull request)
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 tools/checks/run_static_analysis.py --build-dir build-analyze \
+            --no-build --changed origin/${{ github.base_ref }} \
+            --report-dir analysis-report
+
+      - name: Analyse all files (push to main)
+        if: github.event_name != 'pull_request'
+        run: |
+          python3 tools/checks/run_static_analysis.py --build-dir build-analyze \
+            --no-build --report-dir analysis-report
+
+      - name: Upload analysis report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-analysis-report
+          path: analysis-report
+          if-no-files-found: ignore

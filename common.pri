@@ -94,6 +94,14 @@ werror {
 
 # --- Optional instrumented builds ---------------------------------------------
 
+# CONFIG+=msvc_analyze: MSVC's code analysis (/analyze) of our own code;
+# headers included with <...> are external and not analysed. With
+# CONFIG+=werror its warnings are errors too. Used by the nightly CI.
+msvc_analyze {
+    !msvc: error("CONFIG+=msvc_analyze needs MSVC.")
+    QMAKE_CXXFLAGS += /analyze /analyze:external-
+}
+
 # CONFIG+=compiledb (Clang): every object also writes a compile-database
 # fragment, <object>.json, which tools/checks/run_static_analysis.py merges
 # into compile_commands.json for clang-tidy and clazy. `$@` is make's
@@ -110,9 +118,11 @@ tsan {
     DEFINES += TS_TSAN_BUILD
 }
 
-# CONFIG+=asan: AddressSanitizer + UBSan build.
+# CONFIG+=asan: AddressSanitizer + UBSan build. Undefined behaviour stops
+# the program (-fno-sanitize-recover), so a test that hits it fails.
 asan {
-    QMAKE_CXXFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -g
+    QMAKE_CXXFLAGS += -fsanitize=address,undefined \
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g
     QMAKE_LFLAGS += -fsanitize=address,undefined
 }
 

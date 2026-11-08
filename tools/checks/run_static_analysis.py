@@ -17,6 +17,7 @@ Usage: run_static_analysis.py [options]
   --self-test        check that each tool still reports the known-bad code
                      in tests/static_analysis/ (see the README there)
   --no-build         reuse the existing analysis build
+  --build-only       only build and write compile_commands.json
   -j N               parallel jobs (default: number of CPUs)
 
 Tools are found on PATH, or from these environment variables:
@@ -418,6 +419,7 @@ def main(argv):
     parser.add_argument("--report-dir")
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--no-build", action="store_true")
+    parser.add_argument("--build-only", action="store_true")
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 2)
     args = parser.parse_args(argv[1:])
 
@@ -430,6 +432,9 @@ def main(argv):
     if not args.no_build:
         configure_and_build(build_dir, args.jobs)
     entries = compile_database(build_dir)
+    if args.build_only:
+        print(f"Compile database: {len(entries)} file(s) in {build_dir}")
+        return 0
 
     if args.self_test:
         return self_test(build_dir, entries, tools, args.jobs)
