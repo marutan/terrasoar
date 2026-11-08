@@ -33,6 +33,9 @@ HEADERS += \
     include/ts/globe/tilerenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
+    include/ts/layers/layerdefinition.h \
+    include/ts/layers/layertreemodel.h \
+    include/ts/layers/projectfile.h \
     include/ts/maths/angles.h \
     include/ts/maths/mat4.h \
     include/ts/maths/ray.h \
@@ -41,6 +44,7 @@ HEADERS += \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
     include/ts/perf/processstats.h \
+    include/ts/providers/providerregistry.h \
     include/ts/providers/testproviders.h \
     include/ts/providers/tileprovider.h \
     include/ts/render/framepacer.h \
@@ -71,9 +75,13 @@ SOURCES += \
     src/globe/tilerenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
+    src/layers/layerdefinition.cpp \
+    src/layers/layertreemodel.cpp \
+    src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
     src/perf/processstats.cpp \
+    src/providers/providerregistry.cpp \
     src/providers/testproviders.cpp \
     src/providers/tileprovider.cpp \
     src/render/framepacer.cpp \
