@@ -16,3 +16,11 @@ race:libgallium
 # an order TSan reports as a lock-order inversion. Both locks are internal to
 # GDAL and taken on one thread; libgdal is not instrumented.
 deadlock:libgdal.so
+
+# Qt Test's watchdog thread (started in every Qt Test program):
+# QWaitCondition::wakeAll() on the watchdog thread, then ~QWaitCondition()
+# on the main thread after QThread::wait(). The join happens inside
+# libQt6Core, which is not built with TSan, so TSan cannot see the ordering.
+# Note: this also hides a real destroy-while-in-use bug with QWaitCondition
+# in our own code, which the concurrency tests must catch another way.
+race:QWaitCondition::~QWaitCondition
