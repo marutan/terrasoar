@@ -40,9 +40,16 @@ HEADERS += \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
     include/ts/perf/processstats.h \
+    include/ts/providers/testproviders.h \
+    include/ts/providers/tileprovider.h \
     include/ts/render/framepacer.h \
     include/ts/render/glrenderdevice.h \
-    include/ts/render/renderdevice.h
+    include/ts/render/renderdevice.h \
+    include/ts/tiling/lrucache.h \
+    include/ts/tiling/tilekey.h \
+    include/ts/tiling/tileloader.h \
+    include/ts/tiling/tilemesh.h \
+    include/ts/tiling/tileselector.h
 
 SOURCES += \
     src/base/buildinfo.cpp \
@@ -64,5 +71,11 @@ SOURCES += \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
     src/perf/processstats.cpp \
+    src/providers/testproviders.cpp \
+    src/providers/tileprovider.cpp \
     src/render/framepacer.cpp \
-    src/render/glrenderdevice.cpp
+    src/render/glrenderdevice.cpp \
+    src/tiling/tilekey.cpp \
+    src/tiling/tileloader.cpp \
+    src/tiling/tilemesh.cpp \
+    src/tiling/tileselector.cpp
