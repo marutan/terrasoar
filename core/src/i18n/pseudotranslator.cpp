@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ts/i18n/pseudotranslator.h"
 
+#include <cstddef>
+#include <string_view>
+
 #include <QChar>
 
 namespace ts
@@ -10,17 +13,17 @@ namespace
 {
 
 /** Accented look-alikes for 'A'..'Z' and 'a'..'z'. */
-const char16_t upperMap[] = u"ÅƁÇĐÉƑĜĤÎĴĶĹṀÑÖÞǪŘŠŢÛṼŴẊÝŽ";
-const char16_t lowerMap[] = u"åƀçđéƒĝĥîĵķĺɱñöþǫŕšţûṽŵẋýž";
+constexpr std::u16string_view upperMap = u"ÅƁÇĐÉƑĜĤÎĴĶĹṀÑÖÞǪŘŠŢÛṼŴẊÝŽ";
+constexpr std::u16string_view lowerMap = u"åƀçđéƒĝĥîĵķĺɱñöþǫŕšţûṽŵẋýž";
 
 QChar accent(QChar c)
 {
   const char16_t u = c.unicode();
   if (u >= u'A' && u <= u'Z') {
-    return QChar(upperMap[u - u'A']);
+    return QChar(upperMap[static_cast<std::size_t>(u - u'A')]);
   }
   if (u >= u'a' && u <= u'z') {
-    return QChar(lowerMap[u - u'a']);
+    return QChar(lowerMap[static_cast<std::size_t>(u - u'a')]);
   }
   return c;
 }
@@ -28,6 +31,34 @@ QChar accent(QChar c)
 bool isDigit(QChar c)
 {
   return c >= QLatin1Char('0') && c <= QLatin1Char('9');
+}
+
+/**
+ * Length of the Qt placeholder (%1..%99, %L1, %n, %Ln) starting at
+ * @p i in @p source, or 0 if there is none.
+ */
+int placeholderLength(const QString& source, int i)
+{
+  const int size = static_cast<int>(source.size());
+  if (source.at(i) != QLatin1Char('%') || i + 1 >= size) {
+    return 0;
+  }
+  int j = i + 1;
+  if (source.at(j) == QLatin1Char('L')) {
+    ++j;
+  }
+  if (j < size && source.at(j) == QLatin1Char('n')) {
+    ++j;
+  } else {
+    while (j < size && isDigit(source.at(j))) {
+      ++j;
+    }
+  }
+  // "%" alone, or "%L" with nothing after it, is not a placeholder.
+  if (j == i + 1 || source.at(j - 1) == QLatin1Char('L')) {
+    return 0;
+  }
+  return j - i;
 }
 
 } // namespace
@@ -60,25 +91,13 @@ QString PseudoTranslator::pseudoTranslate(const QString& source)
   const int size = static_cast<int>(source.size());
   while (i < size) {
     const QChar c = source.at(i);
-    if (c == QLatin1Char('%') && i + 1 < size) {
-      // %1..%99, %L1, %n, %Ln: copy untouched.
-      int j = i + 1;
-      if (source.at(j) == QLatin1Char('L')) {
-        ++j;
-      }
-      if (j < size && source.at(j) == QLatin1Char('n')) {
-        ++j;
-      } else {
-        while (j < size && isDigit(source.at(j))) {
-          ++j;
-        }
-      }
-      if (j > i + 1 && (source.at(j - 1) != QLatin1Char('L'))) {
-        out += source.mid(i, j - i);
-        visible += 2;
-        i = j;
-        continue;
-      }
+    // Placeholders are copied untouched.
+    const int placeholder = placeholderLength(source, i);
+    if (placeholder > 0) {
+      out += source.mid(i, placeholder);
+      visible += 2;
+      i += placeholder;
+      continue;
     }
     if (c == QLatin1Char('&')) {
       // "&&" is a literal ampersand; "&x" marks a mnemonic.

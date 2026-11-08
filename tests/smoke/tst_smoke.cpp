@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <array>
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
@@ -51,7 +53,7 @@ Run runApp(const QStringList& arguments, bool headless = true,
 /** Returns stderr lines that look like Qt runtime warnings. */
 QStringList qtWarnings(const QByteArray& err)
 {
-  static const char* const markers[] = {
+  static const std::array<const char*, 6> markers = {
       "QObject::", "QWidget::", "QPainter::", "QOpenGL", "ASSERT", "Cannot "};
   QStringList found;
   const QList<QByteArray> lines = err.split('\n');

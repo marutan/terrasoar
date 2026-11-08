@@ -6,6 +6,8 @@
 #   - performance and memory checks against the stored baselines, on Mesa
 #     llvmpipe, plus an optional self-hosted run on the reference PC
 #   - Doxygen API docs as an artefact
+#   - full-tree static analysis (clang-tidy, clazy, cppcheck) and an MSVC
+#     /analyze build, with the reports as artefacts
 #   - on tags: source tarball published to GitHub Releases
 #
 # Golden-image, scripted-flight and install tests join this workflow in the
@@ -121,10 +123,104 @@ jobs:
           name: api-docs
           path: build/docs/api
 
+  analysis:
+    name: Static analysis (full tree)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS \
+            clang-tidy-18 clazy cppcheck
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Analyse
+        env:
+          QMAKE: qmake
+        run: |
+          export CLAZY_RESOURCE_DIR="$(clang-15 -print-resource-dir)"
+          python3 tools/checks/run_static_analysis.py --build-dir build-analyze \
+            --self-test
+          python3 tools/checks/run_static_analysis.py --build-dir build-analyze \
+            --no-build --report-dir analysis-report
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: static-analysis-report
+          path: analysis-report
+          if-no-files-found: ignore
+
+  msvc-analyze:
+    name: MSVC /analyze (Windows / Qt 6)
+    runs-on: windows-2022
+    env:
+      VCPKG_TRIPLET: x64-windows
+      VCPKG_INSTALLED: ${{ github.workspace }}\vcpkg_installed
+    steps:
+      - uses: actions/checkout@v7
+
+      # Same third-party libraries and cache key as ci.yml.
+      - name: Restore third-party libraries
+        id: deps-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: vcpkg_installed
+          key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-v1
+
+      - name: Build third-party libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            --triplet $env:VCPKG_TRIPLET `
+            --x-install-root="$env:VCPKG_INSTALLED" `
+            gdal proj geos sqlite3
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Set up MSVC environment
+        uses: ./.github/actions/msvc-env
+
+      - name: Install jom
+        shell: pwsh
+        run: choco install jom -y --no-progress
+
+      - name: Build with /analyze
+        # Analysis warnings in our own code are errors (CONFIG+=werror).
+        shell: cmd
+        run: |
+          mkdir build-analyze && cd build-analyze
+          qmake ..\terrasoar.pro CONFIG+=werror CONFIG+=release ^
+            CONFIG+=msvc_analyze DEPS_ROOT=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%
+          jom > ..\msvc-analyze.log 2>&1
+          set RESULT=%ERRORLEVEL%
+          type ..\msvc-analyze.log
+          exit /b %RESULT%
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: msvc-analyze-log
+          path: msvc-analyze.log
+          if-no-files-found: ignore
+
   release:
     name: Publish release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [performance, docs]
+    needs: [performance, docs, analysis, msvc-analyze]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

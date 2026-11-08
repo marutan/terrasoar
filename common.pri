@@ -38,9 +38,20 @@ DEFINES += \
     QT_NO_NARROWING_CONVERSIONS_IN_CONNECT \
     QT_USE_QSTRINGBUILDER
 
+# The full warning set, on every build (CONFIG+=werror makes them errors).
+# qmake's warn_on already adds -Wall -Wextra on GCC and Clang; they are listed
+# here too so the policy doesn't depend on the mkspec. See
+# docs/coding-standards.md for why each flag is on.
 gcc|clang {
-    QMAKE_CXXFLAGS_WARN_ON += -Wpedantic -Wshadow -Wnon-virtual-dtor
+    QMAKE_CXXFLAGS_WARN_ON += \
+        -Wall -Wextra -Wpedantic \
+        -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual \
+        -Wconversion -Wsign-conversion -Wold-style-cast \
+        -Wdouble-promotion -Wformat=2 -Wimplicit-fallthrough
 }
+# Clang only: GCC's -Wnull-dereference reports false positives in inlined
+# libstdc++ code at -O2 (e.g. inside std::nth_element).
+clang: QMAKE_CXXFLAGS_WARN_ON += -Wnull-dereference
 # qmake passes Qt's headers with -I, so the compiler checks them with our
 # warning flags; Clang's -Wpedantic then rejects Qt 6.8's [[nodiscard("…")]]
 # under C++17. Marking Qt's include directories as system headers keeps
@@ -83,6 +94,23 @@ werror {
 
 # --- Optional instrumented builds ---------------------------------------------
 
+# CONFIG+=msvc_analyze: MSVC's code analysis (/analyze) of our own code;
+# headers included with <...> are external and not analysed. With
+# CONFIG+=werror its warnings are errors too. Used by the nightly CI.
+msvc_analyze {
+    !msvc: error("CONFIG+=msvc_analyze needs MSVC.")
+    QMAKE_CXXFLAGS += /analyze /analyze:external-
+}
+
+# CONFIG+=compiledb (Clang): every object also writes a compile-database
+# fragment, <object>.json, which tools/checks/run_static_analysis.py merges
+# into compile_commands.json for clang-tidy and clazy. `$@` is make's
+# target, so the fragment sits next to its object file.
+compiledb {
+    !clang: error("CONFIG+=compiledb needs Clang (qmake -spec linux-clang).")
+    QMAKE_CXXFLAGS += -MJ $@.json
+}
+
 # CONFIG+=tsan: ThreadSanitizer build (Linux, GCC or Clang).
 tsan {
     QMAKE_CXXFLAGS += -fsanitize=thread -fno-omit-frame-pointer -g -O1
@@ -90,9 +118,11 @@ tsan {
     DEFINES += TS_TSAN_BUILD
 }
 
-# CONFIG+=asan: AddressSanitizer + UBSan build.
+# CONFIG+=asan: AddressSanitizer + UBSan build. Undefined behaviour stops
+# the program (-fno-sanitize-recover), so a test that hits it fails.
 asan {
-    QMAKE_CXXFLAGS += -fsanitize=address,undefined -fno-omit-frame-pointer -g
+    QMAKE_CXXFLAGS += -fsanitize=address,undefined \
+        -fno-sanitize-recover=undefined -fno-omit-frame-pointer -g
     QMAKE_LFLAGS += -fsanitize=address,undefined
 }
 

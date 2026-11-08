@@ -40,12 +40,12 @@ enum ExitCode {
  * (software OpenGL, the locale) must be known before the application object
  * or the translated --help text is created.
  */
-const char* findArgument(int argc, char* argv[], const char* name,
+const char* findArgument(int argc, char** argv, const char* name,
                          bool wantsValue)
 {
   const std::size_t length = std::strlen(name);
   for (int i = 1; i < argc; ++i) {
-    if (std::strncmp(argv[i], name, length) != 0) {
+    if (argv[i] == nullptr || std::strncmp(argv[i], name, length) != 0) {
       continue;
     }
     const char rest = argv[i][length];
@@ -66,10 +66,9 @@ bool writeJson(const QJsonObject& object, const QString& target)
 {
   const QByteArray json = QJsonDocument(object).toJson(QJsonDocument::Indented);
   if (target == QLatin1String("-")) {
-    std::fwrite(json.constData(), 1, static_cast<std::size_t>(json.size()),
-                stdout);
-    std::fflush(stdout);
-    return true;
+    const std::size_t size = static_cast<std::size_t>(json.size());
+    return std::fwrite(json.constData(), 1, size, stdout) == size &&
+           std::fflush(stdout) == 0;
   }
   QFile file(target);
   if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
@@ -190,10 +189,11 @@ int main(int argc, char* argv[])
   bool idleOk = false;
   const int idleS = parser.value(idleOption).toInt(&idleOk);
   if (!idleOk || idleS < 0) {
-    std::fputs(
+    // Nothing useful to do if stderr itself fails.
+    static_cast<void>(std::fputs(
         qPrintable(QCoreApplication::translate(
             "main", "--idle-seconds needs a whole number of seconds.\n")),
-        stderr);
+        stderr));
     return ExitUsage;
   }
 
@@ -223,5 +223,5 @@ int main(int argc, char* argv[])
     QTimer::singleShot(0, &window, &QWidget::close);
   }
 
-  return app.exec();
+  return QApplication::exec();
 }

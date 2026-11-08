@@ -78,7 +78,8 @@ ProcessStats currentProcessStats()
       stats.peakResidentBytes = hwm;
     }
   }
-  struct rusage usage;
+  struct rusage usage {
+  };
   if (getrusage(RUSAGE_SELF, &usage) == 0) {
     stats.cpuTimeS =
         static_cast<double>(usage.ru_utime.tv_sec + usage.ru_stime.tv_sec) +
@@ -89,8 +90,11 @@ ProcessStats currentProcessStats()
 #if defined(__APPLE__)
       stats.peakResidentBytes = static_cast<std::uint64_t>(usage.ru_maxrss);
 #else
+      // glibc declares the rusage fields inside anonymous unions.
+      // NOLINTBEGIN(cppcoreguidelines-pro-type-union-access)
       stats.peakResidentBytes =
           static_cast<std::uint64_t>(usage.ru_maxrss) * 1024U;
+      // NOLINTEND(cppcoreguidelines-pro-type-union-access)
 #endif
       stats.residentBytes = stats.peakResidentBytes;
       stats.valid = stats.peakResidentBytes > 0;

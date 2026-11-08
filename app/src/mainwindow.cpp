@@ -17,7 +17,8 @@
 namespace ts
 {
 
-MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
+MainWindow::MainWindow(QWidget* parent)
+    : QMainWindow(parent), m_statusLabel(new QLabel(this))
 {
   setObjectName(QStringLiteral("mainWindow"));
   // Phase 1 puts the globe view here.
@@ -25,7 +26,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
   central->setObjectName(QStringLiteral("centralArea"));
   setCentralWidget(central);
 
-  m_statusLabel = new QLabel(this);
   m_statusLabel->setObjectName(QStringLiteral("statusLabel"));
   statusBar()->addWidget(m_statusLabel, 1);
 

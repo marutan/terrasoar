@@ -28,6 +28,7 @@ namespace ts
 class MainWindow : public QMainWindow
 {
   Q_OBJECT
+  Q_DISABLE_COPY_MOVE(MainWindow)
 
 public:
   /** Creates the window. @param parent Usual QWidget parent. */

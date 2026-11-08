@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# clang-tidy configuration (clang-tidy 18, pinned in CI). Run it with
+# tools/checks/run_static_analysis.py or `make analyze`; see
+# docs/coding-standards.md for the policy.
+#
+# Every check below that is switched off has its reason next to it. Don't
+# switch off more without adding the reason here and in
+# docs/coding-standards.md; suppress single findings inline instead:
+#   // NOLINT(check-name): reason
+---
+Checks: >
+  -*,
+  clang-diagnostic-*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -modernize-use-auto,
+  -modernize-use-trailing-return-type,
+  -modernize-return-braced-init-list,
+  -modernize-use-nodiscard,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -performance-enum-size
+# clang-diagnostic-* are the compiler's own warnings (the flags in common.pri),
+# so the analysis job reports them too.
+#
+# Why each is off:
+#   modernize-use-auto                 contradicts the project's no-`auto` rule
+#   modernize-use-trailing-return-type style; the project uses leading types
+#   modernize-return-braced-init-list  style; `return QString();` names the type
+#   modernize-use-nodiscard            would put [[nodiscard]] on nearly every
+#                                      getter; reconsider for error returns
+#   *-magic-numbers                    geodesy and test values are clearer as
+#                                      literals; name constants in review
+#   readability-identifier-length      x, y, z, i, n are normal in maths code
+#   cppcoreguidelines-owning-memory    Qt's parent/child ownership of QObjects
+#                                      (`new QLabel(this)`) has no gsl::owner
+#   *-pro-bounds-pointer-arithmetic    needed for the C APIs (GDAL, PROJ, GEOS,
+#   *-pro-type-reinterpret-cast        SQLite, OpenGL) and argv; both are easy
+#                                      to grep for and reviewed by hand
+#   performance-enum-size              micro-optimisation; plain enums are fine
+WarningsAsErrors: '*'
+# Our own headers only; Qt and third-party headers are system headers.
+HeaderFilterRegex: '/(core|app|tools|tests)/.*\.h$'
+FormatStyle: file
+CheckOptions:
+  # Qt Test's QVERIFY/QCOMPARE expand to nested ifs; count only our code.
+  - key: readability-function-cognitive-complexity.IgnoreMacros
+    value: true
+  # `if (pointer)` is idiomatic with Qt and the C APIs.
+  - key: readability-implicit-bool-conversion.AllowPointerConditions
+    value: true
+  - key: readability-braces-around-statements.ShortStatementLines
+    value: 0
+...

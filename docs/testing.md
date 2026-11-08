@@ -126,6 +126,44 @@ Any report in Terra Soar's own code is a bug: fix it. Suppressions are only
 for uninstrumented third-party code, each with a reason
 (see `tests/tsan.supp`).
 
+## AddressSanitizer and UBSan
+
+```sh
+mkdir -p build/asan && cd build/asan
+qmake6 -spec linux-clang ../../terrasoar.pro CONFIG+=asan
+make -j"$(nproc)"
+ASAN_OPTIONS=detect_leaks=1 QT_QPA_PLATFORM=offscreen make check
+```
+
+The `asan` build finds memory errors and leaks (AddressSanitizer) and
+undefined behaviour (UBSan). Undefined behaviour stops the program, so the
+test fails. CI runs it on every push with no reports allowed. Like the TSan
+job it uses the offscreen platform, because Mesa's llvmpipe isn't
+instrumented.
+
+## Static analysis
+
+```sh
+make analyze                                            # from a build directory
+python3 tools/checks/run_static_analysis.py --changed   # only your changes
+```
+
+Runs clang-tidy, clazy and cppcheck (see
+[building.md](building.md#static-analysis) and
+[coding-standards.md](coding-standards.md#warnings-and-static-analysis)).
+`--self-test` checks that each tool still reports the known-bad code in
+`tests/static_analysis/`; CI runs it before every analysis.
+
+## Before opening a pull request
+
+1. `make check` in a normal build (with `CONFIG+=werror`).
+2. `python3 tools/checks/run_all.py` for the style and documentation checks.
+3. `make analyze`, or `run_static_analysis.py --changed`, for the static
+   analysis.
+4. For threading or memory changes, the TSan and ASan builds above.
+
+CI runs all of these; running them first saves a round trip.
+
 ## Style and documentation checks
 
 ```sh
@@ -186,8 +224,8 @@ during the flights, and a fake-clock test that replays the same input at
 
 | Workflow | When | Jobs |
 | --- | --- | --- |
-| `ci.yml` | Every push and pull request | Style checks; Linux GCC and Clang × Qt 5.15/6 (GL tests under Xvfb + llvmpipe); Windows MSVC × Qt 5.15/6; ThreadSanitizer |
-| `nightly.yml` | Nightly, on `v*` tags, on demand | Benchmarks, start-up/memory/idle checks, API docs artefact, optional reference-PC run; on tags, source tarball published to GitHub Releases |
+| `ci.yml` | Every push and pull request | Style checks; Linux GCC and Clang × Qt 5.15/6 (GL tests under Xvfb + llvmpipe); Windows MSVC × Qt 5.15/6; ThreadSanitizer; AddressSanitizer + UBSan; static analysis of the changed files (whole tree on `main`), after the tooling self-test |
+| `nightly.yml` | Nightly, on `v*` tags, on demand | Benchmarks, start-up/memory/idle checks, API docs artefact, optional reference-PC run; full-tree static analysis and MSVC `/analyze`, with reports as artefacts; on tags, source tarball published to GitHub Releases (after the analysis jobs pass) |
 
 On Windows, CI installs Mesa llvmpipe (from
 [mesa-dist-win](https://github.com/pal1000/mesa-dist-win), version and

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ts/gl/glprobe.h"
 
+#include <algorithm>
+#include <array>
+
 #include <QCoreApplication>
 #include <QOffscreenSurface>
 #include <QOpenGLContext>
@@ -24,16 +27,15 @@ QString glString(QOpenGLFunctions* functions, GLenum name)
 
 bool isSoftwareRenderer(const QString& renderer)
 {
-  static const char* const markers[] = {"llvmpipe",    "softpipe",
-                                        "swrast",      "Software Rasterizer",
-                                        "SwiftShader", "Microsoft Basic Render",
-                                        "GDI Generic", "lavapipe"};
-  for (const char* marker : markers) {
-    if (renderer.contains(QLatin1String(marker), Qt::CaseInsensitive)) {
-      return true;
-    }
-  }
-  return false;
+  static const std::array<const char*, 8> markers = {
+      "llvmpipe",    "softpipe",
+      "swrast",      "Software Rasterizer",
+      "SwiftShader", "Microsoft Basic Render",
+      "GDI Generic", "lavapipe"};
+  return std::any_of(
+      markers.begin(), markers.end(), [&renderer](const char* marker) {
+        return renderer.contains(QLatin1String(marker), Qt::CaseInsensitive);
+      });
 }
 
 GlProbeResult probeOpenGl(int major, int minor)

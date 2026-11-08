@@ -174,7 +174,9 @@ private slots:
     QVERIFY(first.isOpen());
     ts::GdalDataset second(std::move(first));
     QVERIFY(second.isOpen());
-    QVERIFY(!first.isOpen()); // NOLINT(bugprone-use-after-move)
+    // Checks the moved-from state on purpose.
+    // NOLINTNEXTLINE(bugprone-use-after-move,clang-analyzer-cplusplus.Move)
+    QVERIFY(!first.isOpen());
     ts::GdalDataset third;
     third = std::move(second);
     QCOMPARE(third.featureCount(0), 2LL);
@@ -184,7 +186,7 @@ private slots:
   {
     const ts::ProjContext context;
     QVERIFY(context.isValid());
-    PJ_COORD ecef;
+    PJ_COORD ecef{};
     // Uses proj.db: the sample file PROJ needs for EPSG codes.
     QVERIFY2(geodeticToEcef(context, 0.0, 0.0, 0.0, &ecef),
              qPrintable(context.lastErrorString()));
@@ -271,7 +273,7 @@ private slots:
             return false;
           }
           for (int i = 0; i < 20; ++i) {
-            PJ_COORD ecef;
+            PJ_COORD ecef{};
             if (!geodeticToEcef(proj, 0.0, 0.0, 0.0, &ecef) ||
                 std::abs(ecef.xyz.x - 6378137.0) > 1e-3) {
               return false;
