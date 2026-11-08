@@ -233,6 +233,7 @@ jobs:
           Copy-Item (Join-Path $out libgallium_wgl.dll) $bin -Force
 
       - name: Test
+        id: test
         shell: cmd
         env:
           TS_REQUIRE_GL: "1"
@@ -246,8 +247,10 @@ jobs:
           set PATH=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%\bin;%PATH%
           cd build-ci && jom check
 
+      # Only when the tests themselves failed: after an earlier failure
+      # there is no build-ci directory and nothing to show.
       - name: Show test results
-        if: failure()
+        if: failure() && steps.test.outcome == 'failure'
         shell: pwsh
         run: |
           Get-ChildItem build-ci\tests -Recurse -Filter testresults.txt |
