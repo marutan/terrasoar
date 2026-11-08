@@ -100,8 +100,9 @@ libraries it calls into, not the hundred or so that GDAL depends on.
 
    `DEPS_ROOT` may also be set as an environment variable. If your import
    libraries have other names, override them with `GDAL_LIB`, `PROJ_LIB`,
-   `GEOS_LIB` and `SQLITE_LIB` (defaults `gdal`, `proj`, `geos_c`,
-   `sqlite3`).
+   `GEOS_LIB`, `SQLITE_LIB` and `GEOGRAPHICLIB_LIB` (defaults `gdal`,
+   `proj`, `geos_c`, `sqlite3`, and `GeographicLib-i` when that import
+   library exists, as in vcpkg's DLL build, otherwise `GeographicLib`).
 5. Before running, put `%DEPS_ROOT%\bin` and Qt's `bin` on `PATH` (or run
    `windeployqt app\release\terrasoar.exe`).
 
