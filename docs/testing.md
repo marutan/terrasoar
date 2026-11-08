@@ -31,6 +31,8 @@ directly. Qt Test options work as usual:
 | `TS_REQUIRE_GL=1` | A missing OpenGL 3.3 context is a failure, not a skip (CI) |
 | `TS_EXPECT_SOFTWARE_GL=1` | The GL context must be a software rasteriser such as llvmpipe (CI) |
 | `LIBGL_ALWAYS_SOFTWARE=1` | Make Mesa use llvmpipe |
+| `QT_OPENGL=software` | Windows: Qt loads `opengl32sw.dll` instead of the system OpenGL |
+| `GALLIUM_DRIVER=llvmpipe` | Windows Mesa: use llvmpipe rather than another Gallium driver |
 | `TSAN_OPTIONS=suppressions=tests/tsan.supp` | ThreadSanitizer suppressions for third-party code |
 
 The offscreen platform cannot create OpenGL contexts. To run the GL tests
@@ -187,9 +189,16 @@ during the flights, and a fake-clock test that replays the same input at
 | `ci.yml` | Every push and pull request | Style checks; Linux GCC and Clang × Qt 5.15/6 (GL tests under Xvfb + llvmpipe); Windows MSVC × Qt 5.15/6; ThreadSanitizer |
 | `nightly.yml` | Nightly, on `v*` tags, on demand | Benchmarks, start-up/memory/idle checks, API docs artefact, optional reference-PC run; on tags, source tarball published to GitHub Releases |
 
-On Windows, GL tests require a context only on Qt 5, which bundles
-`opengl32sw.dll`. A software fallback for Qt 6 (a Mesa build) is still to
-come.
+On Windows, CI installs Mesa llvmpipe (from
+[mesa-dist-win](https://github.com/pal1000/mesa-dist-win), version and
+SHA-256 pinned in `ci.yml`) as Qt's `opengl32sw.dll`, and the GL tests
+require a software OpenGL 3.3 context on both Qt 5 and Qt 6. Qt 5's own
+`opengl32sw.dll` (Mesa 12) only offers OpenGL 3.0, so it is replaced.
+
+Qt Test's console output doesn't reach the log on the Windows runners. CI
+sets `TESTARGS="-o -,txt -o testresults.txt,txt"`, so each test also writes
+`testresults.txt` in its build directory, and prints those files when a
+test fails.
 
 Golden-image tests (Phase 1 on), network mock-server tests (Phase 4) and
 install tests (Phase 8) join these workflows in the phases that introduce

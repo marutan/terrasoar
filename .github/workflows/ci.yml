@@ -27,6 +27,12 @@ env:
   # Versions installed with aqtinstall. Keep in step with docs/building.md.
   QT5_VERSION: "5.15.2"
   QT6_VERSION: "6.8.3"
+  # Mesa llvmpipe for software OpenGL on Windows, from
+  # github.com/pal1000/mesa-dist-win. The MinGW build, because 26.2.6's MSVC
+  # build has no working software OpenGL (see its release notes). Keep in
+  # step with docs/building.md.
+  MESA_VERSION: "26.2.6"
+  MESA_SHA256: "da0f71d9181b672c1918f3c342f11118c687f6059a46b16502845160733cc388"
   # Apt packages for the third-party libraries on Linux (installed fresh
   # each run; the slow dependency build is on Windows, cached via vcpkg).
   LINUX_DEPS: >-
@@ -170,44 +176,54 @@ jobs:
         shell: cmd
         run: cd build-ci && jom
 
-      # TEMPORARY: diagnosing tst_gl failing silently on Qt 5. Remove once
-      # fixed.
-      - name: Check software OpenGL files (diagnostic)
+      # Windows runners have no GPU. With QT_OPENGL=software, Qt loads
+      # opengl32sw.dll from its bin directory; install Mesa llvmpipe as that
+      # file. Qt 5's own opengl32sw.dll (Mesa 12, 2016) only gives OpenGL 3.0,
+      # and Qt 6 ships none.
+      - name: Install Mesa software OpenGL
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          Get-ChildItem "$env:QT_ROOT_DIR\bin" -Filter *.dll |
-            Where-Object Name -match 'opengl|d3dcompiler|libEGL|libGLES' |
-            Format-Table Name, Length
+          $name = "mesa3d-$env:MESA_VERSION-release-mingw.7z"
+          gh release download $env:MESA_VERSION -R pal1000/mesa-dist-win `
+            -p $name -D $env:RUNNER_TEMP
+          $archive = Join-Path $env:RUNNER_TEMP $name
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:MESA_SHA256) {
+            throw "SHA-256 of $name is $hash, expected $env:MESA_SHA256"
+          }
+          $out = Join-Path $env:RUNNER_TEMP mesa
+          7z e -y "-o$out" $archive x64/opengl32.dll x64/libgallium_wgl.dll
+          if ($LASTEXITCODE -ne 0) { throw "7z failed" }
+          $bin = Join-Path $env:QT_ROOT_DIR bin
+          Copy-Item (Join-Path $out opengl32.dll) `
+            (Join-Path $bin opengl32sw.dll) -Force
+          Copy-Item (Join-Path $out libgallium_wgl.dll) $bin -Force
 
       - name: Test
         shell: cmd
         env:
-          # Windows runners have no GPU: the GL tests use the bundled
-          # software OpenGL (opengl32sw.dll on Qt 5). Qt 6 has no bundled
-          # fallback yet (a Mesa build is planned), so only Qt 5 requires GL.
-          TS_REQUIRE_GL: ${{ matrix.qt == 5 && '1' || '0' }}
+          TS_REQUIRE_GL: "1"
+          TS_EXPECT_SOFTWARE_GL: "1"
           QT_OPENGL: software
+          GALLIUM_DRIVER: llvmpipe
+          # Qt Test's console output doesn't reach the log on Windows, so
+          # each test also writes its results to a file (printed below).
+          TESTARGS: "-o -,txt -o testresults.txt,txt"
         run: |
           set PATH=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%\bin;%PATH%
           cd build-ci && jom check
 
-      # TEMPORARY: rerun the GL test on its own with full output, since
-      # `jom check` shows none. Qt Test's stdout doesn't reach the log on
-      # Windows, so the results go to a file that is then printed. Remove
-      # once tst_gl is fixed.
-      - name: Rerun GL test verbosely (diagnostic)
+      - name: Show test results
         if: failure()
-        shell: cmd
-        env:
-          TS_REQUIRE_GL: ${{ matrix.qt == 5 && '1' || '0' }}
-          QT_OPENGL: software
-          QT_LOGGING_RULES: "qt.qpa.gl=true"
+        shell: pwsh
         run: |
-          set PATH=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%\bin;%PATH%
-          cd build-ci\tests\gl
-          call target_wrapper.bat release\tst_gl.exe -v2 -o tst_gl.txt,txt
-          echo tst_gl exit code %ERRORLEVEL%
-          type tst_gl.txt
+          Get-ChildItem build-ci\tests -Recurse -Filter testresults.txt |
+            ForEach-Object {
+              "===== $($_.Directory.Name)"
+              Get-Content $_.FullName
+            }
 
   tsan:
     name: ThreadSanitizer (Linux Clang / Qt 6)

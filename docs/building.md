@@ -138,9 +138,13 @@ binary, e.g. `CLANG_FORMAT=clang-format-18`.
 
 - `QT_QPA_PLATFORM=offscreen ./app/terrasoar --smoke-test` opens and closes
   the main window without a display.
-- `./app/terrasoar --software-gl` asks Qt for software OpenGL (on Windows
-  with Qt 5 this is the bundled `opengl32sw.dll`). On Linux, set
-  `LIBGL_ALWAYS_SOFTWARE=1` to use Mesa llvmpipe.
+- `./app/terrasoar --software-gl` asks Qt for software OpenGL. On Linux,
+  set `LIBGL_ALWAYS_SOFTWARE=1` to use Mesa llvmpipe. On Windows, Qt loads
+  `opengl32sw.dll` from its `bin` directory; Qt 5's bundled one only offers
+  OpenGL 3.0 and Qt 6 ships none, so install Mesa llvmpipe: from the
+  MinGW x64 build of [mesa-dist-win](https://github.com/pal1000/mesa-dist-win)
+  26.2.6 (the version CI uses), copy `x64/opengl32.dll` to Qt's `bin` as
+  `opengl32sw.dll`, and copy `x64/libgallium_wgl.dll` next to it.
 - `./app/terrasoar --gl-check` reports whether an OpenGL 3.3 core context
   can be created and prints the renderer as JSON.
 
