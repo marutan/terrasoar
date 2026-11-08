@@ -39,7 +39,7 @@ env:
   # Apt packages for the third-party libraries on Linux (installed fresh
   # each run; the slow dependency build is on Windows, cached via vcpkg).
   LINUX_DEPS: >-
-    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev
+    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev libgeographiclib-dev
     libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
     libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
     libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
@@ -137,7 +137,10 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: vcpkg_installed
-          key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-v1
+          key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-geographiclib-v1
+          # A cache for an earlier library list is a good start: vcpkg then
+          # only builds what is missing (minutes, not the full hour).
+          restore-keys: vcpkg-${{ env.VCPKG_TRIPLET }}-
 
       - name: Build third-party libraries
         if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -146,7 +149,7 @@ jobs:
           & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
             --triplet $env:VCPKG_TRIPLET `
             --x-install-root="$env:VCPKG_INSTALLED" `
-            gdal proj geos sqlite3
+            gdal proj geos sqlite3 geographiclib
 
       - name: Save third-party libraries
         if: steps.deps-cache.outputs.cache-hit != 'true'

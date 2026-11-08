@@ -26,10 +26,15 @@ struct DependencyVersions {
   QString geos;
   /** SQLite library version, e.g. "3.45.1". */
   QString sqlite;
+  /**
+   * GeographicLib version, e.g. "2.3". GeographicLib has no run-time query,
+   * so this is the version of the headers the core was built with.
+   */
+  QString geographicLib;
 };
 
 /**
- * Returns the run-time versions of GDAL, PROJ, GEOS and SQLite.
+ * Returns the versions of GDAL, PROJ, GEOS, SQLite and GeographicLib.
  *
  * @threadsafe
  */

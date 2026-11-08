@@ -3,6 +3,7 @@
 
 #include <mutex>
 
+#include <GeographicLib/Config.h>
 #include <gdal.h>
 #include <geos_c.h>
 #include <proj.h>
@@ -18,6 +19,7 @@ DependencyVersions dependencyVersions()
   versions.proj = QString::fromUtf8(proj_info().version);
   versions.geos = QString::fromUtf8(GEOSversion());
   versions.sqlite = QString::fromUtf8(sqlite3_libversion());
+  versions.geographicLib = QStringLiteral(GEOGRAPHICLIB_VERSION_STRING);
   return versions;
 }
 
