@@ -257,7 +257,8 @@ private slots:
     if (globe == nullptr) {
       QFAIL("no globe view although OpenGL is available");
     }
-    QTRY_VERIFY(globe->framesRendered() > 0);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return globe->framesRendered() > 0; }, 5000));
     QVERIFY2(globe->errorString().isEmpty(), qPrintable(globe->errorString()));
   }
 
@@ -312,7 +313,9 @@ private slots:
     QVERIFY2(pointer->text().contains(QStringLiteral("° N")) &&
                  pointer->text().contains(QStringLiteral("° E")),
              qPrintable(pointer->text()));
-    QTRY_VERIFY(eye->text().startsWith(QStringLiteral("Eye height ")));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return eye->text().startsWith(QStringLiteral("Eye height ")); },
+        5000));
     QVERIFY2(eye->text().endsWith(QStringLiteral(" km")),
              qPrintable(eye->text()));
     sendMouse(globe, QEvent::MouseMove, QPointF(2.0, 2.0), Qt::NoButton,
@@ -340,14 +343,17 @@ private slots:
     overlay->trigger();
     QVERIFY(globe->isDebugOverlayVisible());
     const int frames = globe->framesRendered();
-    QTRY_VERIFY(globe->framesRendered() > frames);
+    QVERIFY(QTest::qWaitFor([&]() { return globe->framesRendered() > frames; },
+                            5000));
 
     // Move away, then Reset View flies home.
     globe->flyTo(ts::CameraPose{-33.9, 151.2, 1.0e5, 30.0, 40.0}, 0.2);
-    QTRY_VERIFY(!globe->controller().isAnimating());
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !globe->controller().isAnimating(); }, 5000));
     reset->trigger();
     QVERIFY(globe->controller().isAnimating());
-    QTRY_VERIFY_WITH_TIMEOUT(!globe->controller().isAnimating(), 10000);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !globe->controller().isAnimating(); }, 10000));
     const ts::CameraPose home = ts::GlobeView::homePose();
     const ts::CameraPose& pose = globe->controller().camera().pose();
     QCOMPARE(pose.targetLatDeg, home.targetLatDeg);
@@ -365,7 +371,8 @@ private slots:
     if (globe == nullptr) {
       QSKIP("No OpenGL view on this platform.");
     }
-    QTRY_VERIFY(globe->framesRendered() > 0);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return globe->framesRendered() > 0; }, 5000));
     QTest::qWait(200);
     const int frames = globe->framesRendered();
     QTest::qWait(500);

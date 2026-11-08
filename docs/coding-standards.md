@@ -55,6 +55,11 @@ Qt's and the third-party libraries' headers are system or external headers
 cover only our own code. Include them with `<...>` and our own headers with
 `"..."`, or MSVC treats them the wrong way round.
 
+Don't use Qt Test's `QTRY_VERIFY`/`QTRY_COMPARE`: in Qt 6.8 they expand,
+in our own code, to a `std::chrono` count narrowed to `int`, which GCC's
+`-Wconversion` rejects. Write
+`QVERIFY(QTest::qWaitFor([&]() { return condition; }, 5000))` instead.
+
 With `-Wconversion` and `-Wsign-conversion`, write conversions out:
 `static_cast<std::size_t>(i)`, `static_cast<double>(list.size())`,
 `std::ptrdiff_t` offsets for iterators.
