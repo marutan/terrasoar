@@ -4,9 +4,11 @@ A 3D globe and 2D map viewer for Windows and Linux, built with Qt 5.15 or
 Qt 6 and its own OpenGL 3.3 renderer. It runs well on integrated graphics,
 over remote desktop and with software rendering.
 
-Terra Soar is in early development: Phase 0 (project foundations) of the
-[roadmap](docs/Terra%20Soar%20–%20Phased%20Roadmap.md) gives an empty main
-window with the build, tests, checks and documentation in place.
+Terra Soar is in early development. Following the
+[roadmap](docs/Terra%20Soar%20–%20Phased%20Roadmap.md), it shows a shaded
+WGS 84 globe with a graticule that you can pan, turn, tilt and zoom (down
+to a metre above the surface), with the latitude and longitude under the
+pointer in the status bar. Imagery and map layers come next.
 
 ## Building
 
@@ -18,8 +20,9 @@ QT_QPA_PLATFORM=offscreen make check
 ./app/terrasoar
 ```
 
-You need Qt 5.15 or Qt 6 (with the linguist tools), a C++17 compiler, and
-GDAL, PROJ, GEOS and SQLite. [docs/building.md](docs/building.md) has the
+You need Qt 5.15 or Qt 6 (with the linguist tools), a C++17 compiler,
+OpenGL 3.3 (Mesa's llvmpipe will do), and GDAL, PROJ, GEOS, SQLite and
+GeographicLib. [docs/building.md](docs/building.md) has the
 full instructions for each OS.
 
 ## Documentation
@@ -28,6 +31,9 @@ full instructions for each OS.
 - [Architecture](docs/architecture.md)
 - [Coding standards](docs/coding-standards.md)
 - [Testing](docs/testing.md)
+- Design notes: [coordinates](docs/design/coordinates.md),
+  [renderer backend](docs/design/renderer-backend.md),
+  [camera and precision](docs/design/camera-and-precision.md)
 - API reference: `make docs` (or `doxygen Doxyfile`), then open
   `build/docs/api/index.html`
 
