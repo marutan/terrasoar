@@ -192,7 +192,9 @@ jobs:
           cd build-ci && jom check
 
       # TEMPORARY: rerun the GL test on its own with full output, since
-      # `jom check` shows none. Remove once tst_gl is fixed.
+      # `jom check` shows none. Qt Test's stdout doesn't reach the log on
+      # Windows, so the results go to a file that is then printed. Remove
+      # once tst_gl is fixed.
       - name: Rerun GL test verbosely (diagnostic)
         if: failure()
         shell: cmd
@@ -203,8 +205,9 @@ jobs:
         run: |
           set PATH=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%\bin;%PATH%
           cd build-ci\tests\gl
-          call target_wrapper.bat release\tst_gl.exe -v2 -o -,txt
+          call target_wrapper.bat release\tst_gl.exe -v2 -o tst_gl.txt,txt
           echo tst_gl exit code %ERRORLEVEL%
+          type tst_gl.txt
 
   tsan:
     name: ThreadSanitizer (Linux Clang / Qt 6)
