@@ -10,7 +10,7 @@ them.
 ```
 terrasoar.pro      top-level qmake subdirs project
 common.pri         settings every project includes (Qt switch, C++17, warnings)
-deps.pri           GDAL, PROJ, GEOS, SQLite (pkg-config or DEPS_ROOT)
+deps.pri           GDAL, PROJ, GEOS, SQLite, GeographicLib (pkg-config or DEPS_ROOT)
 core/              tscore: the Qt-widget-free library
   include/ts/<subsection>/   public headers
   src/<subsection>/          implementation
@@ -46,14 +46,16 @@ and the wrappers around third-party libraries.
   `ts`.
 - Each subsection has its own unit test project in `tests/<subsection>/`.
 
-Subsections in Phase 0:
+Subsections so far:
 
 | Subsection | Contents |
 | --- | --- |
 | `base` | Build and version information, program name |
 | `deps` | Owning handles for GDAL datasets, PROJ contexts, GEOS contexts and SQLite connections; library versions |
+| `geo` | WGS 84 constants, geodetic ↔ ECEF, normals and local frames, ray–ellipsoid picking, geodesics (`docs/design/coordinates.md`) |
 | `gl` | OpenGL capability probe, software-renderer detection |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
+| `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion |
 | `perf` | Frame-time statistics, process memory and CPU readings |
 
 ### app (`terrasoar`)

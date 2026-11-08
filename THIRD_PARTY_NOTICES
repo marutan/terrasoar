@@ -36,6 +36,11 @@ SQLite
   Licence: public domain
   https://sqlite.org/
 
+GeographicLib
+  Charles F. F. Karney and others
+  Licence: MIT/X style
+  https://geographiclib.sourceforge.io/
+
 Runtime components bundled in Windows packages
 ----------------------------------------------
 
@@ -46,7 +51,10 @@ Qt software OpenGL fallback (opengl32sw.dll, Qt 5 builds)
 Data
 ----
 
-No third-party data is bundled yet. The base pack (Phase 3) will add
+No third-party data is bundled with the application yet. (The source tree
+has test data that is not distributed: tests/data/geodtest-sample.dat, a
+sample of C. F. F. Karney's "Test set for geodesics", CC0 1.0,
+https://doi.org/10.5281/zenodo.32156.) The base pack (Phase 3) will add
 WVS, Blue Marble and others; each dataset will be listed here with its
 source, licence and required attribution.
 
