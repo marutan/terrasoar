@@ -65,7 +65,13 @@ clang: QMAKE_CXXFLAGS_WARN_ON += -Wno-gnu-zero-variadic-macro-arguments
 linux: QMAKE_LFLAGS += -Wl,--as-needed
 
 msvc {
-    QMAKE_CXXFLAGS_WARN_ON += /W4
+    # Replace the mkspec's -W3 with /W4 (otherwise cl warns D9025 on every
+    # file). As with -isystem above, headers included with <...> (Qt, vcpkg
+    # libraries) are external and get no warnings, so /WX checks only our own
+    # code; project headers are included with "..." and keep /W4. Qt 5.15's
+    # qstringbuilder.h otherwise fails with C4127.
+    QMAKE_CXXFLAGS_WARN_ON -= -W3
+    QMAKE_CXXFLAGS_WARN_ON += /W4 /external:anglebrackets /external:W0
     DEFINES += NOMINMAX _USE_MATH_DEFINES
 }
 
