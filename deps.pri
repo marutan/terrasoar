@@ -35,4 +35,11 @@ win32 {
 } else {
     CONFIG += link_pkgconfig
     PKGCONFIG += gdal proj geos sqlite3
+    # pkg-config's include directories come with -I; also pass them as
+    # -isystem (which wins for a directory given both ways) so warnings and
+    # analysis cover only our own code, as for Qt's headers in common.pri.
+    TS_DEPS_INCLUDES = $$system(pkg-config --cflags-only-I gdal proj geos sqlite3)
+    for (flag, TS_DEPS_INCLUDES) {
+        QMAKE_CXXFLAGS += -isystem $$shell_quote($$replace(flag, ^-I, ))
+    }
 }

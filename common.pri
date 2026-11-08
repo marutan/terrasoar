@@ -38,9 +38,20 @@ DEFINES += \
     QT_NO_NARROWING_CONVERSIONS_IN_CONNECT \
     QT_USE_QSTRINGBUILDER
 
+# The full warning set, on every build (CONFIG+=werror makes them errors).
+# qmake's warn_on already adds -Wall -Wextra on GCC and Clang; they are listed
+# here too so the policy doesn't depend on the mkspec. See
+# docs/coding-standards.md for why each flag is on.
 gcc|clang {
-    QMAKE_CXXFLAGS_WARN_ON += -Wpedantic -Wshadow -Wnon-virtual-dtor
+    QMAKE_CXXFLAGS_WARN_ON += \
+        -Wall -Wextra -Wpedantic \
+        -Wshadow -Wnon-virtual-dtor -Woverloaded-virtual \
+        -Wconversion -Wsign-conversion -Wold-style-cast \
+        -Wdouble-promotion -Wformat=2 -Wimplicit-fallthrough
 }
+# Clang only: GCC's -Wnull-dereference reports false positives in inlined
+# libstdc++ code at -O2 (e.g. inside std::nth_element).
+clang: QMAKE_CXXFLAGS_WARN_ON += -Wnull-dereference
 # qmake passes Qt's headers with -I, so the compiler checks them with our
 # warning flags; Clang's -Wpedantic then rejects Qt 6.8's [[nodiscard("…")]]
 # under C++17. Marking Qt's include directories as system headers keeps

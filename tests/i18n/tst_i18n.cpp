@@ -90,7 +90,8 @@ private slots:
   {
     const QString source = QStringLiteral("Show the program version");
     const QString pseudo = ts::PseudoTranslator::pseudoTranslate(source);
-    QVERIFY(pseudo.size() >= source.size() * 1.3);
+    QVERIFY(static_cast<double>(pseudo.size()) >=
+            static_cast<double>(source.size()) * 1.3);
   }
 
   void accentTablesCoverAlphabet()

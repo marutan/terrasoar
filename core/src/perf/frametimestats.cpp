@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 namespace ts
 {
@@ -44,7 +45,8 @@ double FrameTimeStats::maxS() const
   if (m_size == 0) {
     return 0.0;
   }
-  return *std::max_element(m_samplesS.begin(), m_samplesS.begin() + m_size);
+  const std::vector<double>::const_iterator first = m_samplesS.begin();
+  return *std::max_element(first, first + static_cast<std::ptrdiff_t>(m_size));
 }
 
 double FrameTimeStats::percentileS(double p) const
@@ -53,12 +55,16 @@ double FrameTimeStats::percentileS(double p) const
     return 0.0;
   }
   const double clamped = std::clamp(p, 0.0, 100.0);
-  std::vector<double> sorted(m_samplesS.begin(), m_samplesS.begin() + m_size);
+  std::vector<double> sorted(m_samplesS.begin(),
+                             m_samplesS.begin() +
+                                 static_cast<std::ptrdiff_t>(m_size));
   // Nearest-rank: the smallest value with at least p% of samples <= it.
   const double rank = std::ceil(clamped / 100.0 * static_cast<double>(m_size));
   const std::size_t index = rank < 1.0 ? 0 : static_cast<std::size_t>(rank) - 1;
-  std::nth_element(sorted.begin(), sorted.begin() + index, sorted.end());
-  return sorted[index];
+  const std::vector<double>::iterator nth =
+      sorted.begin() + static_cast<std::ptrdiff_t>(index);
+  std::nth_element(sorted.begin(), nth, sorted.end());
+  return *nth;
 }
 
 double FrameTimeStats::meanFps() const
