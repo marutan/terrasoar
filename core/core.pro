@@ -16,6 +16,8 @@ INCLUDEPATH += $$PWD/include
 
 HEADERS += \
     include/ts/base/buildinfo.h \
+    include/ts/camera/camera.h \
+    include/ts/camera/cameracontroller.h \
     include/ts/deps/dependencies.h \
     include/ts/deps/gdaldataset.h \
     include/ts/deps/geoscontext.h \
@@ -43,6 +45,8 @@ HEADERS += \
 
 SOURCES += \
     src/base/buildinfo.cpp \
+    src/camera/camera.cpp \
+    src/camera/cameracontroller.cpp \
     src/deps/dependencies.cpp \
     src/deps/gdaldataset.cpp \
     src/deps/geoscontext.cpp \
