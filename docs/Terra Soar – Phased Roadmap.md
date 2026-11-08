@@ -4,7 +4,7 @@ Nov 6, 2026 · @Peter
 
 ## Overview
 
-Terra Soar is built in nine phases (0–8), each ending with working software, technical documentation and a regression test suite that every later phase must keep green.
+Terra Soar is built in ten phases (0, 0.5 and 1–8), each ending with working software, technical documentation and a regression test suite that every later phase must keep green.
 
 Key decisions this plan builds on: Qt 5.15 and Qt 6 with qmake; Windows 10+ and Linux; GPL-2.0-or-later; own OpenGL 3.3 renderer behind a backend abstraction; WGS 84 ellipsoid; geographic EPSG:4326 quadtree tiling; layer tree with ordering and alpha; WVS, Blue Marble and WMS as the first sources; 2D Mercator and Miller with an animated 3D/2D morph.
 
@@ -140,6 +140,48 @@ Goal: an empty but fully built, tested and documented project on all CI configur
 * Thread-safety checks: ThreadSanitizer build of the unit and stress tests on Linux CI; each parser and core class has a concurrent test (many threads, own instances) and each thread-safe service a shared-instance stress test
 
 **Exit criteria**: all CI jobs green; a new developer can build from `docs/building.md` alone.
+
+## Phase 0.5 – Compiler warnings and static analysis
+
+Goal: every build, local and CI, compiles with a full warning set, and static analysis runs on all code before Phase 1 adds any, so the code base starts and stays at zero findings.
+
+**Deliverables**
+
+- Warning flags set explicitly in `common.pri` for every build, not only through qmake's `warn_on`: `-Wall -Wextra` (plus the existing `-Wpedantic -Wshadow -Wnon-virtual-dtor`) on GCC and Clang, `/W4` on MSVC
+- Further warnings once the code base is clean with them: `-Wconversion`, `-Wsign-conversion`, `-Wold-style-cast`, `-Woverloaded-virtual`, `-Wnull-dereference`, `-Wdouble-promotion`, `-Wformat=2`, `-Wimplicit-fallthrough`
+- Qt and third-party headers (GDAL, PROJ, GEOS, SQLite) passed as system includes (`-isystem`, MSVC `/external:I` with `/external:W0`), so warnings and analysis cover only our own code
+- `CONFIG+=werror` stays on in CI; local builds show the same warnings but don't fail on them
+- Static analysis tools, each with its config checked in at the repo root and pinned to one version in CI:
+  - **clang-tidy** (`.clang-tidy`): `bugprone-*`, `concurrency-*`, `cert-*`, `performance-*`, `portability-*`, and selected `cppcoreguidelines-*`, `modernize-*` and `readability-*` checks; `WarningsAsErrors: '*'`
+  - **clazy** for Qt-specific problems (detached containers, connect mistakes, `QString` misuse, non-pod globals), at level 1 plus chosen level 2 checks
+  - **cppcheck** with `--enable=warning,performance,portability --inline-suppr --error-exitcode=1`
+  - **MSVC `/analyze`** in one Windows build
+- `compile_commands.json` produced for the analysis builds (`bear -- make` on Linux; Qt 6 qmake's own output where available)
+- `tools/checks/run_static_analysis.py`: runs clang-tidy, clazy and cppcheck on the whole tree, or only on changed files (`--changed`); used both locally and in CI
+- `make analyze` target, so a developer runs the same checks as CI with one command
+- Suppression rule: only inline (`// NOLINT(check-name): reason`, `// cppcheck-suppress id`), always with a reason; no global disables without a note in `docs/coding-standards.md`
+
+**Build, test and CI integration**
+
+- Build: all `core/`, `app/`, `tools/` and `tests/` code built with the full warning set on all six OS × compiler × Qt configurations
+- Test: test code is checked too (warnings and clang-tidy); `make check` runs as before, and `make analyze` is listed in `docs/testing.md` as a step before opening a pull request
+- CI, every push and pull request: new **Static analysis** job (Linux Clang / Qt 6) running clang-tidy, clazy and cppcheck on changed files; any finding fails the job
+- CI, nightly: full-tree clang-tidy, clazy and cppcheck, plus the MSVC `/analyze` build, with reports saved as build artefacts
+- Sanitizers: the existing `asan` (AddressSanitizer + UBSan) configuration added to CI next to ThreadSanitizer
+
+**Technical documentation**
+
+- `docs/coding-standards.md`: warning policy, enabled analysis checks and why each disabled check is off, how to suppress a finding
+- `docs/building.md`: installing clang-tidy, clazy and cppcheck; the `analyze` target and `run_static_analysis.py`
+- `docs/testing.md`: running the analysis and sanitizer builds before a pull request
+
+**Regression tests**
+
+- Tooling self-test: a small fixture under `tests/static_analysis/` with known bad code (unused variable, uninitialised member, Qt container detach, shadowed name) that each tool must flag; CI fails if a tool stops reporting it, so a broken config can't pass silently
+- Zero warnings and zero analysis findings on the whole tree in every CI configuration
+- AddressSanitizer + UBSan run of the unit tests on Linux CI with no reports
+
+**Exit criteria**: all existing code is clean with the full warning set and all analysis tools; the static analysis and sanitizer jobs are green and required for merging; a developer can run every check locally from the docs alone.
 
 ## Phase 1 – WGS 84 globe core
 
