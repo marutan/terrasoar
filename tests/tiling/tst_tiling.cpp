@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <memory>
 #include <set>
 #include <string>
@@ -580,8 +581,10 @@ private slots:
 
   void loaderStressWhileCameraMoves()
   {
-    // Thread safety: thousands of tiles requested and taken while the
-    // camera flies around (run under ThreadSanitizer in CI).
+    // Thread safety: thousands of requests, cancellations and loads while
+    // the camera flies around (run under ThreadSanitizer in CI); then the
+    // final view must load completely. No assertion depends on how fast
+    // the workers are.
     const std::shared_ptr<ts::CheckerboardImageryProvider> provider =
         std::make_shared<ts::CheckerboardImageryProvider>(32);
     ts::TileLoaderSettings settings;
@@ -593,33 +596,54 @@ private slots:
     loader.setTilesReadyCallback([&callbacks]() { ++callbacks; });
     const ts::TileSelector selector;
     std::unordered_set<ts::TileKey, ts::TileKeyHash> resident;
+    std::unordered_set<ts::TileKey, ts::TileKeyHash> requested;
     int taken = 0;
-    for (int frame = 0; frame < 400; ++frame) {
-      const double t = frame / 400.0;
-      const ts::Camera camera = makeCamera(ts::CameraPose{
-          60.0 * std::sin(6.0 * t), 360.0 * t - 180.0,
-          2.0e7 * std::pow(1.0e-3, std::sin(3.14159 * t)), 0.0, 40.0 * t});
+    bool unrequestedTile = false;
+    ts::Camera camera;
+    const std::function<void()> step = [&]() {
       for (const ts::LoadedTile& tile : loader.takeLoaded(16)) {
+        unrequestedTile = unrequestedTile || requested.count(tile.key) == 0;
         resident.insert(tile.key);
         ++taken;
       }
+    };
+    for (int frame = 0; frame < 400; ++frame) {
+      const double t = frame / 400.0;
+      camera = makeCamera(ts::CameraPose{
+          60.0 * std::sin(6.0 * t), 360.0 * t - 180.0,
+          2.0e7 * std::pow(1.0e-3, std::sin(3.14159 * t)), 0.0, 40.0 * t});
+      step();
       const ts::TileSelection selection =
           selector.select(camera, [&resident](ts::TileKey key) {
             return resident.count(key) != 0;
           });
+      for (const ts::TileLoadRequest& request : selection.load) {
+        requested.insert(request.key);
+      }
       loader.setRequests(selection.load);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    loader.setRequests({});
+    // Stay at the last camera until everything it wants is loaded.
     QVERIFY(QTest::qWaitFor(
         [&]() {
-          taken += static_cast<int>(loader.takeLoaded(1000).size());
-          return loader.outstanding() == 0;
+          step();
+          const ts::TileSelection selection =
+              selector.select(camera, [&resident](ts::TileKey key) {
+                return resident.count(key) != 0;
+              });
+          for (const ts::TileLoadRequest& request : selection.load) {
+            requested.insert(request.key);
+          }
+          loader.setRequests(selection.load);
+          return selection.load.empty();
         },
-        20000));
+        30000));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return callbacks.load() == loader.loadedCount(); }, 5000));
     qInfo("%d tiles taken, %d loaded, %d cancelled, %d callbacks", taken,
           loader.loadedCount(), loader.cancelledCount(), callbacks.load());
-    QVERIFY(taken > 500);
-    QCOMPARE(callbacks.load(), loader.loadedCount());
+    QVERIFY(taken > 0);
+    QVERIFY(!unrequestedTile);
     QVERIFY(loader.cache().totalCost() <= settings.cacheBytes);
   }
 
