@@ -41,7 +41,7 @@ public:
    *        finish straight after the first paint.
    * @param parent Usual QObject parent.
    */
-  StartupMeasurement(const QElapsedTimer& sinceMain, QWidget* window, int idleS,
+  StartupMeasurement(QElapsedTimer sinceMain, QWidget* window, int idleS,
                      QObject* parent = nullptr);
 
   /** Starts watching the window. Call before the window is shown. */

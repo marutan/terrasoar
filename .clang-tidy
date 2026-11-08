@@ -11,6 +11,7 @@
 ---
 Checks: >
   -*,
+  clang-diagnostic-*,
   bugprone-*,
   cert-*,
   clang-analyzer-*,
@@ -31,6 +32,9 @@ Checks: >
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -cppcoreguidelines-pro-type-reinterpret-cast,
   -performance-enum-size
+# clang-diagnostic-* are the compiler's own warnings (the flags in common.pri),
+# so the analysis job reports them too.
+#
 # Why each is off:
 #   modernize-use-auto                 contradicts the project's no-`auto` rule
 #   modernize-use-trailing-return-type style; the project uses leading types

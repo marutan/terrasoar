@@ -12,9 +12,8 @@
 namespace ts
 {
 
-StartupMeasurement::StartupMeasurement(const QElapsedTimer& sinceMain,
-                                       QWidget* window, int idleS,
-                                       QObject* parent)
+StartupMeasurement::StartupMeasurement(QElapsedTimer sinceMain, QWidget* window,
+                                       int idleS, QObject* parent)
     : QObject(parent), m_sinceMain(sinceMain), m_window(window),
       m_idleS(idleS > 0 ? idleS : 0)
 {
