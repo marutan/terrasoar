@@ -77,6 +77,7 @@ public:
                         std::size_t offsetBytes,
                         std::size_t sizeBytes) override;
   void setTexture(int unit, const GpuTexture& texture) override;
+  void setRenderTargetTexture(int unit, const RenderTarget& target) override;
   void draw(int vertexCount, int firstVertex, int instances) override;
   void drawIndexed(int indexCount, int firstIndex, int instances) override;
   void endPass() override;

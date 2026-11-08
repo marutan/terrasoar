@@ -140,7 +140,7 @@ LoadedTile TileLoader::load(TileKey key, const std::atomic<bool>& cancelled)
                      static_cast<std::size_t>(tile.image.sizeInBytes()));
     }
   }
-  if (!cancelled.load()) {
+  if (m_settings.buildMeshes && !cancelled.load()) {
     tile.mesh = buildTileMesh(key, m_settings.meshSegments);
   }
   return tile;

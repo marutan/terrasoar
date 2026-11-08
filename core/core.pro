@@ -30,6 +30,7 @@ HEADERS += \
     include/ts/geo/wgs84.h \
     include/ts/gl/glprobe.h \
     include/ts/globe/globerenderer.h \
+    include/ts/globe/layerstackdraws.h \
     include/ts/globe/tilerenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
@@ -72,6 +73,7 @@ SOURCES += \
     src/geo/geoformat.cpp \
     src/gl/glprobe.cpp \
     src/globe/globerenderer.cpp \
+    src/globe/layerstackdraws.cpp \
     src/globe/tilerenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \

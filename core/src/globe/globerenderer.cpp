@@ -348,6 +348,22 @@ void GlobeRenderer::setImageryProvider(
   }
 }
 
+void GlobeRenderer::setImageryLayers(
+    const std::vector<ImageryLayerDraw>& layers,
+    const std::vector<double>& groupAlphas)
+{
+  if (m_tiles) {
+    m_tiles->setLayers(layers, groupAlphas);
+  }
+}
+
+void GlobeRenderer::setGroupCompositing(bool enabled)
+{
+  if (m_tiles) {
+    m_tiles->setGroupCompositing(enabled);
+  }
+}
+
 void GlobeRenderer::setTilesReadyCallback(std::function<void()> callback)
 {
   if (m_tiles) {
@@ -467,7 +483,12 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   m_device.setPipeline(*r.globePipeline);
   m_device.draw(3, 0, 1);
   if (m_tiles) {
-    m_tiles->draw();
+    const std::function<void()> rebind = [this, &r]() {
+      m_device.setUniformBuffer(frameBinding, *r.uniforms, 0, sizeof(frame));
+      m_device.setUniformBuffer(globeBinding, *r.uniforms, r.globeOffset,
+                                sizeof(globe));
+    };
+    m_tiles->draw(clearPass, rebind);
   }
 
   if (r.markerCount > 0 && r.markerInstances) {

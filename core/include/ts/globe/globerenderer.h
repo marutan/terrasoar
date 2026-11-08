@@ -23,6 +23,7 @@ namespace ts
 class Camera;
 class ImageryProvider;
 class TileRenderer;
+struct ImageryLayerDraw;
 struct TileRendererSettings;
 struct TileStatistics;
 
@@ -116,6 +117,19 @@ public:
    * for the plain globe. Only after initialise().
    */
   void setImageryProvider(std::shared_ptr<ImageryProvider> provider);
+
+  /**
+   * Sets the imagery layers drawn on the globe, bottom to top, with the
+   * opacities of their composite groups (see TileRenderer::setLayers()).
+   */
+  void setImageryLayers(const std::vector<ImageryLayerDraw>& layers,
+                        const std::vector<double>& groupAlphas);
+
+  /**
+   * Turns composite groups on or off; off, a group's opacity multiplies
+   * into its layers (the software quality tier).
+   */
+  void setGroupCompositing(bool enabled);
 
   /**
    * Sets the function called (on a worker thread) when imagery tiles

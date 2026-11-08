@@ -354,8 +354,9 @@ private:
 };
 
 /**
- * An offscreen colour (RGBA 8-bit) and depth target, for tests, golden
- * images and screenshots.
+ * An offscreen colour (RGBA 8-bit) and depth target: for drawing a
+ * group of layers to composite it later, and for tests, golden images and
+ * screenshots.
  *
  * @renderthread
  */
@@ -499,6 +500,13 @@ public:
 
   /** Binds @p texture to texture unit @p unit. */
   virtual void setTexture(int unit, const GpuTexture& texture) = 0;
+
+  /**
+   * Binds the colour of @p target to texture unit @p unit (bilinear,
+   * clamped), to draw what was rendered offscreen. The target must not be
+   * the one being drawn into.
+   */
+  virtual void setRenderTargetTexture(int unit, const RenderTarget& target) = 0;
 
   /** Draws @p vertexCount vertices from @p firstVertex, @p instances times. */
   virtual void draw(int vertexCount, int firstVertex, int instances) = 0;

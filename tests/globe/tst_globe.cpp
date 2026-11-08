@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <array>
 #include <cmath>
 #include <optional>
 #include <vector>
 
+#include <QColor>
 #include <QImage>
 #include <QtTest>
 
@@ -99,6 +101,7 @@ private:
   std::unique_ptr<ts::GlobeRenderer> m_renderer;
   std::unique_ptr<ts::RenderTarget> m_target;
   bool m_softwareRenderer = false;
+  std::array<QImage, 3> m_compositingImages;
 
   // NOLINTNEXTLINE(readability-redundant-access-specifiers): Qt's slots marker
 private slots:
@@ -227,6 +230,101 @@ private slots:
     const QString failure = ts::test::checkGolden(
         image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void layerCompositing_data()
+  {
+    QTest::addColumn<int>("scene");
+    QTest::newRow("two-layers-50") << 0;
+    QTest::newRow("group-composite") << 1;
+    QTest::newRow("group-multiply") << 2;
+  }
+
+  void layerCompositing()
+  {
+    // 0: the checkerboard with red at 50 % over it. 1 and 2: a collection
+    //    at 50 % holding the checkerboard and opaque blue over it; drawn as
+    //    one composite image (1) the checkerboard doesn't show through, with
+    //    multiplied opacity (2) it does.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(int, scene);
+    const std::shared_ptr<ts::ImageryProvider> checkerboard =
+        std::make_shared<ts::CheckerboardImageryProvider>();
+    const std::shared_ptr<ts::ImageryProvider> red =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(255, 0, 0), 64);
+    const std::shared_ptr<ts::ImageryProvider> blue =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(0, 0, 255), 64);
+    std::vector<ts::ImageryLayerDraw> layers;
+    std::vector<double> groups;
+    if (scene == 0) {
+      layers = {{checkerboard, 1.0, -1}, {red, 0.5, -1}};
+    } else {
+      layers = {{checkerboard, 1.0, 0}, {blue, 1.0, 0}};
+      groups = {0.5};
+    }
+    m_gl->makeCurrent();
+    m_renderer->setGroupCompositing(scene != 2);
+    m_renderer->setImageryLayers(layers, groups);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{48.0, 10.0, 2.0e6, 0.0, 30.0});
+    QImage image;
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          image = render(camera);
+          return !m_renderer->isBusy();
+        },
+        30000));
+    image = render(camera);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setGroupCompositing(true);
+    QCOMPARE(tiles.groupsComposited, scene == 1 ? 1 : 0);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    // In the middle of the view: red over the checkerboard keeps half its
+    // pattern; the composite group is plain blue over the globe; the
+    // multiplied one lets the checkerboard through.
+    const QColor centre = image.pixelColor(imageWidthPx / 2, imageHeightPx / 2);
+    if (scene == 0) {
+      QVERIFY2(centre.red() > 140 && centre.blue() < 120,
+               qPrintable(centre.name()));
+    } else {
+      QVERIFY2(centre.blue() > 110 && centre.red() < 100,
+               qPrintable(centre.name()));
+    }
+    m_compositingImages.at(static_cast<std::size_t>(scene)) = image;
+    if (scene == 2) {
+      QVERIFY(m_compositingImages[1] != m_compositingImages[2]);
+    }
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void layersShareSources()
+  {
+    // Two layers with the same provider share one loader and set of
+    // textures; a third provider adds a second source.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    ts::TileRenderer tiles(m_gl->device());
+    QString error;
+    QVERIFY2(tiles.initialise(&error), qPrintable(error));
+    const std::shared_ptr<ts::ImageryProvider> shared =
+        std::make_shared<ts::CheckerboardImageryProvider>(64);
+    const std::shared_ptr<ts::ImageryProvider> other =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(0, 255, 0));
+    tiles.setLayers({{shared, 1.0, -1}, {shared, 0.5, -1}}, {});
+    QCOMPARE(tiles.sourceCount(), 1);
+    tiles.setLayers({{shared, 1.0, -1}, {other, 0.5, -1}, {shared, 0.2, -1}},
+                    {});
+    QCOMPARE(tiles.sourceCount(), 2);
+    tiles.setLayers({}, {});
+    QCOMPARE(tiles.sourceCount(), 0);
   }
 
   void silhouetteMatchesPicking()
