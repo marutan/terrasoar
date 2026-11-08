@@ -298,7 +298,8 @@ def run_cppcheck(build_dir, files, jobs):
               encoding="utf-8") as handle:
         entries = json.load(handle)
     for entry in entries:
-        entry["arguments"] = own_includes_only(entry["arguments"])
+        entry["arguments"] = own_includes_only(entry["arguments"],
+                                               entry["directory"], build_dir)
     with open(database, "w", encoding="utf-8") as handle:
         json.dump(entries, handle, indent=1)
     command = [cppcheck, f"--project={database}",
@@ -325,28 +326,34 @@ def moc_revision(build_dir):
     return None
 
 
-def own_includes_only(arguments):
-    """Drops system include directories (-isystem, and -I outside the repo
-    and build tree) from a compile command, for cppcheck."""
+def own_includes_only(arguments, directory, build_dir):
+    """Keeps only our own include directories (in the repo or the build tree)
+    in a compile command, for cppcheck. Qt and the other libraries can be
+    anywhere (/usr, or Qt's own install directory in CI), so anything else
+    is dropped, including every -isystem."""
+    roots = (os.path.realpath(ROOT) + os.sep, os.path.realpath(build_dir) + os.sep)
+
+    def own(path):
+        path = os.path.realpath(os.path.join(directory, path))
+        return (path + os.sep).startswith(roots)
+
     kept = []
     skip = False
     for index, argument in enumerate(arguments):
         if skip:
             skip = False
             continue
-        if argument == "-isystem":
+        if argument in ("-isystem", "-I"):
             skip = True
+            if argument == "-I" and index + 1 < len(arguments) and \
+                    own(arguments[index + 1]):
+                kept += [argument, arguments[index + 1]]
             continue
         if argument.startswith("-isystem"):
             continue
-        if argument == "-I" and index + 1 < len(arguments):
-            directory = arguments[index + 1]
-            skip = True
-            if os.path.isabs(directory) and directory.startswith("/usr/"):
-                continue
-            kept += [argument, directory]
-            continue
-        if argument.startswith("-I/usr/"):
+        if argument.startswith("-I"):
+            if own(argument[2:]):
+                kept.append(argument)
             continue
         kept.append(argument)
     return kept
