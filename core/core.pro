@@ -10,7 +10,7 @@ TARGET = tscore
 CONFIG += staticlib
 CONFIG -= app_bundle
 
-QT = core gui
+QT = core gui $$TS_QT_OPENGL
 
 INCLUDEPATH += $$PWD/include
 
@@ -36,7 +36,10 @@ HEADERS += \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
-    include/ts/perf/processstats.h
+    include/ts/perf/processstats.h \
+    include/ts/render/framepacer.h \
+    include/ts/render/glrenderdevice.h \
+    include/ts/render/renderdevice.h
 
 SOURCES += \
     src/base/buildinfo.cpp \
@@ -54,4 +57,6 @@ SOURCES += \
     src/i18n/translationloader.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
-    src/perf/processstats.cpp
+    src/perf/processstats.cpp \
+    src/render/framepacer.cpp \
+    src/render/glrenderdevice.cpp

@@ -6,6 +6,9 @@
 TS_CORE_SRC = $$PWD
 TS_CORE_OUT = $$shadowed($$PWD)
 
+# tscore is static, so its users link the Qt modules it uses.
+QT += gui $$TS_QT_OPENGL
+
 INCLUDEPATH += $$TS_CORE_SRC/include
 DEPENDPATH += $$TS_CORE_SRC/include
 

@@ -192,6 +192,8 @@ Doxygen comment. Doxygen runs with warnings as errors.
   - `@reentrant`: safe when each thread uses its own instances
   - `@threadsafe`: one instance may be shared between threads
   - `@guithread`: GUI thread only
+  - `@renderthread`: render thread only, with its OpenGL context current
+    (the renderer backend and GPU resources)
 - Write hazards as `@warning` (see `ts::GeosContext`).
 
 ```cpp
