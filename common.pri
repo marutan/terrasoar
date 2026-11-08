@@ -15,10 +15,15 @@ lessThan(QT_MAJOR_VERSION, 5) | \
 
 # Name of the module that provides QOpenGLWidget. Projects that use it add
 # QT += $$TS_QT_OPENGLWIDGETS.
+# TS_QT_OPENGL likewise names the module with QOpenGLFunctions_3_3_Core and
+# QOpenGLFramebufferObject (Qt GUI in Qt 5, Qt OpenGL in Qt 6, which doesn't
+# pull in widgets).
 greaterThan(QT_MAJOR_VERSION, 5) {
     TS_QT_OPENGLWIDGETS = openglwidgets
+    TS_QT_OPENGL = opengl
 } else {
     TS_QT_OPENGLWIDGETS = widgets
+    TS_QT_OPENGL = gui
 }
 
 # --- Language and warnings -------------------------------------------------

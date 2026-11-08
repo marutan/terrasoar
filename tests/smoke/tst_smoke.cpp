@@ -30,6 +30,10 @@ Run runApp(const QStringList& arguments, bool headless = true,
   QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
   if (headless) {
     env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
+    // Truly headless: with a display set, the offscreen platform still
+    // opens it for OpenGL (GLX), which loads the GL driver.
+    env.remove(QStringLiteral("DISPLAY"));
+    env.remove(QStringLiteral("WAYLAND_DISPLAY"));
   }
   process.setProcessEnvironment(env);
   process.start(QStringLiteral(TS_APP_PATH), arguments);
@@ -162,6 +166,27 @@ private slots:
     qInfo("idle CPU %.2f%%", percent);
     QVERIFY(percent >= 0.0);
     QVERIFY2(percent < 5.0, run.out.constData());
+  }
+
+  /**
+   * The application with its globe view on the real platform: opens,
+   * draws and closes without warnings. Skipped without OpenGL 3.3 unless
+   * TS_REQUIRE_GL=1.
+   */
+  void startsWithGlobe()
+  {
+    const Run glCheck = runApp({QStringLiteral("--gl-check")}, false);
+    if (glCheck.exitCode != 0 &&
+        qEnvironmentVariableIntValue("TS_REQUIRE_GL") == 0) {
+      QSKIP("No OpenGL 3.3 here; set TS_REQUIRE_GL=1 to fail instead.");
+    }
+    const Run run = runApp({QStringLiteral("--smoke-test")}, false);
+    QVERIFY2(run.finished, run.err.constData());
+    QCOMPARE(run.status, QProcess::NormalExit);
+    QCOMPARE(run.exitCode, 0);
+    const QStringList warnings = qtWarnings(run.err);
+    QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join(QLatin1Char('\n'))));
+    QVERIFY2(!run.err.contains("Globe view:"), run.err.constData());
   }
 
   /**

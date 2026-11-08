@@ -34,8 +34,12 @@ directly. Qt Test options work as usual:
 | `QT_OPENGL=software` | Windows: Qt loads `opengl32sw.dll` instead of the system OpenGL |
 | `GALLIUM_DRIVER=llvmpipe` | Windows Mesa: use llvmpipe rather than another Gallium driver |
 | `TSAN_OPTIONS=suppressions=tests/tsan.supp` | ThreadSanitizer suppressions for third-party code |
+| `TS_UPDATE_GOLDEN=1` | Golden-image tests write the rendered images as the new golden images instead of comparing |
+| `TS_GOLDEN_OUTPUT=<dir>` | Golden-image tests that fail save `<name>-actual.png` and `<name>-diff.png` there (CI uploads them as an artefact) |
 
-The offscreen platform cannot create OpenGL contexts. To run the GL tests
+The offscreen platform cannot show OpenGL views (and without a display it
+can't create contexts at all), so the GPU tests skip there and the
+application shows a message instead of the globe. To run the GPU tests
 without a display, use a virtual X server:
 
 ```sh
@@ -55,13 +59,43 @@ application as a whole.
 | `tests/perf` | Frame-time statistics and percentiles, process memory and CPU readings, benchmarks |
 | `tests/i18n` | English fallback, pseudo-translation rules, placeholders and plurals survive, concurrency |
 | `tests/gl` | Software-renderer detection, OpenGL 3.3 core context creation |
-| `tests/smoke` | Launches the built `terrasoar`: clean start and exit, pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering |
-| `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text |
+| `tests/maths` | Vectors, matrices, rays, the high/low float split |
+| `tests/geo` | WGS 84, geodetic ↔ ECEF round trips and against PROJ, normals, ray picking, geodesics and rhumb lines against reference data |
+| `tests/render` | (GPU) The OpenGL 3.3 backend: draws, viewport orientation, instancing, uniform offsets, textures, depth, blending, error reporting |
+| `tests/camera` | Pose limits, frames, pixel ↔ ray ↔ globe round trips, pan and zoom keep the point under the pointer, frame-rate independence at 10/20/60/144 fps, inertia, flights, stalls |
+| `tests/globe` | (GPU) Golden images, silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
+| `tests/smoke` | Launches the built `terrasoar`: clean start and exit (headless), pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering, the globe window on the real platform |
+| `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
 
-Shared helpers are in `tests/support/`. The main one is
-`ts::test::runConcurrently()`, which starts many threads and releases them
-together. Sample files are in `tests/data/` (see its README). Test code
+Shared helpers are in `tests/support/`: `ts::test::runConcurrently()`
+starts many threads and releases them together; `ts::test::OffscreenGl`
+gives a GPU test an OpenGL 3.3 context and render device
+(`TS_TEST_REQUIRE_GL` skips, or fails under `TS_REQUIRE_GL=1`);
+`ts::test::checkGolden()` compares an image with its golden image.
+Sample files are in `tests/data/` (see its README). Test code
 finds them through `TS_TEST_DATA_DIR`.
+
+### Golden images
+
+`tests/globe` renders fixed views offscreen and compares them with
+`tests/data/golden/*.png`. Rendering differs slightly between drivers, so
+the comparison runs only on Mesa llvmpipe, the renderer every CI job uses,
+and allows small differences between llvmpipe versions: at most 0.5 % of
+the pixels may differ by more than 12 levels in any channel. On other
+renderers the test renders (and checks for errors) but skips the
+comparison.
+
+After an intended change to the picture, regenerate the images on
+llvmpipe, look at every changed one, and commit them with the change:
+
+```sh
+LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=xcb TS_UPDATE_GOLDEN=1 \
+    xvfb-run -a ./tests/globe/tst_globe goldenImages
+git diff --stat tests/data/golden
+```
+
+When CI fails a comparison it uploads the actual and difference images
+(`golden-output-*` artefacts).
 
 ### Application exit codes
 

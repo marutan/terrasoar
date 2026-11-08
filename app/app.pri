@@ -8,10 +8,12 @@ QT += widgets $$TS_QT_OPENGLWIDGETS
 INCLUDEPATH += $$PWD/src
 
 HEADERS += \
+    $$PWD/src/globeview.h \
     $$PWD/src/mainwindow.h \
     $$PWD/src/startupmeasurement.h
 
 SOURCES += \
+    $$PWD/src/globeview.cpp \
     $$PWD/src/mainwindow.cpp \
     $$PWD/src/startupmeasurement.cpp
 

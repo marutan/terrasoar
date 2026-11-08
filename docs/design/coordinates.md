@@ -108,9 +108,10 @@ numbers. A ray starting outside returns the entry point, one starting
 inside returns the exit point, a tangent ray counts as a hit, and a zero
 direction never hits.
 
-The screen-to-ray step (unprojecting a pixel with the camera's inverse
-view-projection matrix) belongs to the camera and comes in Phase 1 with
-it; its pick tests will build on the ones here.
+The screen-to-ray step is `ts::Camera::rayThroughPixel()`, and
+`ts::Camera::pickGeodetic()` combines the two (see
+[camera-and-precision.md](camera-and-precision.md)); `tests/camera` checks
+pixel → ray → surface → pixel round trips.
 
 ## Geodesics
 
@@ -120,6 +121,11 @@ it; its pick tests will build on the ones here.
 nearly antipodal ones included, where Vincenty's formulae fail to
 converge. Distances are on the ellipsoid surface; heights are ignored.
 Azimuths are degrees clockwise from north in (−180, 180].
+
+`rhumbDirect()` and `rhumbInverse()` do the same for rhumb lines (constant
+azimuth) with GeographicLib's `Rhumb`. The camera pans along rhumb lines
+because a rhumb line split into pieces is the same line, which makes
+panning independent of the frame rate.
 
 GeographicLib's `Geodesic::WGS84()` is constructed once (thread-safe since
 C++11) and only its const members are called, so both functions are

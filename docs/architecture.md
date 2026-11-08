@@ -39,8 +39,9 @@ A static library holding everything that is not user interface: maths,
 coordinates, tiling, providers, rendering backends, caches, format parsers,
 and the wrappers around third-party libraries.
 
-- Uses Qt Core and Qt Gui only. **No Qt Widgets**, so the core can be
-  tested headless and reused by tools (such as the Phase 3 packager).
+- Uses Qt Core, Qt Gui and (on Qt 6) Qt OpenGL only. **No Qt Widgets**,
+  so the core can be tested headless and reused by tools (such as the
+  Phase 3 packager).
 - Public headers live under `core/include/ts/<subsection>/` and are
   included as `"ts/<subsection>/<name>.h"`. Everything is in namespace
   `ts`.
@@ -51,12 +52,15 @@ Subsections so far:
 | Subsection | Contents |
 | --- | --- |
 | `base` | Build and version information, program name |
+| `camera` | Camera pose, view and projection, picking rays; navigation controller (pan, rotate, zoom, keys, inertia, fly-to) driven by elapsed time (`docs/design/camera-and-precision.md`) |
 | `deps` | Owning handles for GDAL datasets, PROJ contexts, GEOS contexts and SQLite connections; library versions |
 | `geo` | WGS 84 constants, geodetic ↔ ECEF, normals and local frames, ray–ellipsoid picking, geodesics (`docs/design/coordinates.md`) |
 | `gl` | OpenGL capability probe, software-renderer detection |
+| `globe` | The globe renderer: ray-cast WGS 84 ellipsoid with graticule, markers relative to the eye |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
-| `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion |
+| `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `perf` | Frame-time statistics, process memory and CPU readings |
+| `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 
 ### app (`terrasoar`)
 
@@ -66,6 +70,11 @@ in core.
 
 - `app.pri` lists the shell's sources without `main()`, so the UI tests in
   `tests/ui` build exactly the same code.
+- `GlobeView` (a `QOpenGLWidget`) owns the camera controller and the
+  globe renderer, maps mouse and keyboard input to the controller, paces
+  frames and draws the debug overlay. Where the platform can't show an
+  OpenGL view (the headless `offscreen` platform), the main window shows a
+  message instead and everything else still works.
 - `main.cpp` handles the command line, installs translators and creates
   the main window. Its test and measurement switches (`--smoke-test`,
   `--measure`, `--gl-check`, `--pseudo-locale`, `--software-gl`) are what
@@ -80,7 +89,7 @@ library.
 ### Dependency rules
 
 ```
-app ──► core ──► Qt Core/Gui, GDAL, PROJ, GEOS, SQLite
+app ──► core ──► Qt Core/Gui/OpenGL, GDAL, PROJ, GEOS, SQLite, GeographicLib
 tools ─► core
 tests ─► core (+ app sources for UI tests)
 ```
@@ -127,19 +136,23 @@ concurrent test that would catch it under ThreadSanitizer.
 
 ## Rendering and performance
 
-The renderer arrives in Phase 1, behind a backend interface with an
-OpenGL 3.3 core implementation (`docs/design/renderer-backend.md`). Phase 0
-fixes the ground rules it must follow:
+The renderer sits behind a backend interface with an OpenGL 3.3 core
+implementation (`docs/design/renderer-backend.md`); the camera and the
+precision techniques are in `docs/design/camera-and-precision.md`. The
+ground rules:
 
 - Render on demand only. With no input and no loading, the app uses about
   0% CPU (checked by `tst_smoke` and `tools/perf/measure_startup.py`).
-- Stay within the 256 MB common-use memory budget. The empty application
-  uses about 35 MB, the baseline in `tools/perf/baselines/`.
+- Stay within the 256 MB common-use memory budget. Headless, the
+  application uses about 35 MB (the baseline in `tools/perf/baselines/`);
+  with the globe on Mesa llvmpipe about 170 MB, most of it the software
+  rasteriser itself.
 - Run on OpenGL 3.3 core, including Mesa llvmpipe and, on Windows, a
   bundled software fallback. `ts::probeOpenGl()` detects software renderers
   so that a lighter quality tier can be picked.
 - All motion is driven by elapsed time from `QElapsedTimer`, never by
-  frame count.
+  frame count, and frames never come faster than the screen's refresh
+  rate (`ts::FramePacer`).
 
 ## Translation
 

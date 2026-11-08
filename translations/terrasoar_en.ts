@@ -63,6 +63,33 @@
         </message>
     </context>
     <context>
+        <name>ts::GeoFormat</name>
+        <message>
+            <source>%1° S</source>
+            <translation>%1° S</translation>
+        </message>
+        <message>
+            <source>%1° N</source>
+            <translation>%1° N</translation>
+        </message>
+        <message>
+            <source>%1° W</source>
+            <translation>%1° W</translation>
+        </message>
+        <message>
+            <source>%1° E</source>
+            <translation>%1° E</translation>
+        </message>
+        <message>
+            <source>%1 m</source>
+            <translation>%1 m</translation>
+        </message>
+        <message>
+            <source>%1 km</source>
+            <translation>%1 km</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::GlProbe</name>
         <message>
             <source>Could not create an OpenGL context.</source>
@@ -79,6 +106,62 @@
         <message>
             <source>OpenGL %1.%2 is needed but only %3.%4 is available (%5).</source>
             <translation>OpenGL %1.%2 is needed but only %3.%4 is available (%5).</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::GlRenderDevice</name>
+        <message>
+            <source>The OpenGL context is not current.</source>
+            <translation>The OpenGL context is not current.</translation>
+        </message>
+        <message>
+            <source>OpenGL 3.3 core profile is needed; this context is OpenGL %1.%2.</source>
+            <translation>OpenGL 3.3 core profile is needed; this context is OpenGL %1.%2.</translation>
+        </message>
+        <message>
+            <source>The OpenGL 3.3 functions could not be loaded.</source>
+            <translation>The OpenGL 3.3 functions could not be loaded.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::GlobeView</name>
+        <message>
+            <source>Renderer: %1</source>
+            <translation>Renderer: %1</translation>
+        </message>
+        <message>
+            <source>CPU per frame: %1 ms mean, %2 ms max</source>
+            <translation>CPU per frame: %1 ms mean, %2 ms max</translation>
+        </message>
+        <message>
+            <source>While moving: %1 frames per second</source>
+            <translation>While moving: %1 frames per second</translation>
+        </message>
+        <message>
+            <source>Frames drawn: %1</source>
+            <translation>Frames drawn: %1</translation>
+        </message>
+        <message>
+            <source>Target: %1, %2</source>
+            <translation>Target: %1, %2</translation>
+        </message>
+        <message>
+            <source>Range: %1, heading %2°, tilt %3°</source>
+            <translation>Range: %1, heading %2°, tilt %3°</translation>
+        </message>
+        <message>
+            <source>Eye height: %1</source>
+            <translation>Eye height: %1</translation>
+        </message>
+        <message>
+            <source>The globe could not be drawn.</source>
+            <translation>The globe could not be drawn.</translation>
+        </message>
+        <message>
+            <source>The globe needs OpenGL 3.3, which is not available:
+%1</source>
+            <translation>The globe needs OpenGL 3.3, which is not available:
+%1</translation>
         </message>
     </context>
     <context>
@@ -126,6 +209,42 @@
         <message>
             <source>&lt;h3&gt;%1 %2&lt;/h3&gt;&lt;p&gt;A 3D globe and 2D map viewer.&lt;/p&gt;&lt;p&gt;Built with Qt %3 (running on Qt %4) and %5.&lt;/p&gt;&lt;p&gt;This program is free software, licensed under the GNU General Public License, version 2 or later.&lt;/p&gt;</source>
             <translation>&lt;h3&gt;%1 %2&lt;/h3&gt;&lt;p&gt;A 3D globe and 2D map viewer.&lt;/p&gt;&lt;p&gt;Built with Qt %3 (running on Qt %4) and %5.&lt;/p&gt;&lt;p&gt;This program is free software, licensed under the GNU General Public License, version 2 or later.&lt;/p&gt;</translation>
+        </message>
+        <message>
+            <source>&amp;View</source>
+            <translation>&amp;View</translation>
+        </message>
+        <message>
+            <source>&amp;Reset View</source>
+            <translation>&amp;Reset View</translation>
+        </message>
+        <message>
+            <source>Fly back to the start view</source>
+            <translation>Fly back to the start view</translation>
+        </message>
+        <message>
+            <source>&amp;Debug Overlay</source>
+            <translation>&amp;Debug Overlay</translation>
+        </message>
+        <message>
+            <source>Show frame times and the camera position over the globe</source>
+            <translation>Show frame times and the camera position over the globe</translation>
+        </message>
+        <message>
+            <source>The globe needs OpenGL 3.3, which this display does not offer. Start %1 with --software-gl to use software rendering.</source>
+            <translation>The globe needs OpenGL 3.3, which this display does not offer. Start %1 with --software-gl to use software rendering.</translation>
+        </message>
+        <message>
+            <source>%1  %2</source>
+            <translation>%1  %2</translation>
+        </message>
+        <message>
+            <source>Pointer not on the globe</source>
+            <translation>Pointer not on the globe</translation>
+        </message>
+        <message>
+            <source>Eye height %1</source>
+            <translation>Eye height %1</translation>
         </message>
     </context>
 </TS>

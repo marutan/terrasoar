@@ -7,6 +7,7 @@
 #include "ts/maths/angles.h"
 #include "ts/maths/mat4.h"
 #include "ts/maths/ray.h"
+#include "ts/maths/splitdouble.h"
 #include "ts/maths/vec3.h"
 #include "ts/maths/vec4.h"
 
@@ -117,6 +118,29 @@ private slots:
     QVERIFY((ts::Vec4::direction(p) == ts::Vec4{1.0, 2.0, 3.0, 0.0}));
     QVERIFY((ts::Vec4::point(p).xyz() == p));
     QVERIFY(ts::Vec4::point(p) != ts::Vec4::direction(p));
+  }
+
+  void splitDouble()
+  {
+    // high + low keeps an Earth-radius coordinate to well under a
+    // micrometre, where a float alone is off by up to a quarter metre.
+    const double x = 6378137.123456789;
+    const ts::SplitFloat split = ts::splitDouble(x);
+    QCOMPARE(split.high, static_cast<float>(x));
+    QVERIFY(std::abs(static_cast<double>(split.high) - x) > 1e-3);
+    QVERIFY(std::abs(static_cast<double>(split.high) +
+                     static_cast<double>(split.low) - x) < 1e-7);
+    // The relative-to-eye difference in float arithmetic, as on the GPU:
+    // for nearby points the high parts subtract exactly.
+    const double eye = 6378139.987654321;
+    const ts::SplitFloat e = ts::splitDouble(eye);
+    const float offset = (split.high - e.high) + (split.low - e.low);
+    QVERIFY(std::abs(static_cast<double>(offset) - (x - eye)) < 1e-6);
+    const ts::SplitVec3 v = ts::splitVec3(ts::Vec3{x, -x, 0.5});
+    QCOMPARE(v.highY, -split.high);
+    QCOMPARE(v.lowY, -split.low);
+    QCOMPARE(v.highZ, 0.5F);
+    QCOMPARE(v.lowZ, 0.0F);
   }
 
   void ray()

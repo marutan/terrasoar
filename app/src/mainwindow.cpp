@@ -6,28 +6,50 @@
 #include <QEvent>
 #include <QKeySequence>
 #include <QLabel>
+#include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QWidget>
 
+#include "globeview.h"
 #include "ts/base/buildinfo.h"
+#include "ts/geo/geoformat.h"
 
 namespace ts
 {
 
 MainWindow::MainWindow(QWidget* parent)
-    : QMainWindow(parent), m_statusLabel(new QLabel(this))
+    : QMainWindow(parent), m_statusLabel(new QLabel(this)),
+      m_pointerLabel(new QLabel(this)), m_eyeLabel(new QLabel(this))
 {
   setObjectName(QStringLiteral("mainWindow"));
-  // Phase 1 puts the globe view here.
-  QWidget* central = new QWidget(this);
-  central->setObjectName(QStringLiteral("centralArea"));
-  setCentralWidget(central);
+  if (GlobeView::isOpenGlAvailable()) {
+    m_globeView = new GlobeView(this);
+    setCentralWidget(m_globeView);
+    m_eyeHeightM = m_globeView->controller().camera().eyeGeodetic().heightM;
+    connect(m_globeView, &GlobeView::pointerPositionChanged, this,
+            &MainWindow::showPointerPosition);
+    connect(m_globeView, &GlobeView::cameraChanged, this,
+            &MainWindow::showEyeHeight);
+  } else {
+    // Headless runs (the offscreen platform) and broken drivers: the rest
+    // of the window still works.
+    m_noGlobeLabel = new QLabel(this);
+    m_noGlobeLabel->setObjectName(QStringLiteral("noGlobeLabel"));
+    m_noGlobeLabel->setAlignment(Qt::AlignCenter);
+    m_noGlobeLabel->setWordWrap(true);
+    setCentralWidget(m_noGlobeLabel);
+    m_eyeHeightM = GlobeView::homePose().rangeM;
+  }
 
   m_statusLabel->setObjectName(QStringLiteral("statusLabel"));
   statusBar()->addWidget(m_statusLabel, 1);
+  m_pointerLabel->setObjectName(QStringLiteral("pointerLabel"));
+  statusBar()->addPermanentWidget(m_pointerLabel);
+  m_eyeLabel->setObjectName(QStringLiteral("eyeLabel"));
+  statusBar()->addPermanentWidget(m_eyeLabel);
 
   createActions();
   createMenus();
@@ -46,6 +68,27 @@ void MainWindow::createActions()
   m_quitAction->setMenuRole(QAction::QuitRole);
   connect(m_quitAction, &QAction::triggered, this, &QWidget::close);
 
+  m_debugOverlayAction = new QAction(this);
+  m_debugOverlayAction->setObjectName(QStringLiteral("debugOverlayAction"));
+  m_debugOverlayAction->setCheckable(true);
+  m_debugOverlayAction->setShortcut(QKeySequence(Qt::Key_F3));
+  if (m_globeView) {
+    connect(m_debugOverlayAction, &QAction::toggled, m_globeView,
+            &GlobeView::setDebugOverlayVisible);
+  } else {
+    m_debugOverlayAction->setEnabled(false);
+  }
+
+  m_resetViewAction = new QAction(this);
+  m_resetViewAction->setObjectName(QStringLiteral("resetViewAction"));
+  m_resetViewAction->setShortcut(QKeySequence(Qt::Key_Home));
+  if (m_globeView) {
+    connect(m_resetViewAction, &QAction::triggered, m_globeView,
+            &GlobeView::goHome);
+  } else {
+    m_resetViewAction->setEnabled(false);
+  }
+
   m_aboutAction = new QAction(this);
   m_aboutAction->setObjectName(QStringLiteral("aboutAction"));
   m_aboutAction->setMenuRole(QAction::AboutRole);
@@ -63,6 +106,12 @@ void MainWindow::createMenus()
   m_fileMenu->setObjectName(QStringLiteral("fileMenu"));
   m_fileMenu->addAction(m_quitAction);
 
+  m_viewMenu = menuBar()->addMenu(QString());
+  m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
+  m_viewMenu->addAction(m_resetViewAction);
+  m_viewMenu->addSeparator();
+  m_viewMenu->addAction(m_debugOverlayAction);
+
   m_helpMenu = menuBar()->addMenu(QString());
   m_helpMenu->setObjectName(QStringLiteral("helpMenu"));
   m_helpMenu->addAction(m_aboutAction);
@@ -73,14 +122,47 @@ void MainWindow::retranslateUi()
 {
   setWindowTitle(programName());
   m_fileMenu->setTitle(tr("&File"));
+  m_viewMenu->setTitle(tr("&View"));
   m_helpMenu->setTitle(tr("&Help"));
   m_quitAction->setText(tr("&Quit"));
   m_quitAction->setStatusTip(tr("Close the program"));
+  m_resetViewAction->setText(tr("&Reset View"));
+  m_resetViewAction->setStatusTip(tr("Fly back to the start view"));
+  m_debugOverlayAction->setText(tr("&Debug Overlay"));
+  m_debugOverlayAction->setStatusTip(
+      tr("Show frame times and the camera position over the globe"));
   m_aboutAction->setText(tr("&About %1").arg(programName()));
   m_aboutAction->setStatusTip(tr("Show the program version and licence"));
   m_aboutQtAction->setText(tr("About &Qt"));
   m_aboutQtAction->setStatusTip(tr("Show the Qt version in use"));
   m_statusLabel->setText(tr("Ready"));
+  if (m_noGlobeLabel) {
+    m_noGlobeLabel->setText(
+        tr("The globe needs OpenGL 3.3, which this display does not offer. "
+           "Start %1 with --software-gl to use software rendering.")
+            .arg(programName()));
+  }
+  showPointerPosition(m_pointerOnGlobe, m_pointerLatDeg, m_pointerLonDeg);
+  showEyeHeight(m_eyeHeightM);
+}
+
+void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
+{
+  m_pointerOnGlobe = onGlobe;
+  m_pointerLatDeg = latDeg;
+  m_pointerLonDeg = lonDeg;
+  const QLocale locale;
+  m_pointerLabel->setText(
+      onGlobe ? tr("%1  %2").arg(formatLatitude(latDeg, locale),
+                                 formatLongitude(lonDeg, locale))
+              : tr("Pointer not on the globe"));
+}
+
+void MainWindow::showEyeHeight(double eyeHeightM)
+{
+  m_eyeHeightM = eyeHeightM;
+  m_eyeLabel->setText(
+      tr("Eye height %1").arg(formatDistance(eyeHeightM, QLocale())));
 }
 
 void MainWindow::changeEvent(QEvent* event)

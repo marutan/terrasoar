@@ -46,3 +46,4 @@ WARN_LOGFILE           = build/docs/doxygen-warnings.log
 ALIASES += "reentrant=@par Thread safety^^Reentrant: safe when each thread uses its own instances.^^"
 ALIASES += "threadsafe=@par Thread safety^^Thread-safe: one instance may be shared between threads.^^"
 ALIASES += "guithread=@par Thread safety^^GUI thread only.^^"
+ALIASES += "renderthread=@par Thread safety^^Render thread only: use it where its OpenGL context is current.^^"

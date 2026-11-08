@@ -17,7 +17,10 @@ CONFIG -= app_bundle
 
 # Test helpers shared by several test projects.
 INCLUDEPATH += $$PWD/support
-HEADERS += $$PWD/support/concurrency.h
+HEADERS += \
+    $$PWD/support/concurrency.h \
+    $$PWD/support/goldenimage.h \
+    $$PWD/support/offscreengl.h
 
 # Absolute path of tests/data, for sample files.
 DEFINES += TS_TEST_DATA_DIR=\\\"$$PWD/data\\\"

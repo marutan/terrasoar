@@ -457,6 +457,35 @@ private slots:
     QVERIFY(ts::dot(*exit, direction) > 0.0);
   }
 
+  void rhumbLines()
+  {
+    // Due north a rhumb line is the meridian, the same as the geodesic.
+    const ts::GeodesicDirect north = ts::rhumbDirect(10.0, 20.0, 0.0, 5.0e5);
+    const ts::GeodesicDirect meridian =
+        ts::geodesicDirect(10.0, 20.0, 0.0, 5.0e5);
+    QVERIFY(std::abs(north.latDeg - meridian.latDeg) < 1e-9);
+    QVERIFY(std::abs(north.lonDeg - 20.0) < 1e-12);
+    // Split into ten pieces with the same azimuth it ends in the same
+    // place, which the camera's frame-rate independence relies on.
+    double lat = 35.0;
+    double lon = 139.0;
+    for (int i = 0; i < 10; ++i) {
+      const ts::GeodesicDirect step = ts::rhumbDirect(lat, lon, 63.0, 1.0e5);
+      lat = step.latDeg;
+      lon = step.lonDeg;
+    }
+    const ts::GeodesicDirect once = ts::rhumbDirect(35.0, 139.0, 63.0, 1.0e6);
+    QVERIFY(std::abs(lat - once.latDeg) < 1e-11);
+    QVERIFY(std::abs(lonDifferenceDeg(lon, once.lonDeg)) < 1e-11);
+    QCOMPARE(once.azimuth2Deg, 63.0);
+    // The inverse gives back the distance and azimuth.
+    const ts::GeodesicInverse back =
+        ts::rhumbInverse(35.0, 139.0, once.latDeg, once.lonDeg);
+    QVERIFY(std::abs(back.distanceM - 1.0e6) < 1e-6);
+    QVERIFY(std::abs(back.azimuth1Deg - 63.0) < 1e-9);
+    QCOMPARE(back.azimuth2Deg, back.azimuth1Deg);
+  }
+
   void geodesicKnownCase()
   {
     // JFK to Heathrow, the example in GeographicLib's documentation.
