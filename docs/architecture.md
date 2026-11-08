@@ -58,9 +58,10 @@ Subsections so far:
 | `gl` | OpenGL capability probe, software-renderer detection |
 | `globe` | The globe renderer: ray-cast WGS 84 ellipsoid with graticule, imagery tiles, markers relative to the eye |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
+| `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `perf` | Frame-time statistics, process memory and CPU readings |
-| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`) and generated test imagery (`docs/design/providers.md`) |
+| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, and generated test imagery (`docs/design/providers.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 
@@ -72,6 +73,9 @@ in core.
 
 - `app.pri` lists the shell's sources without `main()`, so the UI tests in
   `tests/ui` build exactly the same code.
+- `LayerTreeDock` shows the layer tree (`ts::LayerTreeModel`, owned by the
+  main window with the provider registry); the main window turns the tree
+  into what the globe draws and opens and saves projects.
 - `GlobeView` (a `QOpenGLWidget`) owns the camera controller and the
   globe renderer, maps mouse and keyboard input to the controller, paces
   frames and draws the debug overlay. Where the platform can't show an

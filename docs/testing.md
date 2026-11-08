@@ -64,10 +64,11 @@ application as a whole.
 | `tests/render` | (GPU) The OpenGL 3.3 backend: draws, viewport orientation, instancing, uniform offsets, textures, depth, blending, error reporting |
 | `tests/camera` | Pose limits, frames, pixel ↔ ray ↔ globe round trips, pan and zoom keep the point under the pointer, frame-rate independence at 10/20/60/144 fps, inertia, flights, stalls |
 | `tests/tiling` | Tile keys, bounds and parent/child at the antimeridian and poles, meshes (positions, skirts, winding), selection (coverage without overlap, culling, expected tile sets, refinement order), LRU cache, loader (cancellation, cache, a many-tile stress test while the camera moves) |
+| `tests/layers` | Layer tree model under `QAbstractItemModelTester`; insert, remove, move between collections, drag and drop; effective opacity and visibility; the draw stack (composite groups, nested groups, vectors above imagery); JSON; project round trip and every older format version (fixtures in `tests/data/projects`); provider sharing |
 | `tests/providers` | Solid-colour and checkerboard test imagery: sizes, determinism, labels, cancellation, a shared instance on many threads |
-| `tests/globe` | (GPU) Golden images (plain and checkerboard globe), silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
+| `tests/globe` | (GPU) Golden images (plain and checkerboard globe; two layers at 50 %; a group composited and multiplied), shared imagery sources, silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
 | `tests/smoke` | Launches the built `terrasoar`: clean start and exit (headless), pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering, the globe window on the real platform |
-| `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
+| `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; layer dock (visibility, opacity, add and remove), project save and open; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
 
 Shared helpers are in `tests/support/`: `ts::test::runConcurrently()`
 starts many threads and releases them together; `ts::test::OffscreenGl`

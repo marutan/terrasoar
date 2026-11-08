@@ -91,19 +91,35 @@ view of a city: every pixel showing the globe is covered by a selected
 tile, no selected tile contains another, every drawn tile's error is
 within the limit, and fixed cameras select fixed tile sets.
 
+## Geometry and imagery
+
+Tile meshes depend only on the key, so `ts::TileRenderer` builds them on
+the render thread as the selection asks for them (up to 32 per frame,
+about 0.02 ms each), and the selection refines as soon as they exist.
+Imagery is separate: each imagery source (one per provider, shared by
+every layer that uses it) has its own loader and GPU textures. For each
+drawn tile, each layer uses its own image if loaded, else its nearest
+loaded ancestor's, stretched through a texture transform. Each source
+requests, coarse first, a stand-in four levels above every drawn tile and
+then the drawn tiles themselves. Layers are blended in the tile fragment
+shader, up to 8 per draw; see [layer-model.md](layer-model.md).
+
 ## From provider to screen
 
 ```
 render thread                         worker threads (TileLoader)
 ─────────────                         ───────────────────────────
 prepare(camera)
- ├ takeLoaded(8) ─────────────────────◄ finished tiles (image + mesh)
- │   upload: texture + vertex buffer
- ├ select(camera, isResident)
- ├ setRequests(wanted) ───────────────► queue, cancel unwanted in flight
- └ evict least recently drawn          load: cache → provider → cache
-draw()                                  build mesh
- └ one draw per tile                    callback → GUI thread: new frame
+ ├ takeLoaded(8, all sources) ────────◄ finished images
+ │   upload textures
+ ├ select(camera, mesh resident)
+ ├ build missing meshes (≤ 32)
+ ├ bind images (own or ancestor)
+ ├ setRequests(wanted) per source ────► queue, cancel unwanted in flight
+ └ evict least recently used           load: cache → provider → cache
+draw()                                  callback → GUI thread: new frame
+ └ per tile: 8 layers per draw;
+   composite groups offscreen
 ```
 
 - **Loader** (`ts::TileLoader`, thread-safe): two worker threads by
