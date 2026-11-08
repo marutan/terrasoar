@@ -16,7 +16,8 @@ SUBDIRS = \
     maths \
     geo \
     render \
-    camera
+    camera \
+    globe
 
 # The smoke tests launch the application with QProcess, whose vfork-based
 # start-up the ThreadSanitizer runtime cannot follow (it aborts with a CHECK

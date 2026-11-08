@@ -29,6 +29,7 @@ HEADERS += \
     include/ts/geo/geoformat.h \
     include/ts/geo/wgs84.h \
     include/ts/gl/glprobe.h \
+    include/ts/globe/globerenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
     include/ts/maths/angles.h \
@@ -57,6 +58,7 @@ SOURCES += \
     src/geo/geodetic.cpp \
     src/geo/geoformat.cpp \
     src/gl/glprobe.cpp \
+    src/globe/globerenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
     src/maths/mat4.cpp \
