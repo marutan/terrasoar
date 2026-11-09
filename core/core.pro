@@ -60,6 +60,9 @@ HEADERS += \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
     include/ts/tiling/tileselector.h \
+    include/ts/vector/vectormesh.h \
+    include/ts/vector/vectorstyle.h \
+    include/ts/vector/vectortileloader.h \
     src/globe/globeuniforms.h \
     src/providers/sqlitestatementpool.h
 
@@ -101,4 +104,7 @@ SOURCES += \
     src/tiling/tilekey.cpp \
     src/tiling/tileloader.cpp \
     src/tiling/tilemesh.cpp \
-    src/tiling/tileselector.cpp
+    src/tiling/tileselector.cpp \
+    src/vector/vectormesh.cpp \
+    src/vector/vectorstyle.cpp \
+    src/vector/vectortileloader.cpp

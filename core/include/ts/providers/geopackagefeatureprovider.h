@@ -146,6 +146,9 @@ public:
   std::optional<FeatureTile>
   loadFeatures(TileKey key, const std::atomic<bool>& cancelled) override;
 
+  /** The ancestor at the storage level of the tables serving @p key. */
+  TileKey storedKey(TileKey key) const override;
+
 private:
   struct Table;
   QString m_path;
