@@ -11,8 +11,10 @@ to a metre above the surface), with the latitude and longitude under the
 pointer in the status bar. The surface is drawn from a geographic tile
 quadtree. Layers and collections are managed in the Layers dock
 (order, visibility, opacity, composite groups) and saved with the view in
-project files; for now the layers are test patterns, and real imagery
-comes next.
+project files. A new project shows NASA's Blue Marble from the built-in
+base pack, which works offline; `make basepack` downloads its sources and
+builds it (see [docs/tools/packager.md](docs/tools/packager.md)). Shorelines
+from the same pack, a graticule layer and attribution come next.
 
 ## Building
 
@@ -21,6 +23,7 @@ mkdir -p build/release && cd build/release
 qmake ../../terrasoar.pro
 make -j"$(nproc)"
 QT_QPA_PLATFORM=offscreen make check
+make basepack      # downloads about 176 MB once; builds the 52 MB base pack
 ./app/terrasoar
 ```
 
@@ -40,6 +43,8 @@ full instructions for each OS.
   [camera and precision](docs/design/camera-and-precision.md),
   [tiling](docs/design/tiling.md), [providers](docs/design/providers.md),
   [layer model](docs/design/layer-model.md)
+- Data: [the base pack](docs/data/base-pack.md),
+  [the packager](docs/tools/packager.md)
 - API reference: `make docs` (or `doxygen Doxyfile`), then open
   `build/docs/api/index.html`
 

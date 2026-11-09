@@ -41,7 +41,7 @@ and the wrappers around third-party libraries.
 
 - Uses Qt Core, Qt Gui and (on Qt 6) Qt OpenGL only. **No Qt Widgets**,
   so the core can be tested headless and reused by tools (such as the
-  Phase 3 packager).
+  packager).
 - Public headers live under `core/include/ts/<subsection>/` and are
   included as `"ts/<subsection>/<name>.h"`. Everything is in namespace
   `ts`.
@@ -60,8 +60,9 @@ Subsections so far:
 | `i18n` | Translation loading with English fallback, pseudo-translator |
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
+| `packs` | Data pack manifests (files with checksums, datasets with sources, licences and attribution), verification, finding the base pack (`docs/data/base-pack.md`) |
 | `perf` | Frame-time statistics, process memory and CPU readings |
-| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, and generated test imagery (`docs/design/providers.md`) |
+| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers (`docs/design/providers.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 

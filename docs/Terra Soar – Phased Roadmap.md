@@ -261,10 +261,12 @@ Goal: the globe draws from an EPSG:4326 tile quadtree, and users manage layers a
 
 Goal: on first launch, offline, the user sees Blue Marble imagery with WVS land/sea fill and a graticule, all within a 75 MB base pack (about 20 MB of it reserved for the coarse global DEM added in Phase 7).
 
+**Source change (decided 2026-11-08)**: NGA's original WVS no longer has a public download (NOAA's datasheet and the NGDC Coastline Extractor are gone). The base pack uses **GSHHG 2.3.7** instead, which is derived from WVS, already comes as land polygons at five resolutions, and is LGPL v3: the pack carries its licence texts. "WVS" below means this shoreline. See `docs/data/base-pack.md`.
+
 **Deliverables**
 
 - Packaging tool (`tools/packager`), run at build time, not in the app:
-  - WVS: join coastline lines into land polygons, repair with GEOS, simplify into LOD levels, write GeoPackage with spatial index
+  - WVS (GSHHG): resolve GSHHG's levels into land polygons (land − lakes + islands − ponds), repair with GEOS, use its resolutions as LOD levels cut to quadtree tiles, write GeoPackage with spatial index
   - Blue Marble: cut the equirectangular source into EPSG:4326 quadtree JPEG tiles (about levels 0–4), stored in SQLite
   - Pack manifest (JSON): contents, versions, checksums, licences and attribution
 - `GeoPackageFeatureProvider` and `SqliteTileImageryProvider`
@@ -366,7 +368,7 @@ Goal: users pre-download chosen areas for offline use and install extra data pac
 - Pinned regions protected from LRU eviction; region manager to list, refresh and delete
 - Per-provider `allowBulkDownload` flag in the catalogue; bulk download blocked where the terms forbid it (e.g. OSM public tiles)
 - Pack manager: reads the online pack manifest, downloads with resume, verifies checksums, installs, updates and removes
-- First extra packs: full-resolution WVS, full-resolution Blue Marble, GSHHG (with LGPL notice)
+- First extra packs: full-resolution GSHHG shoreline (LGPL), full-resolution Blue Marble
 
 **Technical documentation**
 
