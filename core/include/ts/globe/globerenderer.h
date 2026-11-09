@@ -14,6 +14,7 @@
 
 #include <QString>
 
+#include "ts/globe/vectorrenderer.h"
 #include "ts/maths/vec3.h"
 #include "ts/render/renderdevice.h"
 
@@ -49,7 +50,11 @@ struct GlobeStyle {
   std::array<float, 3> surfaceRgb = {0.11F, 0.29F, 0.52F};
   /** Graticule colour, RGB in [0, 1]. */
   std::array<float, 3> graticuleRgb = {0.80F, 0.88F, 1.00F};
-  /** True to draw latitude and longitude lines. */
+  /**
+   * True to draw latitude and longitude lines on the bare globe, under any
+   * imagery. The graticule layer (setVectorLayers()) draws them in the
+   * layer order instead.
+   */
   bool graticule = true;
   /** Graticule line width in logical pixels. */
   float graticuleWidthPx = 1.0F;
@@ -147,6 +152,16 @@ public:
   TileStatistics tileStatistics() const;
 
   /**
+   * Sets the vector layers, bottom to top, drawn over all imagery: feature
+   * layers through the VectorRenderer, graticule layers as the graticule
+   * with the layer's outline colour and width.
+   */
+  void setVectorLayers(const std::vector<VectorLayerDraw>& layers);
+
+  /** Returns what the vector renderer did in the last frame. */
+  VectorStatistics vectorStatistics() const;
+
+  /**
    * Draws a frame as seen by @p camera into @p pass (whose clear colour is
    * replaced by the style's background).
    *
@@ -160,10 +175,17 @@ public:
 private:
   struct Resources;
 
+  void uploadMarkers();
+  std::vector<std::size_t> writeGraticuleUniforms(double fade,
+                                                  double devicePixelRatio);
+  void drawGraticule(std::size_t index);
+
   RenderDevice& m_device;
   std::unique_ptr<Resources> m_resources;
   std::unique_ptr<TileRendererSettings> m_tileSettings;
   std::unique_ptr<TileRenderer> m_tiles;
+  std::unique_ptr<VectorRenderer> m_vectors;
+  std::vector<VectorLayerDraw> m_vectorLayers;
   GlobeStyle m_style;
   std::vector<GlobeMarker> m_markers;
   bool m_markersDirty = true;

@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <optional>
 #include <vector>
 
 #include <QColor>
+#include <QDir>
 #include <QImage>
+#include <QTemporaryDir>
 #include <QtTest>
 
 #include "goldenimage.h"
@@ -14,7 +18,14 @@
 #include "ts/geo/ellipsoid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/globe/globerenderer.h"
+#include "ts/globe/layerstackdraws.h"
 #include "ts/globe/tilerenderer.h"
+#include "ts/globe/vectorrenderer.h"
+#include "ts/layers/layerdefinition.h"
+#include "ts/layers/layertreemodel.h"
+#include "ts/packs/packmanifest.h"
+#include "ts/providers/geopackagefeatureprovider.h"
+#include "ts/providers/providerregistry.h"
 #include "ts/providers/testproviders.h"
 
 namespace
@@ -30,6 +41,75 @@ constexpr int imageHeightPx = 240;
  * between llvmpipe versions (Linux packages, the Windows Mesa build).
  */
 constexpr ts::test::GoldenTolerance goldenTolerance{12, 0.005};
+
+void appendUint32(QByteArray* wkb, std::uint32_t value)
+{
+  for (int i = 0; i < 4; ++i) {
+    wkb->append(
+        static_cast<char>((value >> (8U * static_cast<unsigned>(i))) & 0xffU));
+  }
+}
+
+void appendDouble(QByteArray* wkb, double value)
+{
+  std::uint64_t bits = 0;
+  std::memcpy(&bits, &value, sizeof bits);
+  for (int i = 0; i < 8; ++i) {
+    wkb->append(
+        static_cast<char>((bits >> (8U * static_cast<unsigned>(i))) & 0xffU));
+  }
+}
+
+/** Little-endian WKB of a polygon from rings of lon, lat pairs. */
+QByteArray polygonWkb(const std::vector<std::vector<double>>& rings)
+{
+  QByteArray wkb;
+  wkb.append(static_cast<char>(1));
+  appendUint32(&wkb, 3);
+  appendUint32(&wkb, static_cast<std::uint32_t>(rings.size()));
+  for (const std::vector<double>& ring : rings) {
+    appendUint32(&wkb, static_cast<std::uint32_t>(ring.size() / 2 + 1));
+    for (const double value : ring) {
+      appendDouble(&wkb, value);
+    }
+    appendDouble(&wkb, ring[0]);
+    appendDouble(&wkb, ring[1]);
+  }
+  return wkb;
+}
+
+/**
+ * Writes a GeoPackage with one table stored at level 0 for every level:
+ * a polygon split at the antimeridian (both halves end on 180°, an
+ * artificial edge not to be outlined), a polar cap down to the north pole
+ * in each hemisphere tile, and an island with a lake.
+ */
+bool writeVectorFixture(const QString& path)
+{
+  ts::GeoPackageFeatureWriter writer(path);
+  ts::FeatureTableSpec table;
+  table.name = QStringLiteral("land");
+  table.storageLevel = 0;
+  table.minLevel = 0;
+  table.maxLevel = -1;
+  const ts::TileKey west{0, 0, 0};
+  const ts::TileKey east{0, 1, 0};
+  return writer.addTable(table) &&
+         writer.putFeature(
+             table.name, east,
+             polygonWkb({{170, -25, 180, -25, 180, -5, 170, -5}})) &&
+         writer.putFeature(
+             table.name, west,
+             polygonWkb({{-180, -25, -165, -25, -165, -10, -180, -10}})) &&
+         writer.putFeature(table.name, west,
+                           polygonWkb({{-180, 75, 0, 75, 0, 90, -180, 90}})) &&
+         writer.putFeature(table.name, east,
+                           polygonWkb({{0, 75, 180, 75, 180, 90, 0, 90}})) &&
+         writer.putFeature(table.name, east,
+                           polygonWkb({{20, 30, 40, 30, 40, 50, 20, 50},
+                                       {25, 35, 32, 35, 32, 42, 25, 42}})) &&
+         writer.finish();
+}
 
 ts::Camera makeCamera(const ts::CameraPose& pose)
 {
@@ -85,6 +165,22 @@ class TestGlobe : public QObject
 
 private:
   /** Renders @p camera into an image (needs a valid m_gl). */
+  /** Renders until nothing is loading any more, then once more. */
+  QImage renderSettled(const ts::Camera& camera)
+  {
+    QImage image;
+    const bool settled = QTest::qWaitFor(
+        [&]() {
+          image = render(camera);
+          return !m_renderer->isBusy();
+        },
+        60000);
+    if (!settled) {
+      return QImage();
+    }
+    return render(camera);
+  }
+
   QImage render(const ts::Camera& camera,
                 const std::vector<ts::GlobeMarker>& markers = {})
   {
@@ -325,6 +421,167 @@ private slots:
     QCOMPARE(tiles.sourceCount(), 2);
     tiles.setLayers({}, {});
     QCOMPARE(tiles.sourceCount(), 0);
+  }
+
+  void vectorGolden_data()
+  {
+    QTest::addColumn<int>("scene");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<double>("tiltDeg");
+    // Fill and outline at the antimeridian (no line along 180°), at the
+    // north pole (no line along the pole or 0°/180°), an island with a
+    // lake; and the graticule layer over imagery.
+    QTest::newRow("vector-antimeridian") << 0 << -15.0 << 180.0 << 6.0e6 << 0.0;
+    QTest::newRow("vector-pole") << 0 << 80.0 << 30.0 << 6.0e6 << 30.0;
+    QTest::newRow("vector-lake") << 0 << 40.0 << 30.0 << 4.0e6 << 0.0;
+    QTest::newRow("graticule-over-imagery")
+        << 1 << 20.0 << 10.0 << 1.6e7 << 0.0;
+  }
+
+  void vectorGolden()
+  {
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(int, scene);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(double, tiltDeg);
+    const QTemporaryDir dir;
+    const QString path = QDir(dir.path()).filePath(QStringLiteral("v.gpkg"));
+    QVERIFY(writeVectorFixture(path));
+    const std::shared_ptr<ts::GeoPackageFeatureProvider> features =
+        std::make_shared<ts::GeoPackageFeatureProvider>(path);
+    QVERIFY(features->isValid());
+
+    ts::VectorLayerDraw graticule;
+    graticule.kind = ts::VectorLayerDraw::Kind::Graticule;
+    graticule.style.outline = QColor(255, 255, 255, 200);
+    graticule.style.outlineWidthPx = 1.0;
+    ts::VectorLayerDraw land;
+    land.provider = features;
+    land.style.fill = QColor(200, 185, 140, 200);
+    land.style.outline = QColor(255, 220, 40);
+    land.style.outlineWidthPx = 2.0;
+
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    if (scene == 1) {
+      // Red, to stand out on the pale checkerboard.
+      graticule.style.outline = QColor(220, 30, 30);
+      graticule.style.outlineWidthPx = 1.5;
+      m_renderer->setImageryProvider(
+          std::make_shared<ts::CheckerboardImageryProvider>());
+      m_renderer->setVectorLayers({graticule});
+    } else {
+      m_renderer->setVectorLayers({land, graticule});
+    }
+    const QImage image = renderSettled(
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg}));
+    const ts::VectorStatistics vectors = m_renderer->vectorStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setVectorLayers({});
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setStyle(ts::GlobeStyle());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    if (scene == 0) {
+      QVERIFY(vectors.tilesDrawn > 0);
+      QVERIFY(vectors.triangles > 0);
+      QVERIFY(vectors.segments > 0);
+    }
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void basePackGolden_data()
+  {
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<double>("tiltDeg");
+    QTest::newRow("base-uk") << 54.5 << -3.0 << 2.0e6 << 0.0;
+    QTest::newRow("base-uk-close") << 51.5 << -0.5 << 1.5e5 << 30.0;
+    QTest::newRow("base-pacific-antimeridian")
+        << -17.5 << 179.5 << 1.5e6 << 0.0;
+    QTest::newRow("base-pacific-wide") << 0.0 << 180.0 << 1.2e7 << 0.0;
+    QTest::newRow("base-north-pole") << 90.0 << 0.0 << 7.0e6 << 0.0;
+    QTest::newRow("base-north-pole-close") << 82.0 << -40.0 << 1.5e6 << 30.0;
+    QTest::newRow("base-south-pole") << -90.0 << 0.0 << 9.0e6 << 0.0;
+    QTest::newRow("base-south-pole-close") << -77.5 << 166.0 << 6.0e5 << 30.0;
+  }
+
+  void basePackGolden()
+  {
+    // The default layers (Blue Marble, shoreline, graticule) from the real
+    // base pack, set up through the layer tree like the application.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const QString directory = qEnvironmentVariable("TS_BASEPACK_DIR");
+    if (directory.isEmpty()) {
+      QSKIP("TS_BASEPACK_DIR is not set.");
+    }
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(double, tiltDeg);
+    QString error;
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(directory, &error);
+    if (!manifest) {
+      QFAIL(qPrintable(error));
+    }
+    ts::ProviderRegistry registry;
+    registry.setBasePack(directory, *manifest);
+    ts::LayerTreeModel model;
+    for (const QString& id : {QStringLiteral("builtin:bluemarble"),
+                              QStringLiteral("builtin:shoreline"),
+                              QStringLiteral("builtin:graticule")}) {
+      for (const ts::LayerDefinition& definition :
+           ts::builtinLayerDefinitions()) {
+        if (definition.id == id) {
+          model.addLayer(definition);
+        }
+      }
+    }
+    const ts::LayerStack stack = model.layerStack();
+    QStringList errors;
+    const ts::ImageryDraws imagery =
+        ts::imageryDrawsForStack(stack, registry, &errors);
+    const std::vector<ts::VectorLayerDraw> vectors =
+        ts::vectorDrawsForStack(stack, registry, &errors);
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char(' '))));
+    QCOMPARE(ts::attributionsForStack(stack, registry).size(), 2);
+
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryLayers(imagery.layers, imagery.groupAlphas);
+    m_renderer->setVectorLayers(vectors);
+    const QImage image = renderSettled(
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg}));
+    const ts::VectorStatistics drawn = m_renderer->vectorStatistics();
+    qInfo("vectors: %d tiles, %lld triangles, %lld segments, %d draw calls",
+          drawn.tilesDrawn, drawn.triangles, drawn.segments, drawn.drawCalls);
+    m_gl->makeCurrent();
+    m_renderer->setVectorLayers({});
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
   void silhouetteMatchesPicking()

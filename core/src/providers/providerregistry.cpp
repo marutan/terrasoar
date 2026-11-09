@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 
 #include "ts/packs/packmanifest.h"
+#include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/tilekey.h"
@@ -68,25 +69,37 @@ bool isBasePackSource(const QJsonObject& source)
 
 } // namespace
 
-std::shared_ptr<ImageryProvider>
-ProviderRegistry::createBasePackImagery(const QJsonObject& source,
-                                        QString* errorString) const
+QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
+                                       QString* errorString) const
 {
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const std::unordered_map<QString, QString>& files =
+      features ? m_basePackFeatures : m_basePackImagery;
   const std::unordered_map<QString, QString>::const_iterator file =
-      m_basePackImagery.find(dataset);
-  if (m_basePackDirectory.isEmpty() || file == m_basePackImagery.end()) {
+      files.find(dataset);
+  if (m_basePackDirectory.isEmpty() || file == files.end()) {
     if (errorString) {
       *errorString = QCoreApplication::translate(
                          "ts::ProviderRegistry",
                          "The base pack, which holds \"%1\", is not installed.")
                          .arg(dataset);
     }
+    return QString();
+  }
+  return QDir(m_basePackDirectory).filePath(file->second);
+}
+
+std::shared_ptr<ImageryProvider>
+ProviderRegistry::createBasePackImagery(const QJsonObject& source,
+                                        QString* errorString) const
+{
+  const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const QString path = basePackFile(source, false, errorString);
+  if (path.isEmpty()) {
     return nullptr;
   }
   std::shared_ptr<SqliteTileImageryProvider> provider =
-      std::make_shared<SqliteTileImageryProvider>(
-          QDir(m_basePackDirectory).filePath(file->second));
+      std::make_shared<SqliteTileImageryProvider>(path);
   if (!provider->isValid()) {
     if (errorString) {
       *errorString = QCoreApplication::translate(
@@ -105,11 +118,71 @@ void ProviderRegistry::setBasePack(const QString& directory,
   const std::lock_guard<std::mutex> lock(m_mutex);
   m_basePackDirectory = directory;
   m_basePackImagery.clear();
+  m_basePackFeatures.clear();
+  m_basePackAttribution.clear();
   for (const PackDataset& dataset : manifest.datasets) {
     if (dataset.kind == PackDataset::Kind::Imagery) {
       m_basePackImagery[dataset.id] = dataset.file;
+    } else {
+      m_basePackFeatures[dataset.id] = dataset.file;
+    }
+    m_basePackAttribution[dataset.id] = dataset.attribution;
+  }
+}
+
+std::shared_ptr<FeatureProvider>
+ProviderRegistry::features(const QJsonObject& source, QString* errorString)
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  if (!isBasePackSource(source)) {
+    if (errorString) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Unknown or invalid feature source: %1")
+              .arg(canonical(source));
+    }
+    return nullptr;
+  }
+  const QString key = canonical(source) + m_basePackDirectory;
+  const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
+      it = m_features.find(key);
+  if (it != m_features.end()) {
+    std::shared_ptr<FeatureProvider> live = it->second.lock();
+    if (live) {
+      return live;
     }
   }
+  const QString path = basePackFile(source, true, errorString);
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+  std::shared_ptr<GeoPackageFeatureProvider> provider =
+      std::make_shared<GeoPackageFeatureProvider>(path);
+  if (!provider->isValid()) {
+    if (errorString) {
+      *errorString =
+          QCoreApplication::translate(
+              "ts::ProviderRegistry",
+              "Cannot read \"%1\" from the base pack: %2")
+              .arg(source.value(QStringLiteral("dataset")).toString(),
+                   provider->errorString());
+    }
+    return nullptr;
+  }
+  m_features[key] = provider;
+  return provider;
+}
+
+QString ProviderRegistry::attribution(const QJsonObject& source) const
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  if (!isBasePackSource(source) || m_basePackDirectory.isEmpty()) {
+    return QString();
+  }
+  const std::unordered_map<QString, QString>::const_iterator found =
+      m_basePackAttribution.find(
+          source.value(QStringLiteral("dataset")).toString());
+  return found == m_basePackAttribution.end() ? QString() : found->second;
 }
 
 QString ProviderRegistry::basePackDirectory() const

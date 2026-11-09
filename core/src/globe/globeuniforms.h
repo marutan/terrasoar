@@ -45,9 +45,9 @@ struct GlobeBlock {
   Float4 lightDir{};
   /** Surface colour (rgb). */
   Float4 surfaceColor{};
-  /** Graticule colour (rgb). */
+  /** Unused (the graticule has its own pass and block). */
   Float4 gridColor{};
-  /** Line width (device px), graticule opacity, unused, unused. */
+  /** Unused (the graticule has its own pass and block). */
   Float4 gridParams{};
 };
 
@@ -60,6 +60,10 @@ inline constexpr int frameBinding = 0;
 inline constexpr int globeBinding = 1;
 /** Binding of the tile renderer's per-tile "Tile" block. */
 inline constexpr int tileBinding = 2;
+/** Binding of the vector renderer's per-draw "Vector" block. */
+inline constexpr int vectorBinding = 4;
+/** Binding of the graticule pass's "Graticule" block. */
+inline constexpr int graticuleBinding = 5;
 
 inline const char* const frameBlockGlsl = R"(
 layout(std140) uniform Frame {

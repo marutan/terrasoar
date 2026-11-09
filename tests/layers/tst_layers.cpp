@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <array>
 #include <atomic>
+#include <cmath>
 #include <memory>
 
 #include <QAbstractItemModelTester>
@@ -15,12 +17,14 @@
 
 #include "concurrency.h"
 #include "fixturepack.h"
+#include "ts/globe/layerstackdraws.h"
 #include "ts/layers/layerdefinition.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/layers/projectfile.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/tileprovider.h"
+#include "ts/vector/vectorstyle.h"
 
 namespace
 {
@@ -406,10 +410,19 @@ private slots:
           ts::LayerDefinition::fromJson(definition.toJson(), &error);
       QVERIFY2(back.has_value(), qPrintable(error));
       QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
-      if (definition.source.value(QStringLiteral("kind")).toString() ==
-          QLatin1String("basepack")) {
-        // Needs the base pack: without it the registry says so.
-        ts::ProviderRegistry registry;
+      const QString kind =
+          definition.source.value(QStringLiteral("kind")).toString();
+      ts::ProviderRegistry registry;
+      if (definition.type == ts::LayerType::Vector) {
+        // Vector layers have a style; a pack source needs the pack.
+        QVERIFY(!definition.style.isEmpty());
+        QVERIFY(ts::VectorStyle::fromJson(definition.style).hasOutline() ||
+                ts::VectorStyle::fromJson(definition.style).hasFill());
+        if (kind == QLatin1String("basepack")) {
+          QVERIFY(!registry.features(definition.source, &error));
+          QVERIFY(error.contains(QLatin1String("base pack")));
+        }
+      } else if (kind == QLatin1String("basepack")) {
         QVERIFY(!registry.imagery(definition.source, &error));
         QVERIFY(error.contains(QLatin1String("base pack")));
       } else {
@@ -424,6 +437,91 @@ private slots:
              QStringLiteral("vector"));
     QCOMPARE(ts::layerOriginName(ts::LayerOrigin::Catalogue),
              QStringLiteral("catalogue"));
+  }
+
+  void vectorStyles()
+  {
+    // #rrggbbaa with alpha last; missing members keep their defaults.
+    const ts::VectorStyle style = ts::VectorStyle::fromJson(
+        QJsonObject{{QStringLiteral("fill"), QStringLiteral("#10203040")},
+                    {QStringLiteral("outline"), QStringLiteral("#ff8000")},
+                    {QStringLiteral("outlineWidthPx"), 2.5}});
+    QCOMPARE(style.fill, QColor(0x10, 0x20, 0x30, 0x40));
+    QCOMPARE(style.outline, QColor(255, 128, 0));
+    QCOMPARE(style.outlineWidthPx, 2.5);
+    QCOMPARE(ts::VectorStyle::fromJson(style.toJson()).fill, style.fill);
+    QCOMPARE(ts::colorToRgbaHex(style.fill), QStringLiteral("#10203040"));
+    QVERIFY(!ts::colorFromRgbaHex(QStringLiteral("red")).isValid());
+    QVERIFY(!ts::colorFromRgbaHex(QStringLiteral("#12345")).isValid());
+    const ts::VectorStyle empty = ts::VectorStyle::fromJson(QJsonObject());
+    QVERIFY(!empty.hasFill() && !empty.hasOutline());
+    const std::array<float, 4> rgba =
+        ts::premultipliedRgba(QColor(255, 0, 0, 128), 0.5);
+    QVERIFY(std::abs(rgba[0] - 0.251F) < 0.002F);
+    QVERIFY(std::abs(rgba[3] - 0.251F) < 0.002F);
+
+    // A definition keeps its style through JSON (project files).
+    ts::LayerDefinition definition;
+    definition.id = QStringLiteral("user:roads");
+    definition.type = ts::LayerType::Vector;
+    definition.source =
+        QJsonObject{{QStringLiteral("kind"), QStringLiteral("basepack")}};
+    definition.style = style.toJson();
+    QString error;
+    const std::optional<ts::LayerDefinition> back =
+        ts::LayerDefinition::fromJson(definition.toJson(), &error);
+    QVERIFY(back.has_value());
+    QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
+  }
+
+  void vectorDraws()
+  {
+    // The stack's vector layers become graticule and feature draws, in
+    // order, with their styles and opacities; attributions follow what is
+    // drawn, top first.
+    const QTemporaryDir dir;
+    const ts::PackManifest manifest =
+        ts::test::writeFixtureBasePack(dir.path());
+    ts::ProviderRegistry registry;
+    registry.setBasePack(dir.path(), manifest);
+    ts::LayerTreeModel model;
+    // Top to bottom: graticule, shoreline, Blue Marble.
+    for (const QString& id : {QStringLiteral("builtin:graticule"),
+                              QStringLiteral("builtin:shoreline"),
+                              QStringLiteral("builtin:bluemarble")}) {
+      for (const ts::LayerDefinition& definition :
+           ts::builtinLayerDefinitions()) {
+        if (definition.id == id) {
+          model.addLayer(definition, QModelIndex(), model.rowCount());
+        }
+      }
+    }
+    model.setData(model.index(1, 0), 0.5, ts::LayerTreeModel::OpacityRole);
+    ts::LayerStack stack = model.layerStack();
+    QStringList errors;
+    const std::vector<ts::VectorLayerDraw> draws =
+        ts::vectorDrawsForStack(stack, registry, &errors);
+    QVERIFY(errors.isEmpty());
+    QCOMPARE(draws.size(), std::size_t{2});
+    // Bottom first: the shoreline, then the graticule.
+    QVERIFY(draws[0].kind == ts::VectorLayerDraw::Kind::Features);
+    QVERIFY(draws[0].provider != nullptr);
+    QCOMPARE(draws[0].alpha, 0.5);
+    QVERIFY(draws[0].style.hasOutline());
+    QVERIFY(draws[1].kind == ts::VectorLayerDraw::Kind::Graticule);
+    QCOMPARE(ts::attributionsForStack(stack, registry),
+             (QStringList{QStringLiteral("Fixture shoreline"),
+                          QStringLiteral("Fixture imagery")}));
+    // The same source twice shares one feature provider.
+    QCOMPARE(registry.features(stack.vectors[0].definition.source, nullptr),
+             draws[0].provider);
+    // Without the pack the feature layer is left out, with a reason.
+    ts::ProviderRegistry empty;
+    errors.clear();
+    QCOMPARE(ts::vectorDrawsForStack(stack, empty, &errors).size(),
+             std::size_t{1});
+    QCOMPARE(errors.size(), 1);
+    QVERIFY(ts::attributionsForStack(stack, empty).isEmpty());
   }
 
   void registryBasePack()
