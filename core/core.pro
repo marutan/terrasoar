@@ -44,6 +44,8 @@ HEADERS += \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
+    include/ts/packs/basepack.h \
+    include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
     include/ts/providers/providerregistry.h \
     include/ts/providers/testproviders.h \
@@ -82,6 +84,8 @@ SOURCES += \
     src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
+    src/packs/basepack.cpp \
+    src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
     src/providers/providerregistry.cpp \
     src/providers/testproviders.cpp \
