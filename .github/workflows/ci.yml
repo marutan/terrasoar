@@ -317,10 +317,12 @@ jobs:
           path: basepack-sources
           key: basepack-sources-${{ hashFiles('tools/packager/basepack.json') }}
 
+      # -r writes every subdirectory's Makefile now, so the packager's
+      # tests can be built on their own below.
       - name: Configure
         run: |
           mkdir build-ci && cd build-ci
-          qmake ../terrasoar.pro CONFIG+=werror
+          qmake -r ../terrasoar.pro CONFIG+=werror
 
       - name: Build the packager and its tests
         run: |
