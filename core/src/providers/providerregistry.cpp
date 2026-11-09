@@ -3,8 +3,11 @@
 
 #include <QColor>
 #include <QCoreApplication>
+#include <QDir>
 #include <QJsonDocument>
 
+#include "ts/packs/packmanifest.h"
+#include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/tilekey.h"
 
@@ -54,11 +57,75 @@ createImageryProvider(const QJsonObject& source, QString* errorString)
   return nullptr;
 }
 
+namespace
+{
+
+bool isBasePackSource(const QJsonObject& source)
+{
+  return source.value(QStringLiteral("kind")).toString() ==
+         QLatin1String("basepack");
+}
+
+} // namespace
+
+std::shared_ptr<ImageryProvider>
+ProviderRegistry::createBasePackImagery(const QJsonObject& source,
+                                        QString* errorString) const
+{
+  const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const std::unordered_map<QString, QString>::const_iterator file =
+      m_basePackImagery.find(dataset);
+  if (m_basePackDirectory.isEmpty() || file == m_basePackImagery.end()) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+                         "ts::ProviderRegistry",
+                         "The base pack, which holds \"%1\", is not installed.")
+                         .arg(dataset);
+    }
+    return nullptr;
+  }
+  std::shared_ptr<SqliteTileImageryProvider> provider =
+      std::make_shared<SqliteTileImageryProvider>(
+          QDir(m_basePackDirectory).filePath(file->second));
+  if (!provider->isValid()) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+                         "ts::ProviderRegistry",
+                         "Cannot read \"%1\" from the base pack: %2")
+                         .arg(dataset, provider->errorString());
+    }
+    return nullptr;
+  }
+  return provider;
+}
+
+void ProviderRegistry::setBasePack(const QString& directory,
+                                   const PackManifest& manifest)
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  m_basePackDirectory = directory;
+  m_basePackImagery.clear();
+  for (const PackDataset& dataset : manifest.datasets) {
+    if (dataset.kind == PackDataset::Kind::Imagery) {
+      m_basePackImagery[dataset.id] = dataset.file;
+    }
+  }
+}
+
+QString ProviderRegistry::basePackDirectory() const
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  return m_basePackDirectory;
+}
+
 std::shared_ptr<ImageryProvider>
 ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
 {
-  const QString key = canonical(source);
   const std::lock_guard<std::mutex> lock(m_mutex);
+  // A pack source depends on which pack is installed.
+  const QString key = isBasePackSource(source)
+                          ? canonical(source) + m_basePackDirectory
+                          : canonical(source);
   const std::unordered_map<QString, std::weak_ptr<ImageryProvider>>::iterator
       it = m_imagery.find(key);
   if (it != m_imagery.end()) {
@@ -68,7 +135,8 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
     }
   }
   std::shared_ptr<ImageryProvider> provider =
-      createImageryProvider(source, errorString);
+      isBasePackSource(source) ? createBasePackImagery(source, errorString)
+                               : createImageryProvider(source, errorString);
   if (provider) {
     m_imagery[key] = provider;
   }

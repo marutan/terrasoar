@@ -20,7 +20,9 @@ SUBDIRS = \
     globe \
     tiling \
     providers \
-    layers
+    layers \
+    packs \
+    packager
 
 # The smoke tests launch the application with QProcess, whose vfork-based
 # start-up the ThreadSanitizer runtime cannot follow (it aborts with a CHECK

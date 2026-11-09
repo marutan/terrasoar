@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <QAction>
 #include <QApplication>
+#include <QDir>
 #include <QFile>
 #include <QFontMetrics>
 #include <QJsonArray>
@@ -10,12 +11,14 @@
 #include <QMouseEvent>
 #include <QPointer>
 #include <QPushButton>
+#include <QSignalSpy>
 #include <QSlider>
 #include <QTemporaryDir>
 #include <QTreeView>
 #include <QWheelEvent>
 #include <QtTest>
 
+#include "fixturepack.h"
 #include "globeview.h"
 #include "mainwindow.h"
 #include "ts/i18n/pseudotranslator.h"
@@ -137,7 +140,83 @@ class TestMainWindow : public QObject
 {
   Q_OBJECT
 
+private:
+  /** A base pack for every test, as an installed program has. */
+  QTemporaryDir m_basePack;
+
+  // NOLINTNEXTLINE(readability-redundant-access-specifiers): Qt's slots marker
 private slots:
+  void initTestCase()
+  {
+    QVERIFY(m_basePack.isValid());
+    ts::test::writeFixtureBasePack(m_basePack.path());
+    qputenv("TS_BASEPACK_DIR", m_basePack.path().toUtf8());
+  }
+
+  void basePackStates()
+  {
+    // Installed and intact: Blue Marble by default, "Ready" throughout.
+    {
+      ts::MainWindow window;
+      QCOMPARE(window.basePackDirectory(), QDir::cleanPath(m_basePack.path()));
+      QCOMPARE(window.layerModel()->rowCount(), 1);
+      QCOMPARE(window.layerModel()
+                   ->layerDefinition(window.layerModel()->index(0, 0))
+                   .id,
+               QStringLiteral("builtin:bluemarble"));
+      QSignalSpy verified(&window, &ts::MainWindow::basePackVerified);
+      QVERIFY(window.basePackState() == ts::MainWindow::BasePackState::Ok ||
+              verified.wait(10000));
+      QVERIFY(window.basePackState() == ts::MainWindow::BasePackState::Ok);
+      QCOMPARE(window.findChild<QLabel*>(QStringLiteral("statusLabel"))->text(),
+               QStringLiteral("Ready"));
+    }
+    // Damaged: reported in the status bar, naming the file; still usable.
+    {
+      const QTemporaryDir damaged;
+      ts::test::writeFixtureBasePack(damaged.path());
+      QFile file(
+          QDir(damaged.path()).filePath(QStringLiteral("bluemarble.sqlite")));
+      QVERIFY(file.open(QIODevice::ReadWrite));
+      file.seek(file.size() / 2);
+      file.write("damage");
+      file.close();
+      qputenv("TS_BASEPACK_DIR", damaged.path().toUtf8());
+      ts::MainWindow window;
+      QSignalSpy verified(&window, &ts::MainWindow::basePackVerified);
+      QVERIFY(verified.wait(10000));
+      QVERIFY(window.basePackState() == ts::MainWindow::BasePackState::Damaged);
+      const QString text =
+          window.findChild<QLabel*>(QStringLiteral("statusLabel"))->text();
+      QVERIFY2(text.contains(QLatin1String("damaged")) &&
+                   text.contains(QLatin1String("bluemarble.sqlite")),
+               qPrintable(text));
+    }
+    // Missing: the test imagery, and the status bar says why.
+    {
+      const QTemporaryDir empty;
+      qputenv("TS_BASEPACK_DIR", empty.path().toUtf8());
+      ts::MainWindow window;
+      QVERIFY(window.basePackState() == ts::MainWindow::BasePackState::Missing);
+      QCOMPARE(window.layerModel()
+                   ->layerDefinition(window.layerModel()->index(0, 0))
+                   .id,
+               QStringLiteral("builtin:checkerboard"));
+      QVERIFY(window.findChild<QLabel*>(QStringLiteral("statusLabel"))
+                  ->text()
+                  .contains(QLatin1String("not installed")));
+    }
+    qputenv("TS_BASEPACK_DIR", m_basePack.path().toUtf8());
+  }
+
+  void closeDuringBasePackCheck()
+  {
+    // Closing at once while the check runs: the thread stops and is joined.
+    for (int i = 0; i < 20; ++i) {
+      const ts::MainWindow window;
+    }
+  }
+
   void opensAndClosesCleanly()
   {
     QPointer<ts::MainWindow> window = new ts::MainWindow;
@@ -390,7 +469,7 @@ private slots:
         remove == nullptr) {
       QFAIL("layer dock widgets missing");
     }
-    // A new project shows the checkerboard.
+    // A new project shows Blue Marble from the base pack.
     QCOMPARE(model->rowCount(), 1);
     ts::GlobeView* globe = globeOf(window);
     if (globe != nullptr) {

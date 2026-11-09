@@ -17,10 +17,13 @@ namespace ts
 {
 
 class ImageryProvider;
+class PackManifest;
 
 /**
  * Creates the imagery provider a layer source describes ("kind":
  * "checkerboard" or "solid"), or returns null and sets @p errorString.
+ * Sources in a pack ("kind": "basepack") need a ProviderRegistry that
+ * knows the pack.
  *
  * @threadsafe
  */
@@ -49,9 +52,25 @@ public:
   /** Returns the number of providers still in use. */
   int liveImageryProviders() const;
 
+  /**
+   * Makes the datasets of the base pack in @p directory available to
+   * sources `{"kind": "basepack", "dataset": "<id>"}`. An empty
+   * @p directory means there is no base pack: such sources then fail.
+   */
+  void setBasePack(const QString& directory, const PackManifest& manifest);
+
+  /** Returns the base pack's directory, empty if there is none. */
+  QString basePackDirectory() const;
+
 private:
+  std::shared_ptr<ImageryProvider>
+  createBasePackImagery(const QJsonObject& source, QString* errorString) const;
+
   mutable std::mutex m_mutex;
   std::unordered_map<QString, std::weak_ptr<ImageryProvider>> m_imagery;
+  QString m_basePackDirectory;
+  /** Dataset id → file name, of the base pack's imagery datasets. */
+  std::unordered_map<QString, QString> m_basePackImagery;
 };
 
 } // namespace ts

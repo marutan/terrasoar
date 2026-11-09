@@ -148,7 +148,10 @@ struct Feature {
 
 /** The features of one tile at one level of detail. */
 struct FeatureTile {
-  /** The tile. */
+  /**
+   * The tile the features belong to: the requested key, or an ancestor
+   * when the source stores coarser tiles.
+   */
   TileKey key;
   /** Features intersecting the tile, clipped or not as the source keeps them.
    */
@@ -156,7 +159,7 @@ struct FeatureTile {
 };
 
 /**
- * A source of vector features by tile (World Vector Shoreline, Phase 3;
+ * A source of vector features by tile (the base pack's shoreline, Phase 3;
  * vector layers, Phase 4).
  *
  * @threadsafe

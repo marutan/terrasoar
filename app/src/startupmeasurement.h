@@ -7,6 +7,8 @@
 #ifndef TS_APP_STARTUPMEASUREMENT_H
 #define TS_APP_STARTUPMEASUREMENT_H
 
+#include <functional>
+
 #include <QElapsedTimer>
 #include <QJsonObject>
 #include <QObject>
@@ -47,6 +49,13 @@ public:
   /** Starts watching the window. Call before the window is shown. */
   void start();
 
+  /**
+   * Sets a check for one-off start-up work running in the background
+   * (the base pack's checksums): the idle period starts once it returns
+   * false, so it measures the program at rest.
+   */
+  void setBackgroundBusy(std::function<bool()> busy);
+
   /** Returns the results; complete once finished() has been emitted. */
   QJsonObject result() const { return m_result; }
 
@@ -63,12 +72,14 @@ protected:
 
 private:
   void onStartupComplete();
+  void startIdle();
   void onIdleComplete();
   void finish();
 
   QElapsedTimer m_sinceMain;
   QPointer<QWidget> m_window;
   int m_idleS = 0;
+  std::function<bool()> m_backgroundBusy;
   bool m_painted = false;
   bool m_finished = false;
   double m_idleStartCpuS = 0.0;

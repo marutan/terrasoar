@@ -1,0 +1,50 @@
+{
+  "id": "terrasoar-base",
+  "version": "1",
+  "sizeLimitBytes": 75000000,
+  "reservedBytes": 20000000,
+  "sources": [
+    {
+      "id": "gshhg",
+      "file": "gshhg-shp-2.3.7.zip",
+      "url": "https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-shp-2.3.7.zip",
+      "sha256": "8dbbe7e071e77e9e75f2d639239099ebca8d5c16d6a07df8169729d49f15cf41",
+      "name": "GSHHG (Global Self-consistent, Hierarchical, High-resolution Geography Database), shapefiles",
+      "version": "2.3.7",
+      "notices": ["LICENSE.TXT", "COPYING.LESSERv3"],
+      "localNotices": ["notices/gpl-3.0.txt"]
+    },
+    {
+      "id": "bmng",
+      "file": "world.topo.bathy.200407.3x21600x10800.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg",
+      "sha256": "d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0",
+      "name": "Blue Marble Next Generation with topography and bathymetry",
+      "version": "2004-07"
+    }
+  ],
+  "imagery": {
+    "dataset": "bluemarble",
+    "source": "bmng",
+    "name": "Blue Marble",
+    "licence": "Public domain (NASA)",
+    "attribution": "Blue Marble: NASA Earth Observatory",
+    "maxLevel": 4,
+    "tileSize": 256,
+    "jpegQuality": 85
+  },
+  "shoreline": {
+    "dataset": "shoreline",
+    "source": "gshhg",
+    "name": "Shoreline",
+    "licence": "LGPL-3.0-or-later",
+    "attribution": "Shoreline: GSHHG 2.3.7, P. Wessel and W. H. F. Smith (LGPL)",
+    "minimumAreaKm2": 0,
+    "lods": [
+      {"resolution": "c", "storageLevel": 0, "minLevel": 0, "maxLevel": 1},
+      {"resolution": "l", "storageLevel": 2, "minLevel": 2, "maxLevel": 3},
+      {"resolution": "i", "storageLevel": 4, "minLevel": 4, "maxLevel": 5},
+      {"resolution": "h", "storageLevel": 6, "minLevel": 6, "maxLevel": -1}
+    ]
+  }
+}

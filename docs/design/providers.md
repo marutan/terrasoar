@@ -21,7 +21,7 @@ TileProvider            id(), name(), maximumLevel()
 | `maximumLevel()` | Deepest level with data. Selection stops there, and the deepest tiles are stretched further as the camera comes closer. |
 | `loadImage()` | A square image of `tileSizePx()` pixels covering exactly the tile's rectangle, row 0 at the north edge, linear in latitude and longitude. A null image means no data there (or failure); the tile is then not drawn and the globe shows through. |
 | `loadHeights()` | A square grid of heights above the ellipsoid, edges included, row 0 north. Used from Phase 6. |
-| `loadFeatures()` | The features intersecting the tile at this level of detail, as points, line strings or polygons in latitude/longitude with attributes. Used from Phase 3 (World Vector Shoreline). |
+| `loadFeatures()` | The features intersecting the tile at this level of detail, as points, line strings or polygons in latitude/longitude with attributes. A source may answer for a coarser ancestor (`FeatureTile::key` says which). Used from Phase 3 (the base pack's shoreline). |
 
 ## Threading rules
 
@@ -55,13 +55,45 @@ used by the tests and for development until real data arrives:
   level (four palettes), so level boundaries are visible. The label uses
   a built-in 3 × 5 bitmap font rather than the system fonts, so tiles
   are identical on every platform (golden images) and generating them
-  needs no font engine on the workers. View → Imagery → Checkerboard in
-  the application.
+  needs no font engine on the workers. In the application: Layers dock →
+  Add Layer → Checkerboard.
 
 `tests/providers` checks both (sizes, determinism, the outline and label,
 levels, cancellation, a shared instance on many threads); `tests/tiling`
 loads thousands of checkerboard tiles while a simulated camera flies
 around, under ThreadSanitizer in CI.
+
+## File providers
+
+Two providers read the base pack's files
+([docs/data/base-pack.md](../data/base-pack.md) has the formats). Both
+open SQLite directly (a GeoPackage is a SQLite file) through a small pool
+of read-only connections, each with its prepared statement
+(`core/src/providers/sqlitestatementpool.h`): a worker borrows one for a
+load and gives it back, so a provider has at most one connection per
+worker and no connection is ever used by two threads at once.
+
+- `SqliteTileImageryProvider` reads a tile store: encoded tiles keyed by
+  `TileKey`. A missing tile, or one that does not decode, is no data (a
+  null image). `maximumLevel()` is the store's deepest level; the tiling
+  engine stretches it beyond.
+- `GeoPackageFeatureProvider` reads a tiled GeoPackage: tables of
+  features cut to the tiles of one storage level, each serving a range of
+  display levels (`FeatureTableSpec`). `loadFeatures(key)` returns the
+  features of the key's ancestor at the storage level of the tables
+  serving `key.level`, with that ancestor as `FeatureTile::key`; each
+  feature carries its table name and integer attributes. Geometry is
+  decoded from the GeoPackage blob (header and WKB, 2D/Z/M/ZM, polygons
+  and line strings with their multi forms) with bounds checks: a damaged
+  blob is skipped, never read past its end.
+
+Their writers, `SqliteTileStoreWriter` and `GeoPackageFeatureWriter`
+(through GDAL's GPKG driver, with an R-tree on every table), live next to
+them in core: the packager and the tests write files the same way.
+
+Layer sources `{"kind": "basepack", "dataset": "<id>"}` resolve through
+`ProviderRegistry::setBasePack()`, which the main window calls with the
+pack it found; without a pack such sources fail with a message saying so.
 
 ## Adding a provider
 

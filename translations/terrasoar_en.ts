@@ -72,6 +72,10 @@
             <source>White, 50 %</source>
             <translation>White, 50 %</translation>
         </message>
+        <message>
+            <source>Blue Marble</source>
+            <translation>Blue Marble</translation>
+        </message>
     </context>
     <context>
         <name>ts::GeoFormat</name>
@@ -386,6 +390,14 @@
             <source>Terra Soar projects (*.terrasoar)</source>
             <translation>Terra Soar projects (*.terrasoar)</translation>
         </message>
+        <message>
+            <source>The base pack is not installed; showing test imagery.</source>
+            <translation>The base pack is not installed; showing test imagery.</translation>
+        </message>
+        <message>
+            <source>The base pack is damaged (%1). Reinstall %2 to repair it.</source>
+            <translation>The base pack is damaged (%1). Reinstall %2 to repair it.</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectFile</name>
@@ -419,6 +431,14 @@
         <message>
             <source>Unknown or invalid imagery source: %1</source>
             <translation>Unknown or invalid imagery source: %1</translation>
+        </message>
+        <message>
+            <source>The base pack, which holds "%1", is not installed.</source>
+            <translation>The base pack, which holds "%1", is not installed.</translation>
+        </message>
+        <message>
+            <source>Cannot read "%1" from the base pack: %2</source>
+            <translation>Cannot read "%1" from the base pack: %2</translation>
         </message>
     </context>
     <context>

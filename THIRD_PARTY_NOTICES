@@ -51,15 +51,32 @@ Qt software OpenGL fallback (opengl32sw.dll, Qt 5 builds)
 Data
 ----
 
-No third-party data is bundled with the application yet. (The source tree
-has test data that is not distributed: tests/data/geodtest-sample.dat, a
-sample of C. F. F. Karney's "Test set for geodesics", CC0 1.0,
-https://doi.org/10.5281/zenodo.32156.) The base pack (Phase 3) will add
-WVS, Blue Marble and others; each dataset will be listed here with its
-source, licence and required attribution.
+The base pack (basepack/, built by tools/packager; see
+docs/data/base-pack.md) contains:
+
+Blue Marble Next Generation with topography and bathymetry (July 2004)
+  NASA Earth Observatory (Reto Stöckli and others)
+  Licence: public domain (NASA); credit requested
+  Attribution: "Blue Marble: NASA Earth Observatory"
+  https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/
+
+GSHHG 2.3.7 (Global Self-consistent, Hierarchical, High-resolution
+Geography Database), resolutions c, l, i and h, cut to tiles
+  Paul Wessel (University of Hawaii) and Walter H. F. Smith (NOAA)
+  Licence: GNU LGPL v3 or later; the licence texts (LICENSE.TXT,
+  COPYING.LESSERv3, gpl-3.0.txt) are in basepack/licences/gshhg/
+  Attribution: "Shoreline: GSHHG 2.3.7, P. Wessel and W. H. F. Smith (LGPL)"
+  Source: https://github.com/GenericMappingTools/gshhg-gmt/releases/tag/2.3.7
+  The program that turns it into the pack's form is tools/packager in
+  this source tree.
+
+The source tree also has test data that is not distributed:
+tests/data/geodtest-sample.dat, a sample of C. F. F. Karney's "Test set
+for geodesics", CC0 1.0, https://doi.org/10.5281/zenodo.32156.
 
 Build-time tools (not distributed)
 ----------------------------------
 
 clang-format (Apache 2.0 with LLVM exception), Doxygen (GPL v2),
-Qt Linguist tools (GPL v3), Python 3 (PSF licence).
+Qt Linguist tools (GPL v3), Python 3 (PSF licence), GitHub CLI (MIT,
+optional, fetches the base pack's sources).

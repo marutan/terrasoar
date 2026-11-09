@@ -2,9 +2,11 @@
 #include "mainwindow.h"
 
 #include <memory>
+#include <optional>
 
 #include <QAction>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QEvent>
 #include <QFileDialog>
 #include <QKeySequence>
@@ -14,6 +16,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QStatusBar>
+#include <QTimer>
 #include <QWidget>
 
 #include "globeview.h"
@@ -23,6 +26,8 @@
 #include "ts/globe/layerstackdraws.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/layers/projectfile.h"
+#include "ts/packs/basepack.h"
+#include "ts/packs/packmanifest.h"
 #include "ts/providers/providerregistry.h"
 
 namespace ts
@@ -54,10 +59,15 @@ MainWindow::MainWindow(QWidget* parent)
     m_eyeHeightM = GlobeView::homePose().rangeM;
   }
 
-  // A new project starts with the test imagery; real sources come with
-  // the base pack (Phase 3).
+  // A new project starts with Blue Marble from the base pack, or the test
+  // imagery when the pack is not installed (a development build before
+  // `make basepack`).
+  findBasePack();
+  const QString defaultLayer = m_basePackState == BasePackState::Missing
+                                   ? QStringLiteral("builtin:checkerboard")
+                                   : QStringLiteral("builtin:bluemarble");
   for (const LayerDefinition& definition : builtinLayerDefinitions()) {
-    if (definition.id == QLatin1String("builtin:checkerboard")) {
+    if (definition.id == defaultLayer) {
       m_layers->addLayer(definition);
     }
   }
@@ -85,7 +95,80 @@ MainWindow::MainWindow(QWidget* parent)
   resize(1024, 768);
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+  m_cancelBasePackCheck.store(true);
+  if (m_basePackCheck.joinable()) {
+    m_basePackCheck.join();
+  }
+}
+
+void MainWindow::findBasePack()
+{
+  m_basePackDirectory =
+      ts::findBasePack(QCoreApplication::applicationDirPath());
+  QString error;
+  const std::optional<PackManifest> manifest =
+      m_basePackDirectory.isEmpty()
+          ? std::nullopt
+          : PackManifest::read(m_basePackDirectory, &error);
+  if (!manifest) {
+    m_basePackDirectory.clear();
+    m_basePackState = BasePackState::Missing;
+    return;
+  }
+  m_registry->setBasePack(m_basePackDirectory, *manifest);
+  m_basePackState = BasePackState::Checking;
+  // Reading every byte takes a moment, so the check runs on its own
+  // thread; tiles load meanwhile, and a damaged file only means missing
+  // or wrong tiles, never a crash.
+  //
+  // The result comes back through a std::mutex and a timer on the GUI
+  // thread, not a queued call: Qt's event queue isn't instrumented for
+  // ThreadSanitizer, which then can't see that handing data over that way
+  // is safe.
+  m_basePackCheck = std::thread([this, directory = m_basePackDirectory,
+                                 checked = *manifest]() {
+    PackVerification result = checked.verify(directory, m_cancelBasePackCheck);
+    const std::lock_guard<std::mutex> lock(m_basePackMutex);
+    m_basePackResult = std::move(result);
+  });
+  m_basePackPoll = new QTimer(this);
+  m_basePackPoll->setInterval(50);
+  connect(m_basePackPoll, &QTimer::timeout, this,
+          &MainWindow::pollBasePackCheck);
+  m_basePackPoll->start();
+}
+
+void MainWindow::pollBasePackCheck()
+{
+  std::optional<PackVerification> result;
+  {
+    const std::lock_guard<std::mutex> lock(m_basePackMutex);
+    result.swap(m_basePackResult);
+  }
+  if (!result) {
+    return;
+  }
+  m_basePackPoll->stop();
+  m_basePackCheck.join();
+  for (const QString& problem : result->problems) {
+    qWarning("Base pack %s: %s", qUtf8Printable(m_basePackDirectory),
+             qUtf8Printable(problem));
+  }
+  showBasePackResult(result->ok, result->problems.empty()
+                                     ? QString()
+                                     : result->problems.front());
+}
+
+void MainWindow::showBasePackResult(bool ok, const QString& problem)
+{
+  m_basePackState = ok ? BasePackState::Ok : BasePackState::Damaged;
+  // The file name is the part before the colon of "file: what is wrong".
+  m_basePackProblem = problem.section(QLatin1Char(':'), 0, 0);
+  retranslateUi();
+  emit basePackVerified();
+}
 
 void MainWindow::createActions()
 {
@@ -192,7 +275,21 @@ void MainWindow::retranslateUi()
   m_aboutAction->setStatusTip(tr("Show the program version and licence"));
   m_aboutQtAction->setText(tr("About &Qt"));
   m_aboutQtAction->setStatusTip(tr("Show the Qt version in use"));
-  m_statusLabel->setText(tr("Ready"));
+  switch (m_basePackState) {
+  case BasePackState::Missing:
+    m_statusLabel->setText(
+        tr("The base pack is not installed; showing test imagery."));
+    break;
+  case BasePackState::Damaged:
+    m_statusLabel->setText(
+        tr("The base pack is damaged (%1). Reinstall %2 to repair it.")
+            .arg(m_basePackProblem, programName()));
+    break;
+  case BasePackState::Checking:
+  case BasePackState::Ok:
+    m_statusLabel->setText(tr("Ready"));
+    break;
+  }
   if (m_noGlobeLabel) {
     m_noGlobeLabel->setText(
         tr("The globe needs OpenGL 3.3, which this display does not offer. "

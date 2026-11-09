@@ -44,8 +44,12 @@ HEADERS += \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
+    include/ts/packs/basepack.h \
+    include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
+    include/ts/providers/geopackagefeatureprovider.h \
     include/ts/providers/providerregistry.h \
+    include/ts/providers/sqlitetileimageryprovider.h \
     include/ts/providers/testproviders.h \
     include/ts/providers/tileprovider.h \
     include/ts/render/framepacer.h \
@@ -56,7 +60,8 @@ HEADERS += \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
     include/ts/tiling/tileselector.h \
-    src/globe/globeuniforms.h
+    src/globe/globeuniforms.h \
+    src/providers/sqlitestatementpool.h
 
 SOURCES += \
     src/base/buildinfo.cpp \
@@ -82,8 +87,13 @@ SOURCES += \
     src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
+    src/packs/basepack.cpp \
+    src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
+    src/providers/geopackagefeatureprovider.cpp \
     src/providers/providerregistry.cpp \
+    src/providers/sqlitestatementpool.cpp \
+    src/providers/sqlitetileimageryprovider.cpp \
     src/providers/testproviders.cpp \
     src/providers/tileprovider.cpp \
     src/render/framepacer.cpp \

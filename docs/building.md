@@ -131,6 +131,7 @@ Run from the build directory:
 | `make` | Builds the core library, application and tests |
 | `make check` | Runs every test (see [testing.md](testing.md)) |
 | `make lupdate` | Refreshes `translations/terrasoar_en.ts` from the sources |
+| `make basepack` | Downloads the base pack's sources (pinned by SHA-256, about 176 MB, kept in `basepack-sources/` or `$TS_BASEPACK_SOURCES`) and builds the pack into `basepack/`, where the application finds it ([packager.md](tools/packager.md)) |
 | `make docs` | Builds the API docs into `build/docs/api` |
 | `make analyze` | Static analysis: clang-tidy, clazy and cppcheck (Linux), see below |
 

@@ -29,6 +29,7 @@ directly. Qt Test options work as usual:
 | --- | --- |
 | `QT_QPA_PLATFORM=offscreen` | Run without a display. Tests that need one skip |
 | `TS_REQUIRE_GL=1` | A missing OpenGL 3.3 context is a failure, not a skip (CI) |
+| `TS_BASEPACK_DIR=<dir>` | The application and `tests/ui` use the base pack in `<dir>` (`tests/ui` sets it to a fixture pack itself); `tests/packager` also checks the real pack there |
 | `TS_EXPECT_SOFTWARE_GL=1` | The GL context must be a software rasteriser such as llvmpipe (CI) |
 | `LIBGL_ALWAYS_SOFTWARE=1` | Make Mesa use llvmpipe |
 | `QT_OPENGL=software` | Windows: Qt loads `opengl32sw.dll` instead of the system OpenGL |
@@ -65,10 +66,12 @@ application as a whole.
 | `tests/camera` | Pose limits, frames, pixel ↔ ray ↔ globe round trips, pan and zoom keep the point under the pointer, frame-rate independence at 10/20/60/144 fps, inertia, flights, stalls |
 | `tests/tiling` | Tile keys, bounds and parent/child at the antimeridian and poles, meshes (positions, skirts, winding), selection (coverage without overlap, culling, expected tile sets, refinement order), LRU cache, loader (cancellation, cache, a many-tile stress test while the camera moves) |
 | `tests/layers` | Layer tree model under `QAbstractItemModelTester`; insert, remove, move between collections, drag and drop; effective opacity and visibility; the draw stack (composite groups, nested groups, vectors above imagery); JSON; project round trip and every older format version (fixtures in `tests/data/projects`); provider sharing |
-| `tests/providers` | Solid-colour and checkerboard test imagery: sizes, determinism, labels, cancellation, a shared instance on many threads |
+| `tests/providers` | Solid-colour and checkerboard test imagery: sizes, determinism, labels, cancellation, a shared instance on many threads. SQLite tile stores and tiled GeoPackages: write and read back, missing and undecodable tiles, bad metadata, ancestors and attributes, every truncation and byte change of a geometry blob (under ASan), a shared provider on many threads |
+| `tests/packs` | Pack manifests: round trip, refused input (unsafe paths, newer formats, bad checksums), verification finding changed, truncated and missing files, concurrent verification; where the base pack is found |
+| `tests/packager` | The packager on generated fixtures: valid, closed land polygons inside their tiles, lakes and islands in lakes, the antimeridian and the pole, area within 0.1 %, the tile pyramid matching the mosaic pixel for pixel, a whole pack build with its manifest, notices and size budget. With `TS_BASEPACK_DIR`: the real pack (checksums, budget, every tile and polygon, spot checks) |
 | `tests/globe` | (GPU) Golden images (plain and checkerboard globe; two layers at 50 %; a group composited and multiplied), shared imagery sources, silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
 | `tests/smoke` | Launches the built `terrasoar`: clean start and exit (headless), pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering, the globe window on the real platform |
-| `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; layer dock (visibility, opacity, add and remove), project save and open; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
+| `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; the base pack found, damaged (reported, still usable) and missing (test imagery); layer dock (visibility, opacity, add and remove), project save and open; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
 
 Shared helpers are in `tests/support/`: `ts::test::runConcurrently()`
 starts many threads and releases them together; `ts::test::OffscreenGl`
@@ -237,7 +240,8 @@ python3 tools/perf/measure_startup.py build/release/app/terrasoar
 It runs the app five times, takes the medians, and fails if:
 
 - peak memory is over the 256 MB budget,
-- idle CPU over 10 s is above 1%, or
+- idle CPU over 10 s is above 1% (the idle period starts once start-up
+  work in the background, the base pack's checksum check, has finished), or
 - start-up time or peak memory is more than 10% worse than the baseline
   (start-up also gets 50 ms of absolute slack for noisy runners).
 
