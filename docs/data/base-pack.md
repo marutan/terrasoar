@@ -39,7 +39,8 @@ is not used.
 There are no separate shoreline lines: they would double the size. The
 shore is the polygons' boundary without the segments lying on their tile's
 edges; every artificial edge (tile cuts, the antimeridian, the south pole)
-is such a segment. The vector renderer (Phase 3b) draws outlines that way.
+is such a segment. The vector renderer draws outlines that way
+([vector-rendering.md](../design/vector-rendering.md)).
 
 ## Sources and licences
 
@@ -106,10 +107,14 @@ directory with a manifest whose id is `terrasoar-base` wins
 
 On start-up the main window reads the manifest, makes its datasets
 available to layer sources `{"kind": "basepack", "dataset": "<id>"}` and
-starts a new project with the Blue Marble layer. A background thread then
+starts a new project with the base layers: the graticule and the
+shoreline over Blue Marble (a Land layer, the same polygons filled, is
+in Add Layer). The view credits every dataset on screen in its
+bottom-right corner, with the attribution from the manifest. A
+background thread then
 checks every file's size and SHA-256 (a fraction of a second). A missing or changed
 file is reported in the status bar ("The base pack is damaged
 (shoreline.gpkg)…") and logged; the providers turn unreadable tiles into
 "no data", so a damaged pack never crashes the program. Without a pack
 (a development build before `make basepack`) the project starts with the
-checkerboard and the status bar says so.
+graticule over the checkerboard and the status bar says so.

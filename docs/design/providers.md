@@ -22,6 +22,7 @@ TileProvider            id(), name(), maximumLevel()
 | `loadImage()` | A square image of `tileSizePx()` pixels covering exactly the tile's rectangle, row 0 at the north edge, linear in latitude and longitude. A null image means no data there (or failure); the tile is then not drawn and the globe shows through. |
 | `loadHeights()` | A square grid of heights above the ellipsoid, edges included, row 0 north. Used from Phase 6. |
 | `loadFeatures()` | The features intersecting the tile at this level of detail, as points, line strings or polygons in latitude/longitude with attributes. A source may answer for a coarser ancestor (`FeatureTile::key` says which). Used from Phase 3 (the base pack's shoreline). |
+| `storedKey()` | The tile whose features serve a key (the key itself, or that coarser ancestor), so the vector renderer loads and meshes each stored tile once for all the drawn tiles it serves. |
 
 ## Threading rules
 

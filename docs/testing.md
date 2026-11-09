@@ -29,7 +29,7 @@ directly. Qt Test options work as usual:
 | --- | --- |
 | `QT_QPA_PLATFORM=offscreen` | Run without a display. Tests that need one skip |
 | `TS_REQUIRE_GL=1` | A missing OpenGL 3.3 context is a failure, not a skip (CI) |
-| `TS_BASEPACK_DIR=<dir>` | The application and `tests/ui` use the base pack in `<dir>` (`tests/ui` sets it to a fixture pack itself); `tests/packager` also checks the real pack there |
+| `TS_BASEPACK_DIR=<dir>` | The application and `tests/ui` use the base pack in `<dir>` (`tests/ui` sets it to a fixture pack itself); `tests/packager` also checks the real pack there, and `tests/globe` compares its golden images |
 | `TS_EXPECT_SOFTWARE_GL=1` | The GL context must be a software rasteriser such as llvmpipe (CI) |
 | `LIBGL_ALWAYS_SOFTWARE=1` | Make Mesa use llvmpipe |
 | `QT_OPENGL=software` | Windows: Qt loads `opengl32sw.dll` instead of the system OpenGL |
@@ -69,8 +69,9 @@ application as a whole.
 | `tests/providers` | Solid-colour and checkerboard test imagery: sizes, determinism, labels, cancellation, a shared instance on many threads. SQLite tile stores and tiled GeoPackages: write and read back, missing and undecodable tiles, bad metadata, ancestors and attributes, every truncation and byte change of a geometry blob (under ASan), a shared provider on many threads |
 | `tests/packs` | Pack manifests: round trip, refused input (unsafe paths, newer formats, bad checksums), verification finding changed, truncated and missing files, concurrent verification; where the base pack is found |
 | `tests/packager` | The packager on generated fixtures: valid, closed land polygons inside their tiles, lakes and islands in lakes, the antimeridian and the pole, area within 0.1 %, the tile pyramid matching the mosaic pixel for pixel, a whole pack build with its manifest, notices and size budget. With `TS_BASEPACK_DIR`: the real pack (checksums, budget, every tile and polygon, spot checks) |
-| `tests/globe` | (GPU) Golden images (plain and checkerboard globe; two layers at 50 %; a group composited and multiplied), shared imagery sources, silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
-| `tests/smoke` | Launches the built `terrasoar`: clean start and exit (headless), pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering, the globe window on the real platform |
+| `tests/globe` | (GPU) Golden images (plain and checkerboard globe; two layers at 50 %; a group composited and multiplied; vector fills and outlines at the antimeridian, the pole and around a lake; the graticule layer over imagery; with `TS_BASEPACK_DIR`, the real base pack over the UK, the Pacific antimeridian and both poles at several zoom levels), shared imagery sources, silhouette against CPU picking, horizon and marker jitter 1 m above the surface, high-DPI |
+| `tests/vector` | Vector styles; meshing (area, triangles within a cell, vertices on the ellipsoid, lakes, no outline along tile edges at the antimeridian and the pole, line strings, small rings, cancellation), concurrent meshers, the feature loader and a stress test, a meshing benchmark |
+| `tests/smoke` | Launches the built `terrasoar`: clean start and exit (headless), pseudo and other locales, `--version`, usage errors, start-up measurement, idle CPU, GL 3.3 under software rendering, the globe window on the real platform, an offline start (proxies pointing at a closed port) with the base layers drawn and credited |
 | `tests/ui` | Main window: opens and closes, quit action, English texts, pseudo-locale at creation and at run time, no truncated text; the base pack found, damaged (reported, still usable) and missing (test imagery); layer dock (visibility, opacity, add and remove), project save and open; globe view or its fallback, drag and wheel, status bar readout, debug overlay and Reset View, no frames while idle |
 
 Shared helpers are in `tests/support/`: `ts::test::runConcurrently()`

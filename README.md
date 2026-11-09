@@ -11,10 +11,11 @@ to a metre above the surface), with the latitude and longitude under the
 pointer in the status bar. The surface is drawn from a geographic tile
 quadtree. Layers and collections are managed in the Layers dock
 (order, visibility, opacity, composite groups) and saved with the view in
-project files. A new project shows NASA's Blue Marble from the built-in
-base pack, which works offline; `make basepack` downloads its sources and
-builds it (see [docs/tools/packager.md](docs/tools/packager.md)). Shorelines
-from the same pack, a graticule layer and attribution come next.
+project files. A new project shows NASA's Blue Marble with GSHHG
+shorelines and a graticule, all from the built-in base pack, which works
+offline and credits its sources in the view; `make basepack` downloads
+its sources and builds it (see [docs/tools/packager.md](docs/tools/packager.md)).
+WMS layers over the network come next.
 
 ## Building
 
@@ -42,7 +43,8 @@ full instructions for each OS.
   [renderer backend](docs/design/renderer-backend.md),
   [camera and precision](docs/design/camera-and-precision.md),
   [tiling](docs/design/tiling.md), [providers](docs/design/providers.md),
-  [layer model](docs/design/layer-model.md)
+  [layer model](docs/design/layer-model.md),
+  [vector rendering](docs/design/vector-rendering.md)
 - Data: [the base pack](docs/data/base-pack.md),
   [the packager](docs/tools/packager.md)
 - API reference: `make docs` (or `doxygen Doxyfile`), then open

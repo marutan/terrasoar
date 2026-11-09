@@ -56,7 +56,7 @@ Subsections so far:
 | `deps` | Owning handles for GDAL datasets, PROJ contexts, GEOS contexts and SQLite connections; library versions |
 | `geo` | WGS 84 constants, geodetic ↔ ECEF, normals and local frames, ray–ellipsoid picking, geodesics (`docs/design/coordinates.md`) |
 | `gl` | OpenGL capability probe, software-renderer detection |
-| `globe` | The globe renderer: ray-cast WGS 84 ellipsoid with graticule, imagery tiles, markers relative to the eye |
+| `globe` | The globe renderer: ray-cast WGS 84 ellipsoid, the graticule, imagery tiles, vector layers (fills and outlines), markers relative to the eye; layer stack to draws (`docs/design/vector-rendering.md`) |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
@@ -65,6 +65,7 @@ Subsections so far:
 | `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers (`docs/design/providers.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
+| `vector` | Vector styles, meshing feature tiles into triangles and outline segments on the ellipsoid, the worker-thread feature loader (`docs/design/vector-rendering.md`) |
 
 ### app (`terrasoar`)
 
