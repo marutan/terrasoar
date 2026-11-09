@@ -34,6 +34,14 @@ analyze.commands = python3 $$shell_path($$PWD/tools/checks/run_static_analysis.p
     --build-dir $$shell_path($$OUT_PWD/analyze)
 QMAKE_EXTRA_TARGETS += analyze
 
+# `make basepack` downloads the base pack's sources (pinned by SHA-256) and
+# builds the pack into basepack/ here, where the application finds it. See
+# docs/tools/packager.md.
+basepack.commands = python3 $$shell_path($$PWD/tools/packager/build_basepack.py) \
+    --build-dir $$shell_path($$OUT_PWD)
+basepack.depends = sub-tools
+QMAKE_EXTRA_TARGETS += basepack
+
 # `make docs` builds the Doxygen API documentation into build/docs/api.
 docs.commands = cd $$shell_path($$PWD) && doxygen Doxyfile
 QMAKE_EXTRA_TARGETS += docs

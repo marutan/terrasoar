@@ -7,6 +7,8 @@
 #     with Qt 5.15 and Qt 6, warnings as errors
 #   - ThreadSanitizer build of the unit and stress tests
 #   - AddressSanitizer + UBSan build of the unit tests
+#   - the base pack: download its sources, build it, check size, checksums,
+#     tiles and polygons
 #   - static analysis (clang-tidy, clazy, cppcheck) of the changed files,
 #     and a self-test that each tool still reports known-bad code
 #
@@ -288,6 +290,74 @@ jobs:
             suppressions=${{ github.workspace }}/tests/tsan.supp
           QT_QPA_PLATFORM: offscreen
         run: make -C build-tsan check
+
+  basepack:
+    name: Base pack (Linux GCC / Qt 6)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      # The sources (about 176 MB) change only with basepack.json, which
+      # pins them by SHA-256; fetch_sources.py checks them either way.
+      - name: Restore the pack's sources
+        id: sources
+        uses: actions/cache/restore@v6
+        with:
+          path: basepack-sources
+          key: basepack-sources-${{ hashFiles('tools/packager/basepack.json') }}
+
+      - name: Configure
+        run: |
+          mkdir build-ci && cd build-ci
+          qmake ../terrasoar.pro CONFIG+=werror
+
+      - name: Build the packager and its tests
+        run: |
+          make -C build-ci -j"$(nproc)" sub-tools
+          make -C build-ci/tests -j"$(nproc)" sub-packager
+
+      - name: Build the base pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TS_BASEPACK_SOURCES: ${{ github.workspace }}/basepack-sources
+        run: >-
+          python3 tools/packager/build_basepack.py --build-dir build-ci
+          --report basepack-report.json
+
+      - name: Save the pack's sources
+        if: steps.sources.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: basepack-sources
+          key: basepack-sources-${{ hashFiles('tools/packager/basepack.json') }}
+
+      # Size budget, checksums, every tile and polygon, spot checks.
+      - name: Check the base pack
+        env:
+          TS_BASEPACK_DIR: ${{ github.workspace }}/build-ci/basepack
+          QT_QPA_PLATFORM: offscreen
+        run: make -C build-ci/tests/packager check
+
+      - name: Upload the base pack
+        if: always() && hashFiles('basepack-report.json') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: basepack
+          retention-days: 7
+          path: |
+            basepack-report.json
+            build-ci/basepack
 
   asan:
     name: AddressSanitizer + UBSan (Linux Clang / Qt 6)
