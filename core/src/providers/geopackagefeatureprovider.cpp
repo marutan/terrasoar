@@ -750,6 +750,22 @@ QString GeoPackageFeatureProvider::id() const
   return QStringLiteral("geopackage:") + m_path; // ts-notr: identifier
 }
 
+TileKey GeoPackageFeatureProvider::storedKey(TileKey key) const
+{
+  for (const std::unique_ptr<Table>& table : m_tables) {
+    const FeatureTableSpec& spec = table->spec;
+    if (key.level >= spec.minLevel &&
+        (spec.maxLevel < 0 || key.level <= spec.maxLevel)) {
+      TileKey stored = key;
+      while (stored.level > spec.storageLevel) {
+        stored = stored.parent();
+      }
+      return stored;
+    }
+  }
+  return key;
+}
+
 std::optional<FeatureTile>
 GeoPackageFeatureProvider::loadFeatures(TileKey key,
                                         const std::atomic<bool>& cancelled)

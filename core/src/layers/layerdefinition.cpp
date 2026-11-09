@@ -27,8 +27,11 @@ constexpr std::array<std::pair<LayerOrigin, const char*>, 3> originNames = {{
 }};
 
 /** Names of the built-in definitions, for lupdate; translated on load. */
-constexpr std::array<const char*, 3> builtinNames = {
+constexpr std::array<const char*, 6> builtinNames = {
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Blue Marble"),
+    QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Shoreline"),
+    QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Land"),
+    QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Graticule"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Checkerboard"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "White, 50 %"),
 };
@@ -38,6 +41,20 @@ const char* const builtinJson = R"([
   { "id": "builtin:bluemarble", "origin": "builtin", "type": "imagery",
     "name": "Blue Marble",
     "source": { "kind": "basepack", "dataset": "bluemarble" } },
+  { "id": "builtin:shoreline", "origin": "builtin", "type": "vector",
+    "name": "Shoreline",
+    "source": { "kind": "basepack", "dataset": "shoreline" },
+    "style": { "fill": "#00000000", "outline": "#f2e6bfff",
+               "outlineWidthPx": 1.2 } },
+  { "id": "builtin:land", "origin": "builtin", "type": "vector",
+    "name": "Land",
+    "source": { "kind": "basepack", "dataset": "shoreline" },
+    "style": { "fill": "#c8b98fff", "outline": "#00000000",
+               "outlineWidthPx": 0 } },
+  { "id": "builtin:graticule", "origin": "builtin", "type": "vector",
+    "name": "Graticule",
+    "source": { "kind": "graticule" },
+    "style": { "outline": "#dfe6f0b3", "outlineWidthPx": 1.0 } },
   { "id": "builtin:checkerboard", "origin": "builtin", "type": "imagery",
     "name": "Checkerboard",
     "source": { "kind": "checkerboard", "tileSize": 256 } },
@@ -85,6 +102,9 @@ QJsonObject LayerDefinition::toJson() const
   json.insert(QStringLiteral("type"), layerTypeName(type));
   json.insert(QStringLiteral("name"), name);
   json.insert(QStringLiteral("source"), source);
+  if (!style.isEmpty()) {
+    json.insert(QStringLiteral("style"), style);
+  }
   return json;
 }
 
@@ -95,6 +115,7 @@ LayerDefinition::fromJson(const QJsonObject& json, QString* errorString)
   definition.id = json.value(QStringLiteral("id")).toString();
   definition.name = json.value(QStringLiteral("name")).toString();
   definition.source = json.value(QStringLiteral("source")).toObject();
+  definition.style = json.value(QStringLiteral("style")).toObject();
   if (definition.id.isEmpty()) {
     return fail(errorString,
                 QCoreApplication::translate("ts::LayerDefinition",
@@ -142,7 +163,7 @@ LayerDefinition::fromJson(const QJsonObject& json, QString* errorString)
 bool LayerDefinition::operator==(const LayerDefinition& other) const
 {
   return id == other.id && origin == other.origin && type == other.type &&
-         name == other.name && source == other.source;
+         name == other.name && source == other.source && style == other.style;
 }
 
 std::vector<LayerDefinition> builtinLayerDefinitions()

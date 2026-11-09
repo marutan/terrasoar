@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <array>
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QTemporaryDir>
 #include <QtTest>
+
+#include "fixturepack.h"
 
 namespace
 {
@@ -24,10 +28,12 @@ struct Run {
  * With @p headless the offscreen platform is used, so no display is needed.
  */
 Run runApp(const QStringList& arguments, bool headless = true,
-           int timeoutMs = 60000)
+           int timeoutMs = 60000,
+           const QProcessEnvironment& extra = QProcessEnvironment())
 {
   QProcess process;
   QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+  env.insert(extra);
   if (headless) {
     env.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
     // Truly headless: with a display set, the offscreen platform still
@@ -187,6 +193,53 @@ private slots:
     const QStringList warnings = qtWarnings(run.err);
     QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join(QLatin1Char('\n'))));
     QVERIFY2(!run.err.contains("Globe view:"), run.err.constData());
+  }
+
+  /**
+   * Offline start: the application, on the real platform with the fixture
+   * base pack and every proxy pointing at a closed port (so any network
+   * access would fail), starts with the base layers on the globe: the
+   * graticule and shoreline over Blue Marble, their sources credited, and
+   * tiles drawn. Terra Soar has no network code yet (WMS comes in Phase 4);
+   * this keeps it working offline once it has.
+   */
+  void offlineBaseLayers()
+  {
+    const Run glCheck = runApp({QStringLiteral("--gl-check")}, false);
+    if (glCheck.exitCode != 0 &&
+        qEnvironmentVariableIntValue("TS_REQUIRE_GL") == 0) {
+      QSKIP("No OpenGL 3.3 here; set TS_REQUIRE_GL=1 to fail instead.");
+    }
+    const QTemporaryDir pack;
+    ts::test::writeFixtureBasePack(pack.path());
+    QProcessEnvironment offline;
+    offline.insert(QStringLiteral("TS_BASEPACK_DIR"), pack.path());
+    for (const char* name : {"http_proxy", "https_proxy", "HTTP_PROXY",
+                             "HTTPS_PROXY", "all_proxy", "ALL_PROXY"}) {
+      offline.insert(QLatin1String(name),
+                     QStringLiteral("http://127.0.0.1:9")); // discard port
+    }
+    offline.insert(QStringLiteral("no_proxy"), QString());
+    const Run run =
+        runApp({QStringLiteral("--measure"), QStringLiteral("-"),
+                QStringLiteral("--idle-seconds"), QStringLiteral("2")},
+               false, 60000, offline);
+    verifyCleanExit(run);
+    const QJsonObject state =
+        parseJson(run.out).value(QStringLiteral("state")).toObject();
+    qInfo("%s",
+          QJsonDocument(state).toJson(QJsonDocument::Compact).constData());
+    QCOMPARE(state.value(QStringLiteral("base_pack")).toString(),
+             QStringLiteral("ok"));
+    QCOMPARE(
+        state.value(QStringLiteral("layers")).toArray(),
+        (QJsonArray{QStringLiteral("Graticule"), QStringLiteral("Shoreline"),
+                    QStringLiteral("Blue Marble")}));
+    QCOMPARE(state.value(QStringLiteral("attributions")).toArray().size(), 2);
+    QCOMPARE(state.value(QStringLiteral("imagery_layers")).toInt(), 1);
+    QCOMPARE(state.value(QStringLiteral("vector_layers")).toInt(), 2);
+    QVERIFY(state.value(QStringLiteral("imagery_tiles_drawn")).toInt() > 0);
+    QVERIFY(state.value(QStringLiteral("vector_tiles_drawn")).toInt() > 0);
   }
 
   /**

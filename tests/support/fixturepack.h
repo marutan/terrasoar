@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /**
  * @file
- * A small base pack for tests: solid-colour Blue Marble tiles, levels 0
- * and 1, with a correct manifest.
+ * A small base pack for tests: solid-colour Blue Marble tiles (levels 0
+ * and 1) and a shoreline with one island, with a correct manifest.
  */
 #ifndef TS_TESTS_FIXTUREPACK_H
 #define TS_TESTS_FIXTUREPACK_H
 
+#include <array>
 #include <atomic>
+#include <cstdint>
 
 #include <QBuffer>
 #include <QByteArray>
@@ -21,6 +23,7 @@
 
 #include "ts/packs/basepack.h"
 #include "ts/packs/packmanifest.h"
+#include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/tiling/tilekey.h"
 
@@ -59,20 +62,55 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
     }
     writer.finish();
   }
+  // One island (10°–20°E, 40°–50°N) in the eastern level-0 tile.
+  const QString shoreline = QStringLiteral("shoreline.gpkg");
+  {
+    GeoPackageFeatureWriter writer(dir.filePath(shoreline));
+    FeatureTableSpec table;
+    table.name = QStringLiteral("land_c");
+    table.storageLevel = 0;
+    table.minLevel = 0;
+    table.maxLevel = -1;
+    QByteArray wkb;
+    const std::array<double, 10> ring = {10, 40, 20, 40, 20,
+                                         50, 10, 50, 10, 40};
+    wkb.append(static_cast<char>(1));
+    for (const std::uint32_t value : {3U, 1U, 5U}) {
+      for (int i = 0; i < 4; ++i) {
+        wkb.append(static_cast<char>(
+            (value >> (8U * static_cast<unsigned>(i))) & 0xffU));
+      }
+    }
+    for (const double value : ring) {
+      wkb.append(reinterpret_cast<const char*>(&value), sizeof value);
+    }
+    writer.addTable(table);
+    writer.putFeature(table.name, TileKey{0, 1, 0}, wkb);
+    writer.finish();
+  }
   const std::atomic<bool> notCancelled{false};
   PackManifest manifest;
   manifest.id = basePackId();
   manifest.version = QStringLiteral("test");
-  PackFile packFile;
-  packFile.path = file;
-  packFile.sizeBytes = QFileInfo(dir.filePath(file)).size();
-  packFile.sha256 = fileSha256(dir.filePath(file), notCancelled);
-  manifest.files.push_back(packFile);
+  for (const QString& path : {file, shoreline}) {
+    PackFile packFile;
+    packFile.path = path;
+    packFile.sizeBytes = QFileInfo(dir.filePath(path)).size();
+    packFile.sha256 = fileSha256(dir.filePath(path), notCancelled);
+    manifest.files.push_back(packFile);
+  }
   PackDataset dataset;
   dataset.id = QStringLiteral("bluemarble");
   dataset.kind = PackDataset::Kind::Imagery;
   dataset.file = file;
   dataset.name = info.name;
+  dataset.attribution = QStringLiteral("Fixture imagery");
+  manifest.datasets.push_back(dataset);
+  dataset.id = QStringLiteral("shoreline");
+  dataset.kind = PackDataset::Kind::Features;
+  dataset.file = shoreline;
+  dataset.name = QStringLiteral("Fixture shoreline");
+  dataset.attribution = QStringLiteral("Fixture shoreline");
   manifest.datasets.push_back(dataset);
   QFile json(dir.filePath(PackManifest::fileName()));
   if (json.open(QIODevice::WriteOnly)) {

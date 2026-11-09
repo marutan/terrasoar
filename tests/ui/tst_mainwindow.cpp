@@ -155,15 +155,28 @@ private slots:
 
   void basePackStates()
   {
-    // Installed and intact: Blue Marble by default, "Ready" throughout.
+    // Installed and intact: graticule, shoreline and Blue Marble by
+    // default (top to bottom), their sources credited, "Ready" throughout.
     {
       ts::MainWindow window;
       QCOMPARE(window.basePackDirectory(), QDir::cleanPath(m_basePack.path()));
-      QCOMPARE(window.layerModel()->rowCount(), 1);
-      QCOMPARE(window.layerModel()
-                   ->layerDefinition(window.layerModel()->index(0, 0))
-                   .id,
-               QStringLiteral("builtin:bluemarble"));
+      const ts::LayerTreeModel* model = window.layerModel();
+      QCOMPARE(model->rowCount(), 3);
+      const QStringList expected = {QStringLiteral("builtin:graticule"),
+                                    QStringLiteral("builtin:shoreline"),
+                                    QStringLiteral("builtin:bluemarble")};
+      for (int row = 0; row < 3; ++row) {
+        QCOMPARE(model->layerDefinition(model->index(row, 0)).id,
+                 expected.at(row));
+      }
+      ts::GlobeView* globe = globeOf(window);
+      if (globe != nullptr) {
+        QCOMPARE(globe->imageryLayerCount(), 1);
+        QCOMPARE(globe->vectorLayerCount(), 2);
+        QCOMPARE(globe->attributions(),
+                 (QStringList{QStringLiteral("Fixture shoreline"),
+                              QStringLiteral("Fixture imagery")}));
+      }
       QSignalSpy verified(&window, &ts::MainWindow::basePackVerified);
       QVERIFY(window.basePackState() == ts::MainWindow::BasePackState::Ok ||
               verified.wait(10000));
@@ -198,8 +211,10 @@ private slots:
       qputenv("TS_BASEPACK_DIR", empty.path().toUtf8());
       ts::MainWindow window;
       QVERIFY(window.basePackState() == ts::MainWindow::BasePackState::Missing);
+      // The checkerboard under the graticule.
+      QCOMPARE(window.layerModel()->rowCount(), 2);
       QCOMPARE(window.layerModel()
-                   ->layerDefinition(window.layerModel()->index(0, 0))
+                   ->layerDefinition(window.layerModel()->index(1, 0))
                    .id,
                QStringLiteral("builtin:checkerboard"));
       QVERIFY(window.findChild<QLabel*>(QStringLiteral("statusLabel"))
@@ -469,14 +484,28 @@ private slots:
         remove == nullptr) {
       QFAIL("layer dock widgets missing");
     }
-    // A new project shows Blue Marble from the base pack.
-    QCOMPARE(model->rowCount(), 1);
+    // A new project shows the graticule and shoreline over Blue Marble,
+    // and the dock says vectors stay above imagery.
+    QCOMPARE(model->rowCount(), 3);
+    QVERIFY(!window.findChild<QLabel*>(QStringLiteral("layerOrderNote"))
+                 ->text()
+                 .isEmpty());
     ts::GlobeView* globe = globeOf(window);
     if (globe != nullptr) {
       QCOMPARE(globe->imageryLayerCount(), 1);
+      QCOMPARE(globe->vectorLayerCount(), 2);
     }
-    // Hiding it takes it off the globe at once (the next frame).
-    const QModelIndex layer = model->index(0, 0);
+    // Hiding a layer takes it off the globe at once (the next frame), and
+    // its attribution with it.
+    const QModelIndex shoreline = model->index(1, 0);
+    model->setData(shoreline, Qt::Unchecked, Qt::CheckStateRole);
+    if (globe != nullptr) {
+      QCOMPARE(globe->vectorLayerCount(), 1);
+      QCOMPARE(globe->attributions(),
+               QStringList{QStringLiteral("Fixture imagery")});
+    }
+    model->setData(shoreline, Qt::Checked, Qt::CheckStateRole);
+    const QModelIndex layer = model->index(2, 0);
     model->setData(layer, Qt::Unchecked, Qt::CheckStateRole);
     if (globe != nullptr) {
       QCOMPARE(globe->imageryLayerCount(), 0);
@@ -489,13 +518,13 @@ private slots:
              0.4);
     // A collection goes above the selected layer; remove takes it away.
     addCollection->click();
-    QCOMPARE(model->rowCount(), 2);
+    QCOMPARE(model->rowCount(), 4);
     QVERIFY(
-        model->data(model->index(0, 0), ts::LayerTreeModel::IsCollectionRole)
+        model->data(model->index(2, 0), ts::LayerTreeModel::IsCollectionRole)
             .toBool());
-    view->setCurrentIndex(model->index(0, 0));
+    view->setCurrentIndex(model->index(2, 0));
     remove->click();
-    QCOMPARE(model->rowCount(), 1);
+    QCOMPARE(model->rowCount(), 3);
   }
 
   void projectSaveAndOpen()

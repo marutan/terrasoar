@@ -168,6 +168,35 @@ void GlobeView::setImageryDraws(const ImageryDraws& draws)
   update();
 }
 
+void GlobeView::setVectorDraws(const std::vector<VectorLayerDraw>& draws)
+{
+  m_vectorDraws = draws;
+  if (m_globe) {
+    makeCurrent();
+    m_globe->setVectorLayers(m_vectorDraws);
+    doneCurrent();
+  }
+  update();
+}
+
+void GlobeView::setAttributions(const QStringList& attributions)
+{
+  if (m_attributions != attributions) {
+    m_attributions = attributions;
+    update();
+  }
+}
+
+TileStatistics GlobeView::tileStatistics() const
+{
+  return m_globe ? m_globe->tileStatistics() : TileStatistics();
+}
+
+VectorStatistics GlobeView::vectorStatistics() const
+{
+  return m_globe ? m_globe->vectorStatistics() : VectorStatistics();
+}
+
 bool GlobeView::isGroupCompositingAvailable() const
 {
   return !m_deviceInfo.softwareRenderer;
@@ -225,6 +254,11 @@ void GlobeView::initializeGL()
   // rasterisers multiply the group's opacity into its layers instead.
   m_globe->setGroupCompositing(isGroupCompositingAvailable());
   m_globe->setImageryLayers(m_draws.layers, m_draws.groupAlphas);
+  // The graticule is a layer in the tree, drawn in its order.
+  GlobeStyle style = m_globe->style();
+  style.graticule = false;
+  m_globe->setStyle(style);
+  m_globe->setVectorLayers(m_vectorDraws);
 }
 
 void GlobeView::releaseGl()
@@ -266,6 +300,7 @@ void GlobeView::paintGL()
   m_cpuFrameStats.addFrame(nowS() - startS);
   ++m_framesRendered;
 
+  drawAttributions();
   if (m_overlayVisible) {
     drawOverlay();
   }
@@ -465,6 +500,16 @@ void GlobeView::drawOverlay()
                                           (1024.0 * 1024.0),
                                       'f', 1),
                       locale.toString(tiles.requested));
+    const VectorStatistics vectors = m_globe->vectorStatistics();
+    lines << tr("Vectors: %1 tiles drawn, %2 triangles, %3 segments, %4 on "
+                "the GPU (%5 MB)")
+                 .arg(locale.toString(vectors.tilesDrawn),
+                      locale.toString(vectors.triangles),
+                      locale.toString(vectors.segments),
+                      locale.toString(vectors.resident),
+                      locale.toString(static_cast<double>(vectors.gpuBytes) /
+                                          (1024.0 * 1024.0),
+                                      'f', 1));
   }
   lines << tr("Target: %1, %2")
                .arg(formatLatitude(pose.targetLatDeg, locale),
@@ -492,6 +537,38 @@ void GlobeView::drawOverlay()
   int y = box.top() + margin + metrics.ascent();
   for (const QString& line : lines) {
     painter.drawText(box.left() + margin, y, line);
+    y += lineHeight;
+  }
+}
+
+void GlobeView::drawAttributions()
+{
+  if (m_attributions.isEmpty()) {
+    return;
+  }
+  // Small text on a translucent band in the bottom-right corner, one
+  // line per source.
+  QPainter painter(this);
+  QFont font = painter.font();
+  font.setPointSizeF(font.pointSizeF() * 0.85);
+  painter.setFont(font);
+  const QFontMetrics metrics(font);
+  const int margin = 4;
+  int textWidth = 0;
+  for (const QString& line : m_attributions) {
+    textWidth = std::max(textWidth, metrics.horizontalAdvance(line));
+  }
+  const int lineHeight = metrics.lineSpacing();
+  const int boxHeight =
+      lineHeight * static_cast<int>(m_attributions.size()) + 2 * margin;
+  const QRect box(width() - textWidth - 2 * margin, height() - boxHeight,
+                  textWidth + 2 * margin, boxHeight);
+  painter.fillRect(box, QColor(0, 0, 0, 120));
+  painter.setPen(QColor(225, 230, 240));
+  int y = box.top() + margin + metrics.ascent();
+  for (const QString& line : m_attributions) {
+    painter.drawText(box.right() - margin - metrics.horizontalAdvance(line), y,
+                     line);
     y += lineHeight;
   }
 }

@@ -82,6 +82,7 @@ private:
   QSlider* m_opacitySlider = nullptr;
   QLabel* m_opacityValue = nullptr;
   QCheckBox* m_compositeBox = nullptr;
+  QLabel* m_orderNote = nullptr;
   bool m_compositingAvailable = true;
 };
 

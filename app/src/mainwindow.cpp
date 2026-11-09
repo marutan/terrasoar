@@ -9,6 +9,7 @@
 #include <QCoreApplication>
 #include <QEvent>
 #include <QFileDialog>
+#include <QJsonArray>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLocale>
@@ -63,12 +64,20 @@ MainWindow::MainWindow(QWidget* parent)
   // imagery when the pack is not installed (a development build before
   // `make basepack`).
   findBasePack();
-  const QString defaultLayer = m_basePackState == BasePackState::Missing
-                                   ? QStringLiteral("builtin:checkerboard")
-                                   : QStringLiteral("builtin:bluemarble");
-  for (const LayerDefinition& definition : builtinLayerDefinitions()) {
-    if (definition.id == defaultLayer) {
-      m_layers->addLayer(definition);
+  // Added bottom first; each new layer goes on top.
+  const QStringList defaultLayers =
+      m_basePackState == BasePackState::Missing
+          ? QStringList{QStringLiteral("builtin:checkerboard"),
+                        QStringLiteral("builtin:graticule")}
+          : QStringList{QStringLiteral("builtin:bluemarble"),
+                        QStringLiteral("builtin:shoreline"),
+                        QStringLiteral("builtin:graticule")};
+  const std::vector<LayerDefinition> builtins = builtinLayerDefinitions();
+  for (const QString& id : defaultLayers) {
+    for (const LayerDefinition& definition : builtins) {
+      if (definition.id == id) {
+        m_layers->addLayer(definition);
+      }
     }
   }
   m_layerDock = new LayerTreeDock(m_layers, this);
@@ -159,6 +168,50 @@ void MainWindow::pollBasePackCheck()
   showBasePackResult(result->ok, result->problems.empty()
                                      ? QString()
                                      : result->problems.front());
+}
+
+QJsonObject MainWindow::stateReport() const
+{
+  QString basePack;
+  switch (m_basePackState) {
+  case BasePackState::Missing:
+    basePack = QStringLiteral("missing");
+    break;
+  case BasePackState::Checking:
+    basePack = QStringLiteral("checking");
+    break;
+  case BasePackState::Ok:
+    basePack = QStringLiteral("ok");
+    break;
+  case BasePackState::Damaged:
+    basePack = QStringLiteral("damaged");
+    break;
+  }
+  QJsonObject state;
+  state.insert(QStringLiteral("base_pack"), basePack);
+  const LayerStack stack = m_layers->layerStack();
+  QJsonArray layers;
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    layers.append(stack.vectors[i].definition.name);
+  }
+  for (std::size_t i = stack.imagery.size(); i-- > 0;) {
+    layers.append(stack.imagery[i].definition.name);
+  }
+  state.insert(QStringLiteral("layers"), layers);
+  state.insert(
+      QStringLiteral("attributions"),
+      QJsonArray::fromStringList(attributionsForStack(stack, *m_registry)));
+  if (m_globeView) {
+    state.insert(QStringLiteral("imagery_layers"),
+                 m_globeView->imageryLayerCount());
+    state.insert(QStringLiteral("vector_layers"),
+                 m_globeView->vectorLayerCount());
+    state.insert(QStringLiteral("imagery_tiles_drawn"),
+                 m_globeView->tileStatistics().rendered);
+    state.insert(QStringLiteral("vector_tiles_drawn"),
+                 m_globeView->vectorStatistics().tilesDrawn);
+  }
+  return state;
 }
 
 void MainWindow::showBasePackResult(bool ok, const QString& problem)
@@ -318,8 +371,11 @@ void MainWindow::refreshLayers()
     return;
   }
   QStringList errors;
+  const LayerStack stack = m_layers->layerStack();
   m_globeView->setImageryDraws(
-      imageryDrawsForStack(m_layers->layerStack(), *m_registry, &errors));
+      imageryDrawsForStack(stack, *m_registry, &errors));
+  m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
+  m_globeView->setAttributions(attributionsForStack(stack, *m_registry));
   if (!errors.isEmpty()) {
     statusBar()->showMessage(errors.join(QLatin1Char(' ')), 10000);
   }

@@ -25,6 +25,7 @@ using globe_detail::frameBlockGlsl;
 using globe_detail::globeBinding;
 using globe_detail::GlobeBlock;
 using globe_detail::globeBlockGlsl;
+using globe_detail::graticuleBinding;
 
 /** One marker instance in the vertex buffer. */
 struct MarkerInstance {
@@ -48,9 +49,55 @@ void main()
 }
 )";
 
-const char* const globeFragmentGlsl = R"(
+// The ray through each pixel against the ellipsoid, and the graticule's
+// lines; shared by the surface and graticule passes.
+const char* const traceGlsl = R"(
 in vec3 vRay;
-out vec4 fragColor;
+
+struct SurfaceHit {
+  vec3 d;         // unit view ray
+  vec3 n;         // surface normal
+  float tM;       // distance along d, metres
+  float coverage; // of this pixel by the globe (edge antialiasing)
+  float latDeg;
+  float lonDeg;
+};
+
+SurfaceHit traceSurface()
+{
+  SurfaceHit hit;
+  vec3 d = normalize(vRay);
+  // Ray against the unit sphere in the frame scaled by (1/a, 1/a, 1/b):
+  // |e + tau D|^2 = 1 with D = d (1, 1, a/b) and t = a tau metres.
+  vec3 D = d * vec3(1.0, 1.0, ellipsoid.y);
+  float qa = dot(D, D);
+  float qb = dot(eyeScaled.xyz, D);
+  float qc = eyeScaled.w;
+  float disc = qb * qb - qa * qc;
+  float root = sqrt(max(disc, 0.0));
+  float q = -(qb + (qb >= 0.0 ? root : -root));
+  float tau0 = q / qa;
+  float tau1 = q != 0.0 ? qc / q : tau0;
+  float tauNear = min(tau0, tau1);
+  float tau = tauNear >= 0.0 ? tauNear : max(tau0, tau1);
+  bool isHit = tau >= 0.0;
+  // Off the globe, continue from the ray's closest approach so the
+  // derivatives below stay smooth across the edge.
+  if (!isHit || disc < 0.0) {
+    tau = max(-qb / qa, 0.0);
+  }
+  // Edge antialiasing: disc changes linearly across the silhouette.
+  hit.coverage = isHit ? clamp(0.5 + disc / max(fwidth(disc), 1e-30), 0.0, 1.0)
+                       : 0.0;
+  hit.d = d;
+  hit.tM = tau * ellipsoid.x;
+  vec3 p = eyeMetres.xyz + hit.tM * d;
+  hit.n = normalize(p * vec3(ellipsoid.z, ellipsoid.z, ellipsoid.w));
+  // The normal's latitude is the geodetic latitude.
+  hit.latDeg = degrees(asin(clamp(hit.n.z, -1.0, 1.0)));
+  hit.lonDeg = degrees(atan(hit.n.y, hit.n.x));
+  return hit;
+}
 
 // Coverage of grid lines every spacingDeg at coordinate coordDeg, faded out
 // where the lines get closer than about minGapPx pixels.
@@ -75,63 +122,66 @@ float lonLines(float lonDeg, float spacingDeg, float widthPx, float minGapPx)
   return fwidth(lonDeg) <= fwidth(wrapped) ? a : b;
 }
 
+// The graticule's coverage: 10° lines, fainter 1° lines, the equator and
+// prime meridian a little wider.
+float graticule(SurfaceHit hit, float widthPx)
+{
+  float grid = 0.7 * max(gridLines(hit.latDeg, 10.0, widthPx, 4.0),
+                         lonLines(hit.lonDeg, 10.0, widthPx, 4.0));
+  grid = max(grid, 0.35 * max(gridLines(hit.latDeg, 1.0, widthPx, 12.0),
+                              lonLines(hit.lonDeg, 1.0, widthPx, 12.0)));
+  float axes = max(gridLines(hit.latDeg, 180.0, 1.5 * widthPx, 4.0),
+                   lonLines(hit.lonDeg, 360.0, 1.5 * widthPx, 4.0));
+  return max(grid, axes);
+}
+)";
+
+const char* const globeFragmentGlsl = R"(
+out vec4 fragColor;
 void main()
 {
-  vec3 d = normalize(vRay);
-  // Ray against the unit sphere in the frame scaled by (1/a, 1/a, 1/b):
-  // |e + tau D|^2 = 1 with D = d (1, 1, a/b) and t = a tau metres.
-  vec3 D = d * vec3(1.0, 1.0, ellipsoid.y);
-  float qa = dot(D, D);
-  float qb = dot(eyeScaled.xyz, D);
-  float qc = eyeScaled.w;
-  float disc = qb * qb - qa * qc;
-  float root = sqrt(max(disc, 0.0));
-  float q = -(qb + (qb >= 0.0 ? root : -root));
-  float tau0 = q / qa;
-  float tau1 = q != 0.0 ? qc / q : tau0;
-  float tauNear = min(tau0, tau1);
-  float tau = tauNear >= 0.0 ? tauNear : max(tau0, tau1);
-  bool hit = tau >= 0.0;
-  // Off the globe, continue from the ray's closest approach so the
-  // derivatives below stay smooth across the edge.
-  if (!hit || disc < 0.0) {
-    tau = max(-qb / qa, 0.0);
-  }
-  // Edge antialiasing: disc changes linearly across the silhouette.
-  float coverage = hit ? clamp(0.5 + disc / max(fwidth(disc), 1e-30), 0.0, 1.0)
-                       : 0.0;
-
-  float tM = tau * ellipsoid.x;
-  vec3 offset = tM * d;
-  vec3 p = eyeMetres.xyz + offset;
-  vec3 n = normalize(p * vec3(ellipsoid.z, ellipsoid.z, ellipsoid.w));
-  // The normal's latitude is the geodetic latitude.
-  float latDeg = degrees(asin(clamp(n.z, -1.0, 1.0)));
-  float lonDeg = degrees(atan(n.y, n.x));
-
-  float widthPx = gridParams.x;
-  float grid = 0.7 * max(gridLines(latDeg, 10.0, widthPx, 4.0),
-                         lonLines(lonDeg, 10.0, widthPx, 4.0));
-  grid = max(grid, 0.35 * max(gridLines(latDeg, 1.0, widthPx, 12.0),
-                              lonLines(lonDeg, 1.0, widthPx, 12.0)));
-  float axes = max(gridLines(latDeg, 180.0, 1.5 * widthPx, 4.0),
-                   lonLines(lonDeg, 360.0, 1.5 * widthPx, 4.0));
-  grid = max(grid, axes) * gridParams.y;
-
-  if (coverage <= 0.0) {
+  SurfaceHit hit = traceSurface();
+  if (hit.coverage <= 0.0) {
     discard;
   }
-  float diffuse = max(dot(n, lightDir.xyz), 0.0);
-  float facing = clamp(dot(n, -d), 0.0, 1.0);
-  vec3 color = surfaceColor.rgb * (0.30 + 0.70 * diffuse) * (0.85 + 0.15 * facing);
-  color = mix(color, gridColor.rgb, grid);
-  fragColor = vec4(color * coverage, coverage);
+  float diffuse = max(dot(hit.n, lightDir.xyz), 0.0);
+  float facing = clamp(dot(hit.n, -hit.d), 0.0, 1.0);
+  vec3 color = surfaceColor.rgb * (0.30 + 0.70 * diffuse)
+             * (0.85 + 0.15 * facing);
+  fragColor = vec4(color * hit.coverage, hit.coverage);
   // 1 % farther than the surface: a tile's flat triangles lie a little
   // below the curved surface and must still pass the depth test.
-  float w = 1.01 * tM * dot(d, camForward.xyz);
+  float w = 1.01 * hit.tM * dot(hit.d, camForward.xyz);
   gl_FragDepth = clamp(log2(1.0 + max(w, 0.0)) * depthParams.x, 0.0, 1.0);
 }
 )";
+
+// The graticule alone, over whatever is drawn already (no depth test).
+const char* const graticuleFragmentGlsl = R"(
+layout(std140) uniform Graticule {
+  vec4 graticuleColor;  // premultiplied
+  vec4 graticuleParams; // line width (device px), opacity
+};
+out vec4 fragColor;
+void main()
+{
+  SurfaceHit hit = traceSurface();
+  float amount = graticule(hit, graticuleParams.x) * graticuleParams.y
+               * hit.coverage;
+  if (amount <= 0.0) {
+    discard;
+  }
+  fragColor = graticuleColor * amount;
+}
+)";
+
+/** Uniform block "Graticule" (std140). */
+struct GraticuleBlock {
+  Float4 color{};
+  Float4 params{};
+};
+
+static_assert(sizeof(GraticuleBlock) == 32, "std140 layout of Graticule");
 
 const char* const markerVertexGlsl = R"(
 layout(location = 0) in vec2 corner;
@@ -228,6 +278,11 @@ constexpr double graticuleFadeEndM = 500.0;
 
 struct GlobeRenderer::Resources {
   std::unique_ptr<ShaderProgram> globeShader;
+  std::unique_ptr<ShaderProgram> graticuleShader;
+  std::unique_ptr<Pipeline> graticulePipeline;
+  std::unique_ptr<GpuBuffer> graticuleUniforms;
+  std::size_t graticuleStride = 0;
+  std::size_t graticuleCapacity = 0;
   std::unique_ptr<ShaderProgram> markerShader;
   std::unique_ptr<Pipeline> globePipeline;
   std::unique_ptr<Pipeline> markerPipeline;
@@ -269,10 +324,21 @@ bool GlobeRenderer::initialise(QString* errorString)
   globe.label = QStringLiteral("globe");
   globe.vertexSource =
       QByteArray(frameBlockGlsl) + globeBlockGlsl + globeVertexGlsl;
-  globe.fragmentSource =
-      QByteArray(frameBlockGlsl) + globeBlockGlsl + globeFragmentGlsl;
+  globe.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
+                         traceGlsl + globeFragmentGlsl;
   globe.uniformBlocks = blocks;
   r->globeShader = m_device.createShaderProgram(globe, errorString);
+
+  ShaderDesc graticule;
+  graticule.label = QStringLiteral("graticule");
+  graticule.vertexSource = globe.vertexSource;
+  graticule.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
+                             traceGlsl + graticuleFragmentGlsl;
+  graticule.uniformBlocks = {
+      {QByteArrayLiteral("Frame"), frameBinding},
+      {QByteArrayLiteral("Globe"), globeBinding},
+      {QByteArrayLiteral("Graticule"), graticuleBinding}};
+  r->graticuleShader = m_device.createShaderProgram(graticule, errorString);
 
   ShaderDesc marker;
   marker.label = QStringLiteral("marker");
@@ -280,9 +346,16 @@ bool GlobeRenderer::initialise(QString* errorString)
   marker.fragmentSource = QByteArray(frameBlockGlsl) + markerFragmentGlsl;
   marker.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding}};
   r->markerShader = m_device.createShaderProgram(marker, errorString);
-  if (!r->globeShader || !r->markerShader) {
+  if (!r->globeShader || !r->graticuleShader || !r->markerShader) {
     return false;
   }
+
+  PipelineDesc graticulePipeline;
+  graticulePipeline.shader = r->graticuleShader.get();
+  graticulePipeline.blend = BlendMode::PremultipliedAlpha;
+  r->graticulePipeline = m_device.createPipeline(graticulePipeline);
+  r->graticuleStride =
+      alignUp(sizeof(GraticuleBlock), m_device.uniformBufferAlignment());
 
   PipelineDesc globePipeline;
   globePipeline.shader = r->globeShader.get();
@@ -317,8 +390,8 @@ bool GlobeRenderer::initialise(QString* errorString)
   r->uniforms =
       m_device.createBuffer(BufferType::Uniform, BufferUsage::Dynamic,
                             r->globeOffset + sizeof(GlobeBlock), nullptr);
-  if (!r->globePipeline || !r->markerPipeline || !r->markerCorners ||
-      !r->uniforms) {
+  if (!r->globePipeline || !r->graticulePipeline || !r->markerPipeline ||
+      !r->markerCorners || !r->uniforms) {
     if (errorString) {
       *errorString = QStringLiteral("globe: could not create GPU resources");
     }
@@ -329,7 +402,14 @@ bool GlobeRenderer::initialise(QString* errorString)
   if (!tiles->initialise(errorString)) {
     return false;
   }
+  std::unique_ptr<VectorRenderer> vectors =
+      std::make_unique<VectorRenderer>(m_device);
+  if (!vectors->initialise(errorString)) {
+    return false;
+  }
+  vectors->setLayers(m_vectorLayers);
   m_tiles = std::move(tiles);
+  m_vectors = std::move(vectors);
   m_resources = std::move(r);
   m_markersDirty = true;
   return true;
@@ -366,6 +446,9 @@ void GlobeRenderer::setGroupCompositing(bool enabled)
 
 void GlobeRenderer::setTilesReadyCallback(std::function<void()> callback)
 {
+  if (m_vectors) {
+    m_vectors->setTilesReadyCallback(callback);
+  }
   if (m_tiles) {
     m_tiles->setTilesReadyCallback(std::move(callback));
   }
@@ -373,7 +456,20 @@ void GlobeRenderer::setTilesReadyCallback(std::function<void()> callback)
 
 bool GlobeRenderer::isBusy() const
 {
-  return m_tiles && m_tiles->isBusy();
+  return (m_tiles && m_tiles->isBusy()) || (m_vectors && m_vectors->isBusy());
+}
+
+void GlobeRenderer::setVectorLayers(const std::vector<VectorLayerDraw>& layers)
+{
+  m_vectorLayers = layers;
+  if (m_vectors) {
+    m_vectors->setLayers(m_vectorLayers);
+  }
+}
+
+VectorStatistics GlobeRenderer::vectorStatistics() const
+{
+  return m_vectors ? m_vectors->statistics() : VectorStatistics();
 }
 
 TileStatistics GlobeRenderer::tileStatistics() const
@@ -387,6 +483,87 @@ void GlobeRenderer::setMarkers(const std::vector<GlobeMarker>& markers)
   m_markersDirty = true;
 }
 
+void GlobeRenderer::uploadMarkers()
+{
+  if (!m_markersDirty) {
+    return;
+  }
+  Resources& r = *m_resources;
+  std::vector<MarkerInstance> instances;
+  instances.reserve(m_markers.size());
+  for (const GlobeMarker& marker : m_markers) {
+    const SplitVec3 split = splitVec3(marker.positionEcef);
+    instances.push_back(MarkerInstance{{split.highX, split.highY, split.highZ,
+                                        split.lowX, split.lowY, split.lowZ,
+                                        static_cast<float>(marker.radiusPx)},
+                                       marker.rgba});
+  }
+  if (instances.size() > r.markerCapacity) {
+    r.markerCapacity = std::max<std::size_t>(instances.size(), 16);
+    r.markerInstances = m_device.createBuffer(
+        BufferType::Vertex, BufferUsage::Dynamic,
+        r.markerCapacity * sizeof(MarkerInstance), nullptr);
+  }
+  if (!instances.empty() && r.markerInstances) {
+    r.markerInstances->update(0, instances.data(),
+                              instances.size() * sizeof(MarkerInstance));
+  }
+  r.markerCount = static_cast<int>(instances.size());
+  m_markersDirty = false;
+}
+
+std::vector<std::size_t>
+GlobeRenderer::writeGraticuleUniforms(double fade, double devicePixelRatio)
+{
+  Resources& r = *m_resources;
+  // One Graticule block for the style's graticule (first), then one per
+  // graticule layer; returns each layer's block (0 for other layers).
+  std::vector<GraticuleBlock> graticules;
+  graticules.push_back(GraticuleBlock{
+      color4(m_style.graticuleRgb, 1.0F),
+      {static_cast<float>(static_cast<double>(m_style.graticuleWidthPx) *
+                          devicePixelRatio),
+       static_cast<float>(m_style.graticule ? fade : 0.0), 0.0F, 0.0F}});
+  std::vector<std::size_t> indices(m_vectorLayers.size(), 0);
+  for (std::size_t i = 0; i < m_vectorLayers.size(); ++i) {
+    const VectorLayerDraw& layer = m_vectorLayers[i];
+    if (layer.kind != VectorLayerDraw::Kind::Graticule) {
+      continue;
+    }
+    indices[i] = graticules.size();
+    graticules.push_back(GraticuleBlock{
+        premultipliedRgba(layer.style.outline, layer.alpha),
+        {static_cast<float>(layer.style.outlineWidthPx * devicePixelRatio),
+         static_cast<float>(fade), 0.0F, 0.0F}});
+  }
+  const std::size_t bytes = graticules.size() * r.graticuleStride;
+  if (bytes > r.graticuleCapacity) {
+    r.graticuleCapacity = bytes;
+    r.graticuleUniforms =
+        m_device.createBuffer(BufferType::Uniform, BufferUsage::Dynamic,
+                              r.graticuleCapacity, nullptr);
+  }
+  if (r.graticuleUniforms) {
+    for (std::size_t i = 0; i < graticules.size(); ++i) {
+      r.graticuleUniforms->update(i * r.graticuleStride, &graticules[i],
+                                  sizeof(GraticuleBlock));
+    }
+  }
+  return indices;
+}
+
+void GlobeRenderer::drawGraticule(std::size_t index)
+{
+  const Resources& r = *m_resources;
+  if (!r.graticuleUniforms) {
+    return;
+  }
+  m_device.setPipeline(*r.graticulePipeline);
+  m_device.setUniformBuffer(graticuleBinding, *r.graticuleUniforms,
+                            index * r.graticuleStride, sizeof(GraticuleBlock));
+  m_device.draw(3, 0, 1);
+}
+
 void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
                            double devicePixelRatio)
 {
@@ -395,29 +572,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   }
   Resources& r = *m_resources;
 
-  if (m_markersDirty) {
-    std::vector<MarkerInstance> instances;
-    instances.reserve(m_markers.size());
-    for (const GlobeMarker& marker : m_markers) {
-      const SplitVec3 split = splitVec3(marker.positionEcef);
-      instances.push_back(MarkerInstance{{split.highX, split.highY, split.highZ,
-                                          split.lowX, split.lowY, split.lowZ,
-                                          static_cast<float>(marker.radiusPx)},
-                                         marker.rgba});
-    }
-    if (instances.size() > r.markerCapacity) {
-      r.markerCapacity = std::max<std::size_t>(instances.size(), 16);
-      r.markerInstances = m_device.createBuffer(
-          BufferType::Vertex, BufferUsage::Dynamic,
-          r.markerCapacity * sizeof(MarkerInstance), nullptr);
-    }
-    if (!instances.empty() && r.markerInstances) {
-      r.markerInstances->update(0, instances.data(),
-                                instances.size() * sizeof(MarkerInstance));
-    }
-    r.markerCount = static_cast<int>(instances.size());
-    m_markersDirty = false;
-  }
+  uploadMarkers();
 
   const Vec3& eye = camera.eyeEcef();
   const SplitVec3 eyeSplit = splitVec3(eye);
@@ -440,10 +595,10 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   const Vec3 eyeScaled{eye.x / a, eye.y / a, eye.z / b};
   const Vec3 light = normalized(-camera.forwardEcef() + camera.upEcef() * 0.5 -
                                 camera.rightEcef() * 0.35);
-  const double graticuleOpacity =
-      m_style.graticule ? smoothStep(graticuleFadeEndM, graticuleFadeStartM,
-                                     camera.eyeGeodetic().heightM)
-                        : 0.0;
+  // The graticule is computed from float positions (about 0.5 m steps), so
+  // it fades out close to the ground.
+  const double graticuleFade = smoothStep(
+      graticuleFadeEndM, graticuleFadeStartM, camera.eyeGeodetic().heightM);
 
   GlobeBlock globe;
   globe.camForward = float4(camera.forwardEcef(), 0.0);
@@ -459,13 +614,15 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   globe.lightDir = float4(light, 0.0);
   globe.surfaceColor = color4(m_style.surfaceRgb, 1.0F);
   globe.gridColor = color4(m_style.graticuleRgb, 1.0F);
-  globe.gridParams = {
-      static_cast<float>(static_cast<double>(m_style.graticuleWidthPx) *
-                         devicePixelRatio),
-      static_cast<float>(graticuleOpacity), 0.0F, 0.0F};
+
+  const std::vector<std::size_t> graticuleIndex =
+      writeGraticuleUniforms(graticuleFade, devicePixelRatio);
 
   if (m_tiles) {
     m_tiles->prepare(camera);
+  }
+  if (m_vectors) {
+    m_vectors->prepare(camera);
   }
   r.uniforms->update(0, &frame, sizeof(frame));
   r.uniforms->update(r.globeOffset, &globe, sizeof(globe));
@@ -482,6 +639,9 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
 
   m_device.setPipeline(*r.globePipeline);
   m_device.draw(3, 0, 1);
+  if (m_style.graticule) {
+    drawGraticule(0);
+  }
   if (m_tiles) {
     const std::function<void()> rebind = [this, &r]() {
       m_device.setUniformBuffer(frameBinding, *r.uniforms, 0, sizeof(frame));
@@ -489,6 +649,14 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
                                 sizeof(globe));
     };
     m_tiles->draw(clearPass, rebind);
+  }
+  // Vector layers over all imagery, in tree order.
+  for (std::size_t i = 0; i < m_vectorLayers.size(); ++i) {
+    if (m_vectorLayers[i].kind == VectorLayerDraw::Kind::Graticule) {
+      drawGraticule(graticuleIndex[i]);
+    } else if (m_vectors) {
+      m_vectors->drawLayer(i);
+    }
   }
 
   if (r.markerCount > 0 && r.markerInstances) {

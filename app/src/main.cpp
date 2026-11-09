@@ -207,6 +207,7 @@ int main(int argc, char* argv[])
     measurement->setBackgroundBusy([&window]() {
       return window.basePackState() == ts::MainWindow::BasePackState::Checking;
     });
+    measurement->setStateReport([&window]() { return window.stateReport(); });
     QObject::connect(measurement.get(), &ts::StartupMeasurement::finished,
                      &window, [&window, &measurement, target]() {
                        if (!writeJson(measurement->result(), target)) {

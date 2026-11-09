@@ -46,6 +46,9 @@ enum class LayerOrigin {
  *   "source": { "kind": "checkerboard", "tileSize": 256 } }
  * ```
  *
+ * Vector layers also have a "style" object (see ts::VectorStyle):
+ * `{"fill": "#rrggbbaa", "outline": "#rrggbbaa", "outlineWidthPx": 1.5}`.
+ *
  * The source object is interpreted by the provider factory
  * (createImageryProvider()); two definitions with equal source objects
  * share one provider. See docs/design/layer-model.md.
@@ -63,6 +66,8 @@ struct LayerDefinition {
   QString name;
   /** Source parameters; "kind" selects the provider. */
   QJsonObject source;
+  /** Drawing style of a vector layer; empty for other layers. */
+  QJsonObject style;
 
   /** Returns the JSON form. */
   QJsonObject toJson() const;

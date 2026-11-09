@@ -32,6 +32,7 @@ HEADERS += \
     include/ts/globe/globerenderer.h \
     include/ts/globe/layerstackdraws.h \
     include/ts/globe/tilerenderer.h \
+    include/ts/globe/vectorrenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
     include/ts/layers/layerdefinition.h \
@@ -60,6 +61,9 @@ HEADERS += \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
     include/ts/tiling/tileselector.h \
+    include/ts/vector/vectormesh.h \
+    include/ts/vector/vectorstyle.h \
+    include/ts/vector/vectortileloader.h \
     src/globe/globeuniforms.h \
     src/providers/sqlitestatementpool.h
 
@@ -80,6 +84,7 @@ SOURCES += \
     src/globe/globerenderer.cpp \
     src/globe/layerstackdraws.cpp \
     src/globe/tilerenderer.cpp \
+    src/globe/vectorrenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
     src/layers/layerdefinition.cpp \
@@ -101,4 +106,7 @@ SOURCES += \
     src/tiling/tilekey.cpp \
     src/tiling/tileloader.cpp \
     src/tiling/tilemesh.cpp \
-    src/tiling/tileselector.cpp
+    src/tiling/tileselector.cpp \
+    src/vector/vectormesh.cpp \
+    src/vector/vectorstyle.cpp \
+    src/vector/vectortileloader.cpp

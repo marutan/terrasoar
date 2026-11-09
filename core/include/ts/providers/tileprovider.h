@@ -173,6 +173,13 @@ public:
    */
   virtual std::optional<FeatureTile>
   loadFeatures(TileKey key, const std::atomic<bool>& cancelled) = 0;
+
+  /**
+   * Returns the tile whose features loadFeatures(@p key) returns (its
+   * FeatureTile::key): @p key itself, or an ancestor when the source
+   * stores coarser tiles. Keys with the same stored tile share one load.
+   */
+  virtual TileKey storedKey(TileKey key) const { return key; }
 };
 
 } // namespace ts

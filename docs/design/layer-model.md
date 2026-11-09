@@ -92,7 +92,8 @@ project files, the built-in list, and (Phase 4) server catalogues:
 | `origin` | `builtin` (shipped), `catalogue` (from a server's or pack's catalogue), `user` (added by the user) |
 | `type` | `imagery`, `vector` (Phase 3), `elevation` (Phase 6) |
 | `name` | Default name; built-in names are translated |
-| `source` | Provider parameters; `kind` selects the provider. Now: `checkerboard` (`tileSize`, `maximumLevel`), `solid` (`color` as `#aarrggbb`, `tileSize`, `maximumLevel`) |
+| `source` | Provider parameters; `kind` selects the provider. Now: `checkerboard` (`tileSize`, `maximumLevel`), `solid` (`color` as `#aarrggbb`, `tileSize`, `maximumLevel`), `basepack` (`dataset`: a dataset of the base pack, imagery or features), `graticule` (generated lines) |
+| `style` | Vector layers only, optional: `fill` and `outline` as `#rrggbbaa` (alpha last) and `outlineWidthPx` (see [vector-rendering.md](vector-rendering.md)) |
 
 A layer in the tree keeps a copy of its definition, so a project file is
 self-contained.

@@ -76,6 +76,18 @@
             <source>Blue Marble</source>
             <translation>Blue Marble</translation>
         </message>
+        <message>
+            <source>Shoreline</source>
+            <translation>Shoreline</translation>
+        </message>
+        <message>
+            <source>Land</source>
+            <translation>Land</translation>
+        </message>
+        <message>
+            <source>Graticule</source>
+            <translation>Graticule</translation>
+        </message>
     </context>
     <context>
         <name>ts::GeoFormat</name>
@@ -182,6 +194,10 @@
             <source>Tiles: %1 drawn (deepest level %2), %3 on the GPU (%4 MB), %5 wanted</source>
             <translation>Tiles: %1 drawn (deepest level %2), %3 on the GPU (%4 MB), %5 wanted</translation>
         </message>
+        <message>
+            <source>Vectors: %1 tiles drawn, %2 triangles, %3 segments, %4 on the GPU (%5 MB)</source>
+            <translation>Vectors: %1 tiles drawn, %2 triangles, %3 segments, %4 on the GPU (%5 MB)</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerDefinition</name>
@@ -259,6 +275,10 @@
         <message>
             <source>New Collection</source>
             <translation>New Collection</translation>
+        </message>
+        <message>
+            <source>Vector layers (shorelines, graticule) are always drawn above imagery, in their order in the tree.</source>
+            <translation>Vector layers (shorelines, graticule) are always drawn above imagery, in their order in the tree.</translation>
         </message>
     </context>
     <context>
@@ -439,6 +459,10 @@
         <message>
             <source>Cannot read "%1" from the base pack: %2</source>
             <translation>Cannot read "%1" from the base pack: %2</translation>
+        </message>
+        <message>
+            <source>Unknown or invalid feature source: %1</source>
+            <translation>Unknown or invalid feature source: %1</translation>
         </message>
     </context>
     <context>

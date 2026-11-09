@@ -8,7 +8,8 @@
 #   - ThreadSanitizer build of the unit and stress tests
 #   - AddressSanitizer + UBSan build of the unit tests
 #   - the base pack: download its sources, build it, check size, checksums,
-#     tiles and polygons
+#     tiles and polygons, and its golden images (Linux; Windows with the
+#     pack built on Linux)
 #   - static analysis (clang-tidy, clazy, cppcheck) of the changed files,
 #     and a self-test that each tool still reports known-bad code
 #
@@ -131,6 +132,11 @@ jobs:
   windows:
     name: Windows MSVC / Qt ${{ matrix.qt }}
     runs-on: windows-2022
+    # The base pack built on Linux, for the golden images of the real data.
+    # The job runs (without the pack) even if the base pack job fails, so a
+    # pack problem can't hide a Windows build failure.
+    needs: basepack
+    if: ${{ !cancelled() }}
     strategy:
       fail-fast: false
       matrix:
@@ -220,6 +226,13 @@ jobs:
             (Join-Path $bin opengl32sw.dll) -Force
           Copy-Item (Join-Path $out libgallium_wgl.dll) $bin -Force
 
+      - name: Download the base pack
+        if: needs.basepack.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          name: basepack
+          path: basepack
+
       - name: Test
         id: test
         shell: cmd
@@ -229,6 +242,9 @@ jobs:
           QT_OPENGL: software
           GALLIUM_DRIVER: llvmpipe
           TS_GOLDEN_OUTPUT: ${{ github.workspace }}\golden-output
+          # The real base pack's golden images and checks run where it
+          # was downloaded; they skip otherwise.
+          TS_BASEPACK_DIR: ${{ needs.basepack.result == 'success' && format('{0}\basepack', github.workspace) || '' }}
           # Qt Test's console output doesn't reach the log on Windows, so
           # each test also writes its results to a file (printed below).
           TESTARGS: "-o -,txt -o testresults.txt,txt"
@@ -324,10 +340,10 @@ jobs:
           mkdir build-ci && cd build-ci
           qmake -r ../terrasoar.pro CONFIG+=werror
 
-      - name: Build the packager and its tests
+      - name: Build the packager and the tests that use the pack
         run: |
           make -C build-ci -j"$(nproc)" sub-tools
-          make -C build-ci/tests -j"$(nproc)" sub-packager
+          make -C build-ci/tests -j"$(nproc)" sub-packager sub-globe
 
       - name: Build the base pack
         env:
@@ -351,15 +367,42 @@ jobs:
           QT_QPA_PLATFORM: offscreen
         run: make -C build-ci/tests/packager check
 
+      # The globe with the real pack: golden images of the UK, the Pacific
+      # antimeridian and both poles at several zoom levels.
+      - name: Golden images of the base pack
+        env:
+          TS_BASEPACK_DIR: ${{ github.workspace }}/build-ci/basepack
+          TS_REQUIRE_GL: "1"
+          TS_EXPECT_SOFTWARE_GL: "1"
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          QT_QPA_PLATFORM: xcb
+          TS_GOLDEN_OUTPUT: ${{ github.workspace }}/golden-output
+        run: >-
+          xvfb-run -a -s "-screen 0 1280x1024x24"
+          make -C build-ci/tests/globe check
+
+      - name: Upload golden-image differences
+        if: failure() && hashFiles('golden-output/*.png') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-output-basepack
+          path: golden-output
+
+      # The pack for the Windows jobs (and anyone who wants to look).
       - name: Upload the base pack
-        if: always() && hashFiles('basepack-report.json') != ''
         uses: actions/upload-artifact@v7
         with:
           name: basepack
           retention-days: 7
-          path: |
-            basepack-report.json
-            build-ci/basepack
+          path: build-ci/basepack
+
+      - name: Upload the packager's report
+        if: always() && hashFiles('basepack-report.json') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: basepack-report
+          retention-days: 7
+          path: basepack-report.json
 
   asan:
     name: AddressSanitizer + UBSan (Linux Clang / Qt 6)

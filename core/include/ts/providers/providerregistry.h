@@ -16,6 +16,7 @@
 namespace ts
 {
 
+class FeatureProvider;
 class ImageryProvider;
 class PackManifest;
 
@@ -53,6 +54,20 @@ public:
   int liveImageryProviders() const;
 
   /**
+   * Returns the feature provider for @p source (`{"kind": "basepack",
+   * "dataset": "<id>"}` for a features dataset of the base pack), shared
+   * like imagery(), or null and @p errorString.
+   */
+  std::shared_ptr<FeatureProvider> features(const QJsonObject& source,
+                                            QString* errorString);
+
+  /**
+   * Returns the attribution to show while a layer with @p source is on
+   * screen (from the pack's manifest), or an empty string.
+   */
+  QString attribution(const QJsonObject& source) const;
+
+  /**
    * Makes the datasets of the base pack in @p directory available to
    * sources `{"kind": "basepack", "dataset": "<id>"}`. An empty
    * @p directory means there is no base pack: such sources then fail.
@@ -65,12 +80,19 @@ public:
 private:
   std::shared_ptr<ImageryProvider>
   createBasePackImagery(const QJsonObject& source, QString* errorString) const;
+  QString basePackFile(const QJsonObject& source, bool features,
+                       QString* errorString) const;
 
   mutable std::mutex m_mutex;
   std::unordered_map<QString, std::weak_ptr<ImageryProvider>> m_imagery;
   QString m_basePackDirectory;
   /** Dataset id → file name, of the base pack's imagery datasets. */
   std::unordered_map<QString, QString> m_basePackImagery;
+  /** Dataset id → file name, of the base pack's features datasets. */
+  std::unordered_map<QString, QString> m_basePackFeatures;
+  /** Dataset id → attribution. */
+  std::unordered_map<QString, QString> m_basePackAttribution;
+  std::unordered_map<QString, std::weak_ptr<FeatureProvider>> m_features;
 };
 
 } // namespace ts
