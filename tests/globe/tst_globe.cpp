@@ -477,7 +477,10 @@ private slots:
           std::make_shared<ts::CheckerboardImageryProvider>());
       m_renderer->setVectorLayers({graticule});
     } else {
-      m_renderer->setVectorLayers({land, graticule});
+      // No graticule here: at close range llvmpipe versions place its 1°
+      // parallels a pixel apart (their asin differs); it has its own
+      // golden images at whole-globe scale.
+      m_renderer->setVectorLayers({land});
     }
     const QImage image = renderSettled(
         makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg}));
@@ -520,8 +523,10 @@ private slots:
 
   void basePackGolden()
   {
-    // The default layers (Blue Marble, shoreline, graticule) from the real
-    // base pack, set up through the layer tree like the application.
+    // Blue Marble and the shoreline from the real base pack, set up through
+    // the layer tree like the application. (Not the graticule: at close
+    // range llvmpipe versions place its 1° parallels a pixel apart; it has
+    // its own golden images at whole-globe scale.)
     TS_TEST_REQUIRE_GL(*m_gl);
     const QString directory = qEnvironmentVariable("TS_BASEPACK_DIR");
     if (directory.isEmpty()) {
@@ -541,8 +546,7 @@ private slots:
     registry.setBasePack(directory, *manifest);
     ts::LayerTreeModel model;
     for (const QString& id : {QStringLiteral("builtin:bluemarble"),
-                              QStringLiteral("builtin:shoreline"),
-                              QStringLiteral("builtin:graticule")}) {
+                              QStringLiteral("builtin:shoreline")}) {
       for (const ts::LayerDefinition& definition :
            ts::builtinLayerDefinitions()) {
         if (definition.id == id) {

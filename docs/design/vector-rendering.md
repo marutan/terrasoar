@@ -127,7 +127,11 @@ when the layer is hidden.
   at the pole and with a lake; the graticule layer over imagery; and, with
   `TS_BASEPACK_DIR`, the real base pack over the UK, the Pacific
   antimeridian and both poles at several zoom levels (CI's base pack job on
-  Linux; the Windows jobs with the pack it built).
+  Linux; the Windows jobs with the pack it built). The vector and
+  real-pack images leave the graticule out: at close range, llvmpipe
+  versions (Mesa 25.2 here, 26.2 on Windows CI) place its 1° parallels a
+  pixel apart, their `asin` differing slightly. The graticule has its own
+  images at whole-globe scale, where they agree.
 - `tests/smoke`: the application starts offline (proxies pointing at a
   closed port) with the base layers drawn and credited.
 
