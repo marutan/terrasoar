@@ -8,6 +8,7 @@
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QEvent>
+#include <QFont>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QJsonObject>
@@ -44,6 +45,15 @@ LayerTreeDock::LayerTreeDock(LayerTreeModel* model, QWidget* parent)
                           QAbstractItemView::EditKeyPressed);
   m_view->expandAll();
   layout->addWidget(m_view, 1);
+
+  // The drawing rule the tree order can't show: vectors over imagery.
+  m_orderNote = new QLabel(content);
+  m_orderNote->setObjectName(QStringLiteral("layerOrderNote"));
+  m_orderNote->setWordWrap(true);
+  QFont noteFont = m_orderNote->font();
+  noteFont.setPointSizeF(noteFont.pointSizeF() * 0.9);
+  m_orderNote->setFont(noteFont);
+  layout->addWidget(m_orderNote);
 
   QHBoxLayout* buttons = new QHBoxLayout;
   m_addLayerButton = new QToolButton(content);
@@ -119,6 +129,8 @@ void LayerTreeDock::retranslateUi()
   setWindowTitle(tr("Layers"));
   m_addLayerButton->setText(tr("Add &Layer"));
   m_addLayerMenu->setTitle(tr("Add Layer"));
+  m_orderNote->setText(tr("Vector layers (shorelines, graticule) are always "
+                          "drawn above imagery, in their order in the tree."));
   m_addCollectionButton->setText(tr("Add &Collection"));
   m_removeButton->setText(tr("&Remove"));
   m_opacityLabel->setText(tr("&Opacity:"));

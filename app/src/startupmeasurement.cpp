@@ -96,8 +96,16 @@ void StartupMeasurement::onIdleComplete()
   finish();
 }
 
+void StartupMeasurement::setStateReport(std::function<QJsonObject()> report)
+{
+  m_stateReport = std::move(report);
+}
+
 void StartupMeasurement::finish()
 {
+  if (m_stateReport) {
+    m_result.insert(QStringLiteral("state"), m_stateReport());
+  }
   m_finished = true;
   emit finished();
 }

@@ -12,6 +12,7 @@
 #include <QOpenGLWidget>
 #include <QPointF>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 
 #include "ts/camera/cameracontroller.h"
@@ -91,6 +92,30 @@ public:
     return static_cast<int>(m_draws.layers.size());
   }
 
+  /** Sets the vector layers (and the graticule), bottom to top. */
+  void setVectorDraws(const std::vector<VectorLayerDraw>& draws);
+
+  /** Returns the number of vector layers drawn (the graticule included). */
+  int vectorLayerCount() const
+  {
+    return static_cast<int>(m_vectorDraws.size());
+  }
+
+  /**
+   * Sets the attributions shown in the bottom corner of the view while
+   * their layers are on screen.
+   */
+  void setAttributions(const QStringList& attributions);
+
+  /** Returns the attributions shown. */
+  const QStringList& attributions() const { return m_attributions; }
+
+  /** Returns what the tile renderer did in the last frame. */
+  TileStatistics tileStatistics() const;
+
+  /** Returns what the vector renderer did in the last frame. */
+  VectorStatistics vectorStatistics() const;
+
   /**
    * Returns false where composite groups fall back to multiplied opacity
    * (software rendering), true otherwise.
@@ -168,6 +193,7 @@ private:
   void releaseGl();
   void updatePointerReadout();
   void drawOverlay();
+  void drawAttributions();
   void drawError();
 
   CameraController m_controller;
@@ -175,6 +201,8 @@ private:
   std::unique_ptr<GlRenderDevice> m_device;
   std::unique_ptr<GlobeRenderer> m_globe;
   ImageryDraws m_draws;
+  std::vector<VectorLayerDraw> m_vectorDraws;
+  QStringList m_attributions;
   RenderDeviceInfo m_deviceInfo;
   QString m_error;
 

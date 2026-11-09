@@ -12,6 +12,7 @@
 #include <optional>
 #include <thread>
 
+#include <QJsonObject>
 #include <QMainWindow>
 #include <QString>
 
@@ -86,6 +87,13 @@ public:
 
   /** Returns the base pack's directory, empty if there is none. */
   const QString& basePackDirectory() const { return m_basePackDirectory; }
+
+  /**
+   * Returns what the window shows, as JSON for `--measure`: the base
+   * pack's state, the layers drawn (top first), the attributions and the
+   * last frame's tile counts.
+   */
+  QJsonObject stateReport() const;
 
 signals:
   /** The base pack's checksums have been verified (see basePackState()). */

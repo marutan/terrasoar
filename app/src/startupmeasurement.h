@@ -56,6 +56,13 @@ public:
    */
   void setBackgroundBusy(std::function<bool()> busy);
 
+  /**
+   * Sets a function whose result is added to the JSON as "state" when the
+   * measurement finishes (what the window shows; used by the offline smoke
+   * test).
+   */
+  void setStateReport(std::function<QJsonObject()> report);
+
   /** Returns the results; complete once finished() has been emitted. */
   QJsonObject result() const { return m_result; }
 
@@ -80,6 +87,7 @@ private:
   QPointer<QWidget> m_window;
   int m_idleS = 0;
   std::function<bool()> m_backgroundBusy;
+  std::function<QJsonObject()> m_stateReport;
   bool m_painted = false;
   bool m_finished = false;
   double m_idleStartCpuS = 0.0;
