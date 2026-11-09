@@ -204,6 +204,9 @@ int main(int argc, char* argv[])
     const QString target = parser.value(measureOption);
     measurement =
         std::make_unique<ts::StartupMeasurement>(sinceMain, &window, idleS);
+    measurement->setBackgroundBusy([&window]() {
+      return window.basePackState() == ts::MainWindow::BasePackState::Checking;
+    });
     QObject::connect(measurement.get(), &ts::StartupMeasurement::finished,
                      &window, [&window, &measurement, target]() {
                        if (!writeJson(measurement->result(), target)) {

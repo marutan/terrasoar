@@ -27,13 +27,17 @@ constexpr std::array<std::pair<LayerOrigin, const char*>, 3> originNames = {{
 }};
 
 /** Names of the built-in definitions, for lupdate; translated on load. */
-constexpr std::array<const char*, 2> builtinNames = {
+constexpr std::array<const char*, 3> builtinNames = {
+    QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Blue Marble"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Checkerboard"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "White, 50 %"),
 };
 
 /** The built-in definitions, in the same JSON as catalogues and projects. */
 const char* const builtinJson = R"([
+  { "id": "builtin:bluemarble", "origin": "builtin", "type": "imagery",
+    "name": "Blue Marble",
+    "source": { "kind": "basepack", "dataset": "bluemarble" } },
   { "id": "builtin:checkerboard", "origin": "builtin", "type": "imagery",
     "name": "Checkerboard",
     "source": { "kind": "checkerboard", "tileSize": 256 } },

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <atomic>
 #include <memory>
 
 #include <QAbstractItemModelTester>
+#include <QColor>
 #include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -12,9 +14,11 @@
 #include <QtTest>
 
 #include "concurrency.h"
+#include "fixturepack.h"
 #include "ts/layers/layerdefinition.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/layers/projectfile.h"
+#include "ts/packs/packmanifest.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/tileprovider.h"
 
@@ -402,7 +406,15 @@ private slots:
           ts::LayerDefinition::fromJson(definition.toJson(), &error);
       QVERIFY2(back.has_value(), qPrintable(error));
       QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
-      QVERIFY(ts::createImageryProvider(definition.source, &error));
+      if (definition.source.value(QStringLiteral("kind")).toString() ==
+          QLatin1String("basepack")) {
+        // Needs the base pack: without it the registry says so.
+        ts::ProviderRegistry registry;
+        QVERIFY(!registry.imagery(definition.source, &error));
+        QVERIFY(error.contains(QLatin1String("base pack")));
+      } else {
+        QVERIFY(ts::createImageryProvider(definition.source, &error));
+      }
     }
     QString error;
     QVERIFY(!ts::createImageryProvider(
@@ -412,6 +424,37 @@ private slots:
              QStringLiteral("vector"));
     QCOMPARE(ts::layerOriginName(ts::LayerOrigin::Catalogue),
              QStringLiteral("catalogue"));
+  }
+
+  void registryBasePack()
+  {
+    // Base pack sources resolve through the pack the registry was given.
+    const QTemporaryDir dir;
+    const ts::PackManifest manifest =
+        ts::test::writeFixtureBasePack(dir.path(), QColor(1, 2, 3));
+    const QJsonObject source{
+        {QStringLiteral("kind"), QStringLiteral("basepack")},
+        {QStringLiteral("dataset"), QStringLiteral("bluemarble")}};
+    ts::ProviderRegistry registry;
+    QString error;
+    QVERIFY(!registry.imagery(source, &error));
+    registry.setBasePack(dir.path(), manifest);
+    QCOMPARE(registry.basePackDirectory(), dir.path());
+    const std::shared_ptr<ts::ImageryProvider> provider =
+        registry.imagery(source, &error);
+    QVERIFY2(provider, qPrintable(error));
+    QCOMPARE(provider->maximumLevel(), 1);
+    const std::atomic<bool> notCancelled{false};
+    QCOMPARE(QColor(provider->loadImage(ts::TileKey{1, 2, 1}, notCancelled)
+                        .pixel(3, 3)),
+             QColor(1, 2, 3));
+    QCOMPARE(registry.imagery(source, &error), provider);
+    // An unknown dataset, and no pack at all.
+    QJsonObject other = source;
+    other.insert(QStringLiteral("dataset"), QStringLiteral("nothing"));
+    QVERIFY(!registry.imagery(other, &error));
+    registry.setBasePack(QString(), ts::PackManifest());
+    QVERIFY(!registry.imagery(source, &error));
   }
 
   void registrySharesProviders()

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "startupmeasurement.h"
 
+#include <utility>
+
 #include <QEvent>
 #include <QGuiApplication>
 #include <QTimer>
@@ -17,6 +19,11 @@ StartupMeasurement::StartupMeasurement(QElapsedTimer sinceMain, QWidget* window,
     : QObject(parent), m_sinceMain(sinceMain), m_window(window),
       m_idleS(idleS > 0 ? idleS : 0)
 {
+}
+
+void StartupMeasurement::setBackgroundBusy(std::function<bool()> busy)
+{
+  m_backgroundBusy = std::move(busy);
 }
 
 void StartupMeasurement::start()
@@ -59,7 +66,16 @@ void StartupMeasurement::onStartupComplete()
     finish();
     return;
   }
-  m_idleStartCpuS = stats.cpuTimeS;
+  startIdle();
+}
+
+void StartupMeasurement::startIdle()
+{
+  if (m_backgroundBusy && m_backgroundBusy()) {
+    QTimer::singleShot(20, this, &StartupMeasurement::startIdle);
+    return;
+  }
+  m_idleStartCpuS = currentProcessStats().cpuTimeS;
   m_idleTimer.start();
   QTimer::singleShot(m_idleS * 1000, this, &StartupMeasurement::onIdleComplete);
 }

@@ -6,15 +6,22 @@
 #ifndef TS_APP_MAINWINDOW_H
 #define TS_APP_MAINWINDOW_H
 
+#include <atomic>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <thread>
 
 #include <QMainWindow>
 #include <QString>
+
+#include "ts/packs/packmanifest.h"
 
 class QAction;
 class QEvent;
 class QLabel;
 class QMenu;
+class QTimer;
 
 namespace ts
 {
@@ -66,6 +73,24 @@ public:
   /** Returns the path of the current project, empty if never saved. */
   const QString& projectPath() const { return m_projectPath; }
 
+  /** What is known about the base pack. */
+  enum class BasePackState {
+    Missing,  ///< No base pack was found.
+    Checking, ///< Found; its checksums are being verified.
+    Ok,       ///< Found and intact.
+    Damaged,  ///< Found, but a file is missing or changed.
+  };
+
+  /** Returns the base pack's state. */
+  BasePackState basePackState() const { return m_basePackState; }
+
+  /** Returns the base pack's directory, empty if there is none. */
+  const QString& basePackDirectory() const { return m_basePackDirectory; }
+
+signals:
+  /** The base pack's checksums have been verified (see basePackState()). */
+  void basePackVerified();
+
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;
@@ -80,6 +105,9 @@ private:
   void refreshLayers();
   void openProjectDialog();
   void saveProjectDialog(bool askForPath);
+  void findBasePack();
+  void pollBasePackCheck();
+  void showBasePackResult(bool ok, const QString& problem);
 
   /** The globe, or null where the platform has no OpenGL. */
   GlobeView* m_globeView = nullptr;
@@ -103,6 +131,16 @@ private:
   QLabel* m_eyeLabel = nullptr;
   LayerTreeModel* m_layers = nullptr;
   std::unique_ptr<ProviderRegistry> m_registry;
+  QString m_basePackDirectory;
+  BasePackState m_basePackState = BasePackState::Missing;
+  QString m_basePackProblem;
+  /** Verifies the base pack off the GUI thread; joined on destruction. */
+  std::thread m_basePackCheck;
+  std::atomic<bool> m_cancelBasePackCheck{false};
+  /** The check's result, set by its thread, taken by pollBasePackCheck(). */
+  std::optional<PackVerification> m_basePackResult;
+  std::mutex m_basePackMutex;
+  QTimer* m_basePackPoll = nullptr;
   bool m_pointerOnGlobe = false;
   double m_pointerLatDeg = 0.0;
   double m_pointerLonDeg = 0.0;

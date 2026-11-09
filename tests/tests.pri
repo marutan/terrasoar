@@ -19,6 +19,7 @@ CONFIG -= app_bundle
 INCLUDEPATH += $$PWD/support
 HEADERS += \
     $$PWD/support/concurrency.h \
+    $$PWD/support/fixturepack.h \
     $$PWD/support/goldenimage.h \
     $$PWD/support/offscreengl.h
 
