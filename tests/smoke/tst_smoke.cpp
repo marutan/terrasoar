@@ -200,7 +200,7 @@ private slots:
    * base pack and every proxy pointing at a closed port (so any network
    * access would fail), starts with the base layers on the globe: the
    * graticule and shoreline over Blue Marble, their sources credited, and
-   * tiles drawn. Terra Soar has no network code yet (WMS comes in Phase 4);
+   * tiles drawn. Terra Soar has no network code yet (WMS comes in Phase 5);
    * this keeps it working offline once it has.
    */
   void offlineBaseLayers()

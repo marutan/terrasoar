@@ -141,7 +141,7 @@ test needs widgets. Tests needing the app's sources include
 
 Rules:
 
-- Tests are deterministic and need no network. Network tests (Phase 4)
+- Tests are deterministic and need no network. Network tests (Phase 5)
   use a local mock server.
 - A test that can't run in an environment calls `QSKIP` with the reason
   and the variable that turns the skip into a failure. It never passes
@@ -280,6 +280,6 @@ sets `TESTARGS="-o -,txt -o testresults.txt,txt"`, so each test also writes
 `testresults.txt` in its build directory, and prints those files when a
 test fails.
 
-Golden-image tests (Phase 1 on), network mock-server tests (Phase 4) and
+Golden-image tests (Phase 1 on), network mock-server tests (Phase 5) and
 install tests (Phase 8) join these workflows in the phases that introduce
 them.

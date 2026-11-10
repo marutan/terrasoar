@@ -29,7 +29,7 @@ enum class LayerType {
 enum class LayerOrigin {
   /** Shipped with the application. */
   Builtin,
-  /** From a server's or pack's catalogue (from Phase 4). */
+  /** From a server's or pack's catalogue (from Phase 5). */
   Catalogue,
   /** Added by the user. */
   User,
