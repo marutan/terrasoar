@@ -293,39 +293,7 @@ Goal: on first launch, offline, the user sees Blue Marble imagery with WVS land/
 
 **Exit criteria**: first-run globe looks correct offline on all OSes; pack is under 75 MB.
 
-## Phase 4 – WMS over the network and disk cache
-
-Goal: users add any WMS 1.1.1 or 1.3.0 layer by URL, and it streams, caches and blends like a built-in layer.
-
-**Deliverables**
-
-- Capabilities parser: layers, styles, formats, CRS list, bounding boxes, max image size
-- `WmsImageryProvider`: one GetMap per quadtree tile in EPSG:4326 / CRS:84, with correct axis order per version; EPSG:3857 fallback reprojected in the shader
-- PNG + `TRANSPARENT=TRUE` for overlays, JPEG for opaque layers
-- Network layer on `QNetworkAccessManager`: concurrency limit, cancellation of off-screen tiles, retries with back-off, timeouts, proxy support
-- Persistent disk cache (SQLite per provider): size limit, LRU eviction, HTTP cache headers honoured
-- Online catalogue (JSON) of open WMS sources, editable without a release
-- "Add WMS" dialog: URL entry, layer browser, style/format choice, adds to the layer tree
-- Error and offline states shown per layer
-
-**Technical documentation**
-
-- `docs/design/wms.md`: request building, axis-order rules, reprojection fallback
-- `docs/design/network-and-cache.md`: request lifecycle, cache schema, eviction
-- `docs/user/adding-wms-layers.md`: user guide
-
-**Regression tests**
-
-- Capabilities parsing against a stored set of real-world capabilities documents (both versions, odd-but-valid examples)
-- Axis order: generated BBOX strings for 1.1.1, 1.3.0 + EPSG:4326 and CRS:84 match expected values
-- Mock WMS server (local `QTcpServer`) for deterministic tests: slow, failing, oversized and wrong-format responses
-- Cancellation: tiles leaving the view are cancelled and never uploaded
-- Cache: hit/miss behaviour, eviction at the size limit, survives restart, recovers from a corrupt database
-- Golden image: mock WMS overlay at 50% alpha over Blue Marble
-
-**Exit criteria**: a public WMS can be added and browsed smoothly; all network tests run without internet access.
-
-## Phase 5 – 2D views and 3D/2D morph
+## Phase 4 – 2D views and 3D/2D morph
 
 Goal: one view that animates smoothly between the globe and a flat Mercator or Miller map, with all layers intact.
 
@@ -355,7 +323,41 @@ Goal: one view that animates smoothly between the globe and a flat Mercator or M
 - Measurement: distances are identical in 3D, Mercator and Miller (still geodesic)
 - Performance: morph holds the target frame rate (at least 20 fps) on reference hardware
 
-**Exit criteria**: toggle works in both directions with every layer type; projection tests pass to 1 mm.
+**Exit criteria**: toggle works in both directions with every layer type (imagery, vector, graticule; WMS layers join in Phase 5); projection tests pass to 1 mm.
+
+## Phase 5 – WMS over the network and disk cache
+
+Goal: users add any WMS 1.1.1 or 1.3.0 layer by URL, and it streams, caches and blends like a built-in layer.
+
+**Deliverables**
+
+- Capabilities parser: layers, styles, formats, CRS list, bounding boxes, max image size
+- `WmsImageryProvider`: one GetMap per quadtree tile in EPSG:4326 / CRS:84, with correct axis order per version; EPSG:3857 fallback reprojected in the shader, using the Phase 4 projection code
+- PNG + `TRANSPARENT=TRUE` for overlays, JPEG for opaque layers
+- Network layer on `QNetworkAccessManager`: concurrency limit, cancellation of off-screen tiles, retries with back-off, timeouts, proxy support
+- Persistent disk cache (SQLite per provider): size limit, LRU eviction, HTTP cache headers honoured
+- Online catalogue (JSON) of open WMS sources, editable without a release
+- "Add WMS" dialog: URL entry, layer browser, style/format choice, adds to the layer tree
+- Error and offline states shown per layer
+- WMS layers work in the 2D views and through the 3D/2D morph like every other layer
+
+**Technical documentation**
+
+- `docs/design/wms.md`: request building, axis-order rules, reprojection fallback
+- `docs/design/network-and-cache.md`: request lifecycle, cache schema, eviction
+- `docs/user/adding-wms-layers.md`: user guide
+
+**Regression tests**
+
+- Capabilities parsing against a stored set of real-world capabilities documents (both versions, odd-but-valid examples)
+- Axis order: generated BBOX strings for 1.1.1, 1.3.0 + EPSG:4326 and CRS:84 match expected values
+- Mock WMS server (local `QTcpServer`) for deterministic tests: slow, failing, oversized and wrong-format responses
+- Cancellation: tiles leaving the view are cancelled and never uploaded
+- Cache: hit/miss behaviour, eviction at the size limit, survives restart, recovers from a corrupt database
+- Golden image: mock WMS overlay at 50% alpha over Blue Marble
+- Golden images: the same overlay in Mercator, in Miller and at morph t = 0.5
+
+**Exit criteria**: a public WMS can be added and browsed smoothly in 3D and 2D; all network tests run without internet access.
 
 ## Phase 6 – Offline regions and downloadable packs
 

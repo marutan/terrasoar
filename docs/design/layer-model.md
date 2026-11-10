@@ -74,7 +74,7 @@ in `tests/globe`.
 ## Layer definitions
 
 A layer definition says what a layer shows. The same JSON is used in
-project files, the built-in list, and (Phase 4) server catalogues:
+project files, the built-in list, and (Phase 5) server catalogues:
 
 ```json
 {

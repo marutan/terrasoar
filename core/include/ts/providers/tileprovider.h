@@ -160,7 +160,7 @@ struct FeatureTile {
 
 /**
  * A source of vector features by tile (the base pack's shoreline, Phase 3;
- * vector layers, Phase 4).
+ * user vector formats such as GeoJSON later).
  *
  * @threadsafe
  */
