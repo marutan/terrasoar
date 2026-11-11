@@ -24,13 +24,18 @@ struct FeatureTile;
 
 /**
  * One vertex on the ellipsoid: its offset from the tile centre in metres
- * (ECEF, float) and its longitude and latitude (for clipping to a tile).
+ * (ECEF, float) and in longitude and latitude. The second places the
+ * vertex on the flat map and clips draws to a tile; as an offset from the
+ * centre it keeps a float's precision at any zoom, like the first.
  */
 struct VectorVertex {
   /** ECEF offset from VectorTileMesh::centreEcef, metres. */
   std::array<float, 3> offsetM{};
-  /** Longitude, latitude, degrees. */
-  std::array<float, 2> lonLatDeg{};
+  /**
+   * Longitude and latitude minus VectorTileMesh::centreLonDeg and
+   * centreLatDeg, degrees.
+   */
+  std::array<float, 2> lonLatOffsetDeg{};
 };
 
 static_assert(sizeof(VectorVertex) == 20, "vertex stride");
@@ -55,6 +60,22 @@ struct VectorTileMesh {
   TileKey key;
   /** Origin of the vertices' offsets: the tile's centre on the ellipsoid. */
   Vec3 centreEcef;
+  /** Longitude of the tile's centre, degrees. */
+  double centreLonDeg = 0.0;
+  /** Latitude of the tile's centre, degrees. */
+  double centreLatDeg = 0.0;
+
+  /** Returns the longitude of @p vertex, degrees. */
+  double lonDeg(const VectorVertex& vertex) const
+  {
+    return centreLonDeg + static_cast<double>(vertex.lonLatOffsetDeg[0]);
+  }
+
+  /** Returns the latitude of @p vertex, degrees. */
+  double latDeg(const VectorVertex& vertex) const
+  {
+    return centreLatDeg + static_cast<double>(vertex.lonLatOffsetDeg[1]);
+  }
   /** Polygon fill, three vertices per triangle, not indexed. */
   std::vector<VectorVertex> triangles;
   /**
@@ -94,7 +115,9 @@ struct VectorMeshSettings {
  * (cellSizeDeg()) and each piece triangulated (GEOS constrained Delaunay),
  * so no triangle spans more than one cell and its straight edges stay
  * close to the curved surface; long outline segments are split the same
- * way. See docs/design/vector-rendering.md.
+ * way, and so are a polygon's edges before it is cut, so fill and outline
+ * follow the same curve on the globe and in every map projection. See
+ * docs/design/vector-rendering.md.
  *
  * Holds a GEOS context: each thread uses its own mesher.
  *

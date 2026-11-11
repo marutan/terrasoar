@@ -109,7 +109,12 @@ void VectorTileLoader::work()
       mesh = mesher.build(*features, *cancelled);
     } else if (!cancelled->load()) {
       // No data here: an empty mesh, so the tile counts as loaded.
-      mesh = VectorTileMesh{key, key.centreEcef(), {}, {}};
+      VectorTileMesh empty;
+      empty.key = key;
+      empty.centreEcef = key.centreEcef();
+      empty.centreLonDeg = key.bounds().centreLonDeg();
+      empty.centreLatDeg = key.bounds().centreLatDeg();
+      mesh = std::move(empty);
     }
     if (mesh) {
       // Keyed by the requested (stored) tile, whatever the source said.

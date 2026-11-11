@@ -18,6 +18,8 @@
 #include "concurrency.h"
 #include "ts/camera/camera.h"
 #include "ts/geo/geodetic.h"
+#include "ts/maths/angles.h"
+#include "ts/projection/projection.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/lrucache.h"
 #include "ts/tiling/tilekey.h"
@@ -97,6 +99,17 @@ int coverageFailures(const ts::Camera& camera,
     }
   }
   return failures;
+}
+
+/** A camera on the flat map of @p projection (by identifier). */
+ts::Camera makeMapCamera(const char* projection, const ts::CameraPose& pose)
+{
+  ts::Camera camera;
+  camera.setViewportSize(widthPx, heightPx);
+  camera.setMapProjection(ts::projectionById(QLatin1String(projection)));
+  camera.setMorph(1.0);
+  camera.setPose(pose);
+  return camera;
 }
 
 bool overlaps(const std::vector<ts::TileKey>& tiles)
@@ -423,6 +436,286 @@ private slots:
     QVERIFY(ts::TileSelector::isVisible(camera, below));
   }
 
+  // --- Selection on the flat map
+  // ----------------------------------------------
+
+  void mapSelectionCoversViewWithoutOverlap_data()
+  {
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    const QString mercator = QStringLiteral("mercator");
+    const QString miller = QStringLiteral("miller");
+    QTest::newRow("Mercator world") << mercator << 0.0 << 0.0 << 5.0e7;
+    QTest::newRow("Miller world") << miller << 0.0 << 0.0 << 5.0e7;
+    QTest::newRow("Mercator Europe") << mercator << 48.0 << 10.0 << 2.0e6;
+    QTest::newRow("Mercator antimeridian")
+        << mercator << -15.0 << 180.0 << 3.0e6;
+    QTest::newRow("Mercator top edge") << mercator << 84.0 << 30.0 << 1.0e6;
+    QTest::newRow("Miller pole") << miller << 89.0 << -120.0 << 1.0e6;
+    QTest::newRow("Web Mercator city")
+        << QStringLiteral("web-mercator") << 51.5 << -0.1 << 5.0e3;
+  }
+
+  void mapSelectionCoversViewWithoutOverlap()
+  {
+    // On the flat map every point in view is covered by one drawn tile, no
+    // texel is larger than the limit, and nothing out of view is drawn.
+    QFETCH(QString, projection);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    const ts::Camera camera =
+        makeMapCamera(projection.toLatin1().constData(),
+                      ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    const ts::TileSelector selector;
+    const ts::TileSelection selection =
+        selector.select(camera, everythingRenderable);
+    qInfo("%d tiles drawn, %d visited",
+          static_cast<int>(selection.render.size()), selection.visited);
+    QVERIFY(!selection.render.empty());
+    QVERIFY(selection.load.empty());
+    QVERIFY(!overlaps(selection.render));
+    QCOMPARE(coverageFailures(camera, selection.render), 0);
+    for (const ts::TileKey& key : selection.render) {
+      QVERIFY(selector.screenSpaceErrorPx(camera, key) <=
+                  selector.settings().maximumScreenSpaceErrorPx ||
+              key.level == selector.settings().maximumLevel);
+      QVERIFY(ts::TileSelector::isVisibleOnMap(camera, key));
+      QVERIFY(ts::TileSelector::isVisible(camera, key));
+    }
+    // Far fewer tiles than the whole world at that level.
+    QVERIFY(selection.render.size() < 400);
+  }
+
+  void mapCulling()
+  {
+    // 1000 km above (0°, 0°) on the Mercator map: the view is about
+    // ±5° by ±3.7°.
+    const ts::Camera camera =
+        makeMapCamera("mercator", ts::CameraPose{0.0, 0.0, 1.0e6, 0.0, 0.0});
+    const std::function<ts::TileKey(int, double, double)> tileAt =
+        [](int level, double lat, double lon) {
+          return ts::TileKey::containing(level, ts::Geodetic{lat, lon, 0.0});
+        };
+    QVERIFY(ts::TileSelector::isVisibleOnMap(camera, tileAt(6, 1.0, 1.0)));
+    QVERIFY(!ts::TileSelector::isVisibleOnMap(camera, tileAt(6, 1.0, 25.0)));
+    QVERIFY(!ts::TileSelector::isVisibleOnMap(camera, tileAt(6, 20.0, 1.0)));
+    // There is no horizon on a map: the antipode is merely out of view.
+    QVERIFY(!ts::TileSelector::isVisibleOnMap(camera, tileAt(4, 0.0, 180.0)));
+    // The same answers from isVisible(), which follows the camera's view.
+    QVERIFY(ts::TileSelector::isVisible(camera, tileAt(6, 1.0, 1.0)));
+    QVERIFY(!ts::TileSelector::isVisible(camera, tileAt(6, 1.0, 25.0)));
+    // isVisibleOnMap() answers for the map whatever the camera shows.
+    ts::Camera globe = makeCamera(ts::CameraPose{0.0, 0.0, 1.0e6, 0.0, 0.0});
+    QVERIFY(ts::TileSelector::isVisibleOnMap(globe, tileAt(6, 1.0, 1.0)));
+    QVERIFY(!ts::TileSelector::isVisibleOnMap(globe, tileAt(6, 1.0, 25.0)));
+
+    // Across the edge where the map wraps: centred on 179° E, tiles just
+    // east of the antimeridian are in view, through the next copy.
+    const ts::Camera pacific =
+        makeMapCamera("mercator", ts::CameraPose{0.0, 179.0, 1.0e6, 0.0, 0.0});
+    QVERIFY(ts::TileSelector::isVisibleOnMap(pacific, tileAt(6, 1.0, -179.0)));
+    QVERIFY(ts::TileSelector::isVisibleOnMap(pacific, tileAt(6, 1.0, 178.0)));
+    QVERIFY(!ts::TileSelector::isVisibleOnMap(pacific, tileAt(6, 1.0, -150.0)));
+
+    // Beyond the projection's latitude limit nothing is drawn: Mercator
+    // stops near 85°, Miller goes to the pole.
+    const ts::TileKey polar = tileAt(6, 88.0, 0.0);
+    QVERIFY(polar.bounds().southDeg > 85.1);
+    const ts::CameraPose north{84.5, 0.0, 2.0e6, 0.0, 0.0};
+    QVERIFY(!ts::TileSelector::isVisibleOnMap(makeMapCamera("mercator", north),
+                                              polar));
+    QVERIFY(ts::TileSelector::isVisibleOnMap(makeMapCamera("miller", north),
+                                             polar));
+  }
+
+  void mapErrorFollowsTheProjection()
+  {
+    // On the map a texel's size depends on the latitude, not on how far
+    // the tile is from the centre: Mercator stretches towards the poles.
+    const ts::TileSelector selector;
+    const ts::Camera camera =
+        makeMapCamera("mercator", ts::CameraPose{0.0, 0.0, 2.0e7, 0.0, 0.0});
+    const std::function<double(double, double)> errorAt = [&](double lat,
+                                                              double lon) {
+      return selector.screenSpaceErrorPx(
+          camera, ts::TileKey::containing(5, ts::Geodetic{lat, lon, 0.0}));
+    };
+    QVERIFY(std::abs(errorAt(1.0, 1.0) / errorAt(1.0, 120.0) - 1.0) < 1e-9);
+    QVERIFY(errorAt(61.0, 1.0) > 1.9 * errorAt(1.0, 1.0));
+    QVERIFY(errorAt(80.0, 1.0) > 4.0 * errorAt(1.0, 1.0));
+    // Half the range, twice the size.
+    const ts::Camera closer =
+        makeMapCamera("mercator", ts::CameraPose{0.0, 0.0, 1.0e7, 0.0, 0.0});
+    const ts::TileKey key =
+        ts::TileKey::containing(5, ts::Geodetic{1.0, 1.0, 0.0});
+    QVERIFY(std::abs(selector.screenSpaceErrorPx(closer, key) /
+                         selector.screenSpaceErrorPx(camera, key) -
+                     2.0) < 1e-9);
+    // A level 5 tile is 5.625° of 256 texels; at the equator a degree is
+    // 111.3 km and a pixel of this view 2 × 2e7 × tan(22.5°) / 600 m.
+    const double expected = 5.625 * 111319.49 / 256.0 /
+                            (2.0 * 2.0e7 * std::tan(ts::pi / 8.0) / 600.0);
+    QVERIFY(std::abs(errorAt(1.0, 1.0) / expected - 1.0) < 0.01);
+  }
+
+  void mapMinimumLevel()
+  {
+    // The map's geometry is never coarser than minimumMapLevel, even where
+    // the data ends above it; the globe is unaffected.
+    ts::TileSelectionSettings settings;
+    settings.minimumMapLevel = 3;
+    settings.maximumLevel = 1;
+    const ts::TileSelector selector(settings);
+    const ts::CameraPose pose{0.0, 0.0, 5.0e7, 0.0, 0.0};
+    const ts::TileSelection map =
+        selector.select(makeMapCamera("miller", pose), everythingRenderable);
+    QCOMPARE(static_cast<int>(map.render.size()), 128);
+    for (const ts::TileKey& key : map.render) {
+      QCOMPARE(key.level, 3);
+    }
+    const ts::TileSelection globe =
+        selector.select(makeCamera(pose), everythingRenderable);
+    for (const ts::TileKey& key : globe.render) {
+      QVERIFY(key.level <= 1);
+    }
+    // Until the finer meshes exist the coarse ones are drawn and the
+    // finer requested.
+    const ts::TileSelection waiting =
+        selector.select(makeMapCamera("miller", pose),
+                        [](ts::TileKey key) { return key.level == 0; });
+    QCOMPARE(static_cast<int>(waiting.render.size()), 2);
+    QCOMPARE(static_cast<int>(waiting.load.size()), 8);
+  }
+
+  void mapGeometryError()
+  {
+    // A mesh is straight between its grid rows; Mercator is not. The
+    // error grows towards the map's edge and with the size of the tile,
+    // and such tiles are split on the finished map.
+    const ts::TileSelector selector;
+    const ts::CameraPose world{0.0, 0.0, 5.0e7, 0.0, 0.0};
+    const ts::Camera mercator = makeMapCamera("mercator", world);
+    const std::function<double(const ts::Camera&, int, double)> errorAt =
+        [&](const ts::Camera& camera, int level, double lat) {
+          return selector.mapGeometryErrorPx(
+              camera,
+              ts::TileKey::containing(level, ts::Geodetic{lat, 5.0, 0.0}));
+        };
+    QVERIFY(errorAt(mercator, 2, 10.0) < 0.1);
+    QVERIFY(errorAt(mercator, 2, 80.0) > 10.0 * errorAt(mercator, 2, 10.0));
+    QVERIFY(errorAt(mercator, 2, 80.0) > 0.5);
+    QVERIFY(errorAt(mercator, 2, -80.0) > 0.5);
+    QVERIFY(errorAt(mercator, 5, 80.0) < errorAt(mercator, 2, 80.0) / 30.0);
+    // Miller curves far less.
+    const ts::Camera miller = makeMapCamera("miller", world);
+    QVERIFY(errorAt(miller, 2, 80.0) < 0.2 * errorAt(mercator, 2, 80.0));
+    // Entirely beyond the map's edge there is nothing to be wrong.
+    QCOMPARE(errorAt(mercator, 6, 88.0), 0.0);
+    // The value itself: the middle of the top grid row of 2/x/0, between
+    // its straight ends, in pixels of this view.
+    const ts::Projection& projection = *mercator.mapProjection();
+    const double top = projection.maximumLatDeg();
+    const double below = top - 45.0 / 16.0;
+    const double expectedM =
+        std::abs(projection.forward(0.5 * (top + below), 0.0).yM -
+                 0.5 * (projection.forward(top, 0.0).yM +
+                        projection.forward(below, 0.0).yM));
+    const double pixelM = 2.0 * mercator.mapFrame().halfHeightM / heightPx;
+    QVERIFY(std::abs(errorAt(mercator, 2, 80.0) / (expectedM / pixelM) - 1.0) <
+            1e-9);
+
+    // The selection keeps every drawn tile within the limit: finer tiles
+    // towards the top and bottom of the Mercator map than in the middle.
+    ts::TileSelectionSettings settings;
+    settings.maximumLevel = 1; // the data ends here; the geometry doesn't
+    const ts::TileSelector coarse(settings);
+    const ts::TileSelection selection =
+        coarse.select(mercator, everythingRenderable);
+    int deepest = 0;
+    for (const ts::TileKey& key : selection.render) {
+      QVERIFY(coarse.mapGeometryErrorPx(mercator, key) <=
+              settings.maximumMapGeometryErrorPx);
+      deepest = std::max(deepest, key.level);
+      if (std::abs(key.bounds().centreLatDeg()) < 40.0) {
+        // The level 1 tiles reach the map's edge; their equatorial
+        // halves need no more.
+        QCOMPARE(key.level, 2);
+      }
+    }
+    QVERIFY(deepest >= 3);
+    QVERIFY(!overlaps(selection.render));
+    // Not while the globe is still unrolling: the change takes a second,
+    // and the extra tiles would cost more than they show.
+    ts::Camera morphing = mercator;
+    morphing.setMorph(0.9);
+    for (const ts::TileKey& key :
+         coarse.select(morphing, everythingRenderable).render) {
+      QVERIFY(key.level <= 1);
+    }
+  }
+
+  void stripIndices()
+  {
+    // One column of quads per mesh: each grid row from its west end to
+    // its east end, facing the same way as the full grid.
+    const int n = 16;
+    const std::vector<std::uint16_t> strip = ts::tileMeshStripIndices(n);
+    QCOMPARE(static_cast<int>(strip.size()), 6 * n);
+    const ts::TileMesh mesh = ts::buildTileMesh(ts::TileKey{3, 9, 2}, n);
+    for (std::size_t i = 0; i + 2 < strip.size(); i += 3) {
+      std::array<ts::Vec3, 3> corners;
+      for (std::size_t k = 0; k < 3; ++k) {
+        const int index = strip[i + k];
+        QVERIFY(index < (n + 1) * (n + 1)); // no skirt
+        const int column = index % (n + 1);
+        QVERIFY(column == 0 || column == n);
+        corners.at(k) =
+            mesh.centreEcef +
+            offsetOf(mesh.vertices.at(static_cast<std::size_t>(index)));
+      }
+      // Counter-clockwise seen from outside, like tileMeshIndices().
+      const ts::Vec3 normal =
+          ts::cross(corners[1] - corners[0], corners[2] - corners[0]);
+      QVERIFY(ts::dot(normal, corners[0]) > 0.0);
+    }
+    QCOMPARE(static_cast<int>(ts::tileMeshStripIndices(1).size()), 12);
+  }
+
+  void morphSelectionShowsBothViews()
+  {
+    // Part of the way between globe and map a tile is kept if either
+    // view shows it, and the far side of the globe is not culled: it
+    // unrolls into view.
+    ts::Camera camera = makeCamera(ts::CameraPose{0.0, 0.0, 2.0e7, 0.0, 0.0});
+    const ts::TileKey antipode =
+        ts::TileKey::containing(3, ts::Geodetic{10.0, 175.0, 0.0});
+    QVERIFY(!ts::TileSelector::isVisible(camera, antipode));
+    camera.setMorph(0.5);
+    QVERIFY(ts::TileSelector::isVisible(camera, antipode));
+    const ts::TileSelector selector;
+    const ts::TileSelection selection =
+        selector.select(camera, everythingRenderable);
+    QVERIFY(!overlaps(selection.render));
+    // The whole world is there.
+    double areaDeg2 = 0.0;
+    for (const ts::TileKey& key : selection.render) {
+      areaDeg2 += key.bounds().widthDeg() * key.bounds().heightDeg();
+    }
+    QCOMPARE(areaDeg2, 360.0 * 180.0);
+    // The error is the larger of the two views'.
+    const ts::TileKey near =
+        ts::TileKey::containing(4, ts::Geodetic{60.0, 1.0, 0.0});
+    const double morphing = selector.screenSpaceErrorPx(camera, near);
+    camera.setMorph(0.0);
+    const double onGlobe = selector.screenSpaceErrorPx(camera, near);
+    camera.setMorph(1.0);
+    QVERIFY(morphing >= onGlobe);
+    QVERIFY(morphing >= selector.screenSpaceErrorPx(camera, near) * 0.99);
+  }
+
   void refinementWaitsForChildren()
   {
     // Only levels up to 3 are on the GPU: deeper tiles are requested,
@@ -676,6 +969,19 @@ private slots:
     {
       selector.select(camera, everythingRenderable);
     }
+  }
+
+  void benchmarkMapSelection()
+  {
+    const ts::Camera camera =
+        makeMapCamera("mercator", ts::CameraPose{48.0, 10.0, 2.0e5, 0.0, 0.0});
+    const ts::TileSelector selector;
+    std::size_t count = 0;
+    QBENCHMARK
+    {
+      count += selector.select(camera, everythingRenderable).render.size();
+    }
+    QVERIFY(count > 0);
   }
 
   void benchmarkMesh()

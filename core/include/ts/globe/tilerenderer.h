@@ -45,6 +45,14 @@ struct TileRendererSettings {
    * its layers instead.
    */
   bool groupCompositing = true;
+  /**
+   * Coarsest tiles drawn on the flat map and during the change to it
+   * (TileSelectionSettings::minimumMapLevel): level 2 tiles are 45° wide,
+   * so a grid segment is 2.8°, which keeps the unrolling globe smooth.
+   * Where the finished map needs finer geometry the selection refines by
+   * TileSelectionSettings::maximumMapGeometryErrorPx.
+   */
+  int minimumMapLevel = 2;
 };
 
 /** One imagery layer to draw, bottom to top. */
@@ -96,6 +104,18 @@ struct TileStatistics {
  * per draw (a tile is drawn again for each further 8). A composite group
  * is drawn into an offscreen target and faded onto the scene as one
  * image. See docs/design/tiling.md and docs/design/layer-model.md.
+ *
+ * Every vertex has two positions, on the globe and on the flat map, and
+ * the vertex shader blends them by the camera's morph factor: the globe
+ * position is stored in the mesh; the map position is computed from the
+ * vertex's longitude and latitude by the projection's GLSL. On the map,
+ * tiles near the edge where the world wraps around are drawn once on each
+ * side. On the finished map of a cylindrical projection a tile is a
+ * rectangle, drawn as one column of quads (tileMeshStripIndices()), which
+ * costs software renderers a twentieth of the triangles. While the morph
+ * factor is above 0 there is no ray-cast globe
+ * under the tiles, so drawBase() draws the surface colour on them first,
+ * and drawGraticule() the graticule. See docs/design/morph.md.
  *
  * Expects the globe's "Frame" (binding 0) and "Globe" (binding 1) uniform
  * blocks; draw() re-binds them through a callback after switching
@@ -152,9 +172,30 @@ public:
    * the caller). Composite groups leave and resume that pass; after each
    * resumption @p rebindUniforms is called to bind the Frame and Globe
    * blocks again. Ends inside @p mainPass.
+   *
+   * With @p withBase true the surface colour is drawn under the layers
+   * (see drawBase()), in the same draws where it can be; pass it while
+   * the camera's morph factor is above 0, unless drawBase() was called
+   * already.
    */
   void draw(const PassDesc& mainPass,
-            const std::function<void()>& rebindUniforms);
+            const std::function<void()>& rebindUniforms, bool withBase);
+
+  /**
+   * Draws the plain surface colour on the selected tiles, inside the
+   * current pass. Only while the camera's morph factor is above 0 (the
+   * globe itself is ray-cast, not made of tiles); does nothing otherwise.
+   * Needed on its own only when something goes between the surface and
+   * the layers; otherwise draw() does it without drawing the tiles twice.
+   */
+  void drawBase();
+
+  /**
+   * Draws the graticule on the selected tiles, inside the current pass,
+   * with the "Graticule" uniform block bound by the caller. Only while
+   * the camera's morph factor is above 0; does nothing otherwise.
+   */
+  void drawGraticule();
 
   /**
    * Returns true while frames are needed without input: tiles loading or
@@ -190,8 +231,9 @@ private:
   void bindImages();
   void evict();
   double layerAlpha(const Layer& layer, bool hasImage) const;
-  std::vector<bool> writeBatchUniforms(LayerRange batch);
-  void drawLayers(LayerRange layers);
+  std::vector<bool> writeBatchUniforms(LayerRange batch, bool base);
+  void drawLayers(LayerRange layers, bool withBase);
+  void drawPlain(const Pipeline& pipeline);
   void composite(double alpha);
 
   RenderDevice& m_device;
@@ -201,10 +243,17 @@ private:
 
   std::unique_ptr<ShaderProgram> m_shader;
   std::unique_ptr<Pipeline> m_pipeline;
+  std::unique_ptr<ShaderProgram> m_graticuleShader;
+  std::unique_ptr<Pipeline> m_graticulePipeline;
   std::unique_ptr<ShaderProgram> m_compositeShader;
   std::unique_ptr<Pipeline> m_compositePipeline;
   std::unique_ptr<GpuBuffer> m_indices;
   int m_indexCount = 0;
+  std::unique_ptr<GpuBuffer> m_stripIndices;
+  int m_stripIndexCount = 0;
+  bool m_drawStrips = false;
+  void setTileIndexBuffer();
+  int tileIndexCount() const;
   std::unique_ptr<GpuTexture> m_emptyTexture;
   std::unique_ptr<GpuBuffer> m_tileUniforms;
   std::size_t m_tileUniformStride = 0;
@@ -218,6 +267,7 @@ private:
   std::vector<double> m_groupAlphas;
   std::vector<DrawTile> m_drawTiles;
   bool m_meshesPending = false;
+  double m_morph = 0.0;
   std::uint64_t m_frame = 0;
   std::size_t m_meshBytes = 0;
   TileStatistics m_statistics;

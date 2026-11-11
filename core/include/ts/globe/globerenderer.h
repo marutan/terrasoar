@@ -77,6 +77,11 @@ struct GlobeStyle {
  * high/low float pairs (see SplitFloat), so they stay still to well under
  * a pixel when the eye is a metre above the ground.
  *
+ * While the camera's morph factor is above 0 (the flat map, or the change
+ * to it) nothing is ray-cast: the surface colour and the graticule are
+ * drawn on the tile meshes, whose vertices move between the globe and
+ * the map, and markers are placed the same way. See docs/design/morph.md.
+ *
  * See docs/design/camera-and-precision.md and
  * docs/design/renderer-backend.md.
  *
@@ -175,7 +180,7 @@ public:
 private:
   struct Resources;
 
-  void uploadMarkers();
+  void uploadMarkers(const Camera& camera);
   std::vector<std::size_t> writeGraticuleUniforms(double fade,
                                                   double devicePixelRatio);
   void drawGraticule(std::size_t index);
@@ -189,6 +194,8 @@ private:
   GlobeStyle m_style;
   std::vector<GlobeMarker> m_markers;
   bool m_markersDirty = true;
+  bool m_markersMorphed = false;
+  double m_morph = 0.0;
 };
 
 } // namespace ts

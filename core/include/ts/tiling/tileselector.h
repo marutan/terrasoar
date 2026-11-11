@@ -28,6 +28,23 @@ struct TileSelectionSettings {
   int tileSizePx = 256;
   /** Deepest level to select. */
   int maximumLevel = 18;
+  /**
+   * Coarsest level to select while the view is the flat map or changing
+   * to it (the camera's morph factor is above 0), whatever maximumLevel
+   * says: the geometry of the unrolling globe needs it.
+   */
+  int minimumMapLevel = 0;
+  /**
+   * Largest error of a tile's geometry on the flat map, in pixels. A
+   * tile's mesh is straight between its grid lines, where the projection
+   * curves in latitude (Mercator strongly towards its edges); on the map
+   * (the camera's morph factor is 1) a tile is split while the middle of
+   * its most poleward grid row is off by more than this, whatever
+   * maximumLevel says. See docs/design/morph.md.
+   */
+  double maximumMapGeometryErrorPx = 0.5;
+  /** Grid segments per side of the tile meshes (TileMesh::segments). */
+  int meshSegments = 16;
 };
 
 /** A tile that should be loaded, with what makes it urgent. */
@@ -62,6 +79,15 @@ struct TileSelection {
  * and the missing children are requested, so the view never has holes and
  * detail arrives coarse to fine. See docs/design/tiling.md.
  *
+ * On the flat map (the camera's morph factor is 1) the same walk uses the
+ * map instead: a tile is skipped when its rectangle on the map, in every
+ * copy of the world, is outside the view or it lies beyond the
+ * projection's latitude limits, and its screen-space error is the size of
+ * a texel on the map, which grows with the projection's stretching. While
+ * the view changes between the two, a tile is kept if either view would
+ * show it (ignoring the horizon, since the far side unrolls into view),
+ * with the larger of the two errors. See docs/design/morph.md.
+ *
  * @reentrant
  */
 class TileSelector
@@ -87,6 +113,12 @@ public:
   /** Returns true if any part of @p key may be seen from @p camera. */
   static bool isVisible(const Camera& camera, TileKey key);
 
+  /**
+   * Returns true if any part of @p key is in the view of the flat map of
+   * @p camera (as if its morph factor were 1), in any copy of the world.
+   */
+  static bool isVisibleOnMap(const Camera& camera, TileKey key);
+
   /** Returns true if @p key is entirely inside the view frustum's sides. */
   static bool isInFrustum(const Camera& camera, TileKey key);
 
@@ -96,12 +128,20 @@ public:
   /** Returns the screen-space error of @p key seen from @p camera, pixels. */
   double screenSpaceErrorPx(const Camera& camera, TileKey key) const;
 
+  /**
+   * Returns how far the mesh of @p key is from the projection's true
+   * shape on the flat map of @p camera, in pixels (see
+   * TileSelectionSettings::maximumMapGeometryErrorPx).
+   */
+  double mapGeometryErrorPx(const Camera& camera, TileKey key) const;
+
 private:
-  bool wantsRefinement(const Camera& camera, TileKey key) const;
-  bool refine(const Camera& camera, TileKey key, bool renderable,
+  struct View;
+  bool wantsRefinement(const View& view, TileKey key) const;
+  bool refine(const View& view, TileKey key, bool renderable,
               const std::function<bool(const TileKey&)>& isRenderable,
               TileSelection& selection) const;
-  void visit(const Camera& camera, TileKey key,
+  void visit(const View& view, TileKey key,
              const std::function<bool(const TileKey&)>& isRenderable,
              TileSelection& selection) const;
 

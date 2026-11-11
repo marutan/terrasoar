@@ -78,6 +78,19 @@ TileMesh buildTileMesh(TileKey key, int segments = TileMesh::defaultSegments);
 std::vector<std::uint16_t> tileMeshIndices(int segments);
 
 /**
+ * Returns triangle indices that draw a mesh with @p segments segments as
+ * one column of quads, a quad per grid row from the west edge to the east
+ * edge, without the skirt: 2 × segments triangles in place of
+ * tileMeshIndices()'s 2 × segments² and more. On the flat map of a
+ * cylindrical projection that is the same picture (see
+ * Projection::isCylindrical()): the rows keep the projection's curve in
+ * latitude and nothing varies along them.
+ *
+ * @threadsafe
+ */
+std::vector<std::uint16_t> tileMeshStripIndices(int segments);
+
+/**
  * Returns the skirt depth in metres for a tile at @p level with
  * @p segments segments: twice the largest gap between the chord of one
  * grid segment and the ellipsoid, plus a metre.
