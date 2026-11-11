@@ -117,6 +117,22 @@ TileMesh buildTileMesh(TileKey key, int segments)
   return mesh;
 }
 
+std::vector<std::uint16_t> tileMeshStripIndices(int segments)
+{
+  const int n = clampSegments(segments);
+  std::vector<std::uint16_t> indices;
+  indices.reserve(6 * static_cast<std::size_t>(n));
+  for (int row = 0; row < n; ++row) {
+    const int nw = gridIndex(n, 0, row);
+    const int ne = gridIndex(n, n, row);
+    const int sw = gridIndex(n, 0, row + 1);
+    const int se = gridIndex(n, n, row + 1);
+    pushTriangle(indices, nw, sw, ne);
+    pushTriangle(indices, ne, sw, se);
+  }
+  return indices;
+}
+
 std::vector<std::uint16_t> tileMeshIndices(int segments)
 {
   const int n = clampSegments(segments);

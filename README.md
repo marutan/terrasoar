@@ -15,7 +15,9 @@ project files. A new project shows NASA's Blue Marble with GSHHG
 shorelines and a graticule, all from the built-in base pack, which works
 offline and credits its sources in the view; `make basepack` downloads
 its sources and builds it (see [docs/tools/packager.md](docs/tools/packager.md)).
-WMS layers over the network come next.
+View → 2D Map (Ctrl+M) unrolls the globe into a flat map in the Mercator,
+Web Mercator or Miller projection and back, with every layer intact and a
+scale bar that holds in both. WMS layers over the network come next.
 
 ## Building
 
@@ -44,7 +46,9 @@ full instructions for each OS.
   [camera and precision](docs/design/camera-and-precision.md),
   [tiling](docs/design/tiling.md), [providers](docs/design/providers.md),
   [layer model](docs/design/layer-model.md),
-  [vector rendering](docs/design/vector-rendering.md)
+  [vector rendering](docs/design/vector-rendering.md),
+  [projections](docs/design/projections.md),
+  [the 2D map and the morph](docs/design/morph.md)
 - Data: [the base pack](docs/data/base-pack.md),
   [the packager](docs/tools/packager.md)
 - API reference: `make docs` (or `doxygen Doxyfile`), then open

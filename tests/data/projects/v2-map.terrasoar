@@ -1,0 +1,62 @@
+{
+    "camera": {
+        "headingDeg": 0,
+        "rangeM": 2500000,
+        "targetLatDeg": 48,
+        "targetLonDeg": 10,
+        "tiltDeg": 0
+    },
+    "format": "terrasoar-project",
+    "layers": [
+        {
+            "children": [
+                {
+                    "definition": {
+                        "id": "user:solid-red",
+                        "name": "Red, half",
+                        "origin": "user",
+                        "source": {
+                            "color": "#80ff0000",
+                            "kind": "solid",
+                            "tileSize": 64
+                        },
+                        "type": "imagery"
+                    },
+                    "id": "5b0e8f0e-0d77-4a52-9a0e-2f7f8c6d1a01",
+                    "kind": "layer",
+                    "name": "Red, half",
+                    "opacity": 1,
+                    "visible": true
+                }
+            ],
+            "compositeAsGroup": true,
+            "id": "5b0e8f0e-0d77-4a52-9a0e-2f7f8c6d1a02",
+            "kind": "collection",
+            "name": "Overlays",
+            "opacity": 0.75,
+            "visible": true
+        },
+        {
+            "definition": {
+                "id": "builtin:checkerboard",
+                "name": "Checkerboard",
+                "origin": "builtin",
+                "source": {
+                    "kind": "checkerboard",
+                    "tileSize": 256
+                },
+                "type": "imagery"
+            },
+            "id": "5b0e8f0e-0d77-4a52-9a0e-2f7f8c6d1a03",
+            "kind": "layer",
+            "name": "Checkerboard",
+            "opacity": 1,
+            "visible": true
+        }
+    ],
+    "version": 2,
+    "view": {
+        "mode": "map",
+        "projection": "miller"
+    }
+}

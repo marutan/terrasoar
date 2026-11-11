@@ -34,6 +34,14 @@ QString formatLatitude(double latDeg, const QLocale& locale)
                      .arg(degrees(latDeg, locale));
 }
 
+QString formatWholeLatitude(double latDeg, const QLocale& locale)
+{
+  const QString whole = locale.toString(std::abs(latDeg), 'f', 0);
+  return latDeg <= -0.5
+             ? QCoreApplication::translate("ts::GeoFormat", "%1° S").arg(whole)
+             : QCoreApplication::translate("ts::GeoFormat", "%1° N").arg(whole);
+}
+
 QString formatLongitude(double lonDeg, const QLocale& locale)
 {
   double lon = normaliseLonDeg(lonDeg);
@@ -66,6 +74,21 @@ QString formatDistance(double distanceM, const QLocale& locale)
   }
   return QCoreApplication::translate("ts::GeoFormat", "%1 km")
       .arg(locale.toString(distanceM / 1000.0, 'f', 0));
+}
+
+QString formatRoundDistance(double distanceM, const QLocale& locale)
+{
+  const qlonglong centimetres = qRound64(distanceM * 100.0);
+  if (centimetres % 100000 == 0 && centimetres != 0) {
+    return QCoreApplication::translate("ts::GeoFormat", "%1 km")
+        .arg(locale.toString(centimetres / 100000));
+  }
+  if (centimetres % 100 == 0 && centimetres != 0) {
+    return QCoreApplication::translate("ts::GeoFormat", "%1 m")
+        .arg(locale.toString(centimetres / 100));
+  }
+  return QCoreApplication::translate("ts::GeoFormat", "%1 cm")
+      .arg(locale.toString(centimetres));
 }
 
 } // namespace ts

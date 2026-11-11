@@ -8,7 +8,9 @@
 #include <utility>
 
 #include "ts/camera/camera.h"
+#include "ts/maths/angles.h"
 #include "ts/maths/splitdouble.h"
+#include "ts/projection/projection.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/tiling/tilemesh.h"
 
@@ -24,6 +26,11 @@ using globe_detail::frameBinding;
 using globe_detail::frameBlockGlsl;
 using globe_detail::globeBinding;
 using globe_detail::globeBlockGlsl;
+using globe_detail::graticuleBinding;
+using globe_detail::graticuleBlockGlsl;
+using globe_detail::gridLinesGlsl;
+using globe_detail::morphGlsl;
+using globe_detail::overlayDepthGlsl;
 using globe_detail::tileBinding;
 
 /** Layers blended in one draw (texture units 0 … 7). */
@@ -41,15 +48,34 @@ using Float4 = std::array<float, 4>;
 struct TileBlock {
   Float4 centreHigh{};
   Float4 centreLow{};
-  /** x: number of layers in this draw. */
+  /** x: number of layers in this draw; y: 1 to start from the surface
+   *  colour (the base pass). */
   Float4 layerInfo{};
   /** Per layer: uv scale (xy) and offset (zw) into its image. */
   std::array<Float4, layersPerDraw> uvTransform{};
   /** Per layer opacity, four per vec4. */
   std::array<Float4, 2> layerAlpha{};
+  /**
+   * The map reference point (the tile's centre, held inside the
+   * projection's latitude limits) relative to the centre of the view, in
+   * metres on the map's plane (xy); the latitude of the tile's centre
+   * minus the reference point's, radians (z).
+   */
+  Float4 mapOrigin{};
+  /** The projection's reference values for the reference point. */
+  Float4 projR0{};
+  Float4 projR1{};
+  /** Tile width and height, radians; centre longitude and latitude,
+   *  degrees. */
+  Float4 tileGeo{};
 };
 
-static_assert(sizeof(TileBlock) == 208, "std140 layout of Tile");
+static_assert(sizeof(TileBlock) == 272, "std140 layout of Tile");
+
+/** On the map a tile is drawn this much larger about its centre, so that
+ *  rounding never leaves a crack between neighbours (their shared edge is
+ *  computed from two different centres). A fortieth of a texel. */
+constexpr const char* mapOverlapGlsl = "1.0001";
 
 const char* const tileBlockGlsl = R"(
 layout(std140) uniform Tile {
@@ -58,6 +84,10 @@ layout(std140) uniform Tile {
   vec4 layerInfo;
   vec4 uvTransform[8];
   vec4 layerAlpha[2];
+  vec4 mapOrigin;
+  vec4 projR0;
+  vec4 projR1;
+  vec4 tileGeo;
 };
 )";
 
@@ -67,14 +97,25 @@ layout(location = 1) in vec2 uv;
 out vec2 vUv;
 out float vDepthW;
 out vec3 vNormal;
+out vec3 vRelative;
+out vec2 vLonLatDeg;
 void main()
 {
   // Relative to the eye: centre (high/low) minus eye (high/low), plus the
   // vertex's float offset from the centre.
   vec3 position = (centreHigh.xyz - eyeHigh.xyz) + (centreLow.xyz - eyeLow.xyz)
                 + offset;
+  // The same vertex on the map, from its longitude and latitude.
+  vec2 dLonLat = vec2(uv.x - 0.5, 0.5 - uv.y) * tileGeo.xy;
+  vLonLatDeg = tileGeo.zw + degrees(dLonLat);
+  if (morph.x > 0.0) {
+    position = tsMorph(position,
+                       dLonLat * MAP_OVERLAP + vec2(0.0, mapOrigin.z),
+                       mapOrigin, projR0, projR1);
+  }
   vec4 clip = viewProjection * vec4(position, 1.0);
   vUv = uv;
+  vRelative = position;
   vDepthW = clip.w;
   vNormal = (centreHigh.xyz + offset)
           * vec3(ellipsoid.z, ellipsoid.z, ellipsoid.w);
@@ -94,6 +135,7 @@ QByteArray tileFragmentGlsl()
 in vec2 vUv;
 in float vDepthW;
 in vec3 vNormal;
+in vec3 vRelative;
 out vec4 fragColor;
 
 // One layer's colour, premultiplied, at its opacity.
@@ -121,13 +163,48 @@ void main()
   glsl += R"(
   vec3 n = normalize(vNormal);
   float diffuse = max(dot(n, lightDir.xyz), 0.0);
-  result.rgb *= 0.55 + 0.45 * diffuse;
+  // The flat map is not shaded.
+  result.rgb *= mix(0.55 + 0.45 * diffuse, 1.0, morph.x);
+  if (layerInfo.y > 0.5) {
+    // Under the layers the bare surface, shaded as the ray-cast globe is.
+    float facing = clamp(dot(n, -normalize(vRelative)), 0.0, 1.0);
+    float shade = (0.30 + 0.70 * diffuse) * (0.85 + 0.15 * facing);
+    result.rgb += surfaceColor.rgb * mix(shade, 1.0, morph.x)
+                * (1.0 - result.a);
+    result.a = 1.0;
+  }
   fragColor = result;
   gl_FragDepth = clamp(log2(1.0 + max(vDepthW, 0.0)) * depthParams.x, 0.0, 1.0);
 }
 )";
   return glsl;
 }
+
+// The graticule on the tiles' own geometry, for the map and the morph
+// (on the globe it is ray-cast, see GlobeRenderer).
+const char* const tileGraticuleFragmentGlsl = R"(
+in vec2 vLonLatDeg;
+in float vDepthW;
+out vec4 fragColor;
+void main()
+{
+  float widthPx = graticuleParams.x;
+  float lon = vLonLatDeg.x;
+  float lat = vLonLatDeg.y;
+  float grid = 0.7 * max(gridLines(lat, 10.0, widthPx, 4.0),
+                         gridLines(lon, 10.0, widthPx, 4.0));
+  grid = max(grid, 0.35 * max(gridLines(lat, 1.0, widthPx, 12.0),
+                              gridLines(lon, 1.0, widthPx, 12.0)));
+  float axes = max(gridLines(lat, 180.0, 1.5 * widthPx, 4.0),
+                   gridLines(lon, 360.0, 1.5 * widthPx, 4.0));
+  float amount = max(grid, axes) * graticuleParams.y;
+  if (amount <= 0.0) {
+    discard;
+  }
+  fragColor = graticuleColor * amount;
+  gl_FragDepth = tsOverlayDepth(vDepthW);
+}
+)";
 
 const char* const compositeVertexGlsl = R"(
 out vec2 vUv;
@@ -185,13 +262,21 @@ struct TileRenderer::DrawTile {
   const GpuMesh* mesh = nullptr;
   /** Per layer: the image (null: nothing to draw) and its uv transform. */
   std::vector<std::pair<const GpuTexture*, Float4>> layers;
+  /** The map uniforms of TileBlock (zero on the globe). */
+  Float4 mapOrigin{};
+  Float4 projR0{};
+  Float4 projR1{};
+  Float4 tileGeo{};
 };
 
 TileRenderer::TileRenderer(RenderDevice& device,
                            const TileRendererSettings& settings)
-    : m_device(device), m_settings(settings), m_selector(settings.selection)
+    : m_device(device), m_settings(settings)
 {
   m_settings.loader.buildMeshes = false;
+  m_settings.selection.minimumMapLevel = m_settings.minimumMapLevel;
+  m_settings.selection.meshSegments = m_settings.loader.meshSegments;
+  m_selector.setSettings(m_settings.selection);
 }
 
 TileRenderer::~TileRenderer()
@@ -206,8 +291,11 @@ bool TileRenderer::initialise(QString* errorString)
 {
   ShaderDesc desc;
   desc.label = QStringLiteral("tile");
-  desc.vertexSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
-                      tileBlockGlsl + tileVertexGlsl;
+  const QByteArray vertexSource = QByteArray("#define MAP_OVERLAP ") +
+                                  mapOverlapGlsl + "\n" + frameBlockGlsl +
+                                  globeBlockGlsl + tileBlockGlsl +
+                                  projectionGlsl() + morphGlsl + tileVertexGlsl;
+  desc.vertexSource = vertexSource;
   desc.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
                         tileBlockGlsl + tileFragmentGlsl();
   desc.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding},
@@ -218,6 +306,19 @@ bool TileRenderer::initialise(QString* errorString)
   }
   m_shader = m_device.createShaderProgram(desc, errorString);
 
+  ShaderDesc graticule;
+  graticule.label = QStringLiteral("tile graticule");
+  graticule.vertexSource = vertexSource;
+  graticule.fragmentSource = QByteArray(frameBlockGlsl) + graticuleBlockGlsl +
+                             gridLinesGlsl + overlayDepthGlsl +
+                             tileGraticuleFragmentGlsl;
+  graticule.uniformBlocks = {
+      {QByteArrayLiteral("Frame"), frameBinding},
+      {QByteArrayLiteral("Globe"), globeBinding},
+      {QByteArrayLiteral("Tile"), tileBinding},
+      {QByteArrayLiteral("Graticule"), graticuleBinding}};
+  m_graticuleShader = m_device.createShaderProgram(graticule, errorString);
+
   ShaderDesc composite;
   composite.label = QStringLiteral("group composite");
   composite.vertexSource = compositeVertexGlsl;
@@ -226,7 +327,7 @@ bool TileRenderer::initialise(QString* errorString)
       {QByteArrayLiteral("Composite"), compositeBinding}};
   composite.samplers = {{QByteArrayLiteral("groupImage"), 0}};
   m_compositeShader = m_device.createShaderProgram(composite, errorString);
-  if (!m_shader || !m_compositeShader) {
+  if (!m_shader || !m_compositeShader || !m_graticuleShader) {
     return false;
   }
 
@@ -244,6 +345,12 @@ bool TileRenderer::initialise(QString* errorString)
   pipeline.blend = BlendMode::PremultipliedAlpha;
   m_pipeline = m_device.createPipeline(pipeline);
 
+  // Over the tiles drawn before it; see tsOverlayDepth().
+  PipelineDesc graticulePipeline = pipeline;
+  graticulePipeline.shader = m_graticuleShader.get();
+  graticulePipeline.depthWrite = false;
+  m_graticulePipeline = m_device.createPipeline(graticulePipeline);
+
   PipelineDesc compositePipeline;
   compositePipeline.shader = m_compositeShader.get();
   compositePipeline.blend = BlendMode::PremultipliedAlpha;
@@ -255,6 +362,12 @@ bool TileRenderer::initialise(QString* errorString)
   m_indices = m_device.createBuffer(BufferType::Index, BufferUsage::Static,
                                     indices.size() * sizeof(std::uint16_t),
                                     indices.data());
+  const std::vector<std::uint16_t> strips =
+      tileMeshStripIndices(m_settings.loader.meshSegments);
+  m_stripIndexCount = static_cast<int>(strips.size());
+  m_stripIndices = m_device.createBuffer(BufferType::Index, BufferUsage::Static,
+                                         strips.size() * sizeof(std::uint16_t),
+                                         strips.data());
   TextureDesc empty;
   empty.width = 1;
   empty.height = 1;
@@ -268,7 +381,8 @@ bool TileRenderer::initialise(QString* errorString)
       BufferType::Uniform, BufferUsage::Dynamic, sizeof(Float4), nullptr);
   m_tileUniformStride =
       alignUp(sizeof(TileBlock), m_device.uniformBufferAlignment());
-  if (!m_pipeline || !m_compositePipeline || !m_indices || !m_emptyTexture ||
+  if (!m_pipeline || !m_graticulePipeline || !m_compositePipeline ||
+      !m_indices || !m_stripIndices || !m_emptyTexture ||
       !m_compositeUniforms) {
     if (errorString) {
       *errorString = QStringLiteral("tiles: could not create GPU resources");
@@ -333,6 +447,8 @@ void TileRenderer::setLayers(const std::vector<ImageryLayerDraw>& layers,
     tileSize = std::max(tileSize, source->provider->tileSizePx());
   }
   TileSelectionSettings selection = m_settings.selection;
+  selection.minimumMapLevel = m_settings.minimumMapLevel;
+  selection.meshSegments = m_settings.loader.meshSegments;
   selection.maximumLevel = std::min(selection.maximumLevel, deepest);
   selection.tileSizePx = tileSize;
   m_selector.setSettings(selection);
@@ -576,7 +692,11 @@ void TileRenderer::prepare(const Camera& camera)
   ++m_frame;
   m_statistics = TileStatistics();
   m_drawTiles.clear();
-  if (m_layers.empty()) {
+  m_morph = camera.morph();
+  m_drawStrips = m_morph >= 1.0 && camera.mapProjection()->isCylindrical();
+  // The map's surface and graticule are drawn on the tiles too, so it
+  // needs them even without imagery.
+  if (m_layers.empty() && m_morph <= 0.0) {
     m_meshesPending = false;
     return;
   }
@@ -584,11 +704,40 @@ void TileRenderer::prepare(const Camera& camera)
   const TileSelection selection = m_selector.select(
       camera, [this](TileKey key) { return m_meshes.count(key) != 0; });
   m_drawTiles.reserve(selection.render.size());
+  const MapFrame frame = m_morph > 0.0 ? camera.mapFrame() : MapFrame();
   for (const TileKey& key : selection.render) {
     GpuMesh* mesh = m_meshes.at(key).get();
     mesh->lastUsedFrame = m_frame;
-    m_drawTiles.push_back(DrawTile{key, mesh, {}});
     m_statistics.deepestLevel = std::max(m_statistics.deepestLevel, key.level);
+    if (m_morph <= 0.0) {
+      m_drawTiles.push_back(DrawTile{key, mesh, {}, {}, {}, {}, {}});
+      continue;
+    }
+    // On the map: where the tile's centre lies, once for each copy of the
+    // world it shows in.
+    const Projection& projection = *frame.projection;
+    const GeoRect rect = key.bounds();
+    const double referenceLatDeg =
+        std::clamp(rect.centreLatDeg(), projection.minimumLatDeg(),
+                   projection.maximumLatDeg());
+    const MapPoint offset =
+        frame.offsetOf(referenceLatDeg, rect.centreLonDeg());
+    const ProjectionShaderReference reference =
+        projection.shaderReference(referenceLatDeg, rect.centreLonDeg());
+    DrawTile tile{key, mesh, {}, {}, reference.r0, reference.r1, {}};
+    tile.tileGeo = {static_cast<float>(degToRad(rect.widthDeg())),
+                    static_cast<float>(degToRad(rect.heightDeg())),
+                    static_cast<float>(rect.centreLonDeg()),
+                    static_cast<float>(rect.centreLatDeg())};
+    for (const double shiftM :
+         frame.copyShiftsM(rect.westDeg, rect.eastDeg, m_morph < 1.0)) {
+      tile.mapOrigin = {
+          static_cast<float>((offset.xM + shiftM) * frame.planeScale),
+          static_cast<float>(offset.yM * frame.planeScale),
+          static_cast<float>(degToRad(rect.centreLatDeg() - referenceLatDeg)),
+          0.0F};
+      m_drawTiles.push_back(tile);
+    }
   }
   buildMeshes(selection.load);
   bindImages();
@@ -615,7 +764,7 @@ double TileRenderer::layerAlpha(const Layer& layer, bool hasImage) const
   return alpha;
 }
 
-std::vector<bool> TileRenderer::writeBatchUniforms(LayerRange batch)
+std::vector<bool> TileRenderer::writeBatchUniforms(LayerRange batch, bool base)
 {
   const std::size_t firstLayer = batch.first;
   const std::size_t count = batch.count;
@@ -627,7 +776,13 @@ std::vector<bool> TileRenderer::writeBatchUniforms(LayerRange batch)
     TileBlock block;
     block.centreHigh = tile.mesh->centreHigh;
     block.centreLow = tile.mesh->centreLow;
-    block.layerInfo = {static_cast<float>(count), 0.0F, 0.0F, 0.0F};
+    block.layerInfo = {static_cast<float>(count), base ? 1.0F : 0.0F, 0.0F,
+                       0.0F};
+    block.mapOrigin = tile.mapOrigin;
+    block.projR0 = tile.projR0;
+    block.projR1 = tile.projR1;
+    block.tileGeo = tile.tileGeo;
+    visible[t] = base;
     for (std::size_t slot = 0; slot < count; ++slot) {
       const std::size_t layerIndex = firstLayer + slot;
       const std::pair<const GpuTexture*, Float4>& binding =
@@ -654,17 +809,29 @@ std::vector<bool> TileRenderer::writeBatchUniforms(LayerRange batch)
   return visible;
 }
 
-void TileRenderer::drawLayers(LayerRange layers)
+void TileRenderer::setTileIndexBuffer()
+{
+  m_device.setIndexBuffer(m_drawStrips ? *m_stripIndices : *m_indices,
+                          IndexFormat::UInt16);
+}
+
+int TileRenderer::tileIndexCount() const
+{
+  return m_drawStrips ? m_stripIndexCount : m_indexCount;
+}
+
+void TileRenderer::drawLayers(LayerRange layers, bool withBase)
 {
   m_device.setPipeline(*m_pipeline);
-  m_device.setIndexBuffer(*m_indices, IndexFormat::UInt16);
+  setTileIndexBuffer();
   const std::size_t first = layers.first;
   const std::size_t end = first + layers.count;
   const std::size_t perDraw = static_cast<std::size_t>(layersPerDraw);
   for (std::size_t batch = first; batch < end; batch += perDraw) {
     const std::size_t batchCount = std::min(perDraw, end - batch);
-    const std::vector<bool> visible =
-        writeBatchUniforms(LayerRange{batch, batchCount});
+    // The surface colour goes under the first batch.
+    const std::vector<bool> visible = writeBatchUniforms(
+        LayerRange{batch, batchCount}, withBase && batch == first);
     for (std::size_t t = 0; t < visible.size(); ++t) {
       if (!visible[t]) {
         continue;
@@ -679,9 +846,43 @@ void TileRenderer::drawLayers(LayerRange layers)
       m_device.setVertexBuffer(0, *tile.mesh->vertices, 0);
       m_device.setUniformBuffer(tileBinding, *m_tileUniforms,
                                 t * m_tileUniformStride, sizeof(TileBlock));
-      m_device.drawIndexed(m_indexCount, 0, 1);
+      m_device.drawIndexed(tileIndexCount(), 0, 1);
       ++m_statistics.drawCalls;
     }
+  }
+}
+
+void TileRenderer::drawPlain(const Pipeline& pipeline)
+{
+  if (m_drawTiles.empty() || m_morph <= 0.0) {
+    return;
+  }
+  m_device.setPipeline(pipeline);
+  setTileIndexBuffer();
+  const std::vector<bool> visible = writeBatchUniforms(LayerRange{0, 0}, true);
+  for (int slot = 0; slot < layersPerDraw; ++slot) {
+    m_device.setTexture(slot, *m_emptyTexture);
+  }
+  for (std::size_t t = 0; t < visible.size(); ++t) {
+    m_device.setVertexBuffer(0, *m_drawTiles[t].mesh->vertices, 0);
+    m_device.setUniformBuffer(tileBinding, *m_tileUniforms,
+                              t * m_tileUniformStride, sizeof(TileBlock));
+    m_device.drawIndexed(tileIndexCount(), 0, 1);
+    ++m_statistics.drawCalls;
+  }
+}
+
+void TileRenderer::drawBase()
+{
+  if (m_pipeline) {
+    drawPlain(*m_pipeline);
+  }
+}
+
+void TileRenderer::drawGraticule()
+{
+  if (m_graticulePipeline) {
+    drawPlain(*m_graticulePipeline);
   }
 }
 
@@ -698,13 +899,21 @@ void TileRenderer::composite(double alpha)
 }
 
 void TileRenderer::draw(const PassDesc& mainPass,
-                        const std::function<void()>& rebindUniforms)
+                        const std::function<void()>& rebindUniforms,
+                        bool withBase)
 {
-  if (m_drawTiles.empty() || m_layers.empty() || !m_pipeline) {
+  if (m_drawTiles.empty() || !m_pipeline) {
     return;
   }
+  bool baseWanted = withBase && m_morph > 0.0;
   const int count = static_cast<int>(m_layers.size());
   const bool groups = m_settings.groupCompositing;
+  // A composite group is drawn on its own offscreen, so the surface can't
+  // share its draws; nor can it with no layers at all.
+  if (baseWanted && (count == 0 || (groups && m_layers.front().group >= 0))) {
+    drawBase();
+    baseWanted = false;
+  }
   int first = 0;
   while (first < count) {
     const int group =
@@ -717,7 +926,9 @@ void TileRenderer::draw(const PassDesc& mainPass,
     }
     if (group < 0) {
       drawLayers(LayerRange{static_cast<std::size_t>(first),
-                            static_cast<std::size_t>(end - first)});
+                            static_cast<std::size_t>(end - first)},
+                 baseWanted);
+      baseWanted = false;
       first = end;
       continue;
     }
@@ -737,7 +948,8 @@ void TileRenderer::draw(const PassDesc& mainPass,
       m_device.beginPass(offscreen);
       rebindUniforms();
       drawLayers(LayerRange{static_cast<std::size_t>(first),
-                            static_cast<std::size_t>(end - first)});
+                            static_cast<std::size_t>(end - first)},
+                 false);
       m_device.endPass();
       PassDesc resume = mainPass;
       resume.clearColor = false;

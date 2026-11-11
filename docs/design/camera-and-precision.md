@@ -38,6 +38,12 @@ field of view) into all of that in double precision, plus:
 - Near and far planes: near is half the eye height (0.05 m minimum), far
   is past the horizon of the polar-radius sphere plus 50 km.
 
+The camera also has a **morph factor** between the globe (0) and a flat
+map (1) and the map's projection. On the map the same pose applies, seen
+from straight above with north up; picking, `project()` and the clip
+planes follow. That is all in [morph.md](morph.md), with the map's own
+navigation; the rest of this document is the globe.
+
 ## Navigation
 
 `ts::CameraController` holds the camera and turns input into motion. It

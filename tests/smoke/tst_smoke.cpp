@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <array>
 
+#include <QDir>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -240,6 +241,50 @@ private slots:
     QCOMPARE(state.value(QStringLiteral("vector_layers")).toInt(), 2);
     QVERIFY(state.value(QStringLiteral("imagery_tiles_drawn")).toInt() > 0);
     QVERIFY(state.value(QStringLiteral("vector_tiles_drawn")).toInt() > 0);
+  }
+
+  /**
+   * A project given on the command line opens at start-up: here one
+   * saved in the 2D map view with the Miller projection, which the window
+   * then shows, with tiles drawn and a scale bar.
+   */
+  void opensMapProject()
+  {
+    const Run glCheck = runApp({QStringLiteral("--gl-check")}, false);
+    if (glCheck.exitCode != 0 &&
+        qEnvironmentVariableIntValue("TS_REQUIRE_GL") == 0) {
+      QSKIP("No OpenGL 3.3 here; set TS_REQUIRE_GL=1 to fail instead.");
+    }
+    const QString project =
+        QDir(QStringLiteral(TS_TEST_DATA_DIR))
+            .filePath(QStringLiteral("projects/v2-map.terrasoar"));
+    const Run run =
+        runApp({QStringLiteral("--measure"), QStringLiteral("-"),
+                QStringLiteral("--idle-seconds"), QStringLiteral("1"), project},
+               false);
+    verifyCleanExit(run);
+    const QJsonObject state =
+        parseJson(run.out).value(QStringLiteral("state")).toObject();
+    qInfo("%s",
+          QJsonDocument(state).toJson(QJsonDocument::Compact).constData());
+    QCOMPARE(state.value(QStringLiteral("view")).toString(),
+             QStringLiteral("map"));
+    QCOMPARE(state.value(QStringLiteral("projection")).toString(),
+             QStringLiteral("miller"));
+    QVERIFY(state.value(QStringLiteral("imagery_tiles_drawn")).toInt() > 0);
+    QVERIFY(state.value(QStringLiteral("scale_bar"))
+                .toString()
+                .contains(QStringLiteral("km")));
+  }
+
+  void missingProjectIsAnError()
+  {
+    const Run run = runApp({QStringLiteral("--smoke-test"),
+                            QStringLiteral("no-such-file.terrasoar")});
+    QVERIFY(run.finished);
+    QCOMPARE(run.status, QProcess::NormalExit);
+    QCOMPARE(run.exitCode, 1);
+    QVERIFY2(run.err.contains("no-such-file.terrasoar"), run.err.constData());
   }
 
   /**

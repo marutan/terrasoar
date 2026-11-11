@@ -23,6 +23,7 @@
 #include "mainwindow.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
+#include "ts/projection/projection.h"
 
 namespace
 {
@@ -566,6 +567,154 @@ private slots:
     QVERIFY(!window.openProject(broken.fileName(), &error));
     QVERIFY(!error.isEmpty());
     QCOMPARE(window.layerModel()->toJson(), saved);
+  }
+
+  void mapViewToggle()
+  {
+    // View > 2D Map changes to the flat map and back, animated, keeping
+    // the centre of the view; the map slides under a drag, never turns.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    QAction* mapView =
+        window.findChild<QAction*>(QStringLiteral("mapViewAction"));
+    if (mapView == nullptr) {
+      QFAIL("no mapViewAction");
+    }
+    if (globe == nullptr) {
+      QVERIFY(!mapView->isEnabled());
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QVERIFY(mapView->isEnabled() && !mapView->isChecked());
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    globe->setPose(ts::CameraPose{48.0, 11.0, 4.0e6, 40.0, 30.0});
+    QCOMPARE(globe->viewMode(), ts::ViewMode::Globe);
+    QSignalSpy modeChanges(globe, &ts::GlobeView::viewModeChanged);
+
+    const int framesBefore = globe->framesRendered();
+    mapView->trigger();
+    QVERIFY(mapView->isChecked());
+    QCOMPARE(globe->viewMode(), ts::ViewMode::Map);
+    QCOMPARE(modeChanges.size(), 1);
+    QVERIFY(globe->controller().isMorphing());
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->controller().isMorphing(); },
+                            10000));
+    // Several frames of the change were drawn, not one jump.
+    QVERIFY(globe->framesRendered() > framesBefore + 2);
+    const ts::Camera& camera = globe->controller().camera();
+    QCOMPARE(camera.morph(), 1.0);
+    QCOMPARE(camera.pose().targetLatDeg, 48.0);
+    QCOMPARE(camera.pose().targetLonDeg, 11.0);
+    QCOMPARE(camera.pose().headingDeg, 0.0);
+    QCOMPARE(camera.pose().tiltDeg, 0.0);
+
+    // The pointer readout works on the map: the centre is where it was.
+    QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
+    QVERIFY(pointer != nullptr);
+    const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
+    sendMouse(globe, QEvent::MouseMove, centre, Qt::NoButton, Qt::NoButton);
+    QVERIFY2(pointer->text().startsWith(QStringLiteral("48.0")),
+             qPrintable(pointer->text()));
+
+    // A left drag slides the map; a right drag does not turn it.
+    sendMouse(globe, QEvent::MouseButtonPress, centre, Qt::LeftButton,
+              Qt::LeftButton);
+    sendMouse(globe, QEvent::MouseMove, centre + QPointF(-50.0, 0.0),
+              Qt::NoButton, Qt::LeftButton);
+    QTest::qWait(150); // held still: no inertia after the release
+    sendMouse(globe, QEvent::MouseButtonRelease, centre + QPointF(-50.0, 0.0),
+              Qt::LeftButton, Qt::NoButton);
+    QVERIFY(camera.pose().targetLonDeg > 11.5);
+    QCOMPARE(camera.pose().targetLatDeg, 48.0);
+    sendMouse(globe, QEvent::MouseButtonPress, centre, Qt::RightButton,
+              Qt::RightButton);
+    sendMouse(globe, QEvent::MouseMove, centre + QPointF(80.0, 40.0),
+              Qt::NoButton, Qt::RightButton);
+    sendMouse(globe, QEvent::MouseButtonRelease, centre + QPointF(80.0, 40.0),
+              Qt::RightButton, Qt::NoButton);
+    QCOMPARE(camera.pose().headingDeg, 0.0);
+    QCOMPARE(camera.pose().tiltDeg, 0.0);
+
+    // The scale bar is drawn, and the map goes idle like the globe.
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    QTest::qWait(200);
+    QVERIFY2(globe->scaleBarText().contains(QStringLiteral("km")),
+             qPrintable(globe->scaleBarText()));
+    QCOMPARE(window.stateReport().value(QStringLiteral("view")).toString(),
+             QStringLiteral("map"));
+    QVERIFY(window.stateReport()
+                .value(QStringLiteral("imagery_tiles_drawn"))
+                .toInt() > 0);
+    const int idleFrames = globe->framesRendered();
+    QTest::qWait(400);
+    QCOMPARE(globe->framesRendered(), idleFrames);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      globe->grabFramebuffer().save(
+          QDir(shots).filePath(QStringLiteral("map-view.png")));
+    }
+
+    // Back to the globe.
+    const double lonOnMap = camera.pose().targetLonDeg;
+    mapView->trigger();
+    QVERIFY(!mapView->isChecked());
+    QCOMPARE(globe->viewMode(), ts::ViewMode::Globe);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !globe->controller().isAnimating(); }, 10000));
+    QCOMPARE(camera.morph(), 0.0);
+    QCOMPARE(camera.pose().targetLonDeg, lonOnMap);
+    QCOMPARE(modeChanges.size(), 2);
+  }
+
+  void projectionMenu()
+  {
+    // View > Map Projection lists the projections, one checked; choosing
+    // another changes the map at once.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QMenu* menu = window.findChild<QMenu*>(QStringLiteral("projectionMenu"));
+    if (menu == nullptr) {
+      QFAIL("no projectionMenu");
+    }
+    QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
+    const QList<QAction*> actions = menu->actions();
+    QCOMPARE(actions.size(), 3);
+    QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
+    QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
+    QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
+    QVERIFY(actions.at(0)->isChecked());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QVERIFY(!actions.at(2)->isEnabled());
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QCOMPARE(globe->mapProjection()->id(), QStringLiteral("mercator"));
+    globe->setViewMode(ts::ViewMode::Map, false);
+    QVERIFY(!globe->controller().isMorphing());
+    QCOMPARE(globe->controller().camera().morph(), 1.0);
+    // Mercator can't be centred at 88° N; Miller can.
+    globe->setPose(ts::CameraPose{88.0, 0.0, 1.0e6, 0.0, 0.0});
+    QVERIFY(globe->controller().camera().pose().targetLatDeg < 85.1);
+    actions.at(2)->trigger();
+    QCOMPARE(globe->mapProjection()->id(), QStringLiteral("miller"));
+    QVERIFY(actions.at(2)->isChecked() && !actions.at(0)->isChecked());
+    globe->setPose(ts::CameraPose{88.0, 0.0, 1.0e6, 0.0, 0.0});
+    QCOMPARE(globe->controller().camera().pose().targetLatDeg, 88.0);
+    QCOMPARE(
+        window.stateReport().value(QStringLiteral("projection")).toString(),
+        QStringLiteral("miller"));
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      globe->setPose(ts::CameraPose{20.0, 10.0, 5.0e7, 0.0, 0.0});
+      QVERIFY(
+          QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+      QTest::qWait(300);
+      globe->grabFramebuffer().save(
+          QDir(shots).filePath(QStringLiteral("map-miller-world.png")));
+    }
   }
 
   void idleViewStopsDrawing()

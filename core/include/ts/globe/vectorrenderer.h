@@ -99,6 +99,13 @@ struct VectorRendererSettings {
  * is clipped to its tile's rectangle, so where tiles of two levels of
  * detail meet nothing is drawn twice. See docs/design/vector-rendering.md.
  *
+ * Like tiles, vertices have a position on the globe and one on the flat
+ * map, blended by the camera's morph factor in the vertex shader. While
+ * the factor is above 0 the far side is hidden by the depth the tiles
+ * wrote instead (the globe's "far side" means nothing on a map), and what
+ * lies near the edge where the world wraps around is drawn on both
+ * sides. See docs/design/morph.md.
+ *
  * @renderthread
  */
 class VectorRenderer
@@ -153,11 +160,15 @@ private:
   struct DrawItem {
     const GpuMesh* mesh = nullptr;
     GeoRect clip;
+    /** Which copy of the world on the flat map: its shift in x, metres. */
+    double mapShiftM = 0.0;
   };
 
   std::unique_ptr<GpuMesh> createGpuMesh(const VectorTileMesh& mesh) const;
   void upload();
   void select(Source& source, const Camera& camera) const;
+  static void addItem(Source& source, const Camera& camera, const GpuMesh* mesh,
+                      const GeoRect& clip);
   void evict();
   void writeUniforms(const Camera& camera);
 
@@ -167,6 +178,9 @@ private:
   std::unique_ptr<ShaderProgram> m_lineShader;
   std::unique_ptr<Pipeline> m_fillPipeline;
   std::unique_ptr<Pipeline> m_linePipeline;
+  std::unique_ptr<Pipeline> m_fillMapPipeline;
+  std::unique_ptr<Pipeline> m_lineMapPipeline;
+  double m_morph = 0.0;
   std::unique_ptr<GpuBuffer> m_uniforms;
   std::size_t m_uniformCapacity = 0;
   std::size_t m_uniformStride = 0;

@@ -180,6 +180,10 @@ int main(int argc, char* argv[])
   parser.addOption(smokeOption);
   parser.addOption(measureOption);
   parser.addOption(idleOption);
+  parser.addPositionalArgument(
+      QStringLiteral("project"),
+      QCoreApplication::translate("main", "Project file to open."),
+      QCoreApplication::translate("main", "[project]"));
   parser.process(app);
 
   if (parser.isSet(glCheckOption)) {
@@ -198,6 +202,15 @@ int main(int argc, char* argv[])
   }
 
   ts::MainWindow window;
+  if (!parser.positionalArguments().isEmpty()) {
+    QString error;
+    if (!window.openProject(parser.positionalArguments().constFirst(),
+                            &error)) {
+      static_cast<void>(
+          std::fputs(qPrintable(error + QLatin1Char('\n')), stderr));
+      return ExitFailure;
+    }
+  }
 
   std::unique_ptr<ts::StartupMeasurement> measurement;
   if (parser.isSet(measureOption)) {

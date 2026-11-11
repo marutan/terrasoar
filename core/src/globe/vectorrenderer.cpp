@@ -8,7 +8,9 @@
 #include <utility>
 
 #include "ts/camera/camera.h"
+#include "ts/maths/angles.h"
 #include "ts/maths/splitdouble.h"
+#include "ts/projection/projection.h"
 #include "ts/providers/tileprovider.h"
 
 #include "globeuniforms.h"
@@ -24,6 +26,8 @@ using globe_detail::frameBinding;
 using globe_detail::frameBlockGlsl;
 using globe_detail::globeBinding;
 using globe_detail::globeBlockGlsl;
+using globe_detail::morphGlsl;
+using globe_detail::overlayDepthGlsl;
 using globe_detail::vectorBinding;
 
 /** Slack around a draw's clip rectangle, degrees: no cracks between tiles. */
@@ -33,7 +37,7 @@ constexpr double clipSlackDeg = 1e-5;
 struct VectorBlock {
   Float4 centreHigh{};
   Float4 centreLow{};
-  /** West, south, east, north, degrees. */
+  /** West, south, east, north, degrees from the mesh's centre. */
   Float4 clipRect{};
   /** Premultiplied by the layer's opacity. */
   Float4 fillColor{};
@@ -41,9 +45,19 @@ struct VectorBlock {
   Float4 outlineColor{};
   /** Outline width (logical px), near plane (m), unused, unused. */
   Float4 params{};
+  /**
+   * The map reference point (the mesh's centre, held inside the
+   * projection's latitude limits) relative to the centre of the view, in
+   * metres on the map's plane (xy); the latitude of the mesh's centre
+   * minus the reference point's, radians (z).
+   */
+  Float4 mapOrigin{};
+  /** The projection's reference values for the reference point. */
+  Float4 projR0{};
+  Float4 projR1{};
 };
 
-static_assert(sizeof(VectorBlock) == 96, "std140 layout of Vector");
+static_assert(sizeof(VectorBlock) == 144, "std140 layout of Vector");
 
 const char* const vectorBlockGlsl = R"(
 layout(std140) uniform Vector {
@@ -53,13 +67,31 @@ layout(std140) uniform Vector {
   vec4 fillColor;
   vec4 outlineColor;
   vec4 params;
+  vec4 mapOrigin;
+  vec4 projR0;
+  vec4 projR1;
 };
+)";
 
+// For vertex shaders, after vectorBlockGlsl, projectionGlsl() and
+// morphGlsl.
+const char* const vectorVertexHelpersGlsl = R"(
 // Eye-relative position of a vertex given as an offset from the centre.
 vec3 relativeToEye(vec3 offset)
 {
   return (centreHigh.xyz - eyeHigh.xyz) + (centreLow.xyz - eyeLow.xyz)
        + offset;
+}
+
+// The same between the globe and the flat map; lonLat is the vertex's
+// offset from the centre in degrees.
+vec3 morphed(vec3 relative, vec2 lonLat)
+{
+  if (morph.x <= 0.0) {
+    return relative;
+  }
+  return tsMorph(relative, radians(lonLat) + vec2(0.0, mapOrigin.z),
+                 mapOrigin, projR0, projR1);
 }
 
 // Positive where the ellipsoid faces the eye at that point (on this side
@@ -71,10 +103,21 @@ float facing(vec3 offset, vec3 relative)
   return dot(normalize(normal), -normalize(relative));
 }
 
+)";
+
+// For fragment shaders, after vectorBlockGlsl and overlayDepthGlsl.
+const char* const vectorFragmentHelpersGlsl = R"(
 bool outsideClip(vec2 lonLat)
 {
   return lonLat.x < clipRect.x || lonLat.y < clipRect.y
       || lonLat.x > clipRect.z || lonLat.y > clipRect.w;
+}
+
+// True for what the globe hides: on the globe the far side of the
+// ellipsoid. On the map and during the morph the depth test does it.
+bool hidden(float facing)
+{
+  return morph.x <= 0.0 && facing < 0.0;
 }
 )";
 
@@ -83,25 +126,29 @@ layout(location = 0) in vec3 offset;
 layout(location = 1) in vec2 lonLat;
 out vec2 vLonLat;
 out float vFacing;
+out float vDepthW;
 void main()
 {
   vec3 relative = relativeToEye(offset);
   vLonLat = lonLat;
   vFacing = facing(offset, relative);
-  gl_Position = viewProjection * vec4(relative, 1.0);
+  gl_Position = viewProjection * vec4(morphed(relative, lonLat), 1.0);
+  vDepthW = gl_Position.w;
 }
 )";
 
 const char* const fillFragmentGlsl = R"(
 in vec2 vLonLat;
 in float vFacing;
+in float vDepthW;
 out vec4 fragColor;
 void main()
 {
-  if (vFacing < 0.0 || outsideClip(vLonLat)) {
+  if (hidden(vFacing) || outsideClip(vLonLat)) {
     discard;
   }
   fragColor = fillColor;
+  gl_FragDepth = tsOverlayDepth(vDepthW);
 }
 )";
 
@@ -114,6 +161,7 @@ layout(location = 2) in vec3 bOffset;
 layout(location = 3) in vec2 bLonLat;
 out vec2 vLonLat;
 out float vFacing;
+out float vDepthW;
 flat out vec2 vA;
 flat out vec2 vB;
 flat out float vHalfWidth;
@@ -127,8 +175,8 @@ void main()
 {
   vec3 relA = relativeToEye(aOffset);
   vec3 relB = relativeToEye(bOffset);
-  vec4 clipA = viewProjection * vec4(relA, 1.0);
-  vec4 clipB = viewProjection * vec4(relB, 1.0);
+  vec4 clipA = viewProjection * vec4(morphed(relA, aLonLat), 1.0);
+  vec4 clipB = viewProjection * vec4(morphed(relB, bLonLat), 1.0);
   float nearW = params.y;
   if (clipA.w < nearW && clipB.w < nearW) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // behind the eye: off screen
@@ -158,6 +206,7 @@ void main()
   gl_Position = vec4((corner / viewport.xy * 2.0 - 1.0) * clip.w, 0.0, clip.w);
   vLonLat = atB ? bLonLat : aLonLat;
   vFacing = atB ? facing(bOffset, relB) : facing(aOffset, relA);
+  vDepthW = clip.w;
   vA = sa;
   vB = sb;
   vHalfWidth = halfWidth;
@@ -167,13 +216,14 @@ void main()
 const char* const lineFragmentGlsl = R"(
 in vec2 vLonLat;
 in float vFacing;
+in float vDepthW;
 flat in vec2 vA;
 flat in vec2 vB;
 flat in float vHalfWidth;
 out vec4 fragColor;
 void main()
 {
-  if (vFacing < 0.0 || outsideClip(vLonLat)) {
+  if (hidden(vFacing) || outsideClip(vLonLat)) {
     discard;
   }
   // Distance from the pixel centre to the segment (a capsule: round ends
@@ -187,6 +237,7 @@ void main()
     discard;
   }
   fragColor = outlineColor * coverage;
+  gl_FragDepth = tsOverlayDepth(vDepthW);
 }
 )";
 
@@ -206,6 +257,8 @@ struct VectorRenderer::GpuMesh {
   int segmentCount = 0;
   Float4 centreHigh{};
   Float4 centreLow{};
+  double centreLonDeg = 0.0;
+  double centreLatDeg = 0.0;
   std::size_t bytes = 0;
   std::uint64_t lastUsedFrame = 0;
 };
@@ -240,20 +293,24 @@ bool VectorRenderer::initialise(QString* errorString)
       {QByteArrayLiteral("Frame"), frameBinding},
       {QByteArrayLiteral("Globe"), globeBinding},
       {QByteArrayLiteral("Vector"), vectorBinding}};
-  const QByteArray prefix =
+  const QByteArray blockGlsl =
       QByteArray(frameBlockGlsl) + globeBlockGlsl + vectorBlockGlsl;
+  const QByteArray vertexPrefix =
+      blockGlsl + projectionGlsl() + morphGlsl + vectorVertexHelpersGlsl;
+  const QByteArray fragmentPrefix =
+      blockGlsl + overlayDepthGlsl + vectorFragmentHelpersGlsl;
 
   ShaderDesc fill;
   fill.label = QStringLiteral("vector fill");
-  fill.vertexSource = prefix + fillVertexGlsl;
-  fill.fragmentSource = prefix + fillFragmentGlsl;
+  fill.vertexSource = vertexPrefix + fillVertexGlsl;
+  fill.fragmentSource = fragmentPrefix + fillFragmentGlsl;
   fill.uniformBlocks = blocks;
   m_fillShader = m_device.createShaderProgram(fill, errorString);
 
   ShaderDesc line;
   line.label = QStringLiteral("vector line");
-  line.vertexSource = prefix + lineVertexGlsl;
-  line.fragmentSource = prefix + lineFragmentGlsl;
+  line.vertexSource = vertexPrefix + lineVertexGlsl;
+  line.fragmentSource = fragmentPrefix + lineFragmentGlsl;
   line.uniformBlocks = blocks;
   m_lineShader = m_device.createShaderProgram(line, errorString);
   if (!m_fillShader || !m_lineShader) {
@@ -279,9 +336,19 @@ bool VectorRenderer::initialise(QString* errorString)
   linePipeline.blend = BlendMode::PremultipliedAlpha;
   m_linePipeline = m_device.createPipeline(linePipeline);
 
+  // On the map and during the morph: tested against the tiles' depth (see
+  // tsOverlayDepth()).
+  fillPipeline.depthTest = true;
+  fillPipeline.depthCompare = CompareOp::LessOrEqual;
+  m_fillMapPipeline = m_device.createPipeline(fillPipeline);
+  linePipeline.depthTest = true;
+  linePipeline.depthCompare = CompareOp::LessOrEqual;
+  m_lineMapPipeline = m_device.createPipeline(linePipeline);
+
   m_uniformStride =
       alignUp(sizeof(VectorBlock), m_device.uniformBufferAlignment());
-  if (!m_fillPipeline || !m_linePipeline) {
+  if (!m_fillPipeline || !m_linePipeline || !m_fillMapPipeline ||
+      !m_lineMapPipeline) {
     if (errorString) {
       *errorString = QStringLiteral("vectors: could not create pipelines");
     }
@@ -361,6 +428,8 @@ VectorRenderer::createGpuMesh(const VectorTileMesh& mesh) const
   const SplitVec3 centre = splitVec3(mesh.centreEcef);
   gpu->centreHigh = {centre.highX, centre.highY, centre.highZ, 0.0F};
   gpu->centreLow = {centre.lowX, centre.lowY, centre.lowZ, 0.0F};
+  gpu->centreLonDeg = mesh.centreLonDeg;
+  gpu->centreLatDeg = mesh.centreLatDeg;
   if (!mesh.triangles.empty()) {
     gpu->fill = m_device.createBuffer(
         BufferType::Vertex, BufferUsage::Static,
@@ -402,6 +471,20 @@ void VectorRenderer::upload()
   }
 }
 
+void VectorRenderer::addItem(Source& source, const Camera& camera,
+                             const GpuMesh* mesh, const GeoRect& clip)
+{
+  if (camera.morph() <= 0.0) {
+    source.items.push_back(DrawItem{mesh, clip, 0.0});
+    return;
+  }
+  // On the map: once for each copy of the world the piece shows in.
+  for (const double shiftM : camera.mapFrame().copyShiftsM(
+           clip.westDeg, clip.eastDeg, camera.morph() < 1.0)) {
+    source.items.push_back(DrawItem{mesh, clip, shiftM});
+  }
+}
+
 void VectorRenderer::select(Source& source, const Camera& camera) const
 {
   source.items.clear();
@@ -440,10 +523,10 @@ void VectorRenderer::select(Source& source, const Camera& camera) const
           return other != s && s.contains(other);
         });
     if (!shared) {
-      source.items.push_back(DrawItem{mesh, s.bounds()});
+      addItem(source, camera, mesh, s.bounds());
     } else {
       for (const TileKey& key : served.at(s)) {
-        source.items.push_back(DrawItem{mesh, key.bounds()});
+        addItem(source, camera, mesh, key.bounds());
       }
     }
   }
@@ -503,6 +586,8 @@ void VectorRenderer::writeUniforms(const Camera& camera)
   std::vector<std::uint8_t> staging;
   m_layerUniformStart.assign(m_layers.size(), 0);
   std::size_t block = 0;
+  const bool onMap = camera.morph() > 0.0;
+  const MapFrame frame = onMap ? camera.mapFrame() : MapFrame();
   for (std::size_t i = 0; i < m_layers.size(); ++i) {
     m_layerUniformStart[i] = block;
     const Source* source = m_layers[i].first;
@@ -514,10 +599,41 @@ void VectorRenderer::writeUniforms(const Camera& camera)
       VectorBlock values;
       values.centreHigh = item.mesh->centreHigh;
       values.centreLow = item.mesh->centreLow;
-      values.clipRect = {static_cast<float>(item.clip.westDeg - clipSlackDeg),
-                         static_cast<float>(item.clip.southDeg - clipSlackDeg),
-                         static_cast<float>(item.clip.eastDeg + clipSlackDeg),
-                         static_cast<float>(item.clip.northDeg + clipSlackDeg)};
+      const double lon = item.mesh->centreLonDeg;
+      const double lat = item.mesh->centreLatDeg;
+      values.clipRect = {
+          static_cast<float>(item.clip.westDeg - lon - clipSlackDeg),
+          static_cast<float>(item.clip.southDeg - lat - clipSlackDeg),
+          static_cast<float>(item.clip.eastDeg - lon + clipSlackDeg),
+          static_cast<float>(item.clip.northDeg - lat + clipSlackDeg)};
+      if (onMap) {
+        const Projection& projection = *frame.projection;
+        const double referenceLatDeg = std::clamp(
+            lat, projection.minimumLatDeg(), projection.maximumLatDeg());
+        const MapPoint offset = frame.offsetOf(referenceLatDeg, lon);
+        // offsetOf() takes the copy nearest the view's centre; the copies
+        // of this piece were counted from the middle of its clip rectangle.
+        const double pieceXM =
+            frame
+                .offsetOf(projection.forward(frame.centreLatDeg,
+                                             item.clip.centreLonDeg()))
+                .xM;
+        double originXM = offset.xM;
+        const double halfWorldM = 0.5 * frame.worldWidthM;
+        if (originXM - pieceXM > halfWorldM) {
+          originXM -= frame.worldWidthM;
+        } else if (originXM - pieceXM < -halfWorldM) {
+          originXM += frame.worldWidthM;
+        }
+        const ProjectionShaderReference reference =
+            projection.shaderReference(referenceLatDeg, lon);
+        values.mapOrigin = {
+            static_cast<float>((originXM + item.mapShiftM) * frame.planeScale),
+            static_cast<float>(offset.yM * frame.planeScale),
+            static_cast<float>(degToRad(lat - referenceLatDeg)), 0.0F};
+        values.projR0 = reference.r0;
+        values.projR1 = reference.r1;
+      }
       values.fillColor = premultipliedRgba(draw.style.fill, draw.alpha);
       values.outlineColor = premultipliedRgba(draw.style.outline, draw.alpha);
       values.params = {static_cast<float>(draw.style.outlineWidthPx),
@@ -544,6 +660,7 @@ void VectorRenderer::writeUniforms(const Camera& camera)
 void VectorRenderer::prepare(const Camera& camera)
 {
   ++m_frame;
+  m_morph = camera.morph();
   m_statistics = VectorStatistics();
   upload();
   for (const std::unique_ptr<Source>& source : m_sources) {
@@ -566,7 +683,7 @@ void VectorRenderer::drawLayer(std::size_t index)
   const VectorStyle& style = m_layers[index].second.style;
   const std::size_t start = m_layerUniformStart[index];
   if (style.hasFill()) {
-    m_device.setPipeline(*m_fillPipeline);
+    m_device.setPipeline(m_morph > 0.0 ? *m_fillMapPipeline : *m_fillPipeline);
     for (std::size_t i = 0; i < source.items.size(); ++i) {
       const GpuMesh& mesh = *source.items[i].mesh;
       if (mesh.fillVertices == 0) {
@@ -582,7 +699,7 @@ void VectorRenderer::drawLayer(std::size_t index)
     }
   }
   if (style.hasOutline()) {
-    m_device.setPipeline(*m_linePipeline);
+    m_device.setPipeline(m_morph > 0.0 ? *m_lineMapPipeline : *m_linePipeline);
     for (std::size_t i = 0; i < source.items.size(); ++i) {
       const GpuMesh& mesh = *source.items[i].mesh;
       if (mesh.segmentCount == 0) {

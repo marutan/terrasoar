@@ -23,6 +23,10 @@ class LayerTreeModel;
 struct Project {
   /** Where the camera was. */
   CameraPose camera;
+  /** True if the view was the flat map, false for the globe. */
+  bool mapView = false;
+  /** Identifier of the flat map's projection (Projection::id()). */
+  QString projection = QStringLiteral("mercator");
   /** The layer tree (LayerTreeModel::toJson()). */
   QJsonArray layers;
 };
@@ -34,7 +38,7 @@ inline constexpr const char* projectFormatName = "terrasoar-project";
  * Version of the project file format this build writes. Files of this
  * and every earlier version load; earlier ones are migrated on load.
  */
-inline constexpr int projectFormatVersion = 1;
+inline constexpr int projectFormatVersion = 2;
 
 /**
  * Returns @p project as an indented JSON document. The output is

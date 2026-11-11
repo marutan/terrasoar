@@ -21,6 +21,14 @@ namespace ts
 QString formatLatitude(double latDeg, const QLocale& locale);
 
 /**
+ * Returns @p latDeg rounded to whole degrees as text, e.g. "51° N", for
+ * where a rough latitude is enough (the scale bar).
+ *
+ * @reentrant
+ */
+QString formatWholeLatitude(double latDeg, const QLocale& locale);
+
+/**
  * Returns @p lonDeg (any value; normalised to [−180, 180)) as text, e.g.
  * "0.00050° W".
  *
@@ -35,6 +43,15 @@ QString formatLongitude(double lonDeg, const QLocale& locale);
  * @reentrant
  */
 QString formatDistance(double distanceM, const QLocale& locale);
+
+/**
+ * Returns a round distance as text without decimals, in the largest unit
+ * that keeps it a whole number: "20 cm", "500 m", "2,000 km". For scale
+ * bars; @p distanceM is rounded to whole centimetres.
+ *
+ * @reentrant
+ */
+QString formatRoundDistance(double distanceM, const QLocale& locale);
 
 } // namespace ts
 

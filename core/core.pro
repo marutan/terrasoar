@@ -18,6 +18,7 @@ HEADERS += \
     include/ts/base/buildinfo.h \
     include/ts/camera/camera.h \
     include/ts/camera/cameracontroller.h \
+    include/ts/camera/scalebar.h \
     include/ts/deps/dependencies.h \
     include/ts/deps/gdaldataset.h \
     include/ts/deps/geoscontext.h \
@@ -48,6 +49,8 @@ HEADERS += \
     include/ts/packs/basepack.h \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
+    include/ts/projection/cylindricalprojection.h \
+    include/ts/projection/projection.h \
     include/ts/providers/geopackagefeatureprovider.h \
     include/ts/providers/providerregistry.h \
     include/ts/providers/sqlitetileimageryprovider.h \
@@ -71,6 +74,7 @@ SOURCES += \
     src/base/buildinfo.cpp \
     src/camera/camera.cpp \
     src/camera/cameracontroller.cpp \
+    src/camera/scalebar.cpp \
     src/deps/dependencies.cpp \
     src/deps/gdaldataset.cpp \
     src/deps/geoscontext.cpp \
@@ -95,6 +99,8 @@ SOURCES += \
     src/packs/basepack.cpp \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
+    src/projection/cylindricalprojection.cpp \
+    src/projection/projection.cpp \
     src/providers/geopackagefeatureprovider.cpp \
     src/providers/providerregistry.cpp \
     src/providers/sqlitestatementpool.cpp \

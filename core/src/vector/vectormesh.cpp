@@ -31,6 +31,13 @@ struct Rect {
   double widthDeg() const { return east - west; }
 };
 
+/** The origin of a mesh's vertices. */
+struct Centre {
+  Vec3 ecef;
+  double lonDeg = 0.0;
+  double latDeg = 0.0;
+};
+
 /** Destroys a GEOS geometry with its context. */
 struct GeomDeleter {
   GEOSContextHandle_t context = nullptr;
@@ -98,14 +105,15 @@ struct VectorMesher::Private {
   }
 
   /** The vertex of a point, relative to @p centre. */
-  static VectorVertex vertex(double lonDeg, double latDeg, const Vec3& centre)
+  static VectorVertex vertex(double lonDeg, double latDeg, const Centre& centre)
   {
     const Vec3 ecef = geodeticToEcef(Geodetic{latDeg, lonDeg, 0.0});
     VectorVertex v;
-    v.offsetM = {static_cast<float>(ecef.x - centre.x),
-                 static_cast<float>(ecef.y - centre.y),
-                 static_cast<float>(ecef.z - centre.z)};
-    v.lonLatDeg = {static_cast<float>(lonDeg), static_cast<float>(latDeg)};
+    v.offsetM = {static_cast<float>(ecef.x - centre.ecef.x),
+                 static_cast<float>(ecef.y - centre.ecef.y),
+                 static_cast<float>(ecef.z - centre.ecef.z)};
+    v.lonLatOffsetDeg = {static_cast<float>(lonDeg - centre.lonDeg),
+                         static_cast<float>(latDeg - centre.latDeg)};
     return v;
   }
 
@@ -144,7 +152,7 @@ struct VectorMesher::Private {
   }
 
   /** Appends the triangles of @p piece (a polygonal geometry). */
-  void triangulate(const GEOSGeometry* piece, const Vec3& centre,
+  void triangulate(const GEOSGeometry* piece, const Centre& centre,
                    std::vector<VectorVertex>* triangles) const
   {
     GEOSContextHandle_t c = context();
@@ -178,7 +186,7 @@ struct VectorMesher::Private {
    * wider than @p cellDeg, then triangulates the pieces.
    */
   bool cut(const GEOSGeometry* geometry, const Rect& rect, double cellDeg,
-           const Vec3& centre, const std::atomic<bool>& cancelled,
+           const Centre& centre, const std::atomic<bool>& cancelled,
            std::vector<VectorVertex>* triangles) const
   {
     if (cancelled.load()) {
@@ -216,7 +224,7 @@ struct VectorMesher::Private {
 
   /** Appends @p a → @p b as segments no longer than @p maximumDeg. */
   static void addSegments(GeoPoint a, GeoPoint b, double maximumDeg,
-                          const Vec3& centre,
+                          const Centre& centre,
                           std::vector<VectorSegment>* segments)
   {
     const double span =
@@ -260,6 +268,38 @@ namespace
 {
 
 /**
+ * Returns @p ring with every edge split into pieces no longer than
+ * @p maximumDeg (in longitude or latitude), the way addSegments() splits
+ * outlines. An edge is a straight line in longitude and latitude; on the
+ * ellipsoid and on the flat maps that is a curve, which the fill's
+ * straight triangle edges would otherwise cut short where the outline
+ * follows it.
+ */
+std::vector<GeoPoint> densified(const std::vector<GeoPoint>& ring,
+                                double maximumDeg)
+{
+  std::vector<GeoPoint> result;
+  result.reserve(ring.size());
+  for (std::size_t i = 0; i < ring.size(); ++i) {
+    if (i > 0) {
+      const GeoPoint a = ring[i - 1];
+      const GeoPoint b = ring[i];
+      const double span = std::max(std::abs(b.lonDeg - a.lonDeg),
+                                   std::abs(b.latDeg - a.latDeg));
+      const int pieces =
+          std::max(1, static_cast<int>(std::ceil(span / maximumDeg)));
+      for (int k = 1; k < pieces; ++k) {
+        const double t = static_cast<double>(k) / pieces;
+        result.push_back(GeoPoint{a.latDeg + t * (b.latDeg - a.latDeg),
+                                  a.lonDeg + t * (b.lonDeg - a.lonDeg)});
+      }
+    }
+    result.push_back(ring[i]);
+  }
+  return result;
+}
+
+/**
  * The parts of @p feature worth drawing: rings too small to see are left
  * out, and a polygon whose outer ring is, entirely.
  */
@@ -289,6 +329,9 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
   mesh.key = tile.key;
   mesh.centreEcef = tile.key.centreEcef();
   const GeoRect bounds = tile.key.bounds();
+  mesh.centreLonDeg = bounds.centreLonDeg();
+  mesh.centreLatDeg = bounds.centreLatDeg();
+  const Centre centre{mesh.centreEcef, mesh.centreLonDeg, mesh.centreLatDeg};
   const Rect rect{bounds.westDeg, bounds.southDeg, bounds.eastDeg,
                   bounds.northDeg};
   const double cellDeg = cellSizeDeg(tile.key.level);
@@ -307,9 +350,17 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
     const std::vector<const std::vector<GeoPoint>*> parts =
         visibleParts(feature, minimumDeg, rect);
     if (rings && !parts.empty()) {
-      const GeomPtr polygon = d->polygon(parts);
+      // The fill's boundary gets the outline's vertices.
+      std::vector<std::vector<GeoPoint>> dense;
+      dense.reserve(parts.size());
+      std::vector<const std::vector<GeoPoint>*> denseParts;
+      for (const std::vector<GeoPoint>* part : parts) {
+        dense.push_back(densified(*part, segmentDeg));
+        denseParts.push_back(&dense.back());
+      }
+      const GeomPtr polygon = d->polygon(denseParts);
       if (polygon && GEOSisEmpty_r(d->context(), polygon.get()) == 0 &&
-          !d->cut(polygon.get(), rect, cellDeg, mesh.centreEcef, cancelled,
+          !d->cut(polygon.get(), rect, cellDeg, centre, cancelled,
                   &mesh.triangles)) {
         return std::nullopt;
       }
@@ -320,8 +371,7 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
         const GeoPoint a = (*part)[i];
         const GeoPoint b = (*part)[i + 1];
         if (!rings || !onTileEdge(a, b, rect)) {
-          Private::addSegments(a, b, segmentDeg, mesh.centreEcef,
-                               &mesh.segments);
+          Private::addSegments(a, b, segmentDeg, centre, &mesh.segments);
         }
       }
     }

@@ -14,6 +14,7 @@
 #include "ts/geo/ellipsoid.h"
 #include "ts/geo/geodesic.h"
 #include "ts/geo/geodetic.h"
+#include "ts/geo/geoformat.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
 #include "ts/maths/ray.h"
@@ -527,6 +528,50 @@ private slots:
     QVERIFY(worstDistanceM < 1e-6);
     // 1e-12 degrees is about 0.1 µm on the ground.
     QVERIFY(worstPositionDeg < 1e-12);
+  }
+
+  void textForTheUser()
+  {
+    // Coordinates and distances as the status bar and scale bar show them.
+    const QLocale english(QLocale::English, QLocale::UnitedStates);
+    QCOMPARE(ts::formatLatitude(51.4769, english),
+             QStringLiteral("51.47690° N"));
+    QCOMPARE(ts::formatLatitude(-33.9, english), QStringLiteral("33.90000° S"));
+    QCOMPARE(ts::formatLatitude(-1e-9, english), QStringLiteral("0.00000° N"));
+    QCOMPARE(ts::formatLongitude(-0.0005, english),
+             QStringLiteral("0.00050° W"));
+    QCOMPARE(ts::formatLongitude(-180.0, english),
+             QStringLiteral("180.00000° E"));
+    QCOMPARE(ts::formatLongitude(370.0, english),
+             QStringLiteral("10.00000° E"));
+    QCOMPARE(ts::formatDistance(8.5, english), QStringLiteral("8.5 m"));
+    QCOMPARE(ts::formatDistance(850.0, english), QStringLiteral("850 m"));
+    QCOMPARE(ts::formatDistance(12345.0, english), QStringLiteral("12.3 km"));
+    QCOMPARE(ts::formatDistance(1.2345e7, english),
+             QStringLiteral("12,345 km"));
+    // Whole degrees, for the scale bar.
+    QCOMPARE(ts::formatWholeLatitude(51.4769, english),
+             QStringLiteral("51° N"));
+    QCOMPARE(ts::formatWholeLatitude(-33.9, english), QStringLiteral("34° S"));
+    QCOMPARE(ts::formatWholeLatitude(-0.4, english), QStringLiteral("0° N"));
+    QCOMPARE(ts::formatWholeLatitude(-0.6, english), QStringLiteral("1° S"));
+    // Round distances in the largest unit that keeps them whole.
+    QCOMPARE(ts::formatRoundDistance(2.0e6, english),
+             QStringLiteral("2,000 km"));
+    QCOMPARE(ts::formatRoundDistance(5000.0, english), QStringLiteral("5 km"));
+    QCOMPARE(ts::formatRoundDistance(500.0, english), QStringLiteral("500 m"));
+    QCOMPARE(ts::formatRoundDistance(1500.0, english),
+             QStringLiteral("1,500 m"));
+    QCOMPARE(ts::formatRoundDistance(1.0, english), QStringLiteral("1 m"));
+    QCOMPARE(ts::formatRoundDistance(0.2, english), QStringLiteral("20 cm"));
+    QCOMPARE(ts::formatRoundDistance(0.05, english), QStringLiteral("5 cm"));
+    QCOMPARE(ts::formatRoundDistance(0.0, english), QStringLiteral("0 cm"));
+    // Another locale's digits and separators.
+    const QLocale german(QLocale::German, QLocale::Germany);
+    QCOMPARE(ts::formatRoundDistance(2.0e6, german),
+             QStringLiteral("2.000 km"));
+    QCOMPARE(ts::formatLatitude(51.4769, german),
+             QStringLiteral("51,47690° N"));
   }
 
   void concurrentSharedGeodesics()

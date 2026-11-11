@@ -53,9 +53,15 @@ CameraPose cameraFromJson(const QJsonObject& json)
  * format change adds a step here and a fixture of the old version to
  * tests/data/projects, which the tests keep loading.
  */
-QJsonObject migrate(QJsonObject document, int /*fromVersion*/)
+QJsonObject migrate(QJsonObject document, int fromVersion)
 {
-  // Version 1 is the first; nothing to migrate yet.
+  if (fromVersion < 2) {
+    // Version 2 added the view: before it there was only the globe.
+    QJsonObject view;
+    view.insert(QStringLiteral("mode"), QStringLiteral("globe"));
+    view.insert(QStringLiteral("projection"), QStringLiteral("mercator"));
+    document.insert(QStringLiteral("view"), view);
+  }
   return document;
 }
 
@@ -67,6 +73,12 @@ QByteArray projectToJson(const Project& project)
   document.insert(QStringLiteral("format"), QLatin1String(projectFormatName));
   document.insert(QStringLiteral("version"), projectFormatVersion);
   document.insert(QStringLiteral("camera"), cameraToJson(project.camera));
+  QJsonObject view;
+  view.insert(QStringLiteral("mode"), project.mapView
+                                          ? QStringLiteral("map")
+                                          : QStringLiteral("globe"));
+  view.insert(QStringLiteral("projection"), project.projection);
+  document.insert(QStringLiteral("view"), view);
   document.insert(QStringLiteral("layers"), project.layers);
   return QJsonDocument(document).toJson(QJsonDocument::Indented);
 }
@@ -109,6 +121,11 @@ std::optional<Project> projectFromJson(const QByteArray& json,
   Project project;
   project.camera =
       cameraFromJson(object.value(QStringLiteral("camera")).toObject());
+  const QJsonObject view = object.value(QStringLiteral("view")).toObject();
+  project.mapView =
+      view.value(QStringLiteral("mode")).toString() == QLatin1String("map");
+  project.projection =
+      view.value(QStringLiteral("projection")).toString(Project().projection);
   project.layers = object.value(QStringLiteral("layers")).toArray();
   return project;
 }

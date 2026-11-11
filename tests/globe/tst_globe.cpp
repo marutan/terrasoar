@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
@@ -24,6 +25,7 @@
 #include "ts/layers/layerdefinition.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/packs/packmanifest.h"
+#include "ts/projection/projection.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/testproviders.h"
@@ -504,21 +506,326 @@ private slots:
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
+  void morphGolden_data()
+  {
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("morph");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<double>("headingDeg");
+    QTest::addColumn<double>("tiltDeg");
+    const QString mercator = QStringLiteral("mercator");
+    const QString miller = QStringLiteral("miller");
+    const QString web = QStringLiteral("web-mercator");
+    // The change from globe to map: t = 0, 0.5 and 1 with the same centre.
+    QTest::newRow("morph-0")
+        << mercator << 0.0 << 20.0 << 10.0 << 2.6e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half")
+        << mercator << 0.5 << 20.0 << 10.0 << 2.6e7 << 0.0 << 0.0;
+    QTest::newRow("morph-1")
+        << mercator << 1.0 << 20.0 << 10.0 << 2.6e7 << 0.0 << 0.0;
+    // Part of the way, the camera still turned and tilted.
+    QTest::newRow("morph-quarter-tilted")
+        << miller << 0.25 << 35.0 << 30.0 << 1.2e7 << 30.0 << 40.0;
+    // The other projections, the whole world.
+    QTest::newRow("map-miller")
+        << miller << 1.0 << 0.0 << 0.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-web-mercator")
+        << web << 1.0 << 0.0 << -60.0 << 5.0e7 << 0.0 << 0.0;
+    // Centred on the antimeridian: polygons that cross it, markers either
+    // side, no streaks across the map.
+    QTest::newRow("map-antimeridian")
+        << mercator << 1.0 << -15.0 << 180.0 << 8.0e6 << 0.0 << 0.0;
+    QTest::newRow("map-antimeridian-wide")
+        << miller << 1.0 << 10.0 << 179.0 << 5.0e7 << 0.0 << 0.0;
+    // The top edge of the Mercator map and Miller's pole.
+    QTest::newRow("map-mercator-north")
+        << mercator << 1.0 << 78.0 << 30.0 << 4.0e6 << 0.0 << 0.0;
+    QTest::newRow("map-miller-north")
+        << miller << 1.0 << 80.0 << 30.0 << 2.0e6 << 0.0 << 0.0;
+    // Close in: the island with its lake.
+    QTest::newRow("map-lake")
+        << mercator << 1.0 << 40.0 << 30.0 << 4.0e6 << 0.0 << 0.0;
+  }
+
+  void morphGolden()
+  {
+    // Every kind of layer on the flat map and part of the way to it:
+    // imagery, vector fills and outlines, the graticule layer, markers.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(QString, projection);
+    QFETCH(double, morph);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(double, headingDeg);
+    QFETCH(double, tiltDeg);
+    const QTemporaryDir dir;
+    const QString path = QDir(dir.path()).filePath(QStringLiteral("v.gpkg"));
+    QVERIFY(writeVectorFixture(path));
+    const std::shared_ptr<ts::GeoPackageFeatureProvider> features =
+        std::make_shared<ts::GeoPackageFeatureProvider>(path);
+    QVERIFY(features->isValid());
+
+    ts::VectorLayerDraw graticule;
+    graticule.kind = ts::VectorLayerDraw::Kind::Graticule;
+    graticule.style.outline = QColor(220, 30, 30);
+    graticule.style.outlineWidthPx = 1.5;
+    ts::VectorLayerDraw land;
+    land.provider = features;
+    land.style.fill = QColor(200, 185, 140, 200);
+    land.style.outline = QColor(255, 220, 40);
+    land.style.outlineWidthPx = 2.0;
+    std::vector<ts::GlobeMarker> markers;
+    for (const double lon : {170.0, 180.0, -170.0}) {
+      ts::GlobeMarker marker;
+      marker.positionEcef = ts::geodeticToEcef(ts::Geodetic{-15.0, lon, 0.0});
+      marker.rgba = {230, 40, 40, 255};
+      marker.radiusPx = 5.0;
+      markers.push_back(marker);
+    }
+
+    ts::Camera camera;
+    camera.setViewportSize(imageWidthPx, imageHeightPx);
+    camera.setMapProjection(ts::projectionById(projection));
+    camera.setPose(ts::CameraPose{latDeg, lonDeg, rangeM, headingDeg, tiltDeg});
+    camera.setMorph(morph);
+
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>());
+    m_renderer->setVectorLayers({land, graticule});
+    QImage image;
+    const bool settled = QTest::qWaitFor(
+        [&]() {
+          image = render(camera, markers);
+          return !m_renderer->isBusy();
+        },
+        60000);
+    image = render(camera, markers);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setMarkers({});
+    m_renderer->setVectorLayers({});
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(settled);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("%d tiles drawn, deepest level %d, %d draw calls", tiles.rendered,
+          tiles.deepestLevel, tiles.drawCalls);
+    QVERIFY(tiles.rendered > 0);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void centreStaysFixedThroughTheMorph()
+  {
+    // A marker at the centre of the view, and one a little way off, drawn
+    // at steps from globe to map: the first never leaves the middle of
+    // the image, and neither jumps from one step to the next.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const ts::CameraPose pose{35.0, 139.0, 4.0e6, 0.0, 0.0};
+    ts::GlobeMarker centre;
+    centre.positionEcef = ts::geodeticToEcef(ts::Geodetic{35.0, 139.0, 0.0});
+    centre.rgba = {255, 0, 0, 255};
+    centre.radiusPx = 4.0;
+    ts::GlobeMarker other = centre;
+    other.positionEcef = ts::geodeticToEcef(ts::Geodetic{43.0, 131.0, 0.0});
+    for (const char* id : {"mercator", "miller"}) {
+      ts::Camera camera = makeCamera(pose);
+      camera.setMapProjection(ts::projectionById(QLatin1String(id)));
+      std::optional<QPointF> previous;
+      for (int step = 0; step <= 10; ++step) {
+        camera.setMorph(0.1 * step);
+        const std::optional<QPointF> atCentre =
+            redCentroid(render(camera, {centre}));
+        if (!atCentre) {
+          QFAIL("centre marker not drawn");
+        }
+        QVERIFY2(std::abs(atCentre->x() - imageWidthPx / 2.0) < 0.6 &&
+                     std::abs(atCentre->y() - imageHeightPx / 2.0) < 0.6,
+                 qPrintable(QStringLiteral("%1, t = %2: (%3, %4)")
+                                .arg(QLatin1String(id))
+                                .arg(0.1 * step)
+                                .arg(atCentre->x())
+                                .arg(atCentre->y())));
+        const std::optional<QPointF> atOther =
+            redCentroid(render(camera, {other}));
+        if (!atOther) {
+          QFAIL("second marker not drawn");
+        }
+        // Where the camera says it is, at both ends of the change.
+        if (step == 0 || step == 10) {
+          const ts::ScreenPoint expected =
+              camera.projectGeodetic(43.0, 131.0)
+                  .value_or(ts::ScreenPoint{-1e9, -1e9, 0.0});
+          QVERIFY(std::abs(atOther->x() - expected.xPx) < 0.6 &&
+                  std::abs(atOther->y() - expected.yPx) < 0.6);
+        }
+        if (previous) {
+          QVERIFY(std::hypot(atOther->x() - previous->x(),
+                             atOther->y() - previous->y()) < 4.0);
+        }
+        previous = atOther;
+      }
+    }
+    m_gl->makeCurrent();
+    m_renderer->setMarkers({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+  }
+
+  void mapWrapsAroundTheWorld()
+  {
+    // Zoomed right out on the antimeridian the map fills the view from
+    // edge to edge: the tiles that straddle the wrap are drawn on both
+    // sides, and no column of pixels is left as background.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    ts::Camera camera;
+    camera.setViewportSize(imageWidthPx, imageHeightPx);
+    camera.setMapProjection(ts::projectionById(QStringLiteral("miller")));
+    camera.setMorph(1.0);
+    camera.setPose(ts::CameraPose{0.0, 170.0, 5.0e7, 0.0, 0.0});
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    const QImage image = renderSettled(camera);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(!image.isNull());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    // 8 × 4 tiles of level 2, and one column of 4 twice.
+    QCOMPARE(tiles.deepestLevel, 2);
+    QCOMPARE(tiles.rendered, 36);
+    const QColor background(image.pixel(2, 2));
+    const QColor sea(image.pixel(imageWidthPx / 2, imageHeightPx / 2));
+    QVERIFY(sea.blue() > background.blue() + 40);
+    for (int x = 0; x < imageWidthPx; ++x) {
+      const QColor pixel(image.pixel(x, imageHeightPx / 2));
+      QVERIFY2(std::abs(pixel.blue() - sea.blue()) <= 2,
+               qPrintable(QStringLiteral("column %1").arg(x)));
+    }
+    // The flat map is not shaded: the surface colour itself.
+    const ts::GlobeStyle defaults;
+    QVERIFY(std::abs(sea.red() - to8Bit(defaults.surfaceRgb[0])) <= 2);
+    QVERIFY(std::abs(sea.green() - to8Bit(defaults.surfaceRgb[1])) <= 2);
+    QVERIFY(std::abs(sea.blue() - to8Bit(defaults.surfaceRgb[2])) <= 2);
+  }
+
+  void morphHoldsFrameRate()
+  {
+    // The change from globe to map with every kind of layer on screen,
+    // frame by frame as the application draws it. The budget on software
+    // rendering is 10 frames per second (20 on the reference hardware, a
+    // GPU several times faster than this); the limit here leaves room for
+    // a loaded CI machine.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const QTemporaryDir dir;
+    const QString path = QDir(dir.path()).filePath(QStringLiteral("v.gpkg"));
+    QVERIFY(writeVectorFixture(path));
+    ts::VectorLayerDraw graticule;
+    graticule.kind = ts::VectorLayerDraw::Kind::Graticule;
+    ts::VectorLayerDraw land;
+    land.provider = std::make_shared<ts::GeoPackageFeatureProvider>(path);
+    land.style.fill = QColor(200, 185, 140, 200);
+    land.style.outline = QColor(255, 220, 40);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>());
+    m_renderer->setVectorLayers({land, graticule});
+    ts::Camera camera = makeCamera(ts::CameraPose{20.0, 10.0, 2.0e7, 0.0, 0.0});
+    // Everything loaded at both ends first, as after a moment's viewing.
+    for (const double morph : {1.0, 0.5, 0.0}) {
+      camera.setMorph(morph);
+      QVERIFY(!renderSettled(camera).isNull());
+    }
+    constexpr int frames = 30;
+    std::vector<double> timesS;
+    for (int frame = 0; frame <= frames; ++frame) {
+      const double u = static_cast<double>(frame) / frames;
+      camera.setMorph(u * u * (3.0 - 2.0 * u));
+      QElapsedTimer one;
+      one.start();
+      render(camera);
+      timesS.push_back(static_cast<double>(one.nsecsElapsed()) * 1e-9);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setVectorLayers({});
+    m_renderer->setImageryProvider(nullptr);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    std::sort(timesS.begin(), timesS.end());
+    double sumS = 0.0;
+    for (const double timeS : timesS) {
+      sumS += timeS;
+    }
+    const double meanS = sumS / static_cast<double>(timesS.size());
+    // The quarter of the frames least disturbed by whatever else the
+    // machine is doing: a busy CI runner must not fail this.
+    const double quartileS = timesS.at(timesS.size() / 4);
+    qInfo("morph: %.1f ms per frame (%.0f fps), fastest quarter within "
+          "%.1f ms, slowest %.1f ms",
+          meanS * 1000.0, 1.0 / meanS, quartileS * 1000.0,
+          timesS.back() * 1000.0);
+#if defined(TS_INSTRUMENTED_BUILD) || !defined(QT_NO_DEBUG)
+    // Sanitizer, coverage and debug builds are several times slower: the
+    // change is drawn (and checked for errors) but not timed.
+    Q_UNUSED(quartileS)
+#else
+    QVERIFY2(quartileS < 0.1, "the morph is below 10 frames per second");
+#endif
+  }
+
   void basePackGolden_data()
   {
     QTest::addColumn<double>("latDeg");
     QTest::addColumn<double>("lonDeg");
     QTest::addColumn<double>("rangeM");
     QTest::addColumn<double>("tiltDeg");
-    QTest::newRow("base-uk") << 54.5 << -3.0 << 2.0e6 << 0.0;
-    QTest::newRow("base-uk-close") << 51.5 << -0.5 << 1.5e5 << 30.0;
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("morph");
+    const QString none;
+    QTest::newRow("base-uk") << 54.5 << -3.0 << 2.0e6 << 0.0 << none << 0.0;
+    QTest::newRow("base-uk-close")
+        << 51.5 << -0.5 << 1.5e5 << 30.0 << none << 0.0;
     QTest::newRow("base-pacific-antimeridian")
-        << -17.5 << 179.5 << 1.5e6 << 0.0;
-    QTest::newRow("base-pacific-wide") << 0.0 << 180.0 << 1.2e7 << 0.0;
-    QTest::newRow("base-north-pole") << 90.0 << 0.0 << 7.0e6 << 0.0;
-    QTest::newRow("base-north-pole-close") << 82.0 << -40.0 << 1.5e6 << 30.0;
-    QTest::newRow("base-south-pole") << -90.0 << 0.0 << 9.0e6 << 0.0;
-    QTest::newRow("base-south-pole-close") << -77.5 << 166.0 << 6.0e5 << 30.0;
+        << -17.5 << 179.5 << 1.5e6 << 0.0 << none << 0.0;
+    QTest::newRow("base-pacific-wide")
+        << 0.0 << 180.0 << 1.2e7 << 0.0 << none << 0.0;
+    QTest::newRow("base-north-pole")
+        << 90.0 << 0.0 << 7.0e6 << 0.0 << none << 0.0;
+    QTest::newRow("base-north-pole-close")
+        << 82.0 << -40.0 << 1.5e6 << 30.0 << none << 0.0;
+    QTest::newRow("base-south-pole")
+        << -90.0 << 0.0 << 9.0e6 << 0.0 << none << 0.0;
+    QTest::newRow("base-south-pole-close")
+        << -77.5 << 166.0 << 6.0e5 << 30.0 << none << 0.0;
+    // The same data on the flat maps and half-way there.
+    const QString mercator = QStringLiteral("mercator");
+    const QString miller = QStringLiteral("miller");
+    QTest::newRow("base-map-mercator-world")
+        << 0.0 << 0.0 << 5.0e7 << 0.0 << mercator << 1.0;
+    QTest::newRow("base-map-miller-world")
+        << 0.0 << 0.0 << 5.0e7 << 0.0 << miller << 1.0;
+    QTest::newRow("base-map-uk")
+        << 54.5 << -3.0 << 2.0e6 << 0.0 << mercator << 1.0;
+    QTest::newRow("base-map-pacific-antimeridian")
+        << -17.5 << 179.5 << 1.5e6 << 0.0 << mercator << 1.0;
+    QTest::newRow("base-map-pacific-wide")
+        << 0.0 << 180.0 << 1.2e7 << 0.0 << miller << 1.0;
+    QTest::newRow("base-map-antarctica")
+        << -75.0 << 0.0 << 6.0e6 << 0.0 << miller << 1.0;
+    QTest::newRow("base-morph-half")
+        << 30.0 << 20.0 << 1.6e7 << 0.0 << mercator << 0.5;
   }
 
   void basePackGolden()
@@ -536,6 +843,8 @@ private slots:
     QFETCH(double, lonDeg);
     QFETCH(double, rangeM);
     QFETCH(double, tiltDeg);
+    QFETCH(QString, projection);
+    QFETCH(double, morph);
     QString error;
     const std::optional<ts::PackManifest> manifest =
         ts::PackManifest::read(directory, &error);
@@ -569,8 +878,13 @@ private slots:
     m_renderer->setStyle(style);
     m_renderer->setImageryLayers(imagery.layers, imagery.groupAlphas);
     m_renderer->setVectorLayers(vectors);
-    const QImage image = renderSettled(
-        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg}));
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg});
+    if (!projection.isEmpty()) {
+      camera.setMapProjection(ts::projectionById(projection));
+      camera.setMorph(morph);
+    }
+    const QImage image = renderSettled(camera);
     const ts::VectorStatistics drawn = m_renderer->vectorStatistics();
     qInfo("vectors: %d tiles, %lld triangles, %lld segments, %d draw calls",
           drawn.tilesDrawn, drawn.triangles, drawn.segments, drawn.drawCalls);
@@ -744,6 +1058,42 @@ private slots:
         },
         30000));
     QVERIFY(m_renderer->tileStatistics().rendered > 20);
+    QBENCHMARK
+    {
+      render(camera);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(nullptr);
+  }
+
+  void benchmarkMapFrame()
+  {
+    // The flat map with imagery, on whatever renderer is there.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    ts::Camera camera = makeCamera(ts::CameraPose{20.0, 10.0, 2.0e7, 0.0, 0.0});
+    camera.setMorph(1.0);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>());
+    QVERIFY(!renderSettled(camera).isNull());
+    QBENCHMARK
+    {
+      render(camera);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(nullptr);
+  }
+
+  void benchmarkMorphFrame()
+  {
+    // Half-way between globe and map.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    ts::Camera camera = makeCamera(ts::CameraPose{20.0, 10.0, 2.0e7, 0.0, 0.0});
+    camera.setMorph(0.5);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>());
+    QVERIFY(!renderSettled(camera).isNull());
     QBENCHMARK
     {
       render(camera);

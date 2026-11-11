@@ -5,10 +5,12 @@
 #include <cmath>
 
 #include "ts/camera/camera.h"
+#include "ts/geo/geodetic.h"
 #include "ts/geo/wgs84.h"
 #include "ts/globe/tilerenderer.h"
 #include "ts/maths/mat4.h"
 #include "ts/maths/splitdouble.h"
+#include "ts/projection/projection.h"
 
 #include "globeuniforms.h"
 
@@ -26,6 +28,8 @@ using globe_detail::globeBinding;
 using globe_detail::GlobeBlock;
 using globe_detail::globeBlockGlsl;
 using globe_detail::graticuleBinding;
+using globe_detail::graticuleBlockGlsl;
+using globe_detail::gridLinesGlsl;
 
 /** One marker instance in the vertex buffer. */
 struct MarkerInstance {
@@ -99,19 +103,6 @@ SurfaceHit traceSurface()
   return hit;
 }
 
-// Coverage of grid lines every spacingDeg at coordinate coordDeg, faded out
-// where the lines get closer than about minGapPx pixels.
-float gridLines(float coordDeg, float spacingDeg, float widthPx, float minGapPx)
-{
-  float cells = coordDeg / spacingDeg;
-  float distance = abs(cells - floor(cells + 0.5));
-  float cellsPerPx = max(fwidth(cells), 1e-9);
-  float halfWidth = 0.5 * widthPx * cellsPerPx;
-  float line = 1.0 - smoothstep(halfWidth - 0.5 * cellsPerPx,
-                                halfWidth + 0.5 * cellsPerPx, distance);
-  return line * (1.0 - smoothstep(0.5 / minGapPx, 1.0 / minGapPx, cellsPerPx));
-}
-
 // Longitude lines; longitude jumps by 360 at the antimeridian, so take
 // whichever of (-180, 180] and [0, 360) is smooth here.
 float lonLines(float lonDeg, float spacingDeg, float widthPx, float minGapPx)
@@ -158,10 +149,6 @@ void main()
 
 // The graticule alone, over whatever is drawn already (no depth test).
 const char* const graticuleFragmentGlsl = R"(
-layout(std140) uniform Graticule {
-  vec4 graticuleColor;  // premultiplied
-  vec4 graticuleParams; // line width (device px), opacity
-};
 out vec4 fragColor;
 void main()
 {
@@ -325,7 +312,7 @@ bool GlobeRenderer::initialise(QString* errorString)
   globe.vertexSource =
       QByteArray(frameBlockGlsl) + globeBlockGlsl + globeVertexGlsl;
   globe.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
-                         traceGlsl + globeFragmentGlsl;
+                         gridLinesGlsl + traceGlsl + globeFragmentGlsl;
   globe.uniformBlocks = blocks;
   r->globeShader = m_device.createShaderProgram(globe, errorString);
 
@@ -333,7 +320,8 @@ bool GlobeRenderer::initialise(QString* errorString)
   graticule.label = QStringLiteral("graticule");
   graticule.vertexSource = globe.vertexSource;
   graticule.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
-                             traceGlsl + graticuleFragmentGlsl;
+                             graticuleBlockGlsl + gridLinesGlsl + traceGlsl +
+                             graticuleFragmentGlsl;
   graticule.uniformBlocks = {
       {QByteArrayLiteral("Frame"), frameBinding},
       {QByteArrayLiteral("Globe"), globeBinding},
@@ -483,16 +471,30 @@ void GlobeRenderer::setMarkers(const std::vector<GlobeMarker>& markers)
   m_markersDirty = true;
 }
 
-void GlobeRenderer::uploadMarkers()
+void GlobeRenderer::uploadMarkers(const Camera& camera)
 {
-  if (!m_markersDirty) {
+  // On the map and during the morph markers move with the camera, so
+  // they are placed again every frame (they are few).
+  const bool morphed = camera.morph() > 0.0;
+  if (!m_markersDirty && !morphed && !m_markersMorphed) {
     return;
   }
+  m_markersMorphed = morphed;
   Resources& r = *m_resources;
   std::vector<MarkerInstance> instances;
   instances.reserve(m_markers.size());
+  const MapFrame frame = morphed ? camera.mapFrame() : MapFrame();
   for (const GlobeMarker& marker : m_markers) {
-    const SplitVec3 split = splitVec3(marker.positionEcef);
+    Vec3 position = marker.positionEcef;
+    if (morphed) {
+      const Geodetic geodetic = ecefToGeodetic(marker.positionEcef);
+      const Vec3 onGlobe = marker.positionEcef - camera.eyeEcef();
+      const Vec3 onMap = camera.mapPlanePoint(
+          frame.offsetOf(geodetic.latDeg, geodetic.lonDeg));
+      position = camera.eyeEcef() + onGlobe * (1.0 - camera.morph()) +
+                 onMap * camera.morph();
+    }
+    const SplitVec3 split = splitVec3(position);
     instances.push_back(MarkerInstance{{split.highX, split.highY, split.highZ,
                                         split.lowX, split.lowY, split.lowZ,
                                         static_cast<float>(marker.radiusPx)},
@@ -558,6 +560,14 @@ void GlobeRenderer::drawGraticule(std::size_t index)
   if (!r.graticuleUniforms) {
     return;
   }
+  if (m_morph > 0.0) {
+    // Not the globe: on the tiles, wherever they are now.
+    m_device.setUniformBuffer(graticuleBinding, *r.graticuleUniforms,
+                              index * r.graticuleStride,
+                              sizeof(GraticuleBlock));
+    m_tiles->drawGraticule();
+    return;
+  }
   m_device.setPipeline(*r.graticulePipeline);
   m_device.setUniformBuffer(graticuleBinding, *r.graticuleUniforms,
                             index * r.graticuleStride, sizeof(GraticuleBlock));
@@ -571,8 +581,9 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
     return;
   }
   Resources& r = *m_resources;
+  m_morph = camera.morph();
 
-  uploadMarkers();
+  uploadMarkers(camera);
 
   const Vec3& eye = camera.eyeEcef();
   const SplitVec3 eyeSplit = splitVec3(eye);
@@ -589,6 +600,17 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   frame.depthParams = {static_cast<float>(1.0 / std::log2(camera.farM() + 1.0)),
                        static_cast<float>(devicePixelRatio),
                        static_cast<float>(camera.tanHalfFovY()), 0.0F};
+  if (m_morph > 0.0) {
+    const MapFrame map = camera.mapFrame();
+    const LocalFrame local =
+        localFrame(camera.pose().targetLatDeg, camera.pose().targetLonDeg);
+    frame.morph = {
+        static_cast<float>(m_morph), static_cast<float>(map.planeScale),
+        static_cast<float>(std::max(projectionIndex(map.projection), 0)), 0.0F};
+    frame.planeEast = float4(local.eastEcef, 0.0);
+    frame.planeNorth = float4(local.northEcef, 0.0);
+    frame.planeOrigin = float4(camera.targetEcef() - eye, 0.0);
+  }
 
   const double a = wgs84::semiMajorAxisM;
   const double b = wgs84::semiMinorAxisM;
@@ -637,8 +659,16 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   m_device.setUniformBuffer(globeBinding, *r.uniforms, r.globeOffset,
                             sizeof(globe));
 
-  m_device.setPipeline(*r.globePipeline);
-  m_device.draw(3, 0, 1);
+  // On the map and during the morph the surface is the tiles themselves,
+  // drawn with the first imagery layers unless the style's graticule goes
+  // in between.
+  const bool baseFirst = m_morph > 0.0 && m_style.graticule;
+  if (baseFirst) {
+    m_tiles->drawBase();
+  } else if (m_morph <= 0.0) {
+    m_device.setPipeline(*r.globePipeline);
+    m_device.draw(3, 0, 1);
+  }
   if (m_style.graticule) {
     drawGraticule(0);
   }
@@ -648,7 +678,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
       m_device.setUniformBuffer(globeBinding, *r.uniforms, r.globeOffset,
                                 sizeof(globe));
     };
-    m_tiles->draw(clearPass, rebind);
+    m_tiles->draw(clearPass, rebind, !baseFirst);
   }
   // Vector layers over all imagery, in tree order.
   for (std::size_t i = 0; i < m_vectorLayers.size(); ++i) {

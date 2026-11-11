@@ -45,6 +45,14 @@ enum CameraMotion : unsigned int {
   TiltDown = 1U << 9U,
 };
 
+/** What the view shows. */
+enum class ViewMode {
+  /** The 3D globe. */
+  Globe,
+  /** The flat map in the camera's projection. */
+  Map,
+};
+
 /**
  * Camera navigation: drag to pan, drag to rotate, wheel to zoom, keys to
  * move, inertia after a pan, and animated fly-to.
@@ -64,6 +72,16 @@ enum CameraMotion : unsigned int {
  * - A step longer than maximumStepS (a stall) is shortened to it, so the
  *   camera never jumps.
  *
+ * The view is the globe or the flat map (setViewMode()); changing between
+ * them is an animation of the camera's morph factor that keeps the centre
+ * of the view in place. On the map the view looks straight down with
+ * north up: dragging and keys slide the map (it wraps around in
+ * longitude and stops at the projection's latitude limits), zooming works
+ * as on the globe, and turning and tilting do nothing. Map motion is
+ * computed in map coordinates, so it too is the same at any frame rate.
+ * While the view changes, input other than setViewMode() is ignored. See
+ * docs/design/morph.md.
+ *
  * @reentrant
  */
 class CameraController
@@ -71,6 +89,8 @@ class CameraController
 public:
   /** Longest time step advance() applies, seconds. */
   static constexpr double maximumStepS = 0.25;
+  /** Usual duration of the change between globe and map, seconds. */
+  static constexpr double defaultMorphDurationS = 1.0;
 
   /** Creates a controller with a default camera. */
   CameraController();
@@ -78,19 +98,44 @@ public:
   /** Returns the camera. */
   const Camera& camera() const { return m_camera; }
 
-  /** Sets the camera pose directly, stopping any animation. */
+  /**
+   * Sets the camera pose directly, stopping any animation (a change of
+   * view mode in progress finishes at once).
+   */
   void setPose(const CameraPose& pose);
+
+  /**
+   * Changes to the globe or the flat map over @p durationS seconds
+   * (ease-in-out; ≤ 0 changes at once). The centre of the view stays
+   * where it is unless the map can't be centred there; going to the map,
+   * heading and tilt go to zero. Called during a change, it turns round
+   * from where the animation is, taking proportionally less time.
+   */
+  void setViewMode(ViewMode mode, double durationS);
+
+  /** Returns the view mode (the one being changed to, during a change). */
+  ViewMode viewMode() const { return m_viewMode; }
+
+  /** Returns true while the view changes between globe and map. */
+  bool isMorphing() const { return m_morph.has_value(); }
+
+  /** Sets the projection of the flat map; null is ignored. */
+  void setMapProjection(const Projection* projection);
 
   /** Sets the viewport size in logical pixels. */
   void setViewportSize(double widthPx, double heightPx);
 
   /**
    * Starts a pan drag at @p positionPx at time @p timeS. Returns false
-   * (and starts nothing) if the cursor is not over the globe.
+   * (and starts nothing) if the cursor is not over the globe or map, or
+   * the view mode is changing.
    */
   bool beginPan(QPointF positionPx, double timeS);
 
-  /** Starts a rotate drag (heading and tilt about the target). */
+  /**
+   * Starts a rotate drag (heading and tilt about the target). Does
+   * nothing on the flat map.
+   */
   void beginRotate(QPointF positionPx);
 
   /** Moves the current drag to @p positionPx at time @p timeS. */
@@ -133,8 +178,9 @@ public:
   void stop();
 
   /**
-   * Returns true while the camera moves without input: inertia, a flight
-   * or held keys. While false, nothing needs redrawing.
+   * Returns true while the camera moves without input: inertia, a flight,
+   * held keys or a change of view mode. While false, nothing needs
+   * redrawing.
    */
   bool isAnimating() const;
 
@@ -160,6 +206,19 @@ private:
     double azimuthDeg = 0.0;
     double speedMPerS = 0.0;
     double elapsedS = 0.0;
+    /** On the flat map: the velocity in map metres per second. */
+    bool onMap = false;
+    double mapVelocityXMPerS = 0.0;
+    double mapVelocityYMPerS = 0.0;
+  };
+
+  struct Morph {
+    double fromT = 0.0;
+    double toT = 1.0;
+    CameraPose from;
+    CameraPose to;
+    double durationS = 1.0;
+    double elapsedS = 0.0;
   };
 
   struct Flight {
@@ -173,7 +232,11 @@ private:
   };
 
   void applyPose(const CameraPose& pose);
-  bool placeUnderCursor(const Vec3& pointEcef, QPointF positionPx);
+  bool isOnMap() const;
+  void moveMapCentre(double xM, double yM);
+  void finishMorph();
+  void advanceMorph(double elapsedS);
+  bool placeUnderCursor(const Geodetic& grabbed, QPointF positionPx);
   void advanceInertia(double elapsedS);
   void advanceFlight(double elapsedS);
   void advanceMotion(double elapsedS);
@@ -181,11 +244,13 @@ private:
 
   Camera m_camera;
   Drag m_drag = Drag::None;
-  Vec3 m_grabEcef;
+  Geodetic m_grab;
   QPointF m_lastPositionPx;
   std::deque<DragSample> m_samples;
   std::optional<Inertia> m_inertia;
   std::optional<Flight> m_flight;
+  std::optional<Morph> m_morph;
+  ViewMode m_viewMode = ViewMode::Globe;
   unsigned int m_motion = NoMotion;
 };
 

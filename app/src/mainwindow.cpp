@@ -5,6 +5,7 @@
 #include <optional>
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QCoreApplication>
 #include <QEvent>
@@ -29,6 +30,7 @@
 #include "ts/layers/projectfile.h"
 #include "ts/packs/basepack.h"
 #include "ts/packs/packmanifest.h"
+#include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
 
 namespace ts
@@ -202,6 +204,13 @@ QJsonObject MainWindow::stateReport() const
       QStringLiteral("attributions"),
       QJsonArray::fromStringList(attributionsForStack(stack, *m_registry)));
   if (m_globeView) {
+    state.insert(QStringLiteral("view"),
+                 m_globeView->viewMode() == ViewMode::Map
+                     ? QStringLiteral("map")
+                     : QStringLiteral("globe"));
+    state.insert(QStringLiteral("projection"),
+                 m_globeView->mapProjection()->id());
+    state.insert(QStringLiteral("scale_bar"), m_globeView->scaleBarText());
     state.insert(QStringLiteral("imagery_layers"),
                  m_globeView->imageryLayerCount());
     state.insert(QStringLiteral("vector_layers"),
@@ -252,6 +261,51 @@ void MainWindow::createActions()
     m_resetViewAction->setEnabled(false);
   }
 
+  // 3D globe or 2D map, and the map's projection.
+  m_mapViewAction = new QAction(this);
+  m_mapViewAction->setObjectName(QStringLiteral("mapViewAction"));
+  m_mapViewAction->setCheckable(true);
+  // As integers: Qt 5 has no operator for a modifier and a key, and
+  // Clang rejects the plain enums' bitwise or.
+  m_mapViewAction->setShortcut(
+      QKeySequence(static_cast<int>(Qt::CTRL) | static_cast<int>(Qt::Key_M)));
+  m_scaleBarAction = new QAction(this);
+  m_scaleBarAction->setObjectName(QStringLiteral("scaleBarAction"));
+  m_scaleBarAction->setCheckable(true);
+  m_scaleBarAction->setChecked(true);
+  m_projectionGroup = new QActionGroup(this);
+  for (const Projection* projection : projections()) {
+    QAction* action = new QAction(this);
+    action->setObjectName(QStringLiteral("projectionAction_") +
+                          projection->id());
+    action->setCheckable(true);
+    action->setData(projection->id());
+    m_projectionGroup->addAction(action);
+  }
+  if (m_globeView) {
+    connect(m_mapViewAction, &QAction::toggled, m_globeView,
+            [this](bool checked) {
+              m_globeView->setViewMode(
+                  checked ? ViewMode::Map : ViewMode::Globe, true);
+            });
+    connect(m_scaleBarAction, &QAction::toggled, m_globeView,
+            &GlobeView::setScaleBarVisible);
+    connect(m_projectionGroup, &QActionGroup::triggered, m_globeView,
+            [this](const QAction* action) {
+              m_globeView->setMapProjection(
+                  projectionById(action->data().toString()));
+            });
+    connect(m_globeView, &GlobeView::viewModeChanged, this,
+            &MainWindow::syncViewActions);
+    connect(m_globeView, &GlobeView::mapProjectionChanged, this,
+            &MainWindow::syncViewActions);
+  } else {
+    m_mapViewAction->setEnabled(false);
+    m_scaleBarAction->setEnabled(false);
+    m_projectionGroup->setEnabled(false);
+  }
+  syncViewActions();
+
   m_openAction = new QAction(this);
   m_openAction->setObjectName(QStringLiteral("openProjectAction"));
   m_openAction->setShortcut(QKeySequence::Open);
@@ -292,6 +346,13 @@ void MainWindow::createMenus()
   m_viewMenu = menuBar()->addMenu(QString());
   m_viewMenu->setObjectName(QStringLiteral("viewMenu"));
   m_viewMenu->addAction(m_resetViewAction);
+  m_viewMenu->addSeparator();
+  m_viewMenu->addAction(m_mapViewAction);
+  m_projectionMenu = m_viewMenu->addMenu(QString());
+  m_projectionMenu->setObjectName(QStringLiteral("projectionMenu"));
+  m_projectionMenu->addActions(m_projectionGroup->actions());
+  m_viewMenu->addAction(m_scaleBarAction);
+  m_viewMenu->addSeparator();
   QAction* layers = m_layerDock->toggleViewAction();
   layers->setObjectName(QStringLiteral("layersDockAction"));
   m_viewMenu->addAction(layers);
@@ -314,6 +375,21 @@ void MainWindow::retranslateUi()
   m_quitAction->setStatusTip(tr("Close the program"));
   m_resetViewAction->setText(tr("&Reset View"));
   m_resetViewAction->setStatusTip(tr("Fly back to the start view"));
+  m_mapViewAction->setText(tr("2D &Map"));
+  m_mapViewAction->setStatusTip(
+      tr("Change between the 3D globe and a flat map"));
+  m_projectionMenu->setTitle(tr("Map &Projection"));
+  for (QAction* action : m_projectionGroup->actions()) {
+    if (const Projection* projection =
+            projectionById(action->data().toString())) {
+      action->setText(projection->displayName());
+      action->setStatusTip(tr("Draw the flat map in the %1 projection")
+                               .arg(projection->displayName()));
+    }
+  }
+  m_scaleBarAction->setText(tr("&Scale Bar"));
+  m_scaleBarAction->setStatusTip(
+      tr("Show a ground distance at the centre of the view"));
   m_openAction->setText(tr("&Open Project…"));
   m_openAction->setStatusTip(
       tr("Replace the layers and view with a saved project"));
@@ -353,16 +429,39 @@ void MainWindow::retranslateUi()
   showEyeHeight(m_eyeHeightM);
 }
 
+void MainWindow::syncViewActions()
+{
+  // The actions follow the view (a project just opened, for instance).
+  const bool onMap =
+      m_globeView != nullptr && m_globeView->viewMode() == ViewMode::Map;
+  const QString projection = m_globeView != nullptr
+                                 ? m_globeView->mapProjection()->id()
+                                 : projections().front()->id();
+  if (m_mapViewAction->isChecked() != onMap) {
+    m_mapViewAction->setChecked(onMap);
+  }
+  for (QAction* action : m_projectionGroup->actions()) {
+    if (action->data().toString() == projection && !action->isChecked()) {
+      action->setChecked(true);
+    }
+  }
+}
+
 void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
 {
   m_pointerOnGlobe = onGlobe;
   m_pointerLatDeg = latDeg;
   m_pointerLonDeg = lonDeg;
   const QLocale locale;
-  m_pointerLabel->setText(
-      onGlobe ? tr("%1  %2").arg(formatLatitude(latDeg, locale),
-                                 formatLongitude(lonDeg, locale))
-              : tr("Pointer not on the globe"));
+  if (onGlobe) {
+    m_pointerLabel->setText(tr("%1  %2").arg(formatLatitude(latDeg, locale),
+                                             formatLongitude(lonDeg, locale)));
+  } else if (m_globeView != nullptr &&
+             m_globeView->viewMode() == ViewMode::Map) {
+    m_pointerLabel->setText(tr("Pointer not on the map"));
+  } else {
+    m_pointerLabel->setText(tr("Pointer not on the globe"));
+  }
 }
 
 void MainWindow::refreshLayers()
@@ -388,6 +487,10 @@ bool MainWindow::openProject(const QString& path, QString* errorString)
     return false;
   }
   if (m_globeView) {
+    // An unknown projection (a newer program's) keeps the current one.
+    m_globeView->setMapProjection(projectionById(project->projection));
+    m_globeView->setViewMode(project->mapView ? ViewMode::Map : ViewMode::Globe,
+                             false);
     m_globeView->setPose(project->camera);
   }
   m_projectPath = path;
@@ -399,6 +502,10 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
   Project project;
   project.camera = m_globeView ? m_globeView->controller().camera().pose()
                                : GlobeView::homePose();
+  if (m_globeView) {
+    project.mapView = m_globeView->viewMode() == ViewMode::Map;
+    project.projection = m_globeView->mapProjection()->id();
+  }
   project.layers = m_layers->toJson();
   if (!ts::saveProject(path, project, errorString)) {
     return false;

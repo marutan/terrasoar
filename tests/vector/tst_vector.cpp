@@ -51,14 +51,22 @@ ts::Feature lineString(const std::vector<double>& lonLat)
   return feature;
 }
 
+/** Longitude and latitude of @p vertex of @p mesh, degrees. */
+std::array<float, 2> lonLatDeg(const ts::VectorTileMesh& mesh,
+                               const ts::VectorVertex& vertex)
+{
+  return {static_cast<float>(mesh.lonDeg(vertex)),
+          static_cast<float>(mesh.latDeg(vertex))};
+}
+
 /** Area of the triangles in longitude/latitude, square degrees. */
 double planarArea(const std::vector<ts::VectorVertex>& triangles)
 {
   double area = 0.0;
   for (std::size_t i = 0; i + 2 < triangles.size(); i += 3) {
-    const std::array<float, 2>& a = triangles[i].lonLatDeg;
-    const std::array<float, 2>& b = triangles[i + 1].lonLatDeg;
-    const std::array<float, 2>& c = triangles[i + 2].lonLatDeg;
+    const std::array<float, 2>& a = triangles[i].lonLatOffsetDeg;
+    const std::array<float, 2>& b = triangles[i + 1].lonLatOffsetDeg;
+    const std::array<float, 2>& c = triangles[i + 2].lonLatOffsetDeg;
     area += 0.5 * std::abs(static_cast<double>((b[0] - a[0]) * (c[1] - a[1]) -
                                                (c[0] - a[0]) * (b[1] - a[1])));
   }
@@ -144,7 +152,7 @@ private slots:
       double lonSum = 0.0;
       double latSum = 0.0;
       for (std::size_t k = 0; k < 3; ++k) {
-        const std::array<float, 2>& p = mesh->triangles[i + k].lonLatDeg;
+        const std::array<float, 2> p = lonLatDeg(*mesh, mesh->triangles[i + k]);
         west = std::min(west, static_cast<double>(p[0]));
         east = std::max(east, static_cast<double>(p[0]));
         south = std::min(south, static_cast<double>(p[1]));
@@ -161,14 +169,61 @@ private slots:
     }
     for (const ts::VectorVertex& v : mesh->triangles) {
       const ts::Vec3 expected = ts::geodeticToEcef(
-          ts::Geodetic{static_cast<double>(v.lonLatDeg[1]),
-                       static_cast<double>(v.lonLatDeg[0]), 0.0});
+          ts::Geodetic{mesh->latDeg(v), mesh->lonDeg(v), 0.0});
       const ts::Vec3 actual{
           mesh->centreEcef.x + static_cast<double>(v.offsetM[0]),
           mesh->centreEcef.y + static_cast<double>(v.offsetM[1]),
           mesh->centreEcef.z + static_cast<double>(v.offsetM[2])};
       QVERIFY(ts::length(actual - expected) < 2.0);
     }
+  }
+
+  void fillFollowsLongEdges()
+  {
+    // A long slanting edge is a straight line in longitude and latitude,
+    // which is a curve on the globe and on a Mercator map. The fill has
+    // vertices along it as close together as the outline's, so the two
+    // agree in every view.
+    ts::VectorMesher mesher;
+    ts::FeatureTile tile;
+    tile.key = ts::TileKey{0, 1, 0};
+    tile.features.push_back(polygon({{0, 60, 40, 80, 0, 80}}));
+    const std::optional<ts::VectorTileMesh> mesh =
+        mesher.build(tile, std::atomic<bool>(false));
+    if (!mesh) {
+      QFAIL("no mesh");
+    }
+    const double longest = mesher.cellSizeDeg(0) * 0.25 + 1e-6;
+    std::vector<double> alongEdge;
+    for (const ts::VectorVertex& v : mesh->triangles) {
+      const double lon = mesh->lonDeg(v);
+      if (std::abs(mesh->latDeg(v) - (60.0 + 0.5 * lon)) < 1e-4) {
+        alongEdge.push_back(lon);
+      }
+    }
+    std::sort(alongEdge.begin(), alongEdge.end());
+    QVERIFY(alongEdge.size() >= 30);
+    QVERIFY(std::abs(alongEdge.front()) < 1e-4);
+    QVERIFY(std::abs(alongEdge.back() - 40.0) < 1e-4);
+    for (std::size_t i = 1; i < alongEdge.size(); ++i) {
+      QVERIFY(alongEdge[i] - alongEdge[i - 1] <= longest);
+    }
+    // The outline has the same points.
+    int outlineOnEdge = 0;
+    for (const ts::VectorSegment& segment : mesh->segments) {
+      const double lon = mesh->lonDeg(segment.a);
+      if (std::abs(mesh->latDeg(segment.a) - (60.0 + 0.5 * lon)) < 1e-4 &&
+          std::abs(mesh->latDeg(segment.b) -
+                   (60.0 + 0.5 * mesh->lonDeg(segment.b))) < 1e-4) {
+        ++outlineOnEdge;
+        QVERIFY(
+            std::any_of(alongEdge.begin(), alongEdge.end(),
+                        [lon](double x) { return std::abs(x - lon) < 1e-4; }));
+      }
+    }
+    QCOMPARE(outlineOnEdge, 29);
+    // The area is unchanged: 40° × 20° / 2.
+    QVERIFY(std::abs(planarArea(mesh->triangles) - 400.0) < 1e-2);
   }
 
   void outlinesLeaveTileEdgesOut()
@@ -188,8 +243,8 @@ private slots:
     QVERIFY(!mesh->segments.empty());
     const double longest = mesher.cellSizeDeg(0) * 0.25 + 1e-6;
     for (const ts::VectorSegment& segment : mesh->segments) {
-      const std::array<float, 2>& a = segment.a.lonLatDeg;
-      const std::array<float, 2>& b = segment.b.lonLatDeg;
+      const std::array<float, 2> a = lonLatDeg(*mesh, segment.a);
+      const std::array<float, 2> b = lonLatDeg(*mesh, segment.b);
       QVERIFY(a[0] != 180.0F || b[0] != 180.0F);
       QVERIFY(a[0] != 0.0F || b[0] != 0.0F);
       QVERIFY(a[1] != 90.0F || b[1] != 90.0F);
@@ -220,7 +275,7 @@ private slots:
     int fromLine = 0;
     bool tinyInside = false;
     for (const ts::VectorSegment& segment : mesh->segments) {
-      const std::array<float, 2>& a = segment.a.lonLatDeg;
+      const std::array<float, 2> a = lonLatDeg(*mesh, segment.a);
       fromLine += std::abs(a[0] - a[1]) < 1e-4F ? 1 : 0;
       tinyInside = tinyInside || (a[0] >= 39.99F && a[0] <= 40.02F &&
                                   a[1] >= 24.99F && a[1] <= 25.02F);

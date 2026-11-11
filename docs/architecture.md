@@ -52,19 +52,20 @@ Subsections so far:
 | Subsection | Contents |
 | --- | --- |
 | `base` | Build and version information, program name |
-| `camera` | Camera pose, view and projection, picking rays; navigation controller (pan, rotate, zoom, keys, inertia, fly-to) driven by elapsed time (`docs/design/camera-and-precision.md`) |
+| `camera` | Camera pose, view and projection, picking rays; the morph factor between globe and flat map and how the map lies in front of the camera; navigation controller (pan, rotate, zoom, keys, inertia, fly-to, the change between globe and map) driven by elapsed time; the scale bar (`docs/design/camera-and-precision.md`, `docs/design/morph.md`) |
 | `deps` | Owning handles for GDAL datasets, PROJ contexts, GEOS contexts and SQLite connections; library versions |
 | `geo` | WGS 84 constants, geodetic ↔ ECEF, normals and local frames, ray–ellipsoid picking, geodesics (`docs/design/coordinates.md`) |
 | `gl` | OpenGL capability probe, software-renderer detection |
-| `globe` | The globe renderer: ray-cast WGS 84 ellipsoid, the graticule, imagery tiles, vector layers (fills and outlines), markers relative to the eye; layer stack to draws (`docs/design/vector-rendering.md`) |
+| `globe` | The globe and map renderer: ray-cast WGS 84 ellipsoid, the graticule, imagery tiles, vector layers (fills and outlines), markers relative to the eye, all blended between globe and flat map in the vertex shaders; layer stack to draws (`docs/design/vector-rendering.md`, `docs/design/morph.md`) |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `packs` | Data pack manifests (files with checksums, datasets with sources, licences and attribution), verification, finding the base pack (`docs/data/base-pack.md`) |
 | `perf` | Frame-time statistics, process memory and CPU readings |
+| `projection` | Map projections for the 2D views (Mercator, Web Mercator, Miller): forward and inverse, domains, scale factors, and each projection as GLSL (`docs/design/projections.md`) |
 | `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers (`docs/design/providers.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
-| `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
+| `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling on the globe and on the flat map, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 | `vector` | Vector styles, meshing feature tiles into triangles and outline segments on the ellipsoid, the worker-thread feature loader (`docs/design/vector-rendering.md`) |
 
 ### app (`terrasoar`)
