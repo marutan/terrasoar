@@ -13,12 +13,12 @@
 #include "ts/maths/mat4.h"
 #include "ts/maths/ray.h"
 #include "ts/maths/vec3.h"
+#include "ts/projection/projection.h"
 
 namespace ts
 {
 
 class Projection;
-struct MapPoint;
 
 /**
  * Where the camera is, as an orbit around a point on the ellipsoid.
@@ -92,7 +92,7 @@ struct MapFrame {
    * taking the copy of the world nearest the centre (x within half a
    * world width).
    */
-  MapPoint offsetOf(const MapPoint& point) const;
+  MapPoint offsetOf(MapPoint point) const;
 
   /** Same for a point given by latitude and longitude. */
   MapPoint offsetOf(double latDeg, double lonDeg) const;
@@ -291,7 +291,7 @@ public:
    * Returns the position, relative to the eye, of the flat map's point
    * @p offset map metres from the centre of the view (ECEF axes, metres).
    */
-  Vec3 mapPlanePoint(const MapPoint& offset) const;
+  Vec3 mapPlanePoint(MapPoint offset) const;
 
 private:
   void update();

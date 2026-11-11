@@ -97,7 +97,7 @@ Vec3 eyeEcefForPose(const CameraPose& pose)
   return poseFrame(pose).eye;
 }
 
-MapPoint MapFrame::offsetOf(const MapPoint& point) const
+MapPoint MapFrame::offsetOf(MapPoint point) const
 {
   double dx = std::fmod(point.xM - centreXM, worldWidthM);
   if (dx >= 0.5 * worldWidthM) {
@@ -310,7 +310,7 @@ Ray Camera::rayThroughPixel(double xPx, double yPx) const
   return Ray{m_eyeEcef, normalized(direction)};
 }
 
-Vec3 Camera::mapPlanePoint(const MapPoint& offset) const
+Vec3 Camera::mapPlanePoint(MapPoint offset) const
 {
   const double scale =
       1.0 / m_projection->scaleAt(m_pose.targetLatDeg).parallel;

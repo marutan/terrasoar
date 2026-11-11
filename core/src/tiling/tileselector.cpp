@@ -105,9 +105,13 @@ bool samplesBehindHorizon(const Camera& camera, TileKey key,
 
 /** True if @p key's rectangle on the map of @p frame meets the view, taken
  * as ± @p halfWidthM by ± @p halfHeightM map metres about the centre. */
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters): width, then height
 bool rectOnMap(const MapFrame& frame, TileKey key, double halfWidthM,
                double halfHeightM)
 {
+  if (frame.projection == nullptr) {
+    return false;
+  }
   const Projection& projection = *frame.projection;
   const GeoRect rect = key.bounds();
   if (rect.southDeg >= projection.maximumLatDeg() ||
@@ -127,20 +131,20 @@ bool rectOnMap(const MapFrame& frame, TileKey key, double halfWidthM,
           .offsetOf(projection.forward(frame.centreLatDeg, rect.centreLonDeg()))
           .xM;
   const double halfSpanM = 0.5 * rect.widthDeg() / 360.0 * frame.worldWidthM;
-  for (const double shift : {0.0, -frame.worldWidthM, frame.worldWidthM}) {
-    if (middleM + shift - halfSpanM < halfWidthM &&
-        middleM + shift + halfSpanM > -halfWidthM) {
-      return true;
-    }
-  }
-  return false;
+  const std::array<double, 3> shifts = {0.0, -frame.worldWidthM,
+                                        frame.worldWidthM};
+  return std::any_of(shifts.begin(), shifts.end(), [&](double shift) {
+    return middleM + shift - halfSpanM < halfWidthM &&
+           middleM + shift + halfSpanM > -halfWidthM;
+  });
 }
 
 } // namespace
 
 /** The camera and, when the map is involved, how it lies. */
 struct TileSelector::View {
-  const Camera& camera;
+  /** The camera; never null. */
+  const Camera* camera;
   /** The camera's morph factor. */
   double morph = 0.0;
   /** The map (when morph > 0). */
@@ -150,10 +154,10 @@ struct TileSelector::View {
   double halfHeightM = 0.0;
 
   explicit View(const Camera& viewCamera, bool forceMap = false)
-      : camera(viewCamera), morph(forceMap ? 1.0 : viewCamera.morph())
+      : camera(&viewCamera), morph(forceMap ? 1.0 : viewCamera.morph())
   {
     if (morph > 0.0) {
-      frame = camera.mapFrame();
+      frame = viewCamera.mapFrame();
       halfWidthM = frame.halfWidthM;
       halfHeightM = frame.halfHeightM;
       if (morph < 1.0) {
@@ -168,15 +172,15 @@ struct TileSelector::View {
                  const TileBounds& bounds) const
   {
     if (morph <= 0.0) {
-      return sphereInFrustum(camera, bounds) &&
-             !samplesBehindHorizon(camera, key, samples);
+      return sphereInFrustum(*camera, bounds) &&
+             !samplesBehindHorizon(*camera, key, samples);
     }
     if (rectOnMap(frame, key, halfWidthM, halfHeightM)) {
       return true;
     }
     // Changing view: also what the globe shows, the far side included (it
     // unrolls into view).
-    return morph < 1.0 && sphereInFrustum(camera, bounds);
+    return morph < 1.0 && sphereInFrustum(*camera, bounds);
   }
 
   bool isVisible(TileKey key) const
@@ -191,12 +195,12 @@ TileBounds tileBounds(TileKey key)
   return boundsFromSamples(key, tileSamples(key));
 }
 
-TileSelector::TileSelector(TileSelectionSettings settings)
+TileSelector::TileSelector(const TileSelectionSettings& settings)
     : m_settings(settings)
 {
 }
 
-void TileSelector::setSettings(TileSelectionSettings settings)
+void TileSelector::setSettings(const TileSelectionSettings& settings)
 {
   m_settings = settings;
 }
@@ -303,7 +307,7 @@ void TileSelector::visit(
   if (!view.isVisible(key, samples, bounds)) {
     return;
   }
-  const Camera& camera = view.camera;
+  const Camera& camera = *view.camera;
   const bool renderable = isRenderable(key);
   if (wantsRefinement(view, key) &&
       refine(view, key, renderable, isRenderable, selection)) {
@@ -329,12 +333,12 @@ bool TileSelector::wantsRefinement(const View& view, TileKey key) const
   if (view.morph > 0.0 && key.level < m_settings.minimumMapLevel) {
     return true;
   }
-  if (view.morph >= 1.0 && mapGeometryErrorPx(view.camera, key) >
+  if (view.morph >= 1.0 && mapGeometryErrorPx(*view.camera, key) >
                                m_settings.maximumMapGeometryErrorPx) {
     return true;
   }
   return key.level < m_settings.maximumLevel &&
-         screenSpaceErrorPx(view.camera, key) >
+         screenSpaceErrorPx(*view.camera, key) >
              m_settings.maximumScreenSpaceErrorPx;
 }
 
@@ -365,7 +369,7 @@ bool TileSelector::refine(
       // This tile stays meanwhile; fetch the missing children.
       selection.load.push_back(
           TileLoadRequest{child, distance(tileBounds(child).centreEcef,
-                                          view.camera.eyeEcef())});
+                                          view.camera->eyeEcef())});
     } else if (!renderable && isRenderable(child)) {
       // This tile can't be drawn yet: use what is there below it. The
       // others wait until this tile has loaded (coarse first).

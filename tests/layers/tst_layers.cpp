@@ -412,7 +412,10 @@ private slots:
         "{\"format\": \"terrasoar-project\", \"version\": 2, "
         "\"view\": 7}",
         &error);
-    QVERIFY(noView && !noView->mapView);
+    if (!noView) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(!noView->mapView);
     QCOMPARE(noView->projection, QStringLiteral("mercator"));
     // A newer format, or something that isn't a project, is refused.
     QJsonObject newer;

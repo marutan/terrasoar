@@ -121,7 +121,7 @@ std::vector<std::uint16_t> tileMeshStripIndices(int segments)
 {
   const int n = clampSegments(segments);
   std::vector<std::uint16_t> indices;
-  indices.reserve(static_cast<std::size_t>(6 * n));
+  indices.reserve(6 * static_cast<std::size_t>(n));
   for (int row = 0; row < n; ++row) {
     const int nw = gridIndex(n, 0, row);
     const int ne = gridIndex(n, n, row);

@@ -99,20 +99,23 @@ double CylindricalProjection::latitudeDeg(double yM) const
   return radToDeg(unitLatitude(m_parameters, yM / wgs84::semiMajorAxisM));
 }
 
+// Latitude first, as everywhere in this code.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 MapPoint CylindricalProjection::forward(double latDeg, double lonDeg) const
 {
   const double dLonDeg = normaliseLonDeg(lonDeg - centralMeridianDeg());
   return MapPoint{wgs84::semiMajorAxisM * degToRad(dLonDeg), northingM(latDeg)};
 }
 
-std::optional<Geodetic>
-CylindricalProjection::inverse(const MapPoint& point) const
+std::optional<Geodetic> CylindricalProjection::inverse(MapPoint point) const
 {
+  // Written so that a NaN is outside too.
   const MapRect limits = bounds();
-  if (!(point.xM >= limits.westM - edgeToleranceM &&
-        point.xM <= limits.eastM + edgeToleranceM &&
-        point.yM >= limits.southM - edgeToleranceM &&
-        point.yM <= limits.northM + edgeToleranceM)) {
+  const bool inside = point.xM >= limits.westM - edgeToleranceM &&
+                      point.xM <= limits.eastM + edgeToleranceM &&
+                      point.yM >= limits.southM - edgeToleranceM &&
+                      point.yM <= limits.northM + edgeToleranceM;
+  if (!inside) {
     return std::nullopt;
   }
   const double latDeg =

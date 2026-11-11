@@ -94,13 +94,13 @@ class TileSelector
 {
 public:
   /** Creates a selector with @p settings. */
-  explicit TileSelector(TileSelectionSettings settings = {});
+  explicit TileSelector(const TileSelectionSettings& settings = {});
 
   /** Returns the settings. */
-  TileSelectionSettings settings() const { return m_settings; }
+  const TileSelectionSettings& settings() const { return m_settings; }
 
   /** Sets the settings. */
-  void setSettings(TileSelectionSettings settings);
+  void setSettings(const TileSelectionSettings& settings);
 
   /**
    * Selects the tiles for @p camera. @p isRenderable tells whether a tile

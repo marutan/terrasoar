@@ -665,11 +665,11 @@ private slots:
         }
         // Where the camera says it is, at both ends of the change.
         if (step == 0 || step == 10) {
-          const std::optional<ts::ScreenPoint> expected =
-              camera.projectGeodetic(43.0, 131.0);
-          QVERIFY(expected.has_value());
-          QVERIFY(std::abs(atOther->x() - expected->xPx) < 0.6 &&
-                  std::abs(atOther->y() - expected->yPx) < 0.6);
+          const ts::ScreenPoint expected =
+              camera.projectGeodetic(43.0, 131.0)
+                  .value_or(ts::ScreenPoint{-1e9, -1e9, 0.0});
+          QVERIFY(std::abs(atOther->x() - expected.xPx) < 0.6 &&
+                  std::abs(atOther->y() - expected.yPx) < 0.6);
         }
         if (previous) {
           QVERIFY(std::hypot(atOther->x() - previous->x(),
@@ -776,7 +776,13 @@ private slots:
           "%.1f ms, slowest %.1f ms",
           meanS * 1000.0, 1.0 / meanS, quartileS * 1000.0,
           timesS.back() * 1000.0);
+#if defined(TS_INSTRUMENTED_BUILD) || !defined(QT_NO_DEBUG)
+    // Sanitizer, coverage and debug builds are several times slower: the
+    // change is drawn (and checked for errors) but not timed.
+    Q_UNUSED(quartileS)
+#else
     QVERIFY2(quartileS < 0.1, "the morph is below 10 frames per second");
+#endif
   }
 
   void basePackGolden_data()

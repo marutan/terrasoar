@@ -46,7 +46,7 @@ public:
   double minimumLatDeg() const override;
   double maximumLatDeg() const override;
   MapPoint forward(double latDeg, double lonDeg) const override;
-  std::optional<Geodetic> inverse(const MapPoint& point) const override;
+  std::optional<Geodetic> inverse(MapPoint point) const override;
   MapRect bounds() const override;
   MapScale scaleAt(double latDeg) const override;
   bool isCylindrical() const override { return true; }

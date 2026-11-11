@@ -110,6 +110,25 @@ double groundDistanceM(const ts::Geodetic& a, const ts::Geodetic& b)
   return ts::geodesicInverse(a.latDeg, a.lonDeg, b.latDeg, b.lonDeg).distanceM;
 }
 
+/** Where a place is on screen; far off screen if it can't be shown. */
+ts::ScreenPoint onScreen(const ts::Camera& camera, double latDeg, double lonDeg)
+{
+  return camera.projectGeodetic(latDeg, lonDeg)
+      .value_or(ts::ScreenPoint{-1e9, -1e9, -1.0});
+}
+
+/** The place under a pixel; nowhere on Earth if there is none. */
+ts::Geodetic placeAt(const ts::Camera& camera, double xPx, double yPx)
+{
+  return camera.pickGeodetic(xPx, yPx).value_or(ts::Geodetic{1e9, 1e9, 0.0});
+}
+
+/** The scale bar; of no length if there is none. */
+ts::ScaleBar barFor(const ts::Camera& camera, double maximumWidthPx)
+{
+  return ts::scaleBarFor(camera, maximumWidthPx).value_or(ts::ScaleBar{});
+}
+
 const std::array<const char*, 3> projectionIds = {"mercator", "web-mercator",
                                                   "miller"};
 
@@ -759,26 +778,25 @@ private slots:
           pose.targetLatDeg, pose.targetLonDeg, 90.0, 5000.0);
       const ts::GeodesicDirect north =
           ts::geodesicDirect(pose.targetLatDeg, pose.targetLonDeg, 0.0, 5000.0);
-      const std::optional<ts::ScreenPoint> mapEast =
-          map.projectGeodetic(east.latDeg, east.lonDeg);
-      const std::optional<ts::ScreenPoint> globeEast =
-          globe.projectGeodetic(east.latDeg, east.lonDeg);
-      const std::optional<ts::ScreenPoint> mapNorth =
-          map.projectGeodetic(north.latDeg, north.lonDeg);
-      const std::optional<ts::ScreenPoint> globeNorth =
-          globe.projectGeodetic(north.latDeg, north.lonDeg);
-      QVERIFY(mapEast && globeEast && mapNorth && globeNorth);
-      QVERIFY(mapEast->xPx > widthPx / 2.0 + 10.0);
-      QVERIFY(std::abs(mapEast->yPx - heightPx / 2.0) < 0.1);
-      QVERIFY(mapNorth->yPx < heightPx / 2.0 - 10.0);
-      QVERIFY(std::abs(mapNorth->xPx - widthPx / 2.0) < 1e-6);
+      const ts::ScreenPoint mapEast = onScreen(map, east.latDeg, east.lonDeg);
+      const ts::ScreenPoint globeEast =
+          onScreen(globe, east.latDeg, east.lonDeg);
+      const ts::ScreenPoint mapNorth =
+          onScreen(map, north.latDeg, north.lonDeg);
+      const ts::ScreenPoint globeNorth =
+          onScreen(globe, north.latDeg, north.lonDeg);
+      QVERIFY(globeEast.depthM > 0.0 && globeNorth.depthM > 0.0);
+      QVERIFY(mapEast.xPx > widthPx / 2.0 + 10.0);
+      QVERIFY(std::abs(mapEast.yPx - heightPx / 2.0) < 0.1);
+      QVERIFY(mapNorth.yPx < heightPx / 2.0 - 10.0);
+      QVERIFY(std::abs(mapNorth.xPx - widthPx / 2.0) < 1e-6);
       // East-west the map is true to scale at the centre (to the globe's
       // curvature over 5 km seen from 100 km: a few thousandths of a pixel).
-      QVERIFY2(std::abs(mapEast->xPx - globeEast->xPx) < 0.02, id);
+      QVERIFY2(std::abs(mapEast.xPx - globeEast.xPx) < 0.02, id);
       // North-south too where the projection is conformal; Miller is 6 %
       // short at this latitude, Web Mercator a fraction of a percent off.
-      const double northOffPx = std::abs(mapNorth->yPx - globeNorth->yPx);
-      const double northPx = heightPx / 2.0 - globeNorth->yPx;
+      const double northOffPx = std::abs(mapNorth.yPx - globeNorth.yPx);
+      const double northPx = heightPx / 2.0 - globeNorth.yPx;
       if (QLatin1String(id) == QLatin1String("mercator")) {
         QVERIFY(northOffPx < 0.02);
       } else if (QLatin1String(id) == QLatin1String("web-mercator")) {
@@ -806,14 +824,11 @@ private slots:
     // East of the antimeridian the longitudes carry on from −180°.
     const ts::Camera pacific =
         makeMapCamera("mercator", ts::CameraPose{0.0, 179.0, 2.0e6, 0.0, 0.0});
-    const std::optional<ts::Geodetic> east =
-        pacific.pickGeodetic(widthPx - 1.0, heightPx / 2.0);
-    const std::optional<ts::Geodetic> west =
-        pacific.pickGeodetic(1.0, heightPx / 2.0);
-    QVERIFY(east && west);
-    QVERIFY(east->lonDeg < -170.0 && east->lonDeg > -180.0);
-    QVERIFY(west->lonDeg > 165.0 && west->lonDeg < 179.0);
-    QVERIFY(std::abs(east->latDeg) < 1e-9);
+    const ts::Geodetic east = placeAt(pacific, widthPx - 1.0, heightPx / 2.0);
+    const ts::Geodetic west = placeAt(pacific, 1.0, heightPx / 2.0);
+    QVERIFY(east.lonDeg < -170.0 && east.lonDeg > -180.0);
+    QVERIFY(west.lonDeg > 165.0 && west.lonDeg < 179.0);
+    QVERIFY(std::abs(east.latDeg) < 1e-9);
   }
 
   void distancesAreTheSameInEveryView()
@@ -831,20 +846,16 @@ private slots:
       cameras.push_back(makeMapCamera(id, pose));
     }
     for (const ts::Camera& camera : cameras) {
-      const std::optional<ts::ScreenPoint> screenA =
-          camera.projectGeodetic(a.latDeg, a.lonDeg);
-      const std::optional<ts::ScreenPoint> screenB =
-          camera.projectGeodetic(b.latDeg, b.lonDeg);
-      QVERIFY(screenA && screenB);
+      const ts::ScreenPoint screenA = onScreen(camera, a.latDeg, a.lonDeg);
+      const ts::ScreenPoint screenB = onScreen(camera, b.latDeg, b.lonDeg);
       // Both are in the view.
-      QVERIFY(screenA->xPx > 0.0 && screenA->xPx < widthPx);
-      QVERIFY(screenB->xPx > 0.0 && screenB->xPx < widthPx);
-      const std::optional<ts::Geodetic> pickedA =
-          camera.pickGeodetic(screenA->xPx, screenA->yPx);
-      const std::optional<ts::Geodetic> pickedB =
-          camera.pickGeodetic(screenB->xPx, screenB->yPx);
-      QVERIFY(pickedA && pickedB);
-      const double measuredM = groundDistanceM(*pickedA, *pickedB);
+      QVERIFY(screenA.xPx > 0.0 && screenA.xPx < widthPx);
+      QVERIFY(screenB.xPx > 0.0 && screenB.xPx < widthPx);
+      const ts::Geodetic pickedA = placeAt(camera, screenA.xPx, screenA.yPx);
+      const ts::Geodetic pickedB = placeAt(camera, screenB.xPx, screenB.yPx);
+      QVERIFY(std::abs(pickedA.latDeg) <= 90.0 &&
+              std::abs(pickedB.latDeg) <= 90.0);
+      const double measuredM = groundDistanceM(pickedA, pickedB);
       QVERIFY2(
           std::abs(measuredM - expectedM) < 1e-3,
           qPrintable(QStringLiteral("%1 m off on %2")
@@ -854,16 +865,15 @@ private slots:
     }
     // On screen the two are *not* the same distance apart in every view:
     // only the measurement is.
-    const double globePx =
-        std::hypot(cameras[0].projectGeodetic(a.latDeg, a.lonDeg)->xPx -
-                       cameras[0].projectGeodetic(b.latDeg, b.lonDeg)->xPx,
-                   cameras[0].projectGeodetic(a.latDeg, a.lonDeg)->yPx -
-                       cameras[0].projectGeodetic(b.latDeg, b.lonDeg)->yPx);
-    const double millerPx =
-        std::hypot(cameras[3].projectGeodetic(a.latDeg, a.lonDeg)->xPx -
-                       cameras[3].projectGeodetic(b.latDeg, b.lonDeg)->xPx,
-                   cameras[3].projectGeodetic(a.latDeg, a.lonDeg)->yPx -
-                       cameras[3].projectGeodetic(b.latDeg, b.lonDeg)->yPx);
+    const std::function<double(const ts::Camera&)> apartPx =
+        [&](const ts::Camera& camera) {
+          const ts::ScreenPoint screenA = onScreen(camera, a.latDeg, a.lonDeg);
+          const ts::ScreenPoint screenB = onScreen(camera, b.latDeg, b.lonDeg);
+          return std::hypot(screenA.xPx - screenB.xPx,
+                            screenA.yPx - screenB.yPx);
+        };
+    const double globePx = apartPx(cameras[0]);
+    const double millerPx = apartPx(cameras[3]);
     QVERIFY(std::abs(globePx - millerPx) > 1.0);
   }
 
@@ -1096,12 +1106,16 @@ private slots:
       const QPointF cursor(620.0, 140.0);
       const std::optional<ts::Geodetic> before =
           controller.camera().pickGeodetic(cursor.x(), cursor.y());
-      QVERIFY(before.has_value());
+      if (!before) {
+        QFAIL("before: no value");
+      }
       controller.zoomAt(cursor, 3.0);
       QVERIFY(controller.camera().pose().rangeM < 0.6e6);
       const std::optional<ts::Geodetic> after =
           controller.camera().pickGeodetic(cursor.x(), cursor.y());
-      QVERIFY(after.has_value());
+      if (!after) {
+        QFAIL("after: no value");
+      }
       QVERIFY2(groundDistanceM(*before, *after) < 1e-3, id);
       // Zooming out stops when the view is as wide as the world.
       controller.zoomAt(QPointF(400.0, 300.0), -60.0);
@@ -1275,12 +1289,10 @@ private slots:
           ts::geodesicDirect(60.0, 25.0, 270.0, 0.5 * bar->lengthM);
       const ts::GeodesicDirect east =
           ts::geodesicDirect(60.0, 25.0, 90.0, 0.5 * bar->lengthM);
-      const std::optional<ts::ScreenPoint> left =
-          camera.projectGeodetic(west.latDeg, west.lonDeg);
-      const std::optional<ts::ScreenPoint> right =
-          camera.projectGeodetic(east.latDeg, east.lonDeg);
-      QVERIFY(left && right);
-      QVERIFY(std::abs((right->xPx - left->xPx) / bar->widthPx - 1.0) < 2e-3);
+      const ts::ScreenPoint left = onScreen(camera, west.latDeg, west.lonDeg);
+      const ts::ScreenPoint right = onScreen(camera, east.latDeg, east.lonDeg);
+      QVERIFY(left.depthM > 0.0 && right.depthM > 0.0);
+      QVERIFY(std::abs((right.xPx - left.xPx) / bar->widthPx - 1.0) < 2e-3);
     }
   }
 
@@ -1290,33 +1302,32 @@ private slots:
     // and bottom; the bar says so and gives its latitude.
     const ts::Camera world =
         makeMapCamera("mercator", ts::CameraPose{40.0, 0.0, 2.0e7, 0.0, 0.0});
-    const std::optional<ts::ScaleBar> wide = ts::scaleBarFor(world, 140.0);
-    QVERIFY(wide && wide->variesAcrossView);
-    QVERIFY(std::abs(wide->latDeg - 40.0) < 1e-6);
+    const ts::ScaleBar wide = barFor(world, 140.0);
+    QVERIFY(wide.lengthM > 0.0 && wide.variesAcrossView);
+    QVERIFY(std::abs(wide.latDeg - 40.0) < 1e-6);
     // The whole globe in view: the scale falls away towards the limb.
-    const std::optional<ts::ScaleBar> globe = ts::scaleBarFor(
-        makeCamera(ts::CameraPose{0.0, 0.0, 3.0e7, 0.0, 0.0}), 140.0);
-    QVERIFY(globe && globe->variesAcrossView);
+    const ts::ScaleBar globe =
+        barFor(makeCamera(ts::CameraPose{0.0, 0.0, 3.0e7, 0.0, 0.0}), 140.0);
+    QVERIFY(globe.lengthM > 0.0 && globe.variesAcrossView);
     // Close in, one bar holds for the whole view.
-    const std::optional<ts::ScaleBar> close = ts::scaleBarFor(
+    const ts::ScaleBar close = barFor(
         makeMapCamera("mercator", ts::CameraPose{40.0, 0.0, 2.0e3, 0.0, 0.0}),
         140.0);
-    QVERIFY(close && !close->variesAcrossView);
-    QCOMPARE(close->lengthM, 200.0);
+    QVERIFY(!close.variesAcrossView);
+    QCOMPARE(close.lengthM, 200.0);
     // The same range at a higher latitude is the same ground distance:
     // the map is drawn to the scale of its centre.
-    const std::optional<ts::ScaleBar> north = ts::scaleBarFor(
+    const ts::ScaleBar north = barFor(
         makeMapCamera("mercator", ts::CameraPose{70.0, 0.0, 2.0e3, 0.0, 0.0}),
         140.0);
-    QVERIFY(north.has_value());
-    QCOMPARE(north->lengthM, 200.0);
-    QVERIFY(std::abs(north->widthPx / close->widthPx - 1.0) < 1e-3);
+    QCOMPARE(north.lengthM, 200.0);
+    QVERIFY(std::abs(north.widthPx / close.widthPx - 1.0) < 1e-3);
     // Nothing to measure with no width, or looking past the globe.
     QVERIFY(!ts::scaleBarFor(world, 0.0));
     // One metre up: centimetres.
-    const std::optional<ts::ScaleBar> ground = ts::scaleBarFor(
-        makeCamera(ts::CameraPose{10.0, 10.0, 1.0, 0.0, 0.0}), 140.0);
-    QVERIFY(ground && ground->lengthM <= 0.2 && ground->lengthM >= 0.05);
+    const ts::ScaleBar ground =
+        barFor(makeCamera(ts::CameraPose{10.0, 10.0, 1.0, 0.0, 0.0}), 140.0);
+    QVERIFY(ground.lengthM <= 0.2 && ground.lengthM >= 0.05);
   }
 
   void concurrentOwnInstances()

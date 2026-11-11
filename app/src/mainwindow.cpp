@@ -429,9 +429,11 @@ void MainWindow::retranslateUi()
 void MainWindow::syncViewActions()
 {
   // The actions follow the view (a project just opened, for instance).
-  const bool onMap = m_globeView && m_globeView->viewMode() == ViewMode::Map;
-  const QString projection = m_globeView ? m_globeView->mapProjection()->id()
-                                         : projections().front()->id();
+  const bool onMap =
+      m_globeView != nullptr && m_globeView->viewMode() == ViewMode::Map;
+  const QString projection = m_globeView != nullptr
+                                 ? m_globeView->mapProjection()->id()
+                                 : projections().front()->id();
   if (m_mapViewAction->isChecked() != onMap) {
     m_mapViewAction->setChecked(onMap);
   }
@@ -448,12 +450,15 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
   m_pointerLatDeg = latDeg;
   m_pointerLonDeg = lonDeg;
   const QLocale locale;
-  m_pointerLabel->setText(
-      onGlobe ? tr("%1  %2").arg(formatLatitude(latDeg, locale),
-                                 formatLongitude(lonDeg, locale))
-      : m_globeView && m_globeView->viewMode() == ViewMode::Map
-          ? tr("Pointer not on the map")
-          : tr("Pointer not on the globe"));
+  if (onGlobe) {
+    m_pointerLabel->setText(tr("%1  %2").arg(formatLatitude(latDeg, locale),
+                                             formatLongitude(lonDeg, locale)));
+  } else if (m_globeView != nullptr &&
+             m_globeView->viewMode() == ViewMode::Map) {
+    m_pointerLabel->setText(tr("Pointer not on the map"));
+  } else {
+    m_pointerLabel->setText(tr("Pointer not on the globe"));
+  }
 }
 
 void MainWindow::refreshLayers()

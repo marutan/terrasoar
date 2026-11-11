@@ -167,8 +167,8 @@ private:
   std::unique_ptr<GpuMesh> createGpuMesh(const VectorTileMesh& mesh) const;
   void upload();
   void select(Source& source, const Camera& camera) const;
-  void addItem(Source& source, const Camera& camera, const GpuMesh* mesh,
-               const GeoRect& clip) const;
+  static void addItem(Source& source, const Camera& camera, const GpuMesh* mesh,
+                      const GeoRect& clip);
   void evict();
   void writeUniforms(const Camera& camera);
 

@@ -123,6 +123,10 @@ tsan {
     DEFINES += TS_TSAN_BUILD
 }
 
+# Sanitizer and coverage builds run several times slower; tests that
+# check a speed look at this.
+tsan|asan|coverage: DEFINES += TS_INSTRUMENTED_BUILD
+
 # CONFIG+=asan: AddressSanitizer + UBSan build. Undefined behaviour stops
 # the program (-fno-sanitize-recover), so a test that hits it fails.
 asan {

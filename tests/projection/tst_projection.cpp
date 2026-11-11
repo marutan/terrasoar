@@ -32,6 +32,10 @@ constexpr double toleranceM = 1e-3;
 /** A millimetre on the ground as an angle, degrees (at the equator). */
 constexpr double toleranceDeg = 1e-8;
 
+/** Stands in for a point inverse() didn't give: far from any real one, so
+ *  the comparison that follows fails. */
+constexpr ts::Geodetic nowhere{1e9, 1e9, -1.0};
+
 /** A PROJ transformation from a PROJ string (radians in, metres out). */
 class ProjPipeline
 {
@@ -57,7 +61,7 @@ public:
     return ts::MapPoint{out.xy.x, out.xy.y};
   }
 
-  ts::Geodetic inverse(const ts::MapPoint& point) const
+  ts::Geodetic inverse(ts::MapPoint point) const
   {
     const PJ_COORD out = proj_trans(m_transform, PJ_INV,
                                     proj_coord(point.xM, point.yM, 0.0, 0.0));
@@ -75,7 +79,8 @@ std::vector<double> gridLatitudes(const ts::Projection& projection)
 {
   std::vector<double> lats = {projection.minimumLatDeg(),
                               projection.maximumLatDeg(), 1e-9, -1e-9};
-  for (double lat = -90.0; lat <= 90.0; lat += 2.5) {
+  for (int step = -36; step <= 36; ++step) {
+    const double lat = 2.5 * step;
     if (projection.containsLatitude(lat)) {
       lats.push_back(lat);
     }
@@ -87,8 +92,8 @@ std::vector<double> gridLatitudes(const ts::Projection& projection)
 std::vector<double> gridLongitudes()
 {
   std::vector<double> lons = {-180.0, -179.999999, 179.999999};
-  for (double lon = -172.5; lon < 180.0; lon += 7.5) {
-    lons.push_back(lon);
+  for (int step = -23; step < 24; ++step) {
+    lons.push_back(7.5 * step);
   }
   return lons;
 }
@@ -200,12 +205,11 @@ private slots:
         }
         worstForwardM = std::max({worstForwardM, std::abs(ours.xM - theirs.xM),
                                   std::abs(ours.yM - theirs.yM)});
-        const std::optional<ts::Geodetic> back = projection.inverse(theirs);
-        QVERIFY(back.has_value());
+        const ts::Geodetic back = projection.inverse(theirs).value_or(nowhere);
         const ts::Geodetic projBack = proj.inverse(theirs);
         worstInverseDeg = std::max(
-            {worstInverseDeg, std::abs(back->latDeg - projBack.latDeg),
-             std::abs(ts::normaliseLonDeg(back->lonDeg - projBack.lonDeg))});
+            {worstInverseDeg, std::abs(back.latDeg - projBack.latDeg),
+             std::abs(ts::normaliseLonDeg(back.lonDeg - projBack.lonDeg))});
       }
     }
     QVERIFY2(worstForwardM < toleranceM,
@@ -225,12 +229,11 @@ private slots:
     double worstM = 0.0;
     for (const double lat : gridLatitudes(projection)) {
       for (const double lon : gridLongitudes()) {
-        const std::optional<ts::Geodetic> back =
-            projection.inverse(projection.forward(lat, lon));
-        QVERIFY(back.has_value());
-        QCOMPARE(back->heightM, 0.0);
+        const ts::Geodetic back =
+            projection.inverse(projection.forward(lat, lon)).value_or(nowhere);
+        QCOMPARE(back.heightM, 0.0);
         worstM = std::max(worstM,
-                          groundDistanceM(ts::Geodetic{lat, lon, 0.0}, *back));
+                          groundDistanceM(ts::Geodetic{lat, lon, 0.0}, back));
       }
     }
     QVERIFY2(worstM < toleranceM, qPrintable(QString::number(worstM, 'g', 6)));
@@ -312,10 +315,9 @@ private slots:
     QVERIFY(std::abs(shifted.forward(40.0, 50.0).xM -
                      plain.forward(40.0, 20.0).xM) < 1e-6);
     QCOMPARE(shifted.forward(40.0, 50.0).yM, plain.forward(40.0, 20.0).yM);
-    const std::optional<ts::Geodetic> back =
-        shifted.inverse(shifted.forward(40.0, -170.0));
-    QVERIFY(back.has_value());
-    QVERIFY(std::abs(back->lonDeg + 170.0) < 1e-9);
+    const ts::Geodetic back =
+        shifted.inverse(shifted.forward(40.0, -170.0)).value_or(nowhere);
+    QVERIFY(std::abs(back.lonDeg + 170.0) < 1e-9);
     // The same projection in PROJ.
     const ProjPipeline proj(shifted.projString());
     QVERIFY(proj.isValid());
@@ -479,7 +481,9 @@ private slots:
             std::array<float, 2> gpu{};
             for (std::size_t component = 0; component < 2; ++component) {
               std::memcpy(&gpu.at(component),
-                          images.at(component).constScanLine(0) + 4 * i, 4);
+                          images.at(component).constScanLine(0) +
+                              4 * static_cast<std::ptrdiff_t>(i),
+                          4);
             }
             // The same offsets the shader used, as the floats it saw.
             const float index = static_cast<float>(i) + first;
@@ -565,7 +569,8 @@ private slots:
     {
       for (int i = 0; i < 1000; ++i) {
         sum += mercator.inverse(ts::MapPoint{1.0e4 * i, -1.5e7 + 3.0e4 * i})
-                   ->latDeg;
+                   .value_or(nowhere)
+                   .latDeg;
       }
     }
     QVERIFY(std::isfinite(sum));

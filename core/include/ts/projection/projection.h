@@ -132,7 +132,7 @@ public:
    * Returns the point (height 0) at a map position, or nothing if it is
    * outside bounds().
    */
-  virtual std::optional<Geodetic> inverse(const MapPoint& point) const = 0;
+  virtual std::optional<Geodetic> inverse(MapPoint point) const = 0;
 
   /** Returns the rectangle the valid domain maps to. */
   virtual MapRect bounds() const = 0;

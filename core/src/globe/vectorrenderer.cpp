@@ -472,7 +472,7 @@ void VectorRenderer::upload()
 }
 
 void VectorRenderer::addItem(Source& source, const Camera& camera,
-                             const GpuMesh* mesh, const GeoRect& clip) const
+                             const GpuMesh* mesh, const GeoRect& clip)
 {
   if (camera.morph() <= 0.0) {
     source.items.push_back(DrawItem{mesh, clip, 0.0});
