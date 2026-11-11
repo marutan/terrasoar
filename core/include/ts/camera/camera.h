@@ -7,6 +7,7 @@
 #define TS_CAMERA_CAMERA_H
 
 #include <optional>
+#include <vector>
 
 #include "ts/geo/geodetic.h"
 #include "ts/maths/mat4.h"
@@ -15,6 +16,9 @@
 
 namespace ts
 {
+
+class Projection;
+struct MapPoint;
 
 /**
  * Where the camera is, as an orbit around a point on the ellipsoid.
@@ -52,6 +56,63 @@ struct ScreenPoint {
 };
 
 /**
+ * How the flat map of the 2D view lies in front of the camera.
+ *
+ * The map is drawn on the plane that touches the ellipsoid at the
+ * camera's target, with map east along the target's east and map north
+ * along its north, scaled so that east-west distances at the target are
+ * true. The camera looks at that plane exactly as it looks at the globe,
+ * so close to the target the two views agree and the 3D/2D morph barely
+ * moves anything there. See docs/design/morph.md.
+ *
+ * @reentrant
+ */
+struct MapFrame {
+  /** The projection; never null. */
+  const Projection* projection = nullptr;
+  /** Latitude of the centre of the view (the camera's target), degrees. */
+  double centreLatDeg = 0.0;
+  /** Longitude of the centre of the view, degrees. */
+  double centreLonDeg = 0.0;
+  /** Map position of the centre, metres. */
+  double centreXM = 0.0;
+  /** Map position of the centre, metres. */
+  double centreYM = 0.0;
+  /** Metres on the plane per metre on the map (1 / parallel scale). */
+  double planeScale = 1.0;
+  /** Half the width of the view looking straight down, map metres. */
+  double halfWidthM = 0.0;
+  /** Half the height of the view looking straight down, map metres. */
+  double halfHeightM = 0.0;
+  /** The map repeats with this period in x, metres. */
+  double worldWidthM = 0.0;
+
+  /**
+   * Returns the offset of a map position from the centre, in map metres,
+   * taking the copy of the world nearest the centre (x within half a
+   * world width).
+   */
+  MapPoint offsetOf(const MapPoint& point) const;
+
+  /** Same for a point given by latitude and longitude. */
+  MapPoint offsetOf(double latDeg, double lonDeg) const;
+
+  /**
+   * Returns which copies of the world something between the meridians
+   * @p westDeg and @p eastDeg (west < east) must be drawn in to fill the
+   * view across the edge where the map wraps around: the shifts in x, in
+   * map metres, to add to the offsetOf() of its middle. Mostly one copy
+   * (shift 0), two for what straddles the edge, none for what is out of
+   * view sideways.
+   *
+   * With @p wholeWorld true one whole world width around the centre is
+   * filled rather than only the view (while the globe unrolls).
+   */
+  std::vector<double> copyShiftsM(double westDeg, double eastDeg,
+                                  bool wholeWorld) const;
+};
+
+/**
  * The globe camera: turns a CameraPose and a viewport into the eye
  * position, view direction, matrices and picking rays.
  *
@@ -81,8 +142,43 @@ public:
   /** Largest tilt, degrees. */
   static constexpr double maximumTiltDeg = 85.0;
 
+  /** Largest latitude of the centre of the 2D map, degrees. */
+  static constexpr double maximumMapCentreLatDeg = 89.0;
+
   /** Creates a camera over (0°, 0°) at 20 000 km, 800 × 600 pixels. */
   Camera();
+
+  /**
+   * Sets the morph factor between the globe (0) and the flat map (1),
+   * clamped to [0, 1]. At exactly 1 the pose is limited to what a map
+   * allows (see setPose()).
+   */
+  void setMorph(double morph);
+
+  /** Returns the morph factor: 0 is the globe, 1 the flat map. */
+  double morph() const { return m_morph; }
+
+  /**
+   * Returns true if positions on screen are those of the flat map (the
+   * morph factor is at least one half): picking and project() use the
+   * map then, the globe otherwise.
+   */
+  bool isMap() const { return m_morph >= 0.5; }
+
+  /** Sets the projection of the flat map; null is ignored. */
+  void setMapProjection(const Projection* projection);
+
+  /** Returns the projection of the flat map; never null. */
+  const Projection* mapProjection() const { return m_projection; }
+
+  /** Returns how the flat map lies in front of the camera. */
+  MapFrame mapFrame() const;
+
+  /**
+   * Returns the largest range of the flat map: the view is then as wide
+   * as the world, so the map never repeats within it.
+   */
+  double maximumMapRangeM() const;
 
   /**
    * Sets the pose. Latitude is clamped to ±89.999 999° (the pose's
@@ -90,6 +186,11 @@ public:
    * heading to [0, 360), tilt to [0, maximumTiltDeg], and the range to at
    * most maximumRangeM and at least what keeps the eye
    * minimumEyeHeightM above the ellipsoid.
+   *
+   * On the flat map (morph() == 1) the view looks straight down with
+   * north up: heading and tilt are 0, the latitude stays within the
+   * projection's domain (and maximumMapCentreLatDeg) and the range within
+   * maximumMapRangeM().
    */
   void setPose(const CameraPose& pose);
 
@@ -165,21 +266,41 @@ public:
 
   /**
    * Returns the point of the WGS 84 surface under (@p xPx, @p yPx), or
-   * nothing if the ray there misses the globe.
+   * nothing if the ray there misses the globe or, on the flat map
+   * (isMap()), the point is off the map.
    */
   std::optional<Geodetic> pickGeodetic(double xPx, double yPx) const;
 
   /**
    * Returns where the ECEF point @p pointEcef lands on the screen, or
    * nothing if it is behind the eye. Points off screen still return their
-   * (outside) coordinates.
+   * (outside) coordinates. On the flat map (isMap()) the point's latitude
+   * and longitude are placed on the map; its height is ignored.
    */
   std::optional<ScreenPoint> project(const Vec3& pointEcef) const;
 
+  /**
+   * Returns where the surface point at @p latDeg, @p lonDeg lands on the
+   * screen: on the globe or, when isMap(), on the copy of the map nearest
+   * the centre of the view.
+   */
+  std::optional<ScreenPoint> projectGeodetic(double latDeg,
+                                             double lonDeg) const;
+
+  /**
+   * Returns the position, relative to the eye, of the flat map's point
+   * @p offset map metres from the centre of the view (ECEF axes, metres).
+   */
+  Vec3 mapPlanePoint(const MapPoint& offset) const;
+
 private:
   void update();
+  double mapRangeLimitM(double latDeg) const;
+  std::optional<ScreenPoint> projectOffset(const Vec3& offset) const;
 
   CameraPose m_pose;
+  double m_morph = 0.0;
+  const Projection* m_projection;
   double m_widthPx = 800.0;
   double m_heightPx = 600.0;
   double m_fovYDeg = 45.0;
@@ -190,6 +311,7 @@ private:
   Vec3 m_forward;
   Vec3 m_up;
   Vec3 m_right;
+  LocalFrame m_local;
   double m_nearM = 1.0;
   double m_farM = 1.0e8;
 };

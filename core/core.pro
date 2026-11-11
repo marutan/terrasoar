@@ -18,6 +18,7 @@ HEADERS += \
     include/ts/base/buildinfo.h \
     include/ts/camera/camera.h \
     include/ts/camera/cameracontroller.h \
+    include/ts/camera/scalebar.h \
     include/ts/deps/dependencies.h \
     include/ts/deps/gdaldataset.h \
     include/ts/deps/geoscontext.h \
@@ -73,6 +74,7 @@ SOURCES += \
     src/base/buildinfo.cpp \
     src/camera/camera.cpp \
     src/camera/cameracontroller.cpp \
+    src/camera/scalebar.cpp \
     src/deps/dependencies.cpp \
     src/deps/gdaldataset.cpp \
     src/deps/geoscontext.cpp \
