@@ -21,6 +21,7 @@ HEADERS += \
     $$PWD/support/concurrency.h \
     $$PWD/support/fixturepack.h \
     $$PWD/support/goldenimage.h \
+    $$PWD/support/mockhttpserver.h \
     $$PWD/support/offscreengl.h
 
 # Absolute path of tests/data, for sample files.

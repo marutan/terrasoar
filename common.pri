@@ -65,8 +65,8 @@ clang: QMAKE_CXXFLAGS_WARN_ON += -Wnull-dereference
 gcc|clang {
     TS_QT_HEADERS = $$[QT_INSTALL_HEADERS]
     QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_QT_HEADERS)
-    for (module, $$list(QtCore QtGui QtWidgets QtOpenGL QtOpenGLWidgets \
-                        QtTest QtDBus)) {
+    for (module, $$list(QtCore QtGui QtNetwork QtWidgets QtOpenGL \
+                        QtOpenGLWidgets QtTest QtDBus)) {
         exists($$TS_QT_HEADERS/$$module): \
             QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_QT_HEADERS/$$module)
     }
