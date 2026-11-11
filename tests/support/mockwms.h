@@ -45,17 +45,18 @@ struct MockWmsBehaviour {
 /** Longitude and latitude to colour: the picture every GetMap draws. */
 inline QRgb mockWmsColour(double lonDeg, double latDeg, bool transparent)
 {
-  // Red discs 3° across at every 30° intersection; yellow lines at 45° N
-  // and 60° E; elsewhere nothing (or white when not transparent).
+  // Red discs 8° across at every 30° intersection; yellow bands 3° wide
+  // at 45° N and 60° E; elsewhere nothing (or white when not
+  // transparent).
   const double nearestLat = 30.0 * std::round(latDeg / 30.0);
   const double nearestLon = 30.0 * std::round(lonDeg / 30.0);
   const double dLon =
       (lonDeg - nearestLon) * std::cos(latDeg * 3.14159265358979 / 180.0);
   const double dLat = latDeg - nearestLat;
-  if (dLon * dLon + dLat * dLat < 1.5 * 1.5) {
+  if (dLon * dLon + dLat * dLat < 4.0 * 4.0) {
     return qRgba(220, 30, 30, 230);
   }
-  if (std::abs(latDeg - 45.0) < 0.75 || std::abs(lonDeg - 60.0) < 0.75) {
+  if (std::abs(latDeg - 45.0) < 1.5 || std::abs(lonDeg - 60.0) < 1.5) {
     return qRgba(250, 220, 40, 200);
   }
   return transparent ? qRgba(0, 0, 0, 0) : qRgba(255, 255, 255, 255);

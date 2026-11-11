@@ -8,8 +8,10 @@
 #include <utility>
 
 #include "ts/camera/camera.h"
+#include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
 #include "ts/maths/splitdouble.h"
+#include "ts/projection/cylindricalprojection.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/tiling/tilemesh.h"
@@ -68,9 +70,22 @@ struct TileBlock {
   /** Tile width and height, radians; centre longitude and latitude,
    *  degrees. */
   Float4 tileGeo{};
+  /**
+   * Per layer whose image is in Web Mercator (zero otherwise): the image
+   * tile's height (x), how far its north edge is above the Mercator limit
+   * (y, 0 unless it reaches past it), the latitude span the image covers
+   * (z), all radians; 1 / that span in Mercator northing on the unit
+   * sphere (w). See imageCoord() in the shader.
+   */
+  std::array<Float4, layersPerDraw> mercatorInfo{};
+  /** Per such layer: Web Mercator's reference values at the image's
+   *  (clipped) north edge (WebMercatorProjection::shaderReference()). */
+  std::array<Float4, layersPerDraw> mercatorR0{};
+  /** The second half of them. */
+  std::array<Float4, layersPerDraw> mercatorR1{};
 };
 
-static_assert(sizeof(TileBlock) == 272, "std140 layout of Tile");
+static_assert(sizeof(TileBlock) == 656, "std140 layout of Tile");
 
 /** On the map a tile is drawn this much larger about its centre, so that
  *  rounding never leaves a crack between neighbours (their shared edge is
@@ -88,6 +103,9 @@ layout(std140) uniform Tile {
   vec4 projR0;
   vec4 projR1;
   vec4 tileGeo;
+  vec4 mercatorInfo[8];
+  vec4 mercatorR0[8];
+  vec4 mercatorR1[8];
 };
 )";
 
@@ -138,11 +156,31 @@ in vec3 vNormal;
 in vec3 vRelative;
 out vec4 fragColor;
 
-// One layer's colour, premultiplied, at its opacity.
-vec4 layerColor(sampler2D image, vec4 transform, float alpha)
+// Where this fragment is in a layer's image. A Web Mercator image's rows
+// are evenly spaced in northing, not latitude: the fragment's latitude,
+// measured down from the image's north edge, becomes a northing with the
+// projection's own difference formula (precise in small tiles), then a
+// row. Outside the latitudes the image covers, inside is 0.
+vec2 imageCoord(vec4 transform, vec4 info, vec4 r0, vec4 r1, out float inside)
 {
-  vec4 texel = texture(image, vUv * transform.xy + transform.zw);
-  return vec4(texel.rgb * texel.a, texel.a) * alpha;
+  vec2 coord = vUv * transform.xy + transform.zw;
+  inside = 1.0;
+  if (info.z > 0.0) {
+    float below = info.y - coord.y * info.x; // ≤ 0 inside the image
+    inside = step(-info.z - 1e-7, below) * step(below, 1e-7);
+    coord.y = -tsCylindricalDy(below, r0, r1) * info.w;
+  }
+  return coord;
+}
+
+// One layer's colour, premultiplied, at its opacity.
+vec4 layerColor(sampler2D image, vec4 transform, float alpha, vec4 info,
+                vec4 r0, vec4 r1)
+{
+  float inside;
+  vec2 coord = imageCoord(transform, info, r0, r1, inside);
+  vec4 texel = texture(image, coord);
+  return vec4(texel.rgb * texel.a, texel.a) * alpha * inside;
 }
 
 void main()
@@ -157,8 +195,9 @@ void main()
     glsl += "  if (count > " + n + ") {\n    c = layerColor(layer" + n +
             ", uvTransform[" + n + "], layerAlpha[" +
             QByteArray::number(i / 4) + "]." +
-            lanes.at(static_cast<std::size_t>(i % 4)) +
-            ");\n    result = c + result * (1.0 - c.a);\n  }\n";
+            lanes.at(static_cast<std::size_t>(i % 4)) + ", mercatorInfo[" + n +
+            "], mercatorR0[" + n + "], mercatorR1[" + n +
+            "]);\n    result = c + result * (1.0 - c.a);\n  }\n";
   }
   glsl += R"(
   vec3 n = normalize(vNormal);
@@ -252,16 +291,30 @@ struct TileRenderer::GpuImage {
 
 struct TileRenderer::Source {
   std::shared_ptr<ImageryProvider> provider;
+  /** The provider's images are in Web Mercator (reprojected when drawn). */
+  bool webMercator = false;
   std::unique_ptr<TileLoader> loader;
   std::unordered_map<TileKey, GpuImage, TileKeyHash> images;
   std::size_t bytes = 0;
 };
 
+/** One layer's image for a drawn tile. */
+struct TileRenderer::LayerImage {
+  /** The image (null: nothing to draw). */
+  const GpuTexture* texture = nullptr;
+  /** Scale (xy) and offset (zw) from the tile's uv into the image. */
+  Float4 transform{};
+  /** For Web Mercator images, see TileBlock::mercatorInfo. */
+  Float4 mercatorInfo{};
+  Float4 mercatorR0{};
+  Float4 mercatorR1{};
+};
+
 struct TileRenderer::DrawTile {
   TileKey key;
   const GpuMesh* mesh = nullptr;
-  /** Per layer: the image (null: nothing to draw) and its uv transform. */
-  std::vector<std::pair<const GpuTexture*, Float4>> layers;
+  /** Per layer: its image. */
+  std::vector<LayerImage> layers;
   /** The map uniforms of TileBlock (zero on the globe). */
   Float4 mapOrigin{};
   Float4 projR0{};
@@ -297,7 +350,7 @@ bool TileRenderer::initialise(QString* errorString)
                                   projectionGlsl() + morphGlsl + tileVertexGlsl;
   desc.vertexSource = vertexSource;
   desc.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
-                        tileBlockGlsl + tileFragmentGlsl();
+                        tileBlockGlsl + projectionGlsl() + tileFragmentGlsl();
   desc.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding},
                         {QByteArrayLiteral("Globe"), globeBinding},
                         {QByteArrayLiteral("Tile"), tileBinding}};
@@ -420,6 +473,8 @@ void TileRenderer::setLayers(const std::vector<ImageryLayerDraw>& layers,
       } else {
         std::unique_ptr<Source> created = std::make_unique<Source>();
         created->provider = draw.provider;
+        created->webMercator = draw.provider->imageProjection() ==
+                               TileImageProjection::WebMercator;
         created->loader =
             std::make_unique<TileLoader>(draw.provider, m_settings.loader);
         created->loader->setTilesReadyCallback(m_callback);
@@ -595,6 +650,29 @@ void TileRenderer::requestImages()
   }
 }
 
+void TileRenderer::setMercatorImage(LayerImage& image, TileKey imageKey)
+{
+  // The image covers its tile's latitudes clipped to the Mercator limit,
+  // rows evenly spaced in northing (see imageCoord() in the shader).
+  static const WebMercatorProjection mercator;
+  const GeoRect rect = imageKey.bounds();
+  const double limit = mercator.maximumLatDeg();
+  const double north = std::min(rect.northDeg, limit);
+  const double south = std::max(rect.southDeg, -limit);
+  if (!(south < north)) {
+    return; // nothing of it is on the map; the provider has no image
+  }
+  const double spanM = mercator.northingM(north) - mercator.northingM(south);
+  const ProjectionShaderReference reference =
+      mercator.shaderReference(north, 0.0);
+  image.mercatorInfo = {static_cast<float>(degToRad(rect.heightDeg())),
+                        static_cast<float>(degToRad(rect.northDeg - north)),
+                        static_cast<float>(degToRad(north - south)),
+                        static_cast<float>(wgs84::semiMajorAxisM / spanM)};
+  image.mercatorR0 = reference.r0;
+  image.mercatorR1 = reference.r1;
+}
+
 void TileRenderer::bindImages()
 {
   for (DrawTile& tile : m_drawTiles) {
@@ -623,11 +701,16 @@ void TileRenderer::bindImages()
       // The drawn tile is a 2^d × 2^d part of the image's tile.
       const int levels = tile.key.level - key.level;
       const float scale = 1.0F / static_cast<float>(1 << levels);
-      const Float4 transform = {
+      LayerImage image;
+      image.texture = texture;
+      image.transform = {
           scale, scale,
           static_cast<float>(tile.key.x - (key.x << levels)) * scale,
           static_cast<float>(tile.key.y - (key.y << levels)) * scale};
-      tile.layers.emplace_back(texture, transform);
+      if (source.webMercator) {
+        setMercatorImage(image, key);
+      }
+      tile.layers.push_back(image);
     }
   }
 }
@@ -785,11 +868,13 @@ std::vector<bool> TileRenderer::writeBatchUniforms(LayerRange batch, bool base)
     visible[t] = base;
     for (std::size_t slot = 0; slot < count; ++slot) {
       const std::size_t layerIndex = firstLayer + slot;
-      const std::pair<const GpuTexture*, Float4>& binding =
-          tile.layers[layerIndex];
+      const LayerImage& binding = tile.layers[layerIndex];
       const double alpha =
-          layerAlpha(m_layers[layerIndex], binding.first != nullptr);
-      block.uvTransform.at(slot) = binding.second;
+          layerAlpha(m_layers[layerIndex], binding.texture != nullptr);
+      block.uvTransform.at(slot) = binding.transform;
+      block.mercatorInfo.at(slot) = binding.mercatorInfo;
+      block.mercatorR0.at(slot) = binding.mercatorR0;
+      block.mercatorR1.at(slot) = binding.mercatorR1;
       block.layerAlpha.at(slot / 4).at(slot % 4) = static_cast<float>(alpha);
       visible[t] = visible[t] || alpha > 0.0;
     }
@@ -839,7 +924,7 @@ void TileRenderer::drawLayers(LayerRange layers, bool withBase)
       const DrawTile& tile = m_drawTiles[t];
       for (std::size_t slot = 0; slot < perDraw; ++slot) {
         const GpuTexture* texture =
-            slot < batchCount ? tile.layers[batch + slot].first : nullptr;
+            slot < batchCount ? tile.layers[batch + slot].texture : nullptr;
         m_device.setTexture(static_cast<int>(slot),
                             texture ? *texture : *m_emptyTexture);
       }
