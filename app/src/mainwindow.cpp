@@ -265,7 +265,10 @@ void MainWindow::createActions()
   m_mapViewAction = new QAction(this);
   m_mapViewAction->setObjectName(QStringLiteral("mapViewAction"));
   m_mapViewAction->setCheckable(true);
-  m_mapViewAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_M));
+  // As integers: Qt 5 has no operator for a modifier and a key, and
+  // Clang rejects the plain enums' bitwise or.
+  m_mapViewAction->setShortcut(
+      QKeySequence(static_cast<int>(Qt::CTRL) | static_cast<int>(Qt::Key_M)));
   m_scaleBarAction = new QAction(this);
   m_scaleBarAction->setObjectName(QStringLiteral("scaleBarAction"));
   m_scaleBarAction->setCheckable(true);
