@@ -6,14 +6,17 @@
 #ifndef TS_LAYERS_LAYERTREEMODEL_H
 #define TS_LAYERS_LAYERTREEMODEL_H
 
+#include <map>
 #include <memory>
 #include <vector>
 
 #include <QAbstractItemModel>
+#include <QIcon>
 #include <QJsonArray>
 #include <QString>
 
 #include "ts/layers/layerdefinition.h"
+#include "ts/providers/tileprovider.h"
 
 namespace ts
 {
@@ -107,6 +110,10 @@ public:
     EffectivelyVisibleRole,
     /** LayerType of a layer as int; −1 for collections. */
     LayerTypeRole,
+    /** ProviderStatus::State of a layer's source as int (Ok if unknown). */
+    StatusRole,
+    /** What is wrong with a layer's source, QString; empty when Ok. */
+    StatusMessageRole,
   };
 
   /** MIME type of dragged entries (their ids, one per line). */
@@ -181,6 +188,16 @@ public:
   /** Returns the index of the entry with id @p id, or an invalid one. */
   QModelIndex indexOfId(const QString& id) const;
 
+  /**
+   * Sets how the source of layer @p nodeId is doing, shown as an icon and
+   * tooltip (see setStatusIcons()). Not saved, and not a change of the
+   * stack. Unknown ids are ignored.
+   */
+  void setLayerStatus(const QString& nodeId, const ProviderStatus& status);
+
+  /** Sets the icons shown for offline and failing sources. */
+  void setStatusIcons(const QIcon& offline, const QIcon& error);
+
   /** Returns the visible layers flattened for drawing. */
   LayerStack layerStack() const;
 
@@ -208,6 +225,10 @@ private:
   void emitDataChangedBelow(const QModelIndex& index);
 
   std::unique_ptr<Node> m_root;
+  /** Status of the layers whose source isn't Ok, by node id. */
+  std::map<QString, ProviderStatus> m_status;
+  QIcon m_offlineIcon;
+  QIcon m_errorIcon;
 };
 
 } // namespace ts

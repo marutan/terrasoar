@@ -57,6 +57,17 @@ public:
    */
   void setGroupCompositingAvailable(bool available);
 
+  /**
+   * Adds a layer showing @p definition where the user is: at the top of
+   * the selected collection, else above the selected entry, else at the
+   * top.
+   */
+  void addLayer(const LayerDefinition& definition);
+
+signals:
+  /** The user asked to add a WMS layer (the window opens the dialog). */
+  void addWmsLayerRequested();
+
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;
@@ -65,7 +76,6 @@ private:
   void retranslateUi();
   void rebuildAddLayerMenu();
   void updateControls();
-  void addLayer(const LayerDefinition& definition);
   void addSolidColorLayer();
   void addCollection();
   void removeCurrent();

@@ -217,8 +217,12 @@ int main(int argc, char* argv[])
     const QString target = parser.value(measureOption);
     measurement =
         std::make_unique<ts::StartupMeasurement>(sinceMain, &window, idleS);
+    // Idle means no input and no loading: wait for the base pack check
+    // and for tiles (from disk or a server) before measuring it.
     measurement->setBackgroundBusy([&window]() {
-      return window.basePackState() == ts::MainWindow::BasePackState::Checking;
+      return window.basePackState() ==
+                 ts::MainWindow::BasePackState::Checking ||
+             window.isLoadingTiles();
     });
     measurement->setStateReport([&window]() { return window.stateReport(); });
     QObject::connect(measurement.get(), &ts::StartupMeasurement::finished,

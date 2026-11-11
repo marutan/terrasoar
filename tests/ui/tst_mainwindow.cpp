@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <QAction>
 #include <QApplication>
+#include <QComboBox>
 #include <QDir>
 #include <QFile>
 #include <QFontMetrics>
@@ -9,21 +10,32 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMouseEvent>
+#include <QNetworkProxy>
 #include <QPointer>
 #include <QPushButton>
 #include <QSignalSpy>
 #include <QSlider>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTreeView>
+#include <QTreeWidget>
+#include <QUrlQuery>
 #include <QWheelEvent>
 #include <QtTest>
 
+#include "addwmsdialog.h"
 #include "fixturepack.h"
 #include "globeview.h"
 #include "mainwindow.h"
+#include "mockhttpserver.h"
+#include "mockwms.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
+#include "ts/network/networkclient.h"
 #include "ts/projection/projection.h"
+#include "ts/providers/providerregistry.h"
+#include "ts/wms/wmsimageryprovider.h"
+#include "ts/wms/wmssource.h"
 
 namespace
 {
@@ -149,6 +161,10 @@ private:
 private slots:
   void initTestCase()
   {
+    // Caches (WMS tiles, the catalogue) go to a test location, and the
+    // catalogue isn't fetched from the internet.
+    QStandardPaths::setTestModeEnabled(true);
+    qputenv("TS_WMS_CATALOGUE_URL", QByteArray());
     QVERIFY(m_basePack.isValid());
     ts::test::writeFixtureBasePack(m_basePack.path());
     qputenv("TS_BASEPACK_DIR", m_basePack.path().toUtf8());
@@ -714,6 +730,278 @@ private slots:
       QTest::qWait(300);
       globe->grabFramebuffer().save(
           QDir(shots).filePath(QStringLiteral("map-miller-world.png")));
+    }
+  }
+
+  // --- WMS
+  // ---------------------------------------------------------------------
+
+  void addWmsDialog()
+  {
+    // The whole dialog against the mock server: the current catalogue
+    // arrives, the server's layers are listed, style and format follow the
+    // layer, and Add makes the layer's definition.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    const ts::test::MockHttpServer::Handler wms =
+        ts::test::mockWmsHandler(behaviour);
+    ts::test::MockHttpServer server;
+    const QUrl serviceUrl = server.url(QStringLiteral("/wms"));
+    server.setHandler(
+        [wms, serviceUrl](const ts::test::MockHttpRequest& request) {
+          if (request.url.path() == QLatin1String("/catalogue.json")) {
+            return ts::test::mockResponse(
+                200,
+                "{\"format\": \"terrasoar-wms-catalogue\", \"version\": 1, "
+                "\"services\": [{\"title\": \"Mock service\", \"url\": \"" +
+                    serviceUrl.toString().toUtf8() +
+                    "\", \"description\": \"Circles and lines\", "
+                    "\"attribution\": \"Mock Agency\", \"terms\": "
+                    "\"https://example.invalid/terms\"}]}",
+                "application/json");
+          }
+          return wms(request);
+        });
+    qputenv("TS_WMS_CATALOGUE_URL",
+            server.url(QStringLiteral("/catalogue.json")).toString().toUtf8());
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    ts::AddWmsDialog dialog(network, nullptr);
+    qputenv("TS_WMS_CATALOGUE_URL", QByteArray());
+    // Built in until the current catalogue arrives.
+    QVERIFY(!dialog.catalogue().empty());
+    QSignalSpy catalogueUpdated(&dialog, &ts::AddWmsDialog::catalogueUpdated);
+    QVERIFY(catalogueUpdated.wait(5000));
+    QCOMPARE(dialog.catalogue().size(), std::size_t{1});
+    QComboBox* services =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmsServiceBox"));
+    QVERIFY(services != nullptr);
+    QCOMPARE(services->count(), 1);
+    QCOMPARE(services->itemText(0), QStringLiteral("Mock service"));
+    services->setCurrentIndex(0);
+    QMetaObject::invokeMethod(services, "activated", Q_ARG(int, 0));
+    QCOMPARE(services->currentText(), serviceUrl.toString());
+    QLabel* about = dialog.findChild<QLabel*>(QStringLiteral("wmsAboutLabel"));
+    QVERIFY(about->text().contains(QStringLiteral("Mock Agency")));
+
+    QSignalSpy loaded(&dialog, &ts::AddWmsDialog::capabilitiesLoaded);
+    QPushButton* connectButton =
+        dialog.findChild<QPushButton*>(QStringLiteral("wmsConnectButton"));
+    connectButton->click();
+    QVERIFY(dialog.isBusy());
+    QVERIFY(loaded.wait(5000));
+    QVERIFY(dialog.capabilities().has_value());
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("2 layer")),
+             qPrintable(dialog.statusText()));
+    QTreeWidget* tree =
+        dialog.findChild<QTreeWidget*>(QStringLiteral("wmsLayerTree"));
+    QCOMPARE(tree->topLevelItemCount(), 1);
+    QCOMPARE(tree->topLevelItem(0)->childCount(), 2);
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("wmsAddButton"));
+    QVERIFY(!add->isEnabled()); // the group has no name
+    QComboBox* styles =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmsStyleBox"));
+    QComboBox* formats =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmsFormatBox"));
+    QVERIFY(dialog.selectLayer(QStringLiteral("pattern")));
+    QVERIFY(add->isEnabled());
+    QCOMPARE(styles->count(), 2); // Default, Plain
+    QCOMPARE(formats->currentText(), QStringLiteral("image/png"));
+    QVERIFY(dialog.selectLayer(QStringLiteral("background")));
+    QCOMPARE(formats->currentText(), QStringLiteral("image/jpeg")); // opaque
+    QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("wmsDetailsLabel"))
+                ->text()
+                .contains(QStringLiteral("EPSG:4326")));
+    add->click();
+    QCOMPARE(dialog.result(), static_cast<int>(QDialog::Accepted));
+    QVERIFY(dialog.layerDefinition().has_value());
+    const ts::LayerDefinition definition =
+        dialog.layerDefinition().value_or(ts::LayerDefinition{});
+    QCOMPARE(definition.type, ts::LayerType::Imagery);
+    QCOMPARE(definition.origin, ts::LayerOrigin::Catalogue);
+    QCOMPARE(definition.name, QStringLiteral("Opaque background"));
+    QString error;
+    const std::optional<ts::WmsSource> source =
+        ts::WmsSource::fromJson(definition.source, &error);
+    QVERIFY2(source.has_value(), qPrintable(error));
+    QCOMPARE(source->layers, QStringList{QStringLiteral("background")});
+    QCOMPARE(source->format, QStringLiteral("image/jpeg"));
+    QVERIFY(!source->transparent);
+    QCOMPARE(source->crs, QStringLiteral("EPSG:4326")); // all the mock offers
+    QCOMPARE(source->url, serviceUrl);
+    // The layer names no credit; the catalogue's is used.
+    QCOMPARE(source->attribution, QStringLiteral("Mock Agency"));
+  }
+
+  void addWmsDialogErrors()
+  {
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    behaviour->refuse130 = true;
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    settings.attempts = 1;
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    ts::AddWmsDialog dialog(network, nullptr);
+    QSignalSpy loaded(&dialog, &ts::AddWmsDialog::capabilitiesLoaded);
+    QSignalSpy failed(&dialog, &ts::AddWmsDialog::connectionFailed);
+    // A server that refuses 1.3.0 is asked again in 1.1.1.
+    dialog.connectTo(server.url(QStringLiteral("/wms")).toString());
+    QVERIFY(loaded.wait(5000));
+    QCOMPARE(dialog.capabilities()->version, QStringLiteral("1.1.1"));
+    QCOMPARE(server.requestCount(), 2);
+    // Not a web address.
+    dialog.connectTo(QStringLiteral("ftp://example.invalid/wms"));
+    QCOMPARE(failed.size(), 1);
+    QVERIFY(dialog.statusText().contains(QStringLiteral("https://")));
+    // Nobody listening.
+    quint16 closedPort = 0;
+    {
+      QTcpServer probe;
+      QVERIFY(probe.listen(QHostAddress::LocalHost, 0));
+      closedPort = probe.serverPort();
+    }
+    dialog.connectTo(QStringLiteral("http://127.0.0.1:%1/wms").arg(closedPort));
+    QVERIFY(failed.wait(5000));
+    QVERIFY2(dialog.statusText().startsWith(QStringLiteral("Can't reach")),
+             qPrintable(dialog.statusText()));
+    QVERIFY(dialog.capabilities() == std::nullopt);
+    // A web page instead of capabilities.
+    behaviour->refuse130 = false;
+    ts::test::MockHttpServer page([](const ts::test::MockHttpRequest&) {
+      return ts::test::mockResponse(200, "<html><body>Welcome</body></html>",
+                                    "text/html");
+    });
+    dialog.connectTo(page.url(QStringLiteral("/")).toString());
+    QVERIFY(failed.wait(5000));
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("web page")),
+             qPrintable(dialog.statusText()));
+  }
+
+  void wmsLayerStatusInTheDock()
+  {
+    // A WMS layer that can't be opened is marked at once; one whose server
+    // can't be reached is marked offline once tiles were asked for.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTemporaryDir cache;
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    settings.attempts = 1;
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    window.registry().setWmsNetwork(
+        std::make_shared<ts::NetworkClient>(settings), wms);
+    ts::LayerTreeModel* model = window.layerModel();
+
+    ts::WmsSource broken;
+    broken.url = QUrl(QStringLiteral("http://127.0.0.1:9/wms"));
+    broken.layers = QStringList{QStringLiteral("x")};
+    broken.styles = QStringList{QString()};
+    QJsonObject badSource = broken.toJson();
+    badSource.insert(QStringLiteral("crs"), QStringLiteral("EPSG:2056"));
+    ts::LayerDefinition definition;
+    definition.id = QStringLiteral("wms:test-broken");
+    definition.origin = ts::LayerOrigin::Catalogue;
+    definition.type = ts::LayerType::Imagery;
+    definition.name = QStringLiteral("Broken");
+    definition.source = badSource;
+    const QModelIndex brokenIndex = model->addLayer(definition);
+    QCOMPARE(model->data(brokenIndex, ts::LayerTreeModel::StatusRole).toInt(),
+             static_cast<int>(ts::ProviderStatus::State::Error));
+    QVERIFY(model->data(brokenIndex, Qt::ToolTipRole)
+                .toString()
+                .contains(QStringLiteral("EPSG:2056")));
+    QVERIFY(
+        !model->data(brokenIndex, Qt::DecorationRole).value<QIcon>().isNull());
+
+    // Nobody listening on port 9 here (the discard port).
+    definition.id = QStringLiteral("wms:test-offline");
+    definition.name = QStringLiteral("Unreachable");
+    definition.source = broken.toJson();
+    const QModelIndex offline = model->addLayer(definition);
+    QCOMPARE(model->data(offline, ts::LayerTreeModel::StatusRole).toInt(),
+             static_cast<int>(ts::ProviderStatus::State::Ok));
+    if (globeOf(window) == nullptr) {
+      QSKIP("No OpenGL view: no tiles are asked for.");
+    }
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return model->data(offline, ts::LayerTreeModel::StatusRole).toInt() ==
+                 static_cast<int>(ts::ProviderStatus::State::Offline);
+        },
+        15000));
+    QVERIFY(model->data(offline, Qt::ToolTipRole)
+                .toString()
+                .contains(QStringLiteral("127.0.0.1")));
+    // The view still goes idle: failed tiles aren't asked for every frame.
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !globeOf(window)->isLoadingTiles(); }, 20000));
+    QTest::qWait(300);
+    const int frames = globeOf(window)->framesRendered();
+    QTest::qWait(500);
+    QCOMPARE(globeOf(window)->framesRendered(), frames);
+    // Removing the layer forgets its status.
+    model->removeNode(offline);
+  }
+
+  void wmsLayerDrawsAndIsCredited()
+  {
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QTemporaryDir cache;
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    window.registry().setWmsNetwork(
+        std::make_shared<ts::NetworkClient>(settings), wms);
+    ts::WmsSource source;
+    source.url = server.url(QStringLiteral("/wms"));
+    source.layers = QStringList{QStringLiteral("pattern")};
+    source.styles = QStringList{QString()};
+    source.title = QStringLiteral("Test pattern");
+    source.attribution = QStringLiteral("Mock Agency");
+    ts::LayerDefinition definition;
+    definition.id = QStringLiteral("wms:test-pattern");
+    definition.origin = ts::LayerOrigin::Catalogue;
+    definition.type = ts::LayerType::Imagery;
+    definition.name = source.title;
+    definition.source = source.toJson();
+    window.layerModel()->addLayer(definition);
+    const QJsonObject state = window.stateReport();
+    QVERIFY(state.value(QStringLiteral("attributions"))
+                .toArray()
+                .contains(QStringLiteral("Mock Agency")));
+    QVERIFY(state.value(QStringLiteral("layers"))
+                .toArray()
+                .contains(QStringLiteral("Test pattern")));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QCOMPARE(globe->imageryLayerCount(), 2);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return ts::test::mockGetMapCount(server) > 0; }, 10000));
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    // Tiles went to the disk cache.
+    QVERIFY(
+        !QDir(cache.path()).entryList({QStringLiteral("*.sqlite")}).isEmpty());
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      QTest::qWait(300);
+      globe->grabFramebuffer().save(
+          QDir(shots).filePath(QStringLiteral("wms-layer.png")));
     }
   }
 

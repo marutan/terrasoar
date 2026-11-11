@@ -11,12 +11,15 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <utility>
+#include <vector>
 
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QString>
 
 #include "ts/packs/packmanifest.h"
+#include "ts/providers/tileprovider.h"
 
 class QAction;
 class QActionGroup;
@@ -29,9 +32,11 @@ namespace ts
 {
 
 class GlobeView;
+class ImageryProvider;
 class LayerTreeDock;
 class LayerTreeModel;
 class ProviderRegistry;
+struct LayerStack;
 
 /**
  * The top-level window: the globe view, the layer tree dock, menus and
@@ -73,6 +78,21 @@ public:
    */
   bool saveProject(const QString& path, QString* errorString);
 
+  /**
+   * Opens the Add WMS Layer dialog and adds what the user chooses. With
+   * @p address, connects to it at once (tests).
+   */
+  void addWmsLayer(const QString& address = QString());
+
+  /**
+   * Returns true while the globe view is loading tiles (false without
+   * one).
+   */
+  bool isLoadingTiles() const;
+
+  /** Returns the provider registry (tests). */
+  ProviderRegistry& registry() const { return *m_registry; }
+
   /** Returns the path of the current project, empty if never saved. */
   const QString& projectPath() const { return m_projectPath; }
 
@@ -92,7 +112,8 @@ public:
 
   /**
    * Returns what the window shows, as JSON for `--measure`: the base
-   * pack's state, the layers drawn (top first), the attributions, the
+   * pack's state, the layers drawn (top first), layers whose source is
+   * offline or failing, the attributions, the
    * view (globe or map, the projection, the scale bar's text) and the
    * last frame's tile counts.
    */
@@ -114,6 +135,8 @@ private:
   void showPointerPosition(bool onGlobe, double latDeg, double lonDeg);
   void showEyeHeight(double eyeHeightM);
   void refreshLayers();
+  void watchLayerStatus(const LayerStack& stack);
+  void updateLayerStatus();
   void syncViewActions();
   void openProjectDialog();
   void saveProjectDialog(bool askForPath);
@@ -147,6 +170,14 @@ private:
   QLabel* m_eyeLabel = nullptr;
   LayerTreeModel* m_layers = nullptr;
   std::unique_ptr<ProviderRegistry> m_registry;
+  QAction* m_addWmsAction = nullptr;
+  /** The imagery layers' providers, by node id, for their status. */
+  std::vector<std::pair<QString, std::shared_ptr<ImageryProvider>>>
+      m_layerProviders;
+  /** Layers whose source can't be opened, by node id, with the reason. */
+  std::vector<std::pair<QString, QString>> m_brokenLayers;
+  /** Passes status changes from loader threads to this window. */
+  std::shared_ptr<QTimer> m_statusRelay;
   QString m_basePackDirectory;
   BasePackState m_basePackState = BasePackState::Missing;
   QString m_basePackProblem;

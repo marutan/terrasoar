@@ -7,13 +7,17 @@ QT += widgets $$TS_QT_OPENGLWIDGETS
 
 INCLUDEPATH += $$PWD/src
 
+RESOURCES += $$PWD/app.qrc
+
 HEADERS += \
+    $$PWD/src/addwmsdialog.h \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
     $$PWD/src/mainwindow.h \
     $$PWD/src/startupmeasurement.h
 
 SOURCES += \
+    $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \

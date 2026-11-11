@@ -81,9 +81,10 @@ public:
 
   /**
    * Sets the network client and settings for WMS sources (`{"kind":
-   * "wms", …}`, see WmsSource). Without this, the first WMS source
-   * creates a client with default settings and no disk cache. Affects
-   * providers created afterwards.
+   * "wms", …}`, see WmsSource). A null @p network is created with default
+   * settings when the first WMS source needs it (so that a program without
+   * WMS layers has no network thread). Without this call there is also no
+   * disk cache. Affects providers created afterwards.
    */
   void setWmsNetwork(std::shared_ptr<NetworkClient> network,
                      const WmsProviderSettings& settings);

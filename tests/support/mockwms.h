@@ -40,6 +40,8 @@ struct MockWmsBehaviour {
   std::atomic<bool> noStore{false};
   /** Send an ETag and answer If-None-Match with 304. */
   std::atomic<bool> etag{false};
+  /** Answer GetCapabilities for 1.3.0 with an exception (an old server). */
+  std::atomic<bool> refuse130{false};
 };
 
 /** Longitude and latitude to colour: the picture every GetMap draws. */
@@ -164,6 +166,14 @@ mockWmsHandler(std::shared_ptr<MockWmsBehaviour> behaviour,
     const QString kind = query.queryItemValue(QStringLiteral("REQUEST"));
     if (kind == QLatin1String("GetCapabilities")) {
       QString version = query.queryItemValue(QStringLiteral("VERSION"));
+      if (behaviour->refuse130.load() && version == QLatin1String("1.3.0")) {
+        return mockResponse(
+            200,
+            "<?xml version=\"1.0\"?><ServiceExceptionReport version=\"1.1.1\">"
+            "<ServiceException>Unsupported VERSION 1.3.0</ServiceException>"
+            "</ServiceExceptionReport>",
+            "application/vnd.ogc.se_xml");
+      }
       if (version != QLatin1String("1.1.1")) {
         version = QStringLiteral("1.3.0");
       }

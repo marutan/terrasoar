@@ -71,6 +71,96 @@
         </message>
     </context>
     <context>
+        <name>ts::AddWmsDialog</name>
+        <message>
+            <source>Add WMS Layer</source>
+            <translation>Add WMS Layer</translation>
+        </message>
+        <message>
+            <source>&amp;Service (choose one or type its address):</source>
+            <translation>&amp;Service (choose one or type its address):</translation>
+        </message>
+        <message>
+            <source>&amp;Connect</source>
+            <translation>&amp;Connect</translation>
+        </message>
+        <message>
+            <source>&amp;Layers:</source>
+            <translation>&amp;Layers:</translation>
+        </message>
+        <message>
+            <source>S&amp;tyle:</source>
+            <translation>S&amp;tyle:</translation>
+        </message>
+        <message>
+            <source>&amp;Format:</source>
+            <translation>&amp;Format:</translation>
+        </message>
+        <message>
+            <source>&amp;Add</source>
+            <translation>&amp;Add</translation>
+        </message>
+        <message>
+            <source>https://example.org/wms</source>
+            <translation>https://example.org/wms</translation>
+        </message>
+        <message>
+            <source>Connect to see the layers the server offers.</source>
+            <translation>Connect to see the layers the server offers.</translation>
+        </message>
+        <message>
+            <source>Default</source>
+            <translation>Default</translation>
+        </message>
+        <message>
+            <source>Credit: %1</source>
+            <translation>Credit: %1</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>Enter the address of a WMS server, starting with https:// or http://.</source>
+            <translation>Enter the address of a WMS server, starting with https:// or http://.</translation>
+        </message>
+        <message>
+            <source>Connecting to %1…</source>
+            <translation>Connecting to %1…</translation>
+        </message>
+        <message>
+            <source>Can't reach %1: %2</source>
+            <translation>Can't reach %1: %2</translation>
+        </message>
+        <message>
+            <source>The server answered: %1</source>
+            <translation>The server answered: %1</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n layer(s).</source>
+            <translation>
+                <numerusform>%1: %n layer.</numerusform>
+                <numerusform>%1: %n layers.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Choose a layer within this group.</source>
+            <translation>Choose a layer within this group.</translation>
+        </message>
+        <message>
+            <source>Drawn from Web Mercator images (%1), reprojected.</source>
+            <translation>Drawn from Web Mercator images (%1), reprojected.</translation>
+        </message>
+        <message>
+            <source>Drawn in %1.</source>
+            <translation>Drawn in %1.</translation>
+        </message>
+        <message>
+            <source>The server's terms: %1</source>
+            <translation>The server's terms: %1</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BuiltinLayers</name>
         <message>
             <source>Checkerboard</source>
@@ -300,6 +390,10 @@
             <source>Vector layers (shorelines, graticule) are always drawn above imagery, in their order in the tree.</source>
             <translation>Vector layers (shorelines, graticule) are always drawn above imagery, in their order in the tree.</translation>
         </message>
+        <message>
+            <source>WMS Layer…</source>
+            <translation>WMS Layer…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -466,6 +560,18 @@
             <source>Pointer not on the map</source>
             <translation>Pointer not on the map</translation>
         </message>
+        <message>
+            <source>Add &amp;WMS Layer…</source>
+            <translation>Add &amp;WMS Layer…</translation>
+        </message>
+        <message>
+            <source>Add a layer from a web map server (WMS) to the layer tree</source>
+            <translation>Add a layer from a web map server (WMS) to the layer tree</translation>
+        </message>
+        <message>
+            <source>%1: %2</source>
+            <translation>%1: %2</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectFile</name>
@@ -537,6 +643,110 @@
         <message>
             <source>Checkerboard</source>
             <translation>Checkerboard</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmsCapabilities</name>
+        <message>
+            <source>The capabilities document is empty.</source>
+            <translation>The capabilities document is empty.</translation>
+        </message>
+        <message>
+            <source>The capabilities are not valid XML: %1 (line %2).</source>
+            <translation>The capabilities are not valid XML: %1 (line %2).</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>The server sent a web page, not WMS capabilities. Check the address.</source>
+            <translation>The server sent a web page, not WMS capabilities. Check the address.</translation>
+        </message>
+        <message>
+            <source>This is not a WMS capabilities document (it starts with &lt;%1&gt;).</source>
+            <translation>This is not a WMS capabilities document (it starts with &lt;%1&gt;).</translation>
+        </message>
+        <message>
+            <source>The capabilities don't say where to send map requests.</source>
+            <translation>The capabilities don't say where to send map requests.</translation>
+        </message>
+        <message>
+            <source>The server offers no layers.</source>
+            <translation>The server offers no layers.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmsCatalogue</name>
+        <message>
+            <source>This is not a WMS catalogue.</source>
+            <translation>This is not a WMS catalogue.</translation>
+        </message>
+        <message>
+            <source>The WMS catalogue is of a newer format than this program reads.</source>
+            <translation>The WMS catalogue is of a newer format than this program reads.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmsImageryProvider</name>
+        <message>
+            <source>Can't reach %1 (%2). Saved tiles are shown where there are some.</source>
+            <translation>Can't reach %1 (%2). Saved tiles are shown where there are some.</translation>
+        </message>
+        <message>
+            <source>The server sent a tile that is far too large.</source>
+            <translation>The server sent a tile that is far too large.</translation>
+        </message>
+        <message>
+            <source>The server answered %1.</source>
+            <translation>The server answered %1.</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>The server sent something that isn't an image (%1).</source>
+            <translation>The server sent something that isn't an image (%1).</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmsSource</name>
+        <message>
+            <source>The WMS layer has no valid http or https address.</source>
+            <translation>The WMS layer has no valid http or https address.</translation>
+        </message>
+        <message>
+            <source>The WMS layer names no layers.</source>
+            <translation>The WMS layer names no layers.</translation>
+        </message>
+        <message>
+            <source>The WMS layer asks for %1, which Terra Soar can't draw.</source>
+            <translation>The WMS layer asks for %1, which Terra Soar can't draw.</translation>
+        </message>
+        <message>
+            <source>Choose a layer.</source>
+            <translation>Choose a layer.</translation>
+        </message>
+        <message>
+            <source>The server draws at most %1 layers at once.</source>
+            <translation>The server draws at most %1 layers at once.</translation>
+        </message>
+        <message>
+            <source>The server has no layer "%1".</source>
+            <translation>The server has no layer "%1".</translation>
+        </message>
+        <message>
+            <source>"%1" can only be drawn whole, at a fixed size, which doesn't work as tiles.</source>
+            <translation>"%1" can only be drawn whole, at a fixed size, which doesn't work as tiles.</translation>
+        </message>
+        <message>
+            <source>The server can't draw this in a coordinate system Terra Soar can use (EPSG:4326, CRS:84 or Web Mercator).</source>
+            <translation>The server can't draw this in a coordinate system Terra Soar can use (EPSG:4326, CRS:84 or Web Mercator).</translation>
+        </message>
+        <message>
+            <source>The server offers no image format Terra Soar can show (PNG, JPEG or GIF).</source>
+            <translation>The server offers no image format Terra Soar can show (PNG, JPEG or GIF).</translation>
         </message>
     </context>
 </TS>
