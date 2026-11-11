@@ -353,6 +353,8 @@ private slots:
     model.addLayer(ts::builtinLayerDefinitions().front());
     ts::Project project;
     project.camera = ts::CameraPose{51.5, -0.1, 12345.5, 30.0, 45.0};
+    project.mapView = true;
+    project.projection = QStringLiteral("miller");
     project.layers = model.toJson();
     QTemporaryDir directory;
     const QString path = directory.filePath(QStringLiteral("p.terrasoar"));
@@ -368,6 +370,12 @@ private slots:
     QVERIFY(reloaded.fromJson(loaded->layers, &error));
     QCOMPARE(reloaded.toJson(), model.toJson());
     QCOMPARE(loaded->camera.rangeM, 12345.5);
+    QVERIFY(loaded->mapView);
+    QCOMPARE(loaded->projection, QStringLiteral("miller"));
+    // A new project is the globe, with Mercator ready for the map.
+    QVERIFY(!ts::Project().mapView);
+    QCOMPARE(ts::Project().projection, QStringLiteral("mercator"));
+    QVERIFY(ts::projectToJson(ts::Project()).contains("\"mode\": \"globe\""));
   }
 
   void projectVersions()
@@ -384,6 +392,28 @@ private slots:
     QCOMPARE(model.rowCount(), 2);
     QCOMPARE(v1->camera.targetLatDeg, 48.0);
     QVERIFY(!model.layerStack().imagery.empty());
+    // Version 1 had no view: it was always the globe.
+    QVERIFY(!v1->mapView);
+    QCOMPARE(v1->projection, QStringLiteral("mercator"));
+    // Version 2 added the view (globe or map) and the map's projection.
+    QCOMPARE(ts::projectFormatVersion, 2);
+    const std::optional<ts::Project> v2 =
+        ts::loadProject(dataPath("projects/v2-map.terrasoar"), &error);
+    if (!v2) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(v2->mapView);
+    QCOMPARE(v2->projection, QStringLiteral("miller"));
+    QCOMPARE(v2->camera.targetLatDeg, 48.0);
+    QVERIFY2(model.fromJson(v2->layers, &error), qPrintable(error));
+    QCOMPARE(model.rowCount(), 2);
+    // A view that is missing or damaged falls back to the globe.
+    const std::optional<ts::Project> noView = ts::projectFromJson(
+        "{\"format\": \"terrasoar-project\", \"version\": 2, "
+        "\"view\": 7}",
+        &error);
+    QVERIFY(noView && !noView->mapView);
+    QCOMPARE(noView->projection, QStringLiteral("mercator"));
     // A newer format, or something that isn't a project, is refused.
     QJsonObject newer;
     newer.insert(QStringLiteral("format"), QStringLiteral("terrasoar-project"));
