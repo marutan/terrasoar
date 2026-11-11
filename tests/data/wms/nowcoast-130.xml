@@ -1,0 +1,1086 @@
+<?xml version="1.0" encoding="UTF-8"?><WMS_Capabilities version="1.3.0" updateSequence="1802" xmlns="http://www.opengis.net/wms" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengis.net/wms https://nowcoast.noaa.gov/geoserver/schemas/wms/1.3.0/capabilities_1_3_0.xsd">
+  <Service>
+    <Name>WMS</Name>
+    <Title>nowCOAST Web Map Services</Title>
+    <Abstract>A compliant implementation of WMS plus most of the SLD extension (dynamic styling). Can also generate PDF, SVG, KML, GeoRSS</Abstract>
+    <KeywordList>
+      <Keyword>WMS</Keyword>
+      <Keyword>GEOSERVER</Keyword>
+      <Keyword>nowCOAST</Keyword>
+    </KeywordList>
+    <OnlineResource xlink:type="simple" xlink:href="http://geoserver.org"/>
+    <Fees>NONE</Fees>
+    <AccessConstraints>NONE</AccessConstraints>
+  </Service>
+  <Capability>
+    <Request>
+      <GetCapabilities>
+        <Format>text/xml</Format>
+        <DCPType>
+          <HTTP>
+            <Get>
+              <OnlineResource xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?SERVICE=WMS&amp;"/>
+            </Get>
+            <Post>
+              <OnlineResource xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?SERVICE=WMS&amp;"/>
+            </Post>
+          </HTTP>
+        </DCPType>
+      </GetCapabilities>
+      <GetMap>
+        <Format>image/png</Format>
+        <Format>application/atom+xml</Format>
+        <Format>application/json;type=utfgrid</Format>
+        <Format>application/pdf</Format>
+        <Format>application/rss+xml</Format>
+        <Format>application/vnd.google-earth.kml+xml</Format>
+        <Format>application/vnd.google-earth.kml+xml;mode=networklink</Format>
+        <Format>application/vnd.google-earth.kmz</Format>
+        <Format>image/geotiff</Format>
+        <Format>image/geotiff8</Format>
+        <Format>image/gif</Format>
+        <Format>image/jpeg</Format>
+        <Format>image/png; mode=8bit</Format>
+        <Format>image/svg+xml</Format>
+        <Format>image/tiff</Format>
+        <Format>image/tiff8</Format>
+        <Format>image/vnd.jpeg-png</Format>
+        <Format>image/vnd.jpeg-png8</Format>
+        <Format>text/html; subtype=openlayers</Format>
+        <Format>text/html; subtype=openlayers2</Format>
+        <Format>text/html; subtype=openlayers3</Format>
+        <DCPType>
+          <HTTP>
+            <Get>
+              <OnlineResource xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?SERVICE=WMS&amp;"/>
+            </Get>
+          </HTTP>
+        </DCPType>
+      </GetMap>
+      <GetFeatureInfo>
+        <Format>text/plain</Format>
+        <Format>application/vnd.ogc.gml</Format>
+        <Format>text/xml</Format>
+        <Format>application/vnd.ogc.gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/html</Format>
+        <Format>application/json</Format>
+        <DCPType>
+          <HTTP>
+            <Get>
+              <OnlineResource xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?SERVICE=WMS&amp;"/>
+            </Get>
+          </HTTP>
+        </DCPType>
+      </GetFeatureInfo>
+    </Request>
+    <Exception>
+      <Format>XML</Format>
+      <Format>INIMAGE</Format>
+      <Format>BLANK</Format>
+      <Format>JSON</Format>
+    </Exception>
+    <Layer>
+      <Title>nowCOAST Web Map Services</Title>
+      <Abstract>A compliant implementation of WMS plus most of the SLD extension (dynamic styling). Can also generate PDF, SVG, KML, GeoRSS</Abstract>
+      <!--Limited list of EPSG projections:-->
+      <CRS>EPSG:3857</CRS>
+      <CRS>EPSG:4326</CRS>
+      <CRS>CRS:84</CRS>
+      <EX_GeographicBoundingBox>
+        <westBoundLongitude>-180.00000000000003</westBoundLongitude>
+        <eastBoundLongitude>180.00000000000003</eastBoundLongitude>
+        <southBoundLatitude>-85.06</southBoundLatitude>
+        <northBoundLatitude>89.11650000000178</northBoundLatitude>
+      </EX_GeographicBoundingBox>
+      <BoundingBox CRS="CRS:84" minx="-180.00000000000003" miny="-85.06" maxx="180.00000000000003" maxy="89.11650000000178"/>
+      <Layer queryable="1">
+        <Name>tropical_cyclones:active_tropical_cyclones</Name>
+        <Title>Active Tropical Cyclones</Title>
+        <Abstract/>
+        <KeywordList>
+          <Keyword>hazards</Keyword>
+          <Keyword>latest advisories</Keyword>
+          <Keyword>active</Keyword>
+          <Keyword>forecasts</Keyword>
+          <Keyword>tropical cyclones</Keyword>
+          <Keyword>tropical cyclone wind extent</Keyword>
+          <Keyword>tropical cyclone track</Keyword>
+          <Keyword>tropical cyclone watches and warnings</Keyword>
+          <Keyword>tropical cyclone current location</Keyword>
+          <Keyword>tropical cyclone forecasted locations</Keyword>
+          <Keyword>tropical cyclone cone of uncertainty</Keyword>
+          <Keyword>hurricane</Keyword>
+          <Keyword>NHC</Keyword>
+          <Keyword>CPHC</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-180.00000000000003</westBoundLongitude>
+          <eastBoundLongitude>180.00000000000003</eastBoundLongitude>
+          <southBoundLatitude>-85.06</southBoundLatitude>
+          <northBoundLatitude>85.06</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-180.00000000000003" miny="-85.06" maxx="180.00000000000003" maxy="85.06"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+        <Style>
+          <Name>default-style-tropical_cyclones:active_tropical_cyclones</Name>
+          <Title>tropical_cyclones:active_tropical_cyclones style</Title>
+          <Abstract>Default style for tropical_cyclones:active_tropical_cyclones layer</Abstract>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Aactive_tropical_cyclones"/>
+          </LegendURL>
+        </Style>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_cone_of_uncertainty_forecast</Name>
+          <Title>Tropical Cyclone Cone of Uncertainty for Track Forecasts</Title>
+          <Abstract>Layer containing geographic information that may be requested as a map</Abstract>
+          <KeywordList>
+            <Keyword>hazard</Keyword>
+            <Keyword>latest advisories</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+            <Keyword>CPHC</Keyword>
+            <Keyword>active</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_forecast_cone</Name>
+            <Title>120-hr Forecast Cone of Uncertainty</Title>
+            <LegendURL width="20" height="20">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_cone_of_uncertainty_forecast"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.6E7</MaxScaleDenominator>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_current_wind_extent</Name>
+          <Title>Tropical Cyclone Current Wind Extent</Title>
+          <Abstract>Tropical Cyclone Current Wind Extent map layer depicts NWS tropical cyclone's current wind extent for each active systems in the Atlantic, Caribbean Sea, Gulf of America, Eastern Pacific Ocean, and Central Pacific Ocean and are based on information from the NWS/National Hurricane Center (NHC) and NWS/Central Pacific Hurricane Center (CPHC) Tropical Cyclone Public Advisories. This map service is updated with the latest information from the regularly scheduled NHC and CPHC tropical cyclone public advisories as well as any intermediate or special public advisories.</Abstract>
+          <KeywordList>
+            <Keyword>hazard</Keyword>
+            <Keyword>latest advisories</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+            <Keyword>CPHC</Keyword>
+            <Keyword>active</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_current_wind_radii</Name>
+            <Title>Current Tropical Wind Extent</Title>
+            <LegendURL width="290" height="60">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_current_wind_extent"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_track_forecast</Name>
+          <Title>Tropical Cyclone Track Line Forecasts</Title>
+          <Abstract>Tropical Cyclone Track Line Forecasts map layer depicts NWS tropical cyclone's forecast track for each active systems in the Atlantic, Caribbean Sea, Gulf of America, Eastern Pacific Ocean, and Central Pacific Ocean and are based on information from the NWS/National Hurricane Center (NHC) and NWS/Central Pacific Hurricane Center (CPHC) Tropical Cyclone Public Advisories. This map service is updated with the latest information from the regularly scheduled NHC and CPHC tropical cyclone public advisories as well as any intermediate or special public advisories.</Abstract>
+          <KeywordList>
+            <Keyword>hazard</Keyword>
+            <Keyword>latest advisories</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+            <Keyword>CPHC</Keyword>
+            <Keyword>active</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_forecast_trackline</Name>
+            <Title>120-hr Forecast Track</Title>
+            <LegendURL width="20" height="20">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_track_forecast"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_intensity_forecast</Name>
+          <Title>Tropical Cyclone Center Position Forecasts</Title>
+          <Abstract>Layer containing geographic information that may be requested as a map</Abstract>
+          <KeywordList>
+            <Keyword>hazard</Keyword>
+            <Keyword>latest advisories</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+            <Keyword>CPHC</Keyword>
+            <Keyword>active</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_forecast_center_position</Name>
+            <Title>Tropical Cyclone Forecast Locations</Title>
+            <LegendURL width="245" height="333">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=245&amp;height=333&amp;layer=tropical_cyclones%3Atropical_cyclone_intensity_forecast"/>
+            </LegendURL>
+          </Style>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_watches_warnings</Name>
+          <Title>Tropical Cyclone Watches and Warnings for Coast</Title>
+          <Abstract>Layer containing geographic information that may be requested as a map</Abstract>
+          <KeywordList>
+            <Keyword>hazard</Keyword>
+            <Keyword>latest advisories</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+            <Keyword>active</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_watches_warnings</Name>
+            <Title>Tropical Cyclones Watches and Warnings</Title>
+            <LegendURL width="170" height="80">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_watches_warnings"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        </Layer>
+      </Layer>
+      <Layer queryable="1">
+        <Name>weather_radar:base_reflectivity_mosaic</Name>
+        <Title>Weather Radar Base Reflectivity Mosaic</Title>
+        <Abstract/>
+        <KeywordList>
+          <Keyword>observations</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>current conditions</Keyword>
+          <Keyword>present weather</Keyword>
+          <Keyword>radar</Keyword>
+          <Keyword>weather_radar</Keyword>
+          <Keyword>CONUS</Keyword>
+          <Keyword>Alaska</Keyword>
+          <Keyword>Hawaii</Keyword>
+          <Keyword>Caribbean</Keyword>
+          <Keyword>Guam</Keyword>
+          <Keyword>mosaic</Keyword>
+          <Keyword>doppler weather radar</Keyword>
+          <Keyword>multi-radar</Keyword>
+          <Keyword>multi-sensor</Keyword>
+          <Keyword>NEXRAD</Keyword>
+          <Keyword>MRMS</Keyword>
+          <Keyword>NWS</Keyword>
+          <Keyword>NSSL</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-180.00000000000003</westBoundLongitude>
+          <eastBoundLongitude>180.00000000000003</eastBoundLongitude>
+          <southBoundLatitude>-85.06</southBoundLatitude>
+          <northBoundLatitude>85.06</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-180.00000000000003" miny="-85.06" maxx="180.00000000000003" maxy="85.06"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+        <Style>
+          <Name>default-style-weather_radar:base_reflectivity_mosaic</Name>
+          <Title>weather_radar:base_reflectivity_mosaic style</Title>
+          <Abstract>Default style for weather_radar:base_reflectivity_mosaic layer</Abstract>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=weather_radar%3Abase_reflectivity_mosaic"/>
+          </LegendURL>
+        </Style>
+        <Layer queryable="1" opaque="0">
+          <Name>weather_radar:conus_base_reflectivity_mosaic</Name>
+          <Title>CONUS Weather Radar Base Reflectivity</Title>
+          <Abstract>Weather radar base reflectivity mosaics of CONUS radar data from Weather Surveillance Radar 1988 Doppler (WSR-88D) sites operated by NWS and DOD and also from Terminal Doppler Weather Radars at major airports. The colors on the map represent the strength of the energy reflected back towards the radar measured in dBZ. The horizontal resolution is  1km (0.62 mi). The mosaics are updated approximately every 4 minutes. Data source: NWS &amp; OAR Multi-Radar/Multi-Sensor (MRMS) System.</Abstract>
+          <KeywordList>
+            <Keyword>observations</Keyword>
+            <Keyword>time-enabled</Keyword>
+            <Keyword>current conditions</Keyword>
+            <Keyword>present weather</Keyword>
+            <Keyword>radar</Keyword>
+            <Keyword>weather_radar</Keyword>
+            <Keyword>conus</Keyword>
+            <Keyword>continental united states</Keyword>
+            <Keyword>mosaic</Keyword>
+            <Keyword>doppler weather radar</Keyword>
+            <Keyword>multi-radar</Keyword>
+            <Keyword>multi-sensor</Keyword>
+            <Keyword>NEXRAD</Keyword>
+            <Keyword>MRMS</Keyword>
+            <Keyword>NWS</Keyword>
+            <Keyword>NSSL</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-129.99999999985712</westBoundLongitude>
+            <eastBoundLongitude>-59.996793505634635</eastBoundLongitude>
+            <southBoundLatitude>20.002682634774324</southBoundLatitude>
+            <northBoundLatitude>54.99999999985709</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-129.99999999985712" miny="20.002682634774324" maxx="-59.996793505634635" maxy="54.99999999985709"/>
+          <BoundingBox CRS="EPSG:3857" minx="-1.447153380310966E7" miny="2273348.7246112144" maxx="-6678812.50227643" maxy="7361866.113023452"/>
+          <Dimension name="time" default="2026-11-11T23:19:51Z" units="ISO8601" nearestValue="1">2026-11-11T15:04:14.000Z,2026-11-11T15:08:00.000Z,2026-11-11T15:12:14.000Z,2026-11-11T15:16:06.000Z,2026-11-11T15:20:08.000Z,2026-11-11T15:24:14.000Z,2026-11-11T15:28:06.000Z,2026-11-11T15:31:36.000Z,2026-11-11T15:36:01.000Z,2026-11-11T15:39:55.000Z,2026-11-11T15:44:14.000Z,2026-11-11T15:48:09.000Z,2026-11-11T15:51:55.000Z,2026-11-11T15:56:08.000Z,2026-11-11T15:59:44.000Z,2026-11-11T16:04:03.000Z,2026-11-11T16:08:08.000Z,2026-11-11T16:12:03.000Z,2026-11-11T16:16:11.000Z,2026-11-11T16:19:48.000Z,2026-11-11T16:24:03.000Z,2026-11-11T16:28:13.000Z,2026-11-11T16:32:00.000Z,2026-11-11T16:36:00.000Z,2026-11-11T16:40:09.000Z,2026-11-11T16:44:05.000Z,2026-11-11T16:47:50.000Z,2026-11-11T16:52:12.000Z,2026-11-11T16:56:07.000Z,2026-11-11T16:59:56.000Z,2026-11-11T17:03:44.000Z,2026-11-11T17:07:54.000Z,2026-11-11T17:12:07.000Z,2026-11-11T17:16:11.000Z,2026-11-11T17:19:42.000Z,2026-11-11T17:24:17.000Z,2026-11-11T17:27:31.000Z,2026-11-11T17:32:10.000Z,2026-11-11T17:36:10.000Z,2026-11-11T17:40:03.000Z,2026-11-11T17:44:06.000Z,2026-11-11T17:47:42.000Z,2026-11-11T17:51:45.000Z,2026-11-11T17:55:57.000Z,2026-11-11T17:59:40.000Z,2026-11-11T18:04:13.000Z,2026-11-11T18:07:50.000Z,2026-11-11T18:11:43.000Z,2026-11-11T18:16:01.000Z,2026-11-11T18:20:15.000Z,2026-11-11T18:23:43.000Z,2026-11-11T18:27:59.000Z,2026-11-11T18:32:09.000Z,2026-11-11T18:36:10.000Z,2026-11-11T18:40:12.000Z,2026-11-11T18:44:10.000Z,2026-11-11T18:48:14.000Z,2026-11-11T18:52:10.000Z,2026-11-11T18:56:10.000Z,2026-11-11T19:00:01.000Z,2026-11-11T19:04:07.000Z,2026-11-11T19:07:58.000Z,2026-11-11T19:12:09.000Z,2026-11-11T19:16:13.000Z,2026-11-11T19:19:49.000Z,2026-11-11T19:23:46.000Z,2026-11-11T19:27:58.000Z,2026-11-11T19:32:09.000Z,2026-11-11T19:35:55.000Z,2026-11-11T19:39:49.000Z,2026-11-11T19:44:03.000Z,2026-11-11T19:48:18.000Z,2026-11-11T19:51:59.000Z,2026-11-11T19:55:56.000Z,2026-11-11T19:59:59.000Z,2026-11-11T20:04:10.000Z,2026-11-11T20:08:16.000Z,2026-11-11T20:12:04.000Z,2026-11-11T20:16:03.000Z,2026-11-11T20:20:11.000Z,2026-11-11T20:24:06.000Z,2026-11-11T20:28:03.000Z,2026-11-11T20:31:57.000Z,2026-11-11T20:35:52.000Z,2026-11-11T20:40:06.000Z,2026-11-11T20:43:59.000Z,2026-11-11T20:48:04.000Z,2026-11-11T20:51:54.000Z,2026-11-11T20:56:10.000Z,2026-11-11T21:00:12.000Z,2026-11-11T21:03:58.000Z,2026-11-11T21:08:03.000Z,2026-11-11T21:12:09.000Z,2026-11-11T21:16:08.000Z,2026-11-11T21:20:19.000Z,2026-11-11T21:24:05.000Z,2026-11-11T21:28:14.000Z,2026-11-11T21:31:46.000Z,2026-11-11T21:35:49.000Z,2026-11-11T21:40:18.000Z,2026-11-11T21:44:19.000Z,2026-11-11T21:48:13.000Z,2026-11-11T21:52:11.000Z,2026-11-11T21:56:13.000Z,2026-11-11T22:00:13.000Z,2026-11-11T22:03:48.000Z,2026-11-11T22:07:46.000Z,2026-11-11T22:12:02.000Z,2026-11-11T22:15:57.000Z,2026-11-11T22:19:47.000Z,2026-11-11T22:23:50.000Z,2026-11-11T22:27:48.000Z,2026-11-11T22:32:14.000Z,2026-11-11T22:36:08.000Z,2026-11-11T22:40:07.000Z,2026-11-11T22:44:13.000Z,2026-11-11T22:48:17.000Z,2026-11-11T22:52:12.000Z,2026-11-11T22:56:04.000Z,2026-11-11T22:59:52.000Z,2026-11-11T23:04:05.000Z,2026-11-11T23:08:19.000Z,2026-11-11T23:12:08.000Z,2026-11-11T23:16:15.000Z,2026-11-11T23:19:51.000Z</Dimension>
+          <Style>
+            <Name>weather_radar_base_reflectivity</Name>
+            <Title>Weather Radar Base Reflectivity</Title>
+            <LegendURL width="272" height="21">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=272&amp;height=21&amp;layer=weather_radar%3Aconus_base_reflectivity_mosaic"/>
+            </LegendURL>
+          </Style>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>weather_radar:alaska_base_reflectivity_mosaic</Name>
+          <Title>Alaska Weather Radar Base Reflectivity Mosaic</Title>
+          <Abstract>Weather radar base reflectivity mosaics of Alaska radar data from Weather Surveillance Radar 1988 Doppler (WSR-88D) sites operated by NWS and DOD and also from Terminal Doppler Weather Radars at major airports. The colors on the map represent the strength of the energy reflected back towards the radar measured in dBZ. The horizontal resolution is  1km (0.62 mi). The mosaics are updated approximately every 4 minutes. Data source: NWS &amp; OAR Multi-Radar/Multi-Sensor (MRMS) System.</Abstract>
+          <KeywordList>
+            <Keyword>observations</Keyword>
+            <Keyword>time-enabled</Keyword>
+            <Keyword>current conditions</Keyword>
+            <Keyword>present weather</Keyword>
+            <Keyword>radar</Keyword>
+            <Keyword>weather_radar</Keyword>
+            <Keyword>alaska</Keyword>
+            <Keyword>mosaic</Keyword>
+            <Keyword>doppler weather radar</Keyword>
+            <Keyword>multi-radar</Keyword>
+            <Keyword>multi-sensor</Keyword>
+            <Keyword>NEXRAD</Keyword>
+            <Keyword>MRMS</Keyword>
+            <Keyword>NWS</Keyword>
+            <Keyword>NSSL</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-175.9999999999</westBoundLongitude>
+            <eastBoundLongitude>-125.99435744000417</eastBoundLongitude>
+            <southBoundLatitude>49.996239780201094</southBoundLatitude>
+            <northBoundLatitude>72.0</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-175.9999999999" miny="49.996239780201094" maxx="-125.99435744000417" maxy="72.0"/>
+          <BoundingBox CRS="EPSG:3857" minx="-1.9592230379605018E7" miny="6445624.662651587" maxx="-1.4025627713046964E7" maxy="1.175318461533845E7"/>
+          <Dimension name="time" default="2026-11-11T23:20:57Z" units="ISO8601" nearestValue="1">2026-11-11T15:04:55.000Z,2026-11-11T15:08:56.000Z,2026-11-11T15:12:57.000Z,2026-11-11T15:16:58.000Z,2026-11-11T15:20:58.000Z,2026-11-11T15:24:59.000Z,2026-11-11T15:28:54.000Z,2026-11-11T15:32:55.000Z,2026-11-11T15:36:56.000Z,2026-11-11T15:40:56.000Z,2026-11-11T15:44:57.000Z,2026-11-11T15:48:58.000Z,2026-11-11T15:52:59.000Z,2026-11-11T15:56:55.000Z,2026-11-11T16:00:56.000Z,2026-11-11T16:04:56.000Z,2026-11-11T16:08:57.000Z,2026-11-11T16:12:58.000Z,2026-11-11T16:16:54.000Z,2026-11-11T16:20:55.000Z,2026-11-11T16:24:55.000Z,2026-11-11T16:28:56.000Z,2026-11-11T16:32:57.000Z,2026-11-11T16:36:58.000Z,2026-11-11T16:40:59.000Z,2026-11-11T16:44:54.000Z,2026-11-11T16:48:55.000Z,2026-11-11T16:52:56.000Z,2026-11-11T16:56:57.000Z,2026-11-11T17:00:58.000Z,2026-11-11T17:04:58.000Z,2026-11-11T17:08:54.000Z,2026-11-11T17:12:55.000Z,2026-11-11T17:16:56.000Z,2026-11-11T17:20:57.000Z,2026-11-11T17:24:58.000Z,2026-11-11T17:28:59.000Z,2026-11-11T17:32:55.000Z,2026-11-11T17:36:56.000Z,2026-11-11T17:40:56.000Z,2026-11-11T17:44:57.000Z,2026-11-11T17:48:58.000Z,2026-11-11T17:52:59.000Z,2026-11-11T17:56:54.000Z,2026-11-11T18:00:55.000Z,2026-11-11T18:04:56.000Z,2026-11-11T18:08:56.000Z,2026-11-11T18:12:57.000Z,2026-11-11T18:16:58.000Z,2026-11-11T18:20:59.000Z,2026-11-11T18:24:54.000Z,2026-11-11T18:28:55.000Z,2026-11-11T18:32:56.000Z,2026-11-11T18:36:56.000Z,2026-11-11T18:40:57.000Z,2026-11-11T18:44:58.000Z,2026-11-11T18:48:59.000Z,2026-11-11T18:52:55.000Z,2026-11-11T18:56:55.000Z,2026-11-11T19:00:56.000Z,2026-11-11T19:04:57.000Z,2026-11-11T19:08:54.000Z,2026-11-11T19:12:57.000Z,2026-11-11T19:16:54.000Z,2026-11-11T19:20:56.000Z,2026-11-11T19:24:57.000Z,2026-11-11T19:28:58.000Z,2026-11-11T19:32:59.000Z,2026-11-11T19:36:54.000Z,2026-11-11T19:40:55.000Z,2026-11-11T19:44:56.000Z,2026-11-11T19:48:56.000Z,2026-11-11T19:52:57.000Z,2026-11-11T19:56:57.000Z,2026-11-11T20:00:58.000Z,2026-11-11T20:04:54.000Z,2026-11-11T20:08:55.000Z,2026-11-11T20:12:55.000Z,2026-11-11T20:16:56.000Z,2026-11-11T20:20:57.000Z,2026-11-11T20:24:58.000Z,2026-11-11T20:28:58.000Z,2026-11-11T20:32:59.000Z,2026-11-11T20:36:55.000Z,2026-11-11T20:40:55.000Z,2026-11-11T20:44:56.000Z,2026-11-11T20:48:57.000Z,2026-11-11T20:52:57.000Z,2026-11-11T20:56:58.000Z,2026-11-11T21:00:59.000Z,2026-11-11T21:04:54.000Z,2026-11-11T21:08:55.000Z,2026-11-11T21:12:56.000Z,2026-11-11T21:16:57.000Z,2026-11-11T21:20:58.000Z,2026-11-11T21:24:54.000Z,2026-11-11T21:28:55.000Z,2026-11-11T21:32:56.000Z,2026-11-11T21:36:58.000Z,2026-11-11T21:40:59.000Z,2026-11-11T21:44:55.000Z,2026-11-11T21:48:56.000Z,2026-11-11T21:52:57.000Z,2026-11-11T21:56:58.000Z,2026-11-11T22:00:54.000Z,2026-11-11T22:04:56.000Z,2026-11-11T22:08:57.000Z,2026-11-11T22:12:58.000Z,2026-11-11T22:16:54.000Z,2026-11-11T22:20:55.000Z,2026-11-11T22:24:57.000Z,2026-11-11T22:28:58.000Z,2026-11-11T22:32:59.000Z,2026-11-11T22:36:55.000Z,2026-11-11T22:40:56.000Z,2026-11-11T22:44:57.000Z,2026-11-11T22:48:58.000Z,2026-11-11T22:52:54.000Z,2026-11-11T22:56:55.000Z,2026-11-11T23:00:57.000Z,2026-11-11T23:04:58.000Z,2026-11-11T23:08:58.000Z,2026-11-11T23:12:55.000Z,2026-11-11T23:16:56.000Z,2026-11-11T23:20:57.000Z</Dimension>
+          <Style>
+            <Name>weather_radar_base_reflectivity</Name>
+            <Title>Weather Radar Base Reflectivity</Title>
+            <LegendURL width="272" height="21">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=272&amp;height=21&amp;layer=weather_radar%3Aalaska_base_reflectivity_mosaic"/>
+            </LegendURL>
+          </Style>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>weather_radar:hawaii_base_reflectivity_mosaic</Name>
+          <Title>Hawaii Weather Radar Base Reflectivity</Title>
+          <Abstract>Weather radar base reflectivity mosaics of Hawaii radar data from Weather Surveillance Radar 1988 Doppler (WSR-88D) sites operated by NWS and DOD and also from Terminal Doppler Weather Radars at major airports. The colors on the map represent the strength of the energy reflected back towards the radar measured in dBZ. The horizontal resolution is  1km (0.62 mi). The mosaics are updated approximately every 4 minutes. Data source: NWS &amp; OAR Multi-Radar/Multi-Sensor (MRMS) System.</Abstract>
+          <KeywordList>
+            <Keyword>observations</Keyword>
+            <Keyword>time-enabled</Keyword>
+            <Keyword>current conditions</Keyword>
+            <Keyword>present weather</Keyword>
+            <Keyword>radar</Keyword>
+            <Keyword>weather_radar</Keyword>
+            <Keyword>hawaii</Keyword>
+            <Keyword>mosaic</Keyword>
+            <Keyword>doppler weather radar</Keyword>
+            <Keyword>multi-radar</Keyword>
+            <Keyword>multi-sensor</Keyword>
+            <Keyword>NEXRAD</Keyword>
+            <Keyword>MRMS</Keyword>
+            <Keyword>NWS</Keyword>
+            <Keyword>NSSL</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-164.00000684818352</westBoundLongitude>
+            <eastBoundLongitude>-151.00052400333598</eastBoundLongitude>
+            <southBoundLatitude>14.997893958991074</southBoundLatitude>
+            <northBoundLatitude>25.99999726557036</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-164.00000684818352" miny="14.997893958991074" maxx="-151.00052400333598" maxy="25.99999726557036"/>
+          <BoundingBox CRS="EPSG:3857" minx="-1.825639725243317E7" miny="1688957.427122261" maxx="-1.6809301441568844E7" maxy="2999080.604799826"/>
+          <Dimension name="time" default="2026-11-11T23:20:56Z" units="ISO8601" nearestValue="1">2026-11-11T15:04:57.000Z,2026-11-11T15:08:57.000Z,2026-11-11T15:12:58.000Z,2026-11-11T15:16:54.000Z,2026-11-11T15:20:55.000Z,2026-11-11T15:24:56.000Z,2026-11-11T15:28:56.000Z,2026-11-11T15:32:57.000Z,2026-11-11T15:36:58.000Z,2026-11-11T15:40:59.000Z,2026-11-11T15:44:54.000Z,2026-11-11T15:48:55.000Z,2026-11-11T15:52:55.000Z,2026-11-11T15:56:56.000Z,2026-11-11T16:00:57.000Z,2026-11-11T16:04:58.000Z,2026-11-11T16:08:58.000Z,2026-11-11T16:12:59.000Z,2026-11-11T16:16:55.000Z,2026-11-11T16:20:56.000Z,2026-11-11T16:24:56.000Z,2026-11-11T16:28:57.000Z,2026-11-11T16:32:58.000Z,2026-11-11T16:36:59.000Z,2026-11-11T16:40:55.000Z,2026-11-11T16:44:55.000Z,2026-11-11T16:48:56.000Z,2026-11-11T16:52:57.000Z,2026-11-11T16:56:58.000Z,2026-11-11T17:00:54.000Z,2026-11-11T17:04:55.000Z,2026-11-11T17:08:55.000Z,2026-11-11T17:12:56.000Z,2026-11-11T17:16:57.000Z,2026-11-11T17:20:58.000Z,2026-11-11T17:24:59.000Z,2026-11-11T17:28:59.000Z,2026-11-11T17:32:55.000Z,2026-11-11T17:36:56.000Z,2026-11-11T17:40:56.000Z,2026-11-11T17:44:57.000Z,2026-11-11T17:48:58.000Z,2026-11-11T17:52:59.000Z,2026-11-11T17:56:54.000Z,2026-11-11T18:00:55.000Z,2026-11-11T18:04:56.000Z,2026-11-11T18:08:56.000Z,2026-11-11T18:12:57.000Z,2026-11-11T18:16:58.000Z,2026-11-11T18:20:59.000Z,2026-11-11T18:24:54.000Z,2026-11-11T18:28:55.000Z,2026-11-11T18:32:56.000Z,2026-11-11T18:36:57.000Z,2026-11-11T18:40:58.000Z,2026-11-11T18:44:59.000Z,2026-11-11T18:48:54.000Z,2026-11-11T18:52:55.000Z,2026-11-11T18:56:56.000Z,2026-11-11T19:00:56.000Z,2026-11-11T19:04:57.000Z,2026-11-11T19:08:59.000Z,2026-11-11T19:12:57.000Z,2026-11-11T19:16:58.000Z,2026-11-11T19:20:59.000Z,2026-11-11T19:24:54.000Z,2026-11-11T19:28:55.000Z,2026-11-11T19:32:55.000Z,2026-11-11T19:36:56.000Z,2026-11-11T19:40:56.000Z,2026-11-11T19:44:57.000Z,2026-11-11T19:48:58.000Z,2026-11-11T19:52:59.000Z,2026-11-11T19:56:54.000Z,2026-11-11T20:00:55.000Z,2026-11-11T20:04:56.000Z,2026-11-11T20:08:56.000Z,2026-11-11T20:12:57.000Z,2026-11-11T20:16:58.000Z,2026-11-11T20:20:59.000Z,2026-11-11T20:24:54.000Z,2026-11-11T20:28:55.000Z,2026-11-11T20:32:55.000Z,2026-11-11T20:36:56.000Z,2026-11-11T20:40:56.000Z,2026-11-11T20:44:57.000Z,2026-11-11T20:48:58.000Z,2026-11-11T20:52:58.000Z,2026-11-11T20:56:54.000Z,2026-11-11T21:00:55.000Z,2026-11-11T21:04:56.000Z,2026-11-11T21:08:56.000Z,2026-11-11T21:12:57.000Z,2026-11-11T21:16:58.000Z,2026-11-11T21:20:59.000Z,2026-11-11T21:24:54.000Z,2026-11-11T21:28:55.000Z,2026-11-11T21:32:55.000Z,2026-11-11T21:36:56.000Z,2026-11-11T21:40:57.000Z,2026-11-11T21:44:57.000Z,2026-11-11T21:48:58.000Z,2026-11-11T21:52:54.000Z,2026-11-11T21:56:55.000Z,2026-11-11T22:00:55.000Z,2026-11-11T22:04:56.000Z,2026-11-11T22:08:57.000Z,2026-11-11T22:12:58.000Z,2026-11-11T22:16:54.000Z,2026-11-11T22:20:55.000Z,2026-11-11T22:24:55.000Z,2026-11-11T22:28:56.000Z,2026-11-11T22:32:57.000Z,2026-11-11T22:36:58.000Z,2026-11-11T22:40:54.000Z,2026-11-11T22:44:55.000Z,2026-11-11T22:48:56.000Z,2026-11-11T22:52:56.000Z,2026-11-11T22:56:57.000Z,2026-11-11T23:00:58.000Z,2026-11-11T23:04:58.000Z,2026-11-11T23:08:54.000Z,2026-11-11T23:12:55.000Z,2026-11-11T23:16:56.000Z,2026-11-11T23:20:56.000Z</Dimension>
+          <Style>
+            <Name>weather_radar_base_reflectivity</Name>
+            <Title>Weather Radar Base Reflectivity</Title>
+            <LegendURL width="272" height="21">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=272&amp;height=21&amp;layer=weather_radar%3Ahawaii_base_reflectivity_mosaic"/>
+            </LegendURL>
+          </Style>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>weather_radar:caribbean_base_reflectivity_mosaic</Name>
+          <Title>Caribbean Weather Radar Base Reflectivity Mosaic</Title>
+          <Abstract>Weather radar base reflectivity mosaics of Caribbean radar data from Weather Surveillance Radar 1988 Doppler (WSR-88D) sites operated by NWS and DOD and also from Terminal Doppler Weather Radars at major airports. The colors on the map represent the strength of the energy reflected back towards the radar measured in dBZ. The horizontal resolution is  1km (0.62 mi). The mosaics are updated approximately every 4 minutes. Data source: NWS &amp; OAR Multi-Radar/Multi-Sensor (MRMS) System.</Abstract>
+          <KeywordList>
+            <Keyword>observations</Keyword>
+            <Keyword>time-enabled</Keyword>
+            <Keyword>current conditions</Keyword>
+            <Keyword>present weather</Keyword>
+            <Keyword>radar</Keyword>
+            <Keyword>weather_radar</Keyword>
+            <Keyword>caribbean</Keyword>
+            <Keyword>puerto rico</Keyword>
+            <Keyword>british virgin islands</Keyword>
+            <Keyword>dominican republic</Keyword>
+            <Keyword>antiqua</Keyword>
+            <Keyword>mosaic</Keyword>
+            <Keyword>doppler weather radar</Keyword>
+            <Keyword>multi-radar</Keyword>
+            <Keyword>multi-sensor</Keyword>
+            <Keyword>NEXRAD</Keyword>
+            <Keyword>MRMS</Keyword>
+            <Keyword>NSSL</Keyword>
+            <Keyword>NWS</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-89.99999999983326</westBoundLongitude>
+            <eastBoundLongitude>-60.004112585492315</eastBoundLongitude>
+            <southBoundLatitude>9.995911550389966</southBoundLatitude>
+            <northBoundLatitude>24.999999999999996</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-89.99999999983326" miny="9.995911550389966" maxx="-60.004112585492315" maxy="24.999999999999996"/>
+          <BoundingBox CRS="EPSG:3857" minx="-1.001875417137606E7" miny="1118427.8326129161" maxx="-6679627.258519262" maxy="2875744.6243522423"/>
+          <Dimension name="time" default="2026-11-11T23:20:54Z" units="ISO8601" nearestValue="1">2026-11-11T15:04:59.000Z,2026-11-11T15:08:56.000Z,2026-11-11T15:12:58.000Z,2026-11-11T15:16:55.000Z,2026-11-11T15:20:58.000Z,2026-11-11T15:24:54.000Z,2026-11-11T15:28:55.000Z,2026-11-11T15:32:57.000Z,2026-11-11T15:36:54.000Z,2026-11-11T15:40:56.000Z,2026-11-11T15:44:58.000Z,2026-11-11T15:48:55.000Z,2026-11-11T15:52:57.000Z,2026-11-11T15:56:54.000Z,2026-11-11T16:00:58.000Z,2026-11-11T16:04:55.000Z,2026-11-11T16:08:57.000Z,2026-11-11T16:12:59.000Z,2026-11-11T16:16:56.000Z,2026-11-11T16:20:58.000Z,2026-11-11T16:24:54.000Z,2026-11-11T16:28:56.000Z,2026-11-11T16:32:58.000Z,2026-11-11T16:36:56.000Z,2026-11-11T16:40:58.000Z,2026-11-11T16:44:54.000Z,2026-11-11T16:48:57.000Z,2026-11-11T16:52:54.000Z,2026-11-11T16:56:56.000Z,2026-11-11T17:00:58.000Z,2026-11-11T17:04:55.000Z,2026-11-11T17:08:57.000Z,2026-11-11T17:12:54.000Z,2026-11-11T17:16:56.000Z,2026-11-11T17:20:58.000Z,2026-11-11T17:24:56.000Z,2026-11-11T17:28:58.000Z,2026-11-11T17:32:55.000Z,2026-11-11T17:36:57.000Z,2026-11-11T17:40:54.000Z,2026-11-11T17:44:56.000Z,2026-11-11T17:48:57.000Z,2026-11-11T17:52:54.000Z,2026-11-11T17:56:56.000Z,2026-11-11T18:00:58.000Z,2026-11-11T18:04:55.000Z,2026-11-11T18:08:57.000Z,2026-11-11T18:12:59.000Z,2026-11-11T18:16:56.000Z,2026-11-11T18:20:58.000Z,2026-11-11T18:24:55.000Z,2026-11-11T18:28:56.000Z,2026-11-11T18:32:58.000Z,2026-11-11T18:36:55.000Z,2026-11-11T18:40:57.000Z,2026-11-11T18:44:59.000Z,2026-11-11T18:48:56.000Z,2026-11-11T18:52:57.000Z,2026-11-11T18:56:55.000Z,2026-11-11T19:00:57.000Z,2026-11-11T19:04:56.000Z,2026-11-11T19:08:58.000Z,2026-11-11T19:12:58.000Z,2026-11-11T19:16:58.000Z,2026-11-11T19:20:56.000Z,2026-11-11T19:24:58.000Z,2026-11-11T19:28:54.000Z,2026-11-11T19:32:56.000Z,2026-11-11T19:36:58.000Z,2026-11-11T19:40:55.000Z,2026-11-11T19:44:57.000Z,2026-11-11T19:48:54.000Z,2026-11-11T19:52:56.000Z,2026-11-11T19:56:57.000Z,2026-11-11T20:00:55.000Z,2026-11-11T20:04:57.000Z,2026-11-11T20:08:54.000Z,2026-11-11T20:12:57.000Z,2026-11-11T20:16:58.000Z,2026-11-11T20:20:55.000Z,2026-11-11T20:24:57.000Z,2026-11-11T20:28:54.000Z,2026-11-11T20:32:56.000Z,2026-11-11T20:36:58.000Z,2026-11-11T20:40:55.000Z,2026-11-11T20:44:57.000Z,2026-11-11T20:48:58.000Z,2026-11-11T20:52:55.000Z,2026-11-11T20:56:57.000Z,2026-11-11T21:00:55.000Z,2026-11-11T21:04:57.000Z,2026-11-11T21:08:54.000Z,2026-11-11T21:12:56.000Z,2026-11-11T21:16:58.000Z,2026-11-11T21:20:54.000Z,2026-11-11T21:24:56.000Z,2026-11-11T21:28:58.000Z,2026-11-11T21:32:55.000Z,2026-11-11T21:36:57.000Z,2026-11-11T21:40:54.000Z,2026-11-11T21:44:56.000Z,2026-11-11T21:48:58.000Z,2026-11-11T21:52:55.000Z,2026-11-11T21:56:57.000Z,2026-11-11T22:00:59.000Z,2026-11-11T22:04:57.000Z,2026-11-11T22:08:59.000Z,2026-11-11T22:12:56.000Z,2026-11-11T22:16:58.000Z,2026-11-11T22:20:55.000Z,2026-11-11T22:24:57.000Z,2026-11-11T22:28:58.000Z,2026-11-11T22:32:55.000Z,2026-11-11T22:36:57.000Z,2026-11-11T22:40:59.000Z,2026-11-11T22:44:56.000Z,2026-11-11T22:48:58.000Z,2026-11-11T22:52:55.000Z,2026-11-11T22:56:57.000Z,2026-11-11T23:00:59.000Z,2026-11-11T23:04:56.000Z,2026-11-11T23:08:54.000Z,2026-11-11T23:12:56.000Z,2026-11-11T23:16:58.000Z,2026-11-11T23:20:54.000Z</Dimension>
+          <Style>
+            <Name>weather_radar_base_reflectivity</Name>
+            <Title>Weather Radar Base Reflectivity</Title>
+            <LegendURL width="272" height="21">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=272&amp;height=21&amp;layer=weather_radar%3Acaribbean_base_reflectivity_mosaic"/>
+            </LegendURL>
+          </Style>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>weather_radar:guam_base_reflectivity_mosaic</Name>
+          <Title>Guam Weather Radar Base Reflectivity</Title>
+          <Abstract>Weather radar base reflectivity mosaics of Guam radar data from Weather Surveillance Radar 1988 Doppler (WSR-88D) sites operated by NWS and DOD and also from Terminal Doppler Weather Radars at major airports. The colors on the map represent the strength of the energy reflected back towards the radar measured in dBZ. The horizontal resolution is  1km (0.62 mi). The mosaics are updated approximately every 4 minutes. Data source: NWS &amp; OAR Multi-Radar/Multi-Sensor (MRMS) System.</Abstract>
+          <KeywordList>
+            <Keyword>observations</Keyword>
+            <Keyword>time-enabled</Keyword>
+            <Keyword>current conditions</Keyword>
+            <Keyword>present weather</Keyword>
+            <Keyword>radar</Keyword>
+            <Keyword>weather_radar</Keyword>
+            <Keyword>guam</Keyword>
+            <Keyword>mosaic</Keyword>
+            <Keyword>doppler weather radar</Keyword>
+            <Keyword>multi-radar</Keyword>
+            <Keyword>multi-sensor</Keyword>
+            <Keyword>NEXRAD</Keyword>
+            <Keyword>MRMS</Keyword>
+            <Keyword>NWS</Keyword>
+            <Keyword>NSSL</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>140.0</westBoundLongitude>
+            <eastBoundLongitude>150.00178163210657</eastBoundLongitude>
+            <southBoundLatitude>8.999276425701353</southBoundLatitude>
+            <northBoundLatitude>17.999999999999986</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="140.0" miny="8.999276425701353" maxx="150.00178163210657" maxy="17.999999999999986"/>
+          <BoundingBox CRS="EPSG:3857" minx="1.5584728711058298E7" miny="1005939.5108742296" maxx="1.669812194936992E7" maxy="2037548.5447506013"/>
+          <Dimension name="time" default="2026-11-11T23:20:59Z" units="ISO8601" nearestValue="1">2026-11-11T15:04:59.000Z,2026-11-11T15:08:56.000Z,2026-11-11T15:12:58.000Z,2026-11-11T15:16:55.000Z,2026-11-11T15:20:58.000Z,2026-11-11T15:24:54.000Z,2026-11-11T15:28:55.000Z,2026-11-11T15:32:57.000Z,2026-11-11T15:36:59.000Z,2026-11-11T15:40:56.000Z,2026-11-11T15:44:58.000Z,2026-11-11T15:48:55.000Z,2026-11-11T15:52:57.000Z,2026-11-11T15:56:54.000Z,2026-11-11T16:00:58.000Z,2026-11-11T16:04:55.000Z,2026-11-11T16:08:57.000Z,2026-11-11T16:12:59.000Z,2026-11-11T16:16:56.000Z,2026-11-11T16:20:58.000Z,2026-11-11T16:24:54.000Z,2026-11-11T16:28:56.000Z,2026-11-11T16:32:58.000Z,2026-11-11T16:36:56.000Z,2026-11-11T16:40:58.000Z,2026-11-11T16:44:54.000Z,2026-11-11T16:48:57.000Z,2026-11-11T16:52:54.000Z,2026-11-11T16:56:56.000Z,2026-11-11T17:00:58.000Z,2026-11-11T17:04:55.000Z,2026-11-11T17:08:57.000Z,2026-11-11T17:12:54.000Z,2026-11-11T17:16:56.000Z,2026-11-11T17:20:58.000Z,2026-11-11T17:24:56.000Z,2026-11-11T17:28:58.000Z,2026-11-11T17:32:55.000Z,2026-11-11T17:36:57.000Z,2026-11-11T17:40:54.000Z,2026-11-11T17:44:56.000Z,2026-11-11T17:48:57.000Z,2026-11-11T17:52:54.000Z,2026-11-11T17:56:56.000Z,2026-11-11T18:00:58.000Z,2026-11-11T18:04:55.000Z,2026-11-11T18:08:57.000Z,2026-11-11T18:12:59.000Z,2026-11-11T18:16:56.000Z,2026-11-11T18:20:58.000Z,2026-11-11T18:24:55.000Z,2026-11-11T18:28:56.000Z,2026-11-11T18:32:58.000Z,2026-11-11T18:36:55.000Z,2026-11-11T18:40:57.000Z,2026-11-11T18:44:59.000Z,2026-11-11T18:48:56.000Z,2026-11-11T18:52:57.000Z,2026-11-11T18:56:55.000Z,2026-11-11T19:00:57.000Z,2026-11-11T19:04:56.000Z,2026-11-11T19:08:58.000Z,2026-11-11T19:12:58.000Z,2026-11-11T19:16:58.000Z,2026-11-11T19:20:56.000Z,2026-11-11T19:24:58.000Z,2026-11-11T19:28:54.000Z,2026-11-11T19:32:56.000Z,2026-11-11T19:36:58.000Z,2026-11-11T19:40:55.000Z,2026-11-11T19:44:57.000Z,2026-11-11T19:48:59.000Z,2026-11-11T19:52:56.000Z,2026-11-11T19:56:57.000Z,2026-11-11T20:00:55.000Z,2026-11-11T20:04:57.000Z,2026-11-11T20:08:59.000Z,2026-11-11T20:12:57.000Z,2026-11-11T20:16:58.000Z,2026-11-11T20:20:55.000Z,2026-11-11T20:24:57.000Z,2026-11-11T20:28:59.000Z,2026-11-11T20:32:56.000Z,2026-11-11T20:36:58.000Z,2026-11-11T20:40:55.000Z,2026-11-11T20:44:57.000Z,2026-11-11T20:48:58.000Z,2026-11-11T20:52:55.000Z,2026-11-11T20:56:57.000Z,2026-11-11T21:00:55.000Z,2026-11-11T21:04:57.000Z,2026-11-11T21:08:54.000Z,2026-11-11T21:12:56.000Z,2026-11-11T21:16:58.000Z,2026-11-11T21:20:59.000Z,2026-11-11T21:24:56.000Z,2026-11-11T21:28:58.000Z,2026-11-11T21:32:55.000Z,2026-11-11T21:36:57.000Z,2026-11-11T21:40:54.000Z,2026-11-11T21:44:56.000Z,2026-11-11T21:48:58.000Z,2026-11-11T21:52:55.000Z,2026-11-11T21:56:57.000Z,2026-11-11T22:00:54.000Z,2026-11-11T22:04:57.000Z,2026-11-11T22:08:54.000Z,2026-11-11T22:12:56.000Z,2026-11-11T22:16:58.000Z,2026-11-11T22:20:55.000Z,2026-11-11T22:24:57.000Z,2026-11-11T22:28:58.000Z,2026-11-11T22:32:55.000Z,2026-11-11T22:36:57.000Z,2026-11-11T22:40:59.000Z,2026-11-11T22:44:56.000Z,2026-11-11T22:48:58.000Z,2026-11-11T22:52:55.000Z,2026-11-11T22:56:57.000Z,2026-11-11T23:00:59.000Z,2026-11-11T23:04:56.000Z,2026-11-11T23:08:54.000Z,2026-11-11T23:12:56.000Z,2026-11-11T23:16:58.000Z,2026-11-11T23:20:59.000Z</Dimension>
+          <Style>
+            <Name>weather_radar_base_reflectivity</Name>
+            <Title>Weather Radar Base Reflectivity</Title>
+            <LegendURL width="272" height="21">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=272&amp;height=21&amp;layer=weather_radar%3Aguam_base_reflectivity_mosaic"/>
+            </LegendURL>
+          </Style>
+        </Layer>
+      </Layer>
+      <Layer queryable="1">
+        <Name>tropical_cyclones:past_tropical_cyclones</Name>
+        <Title>Past Tropical Cyclones</Title>
+        <Abstract/>
+        <KeywordList>
+          <Keyword>hazards</Keyword>
+          <Keyword>observed</Keyword>
+          <Keyword>past</Keyword>
+          <Keyword>tropical cyclone</Keyword>
+          <Keyword>hurricane</Keyword>
+          <Keyword>past cyclone wind extent</Keyword>
+          <Keyword>past cyclone locations</Keyword>
+          <Keyword>past cyclone track</Keyword>
+          <Keyword>NHC</Keyword>
+          <Keyword>CPHC</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-180.00000000000003</westBoundLongitude>
+          <eastBoundLongitude>180.00000000000003</eastBoundLongitude>
+          <southBoundLatitude>-85.06</southBoundLatitude>
+          <northBoundLatitude>85.06</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-180.00000000000003" miny="-85.06" maxx="180.00000000000003" maxy="85.06"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+        <Style>
+          <Name>default-style-tropical_cyclones:past_tropical_cyclones</Name>
+          <Title>tropical_cyclones:past_tropical_cyclones style</Title>
+          <Abstract>Default style for tropical_cyclones:past_tropical_cyclones layer</Abstract>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Apast_tropical_cyclones"/>
+          </LegendURL>
+        </Style>
+        <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_observed_wind_extent</Name>
+          <Title>Tropical Cyclone Observed Surface Wind Swath</Title>
+          <Abstract>Layer containing geographic information that may be requested as a map</Abstract>
+          <KeywordList>
+            <Keyword>hazards</Keyword>
+            <Keyword>observed</Keyword>
+            <Keyword>past</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_besttrack_wind_swath</Name>
+            <Title>Observed Wind Intensity &amp; Extent</Title>
+            <LegendURL width="265" height="60">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_observed_wind_extent"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_observed_track</Name>
+          <Title>Tropical Cyclone Observed Track Line</Title>
+          <Abstract>Layer containing geographic information that may be requested as a map</Abstract>
+          <KeywordList>
+            <Keyword>hazards</Keyword>
+            <Keyword>observed</Keyword>
+            <Keyword>past</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_besttrack_trackline</Name>
+            <Title>Observed Past Track</Title>
+            <LegendURL width="20" height="20">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_observed_track"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        </Layer>
+        <Layer queryable="1" opaque="0">
+          <Name>tropical_cyclones:tropical_cyclone_observed_locations</Name>
+          <Title>Tropical Cyclone Observed Center Positions</Title>
+          <Abstract>Layer containing geographic information that may be requested as a map</Abstract>
+          <KeywordList>
+            <Keyword>hazards</Keyword>
+            <Keyword>observed</Keyword>
+            <Keyword>past</Keyword>
+            <Keyword>tropical cyclone</Keyword>
+            <Keyword>hurricane</Keyword>
+            <Keyword>NHC</Keyword>
+          </KeywordList>
+          <CRS>EPSG:3857</CRS>
+          <CRS>CRS:84</CRS>
+          <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.0</westBoundLongitude>
+            <eastBoundLongitude>180.0</eastBoundLongitude>
+            <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+            <northBoundLatitude>85.05999999999999</northBoundLatitude>
+          </EX_GeographicBoundingBox>
+          <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+          <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+          <Style>
+            <Name>tropical_cyclone_besttrack_center_position</Name>
+            <Title>Observed Past Storm Locations</Title>
+            <LegendURL width="20" height="20">
+              <Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=tropical_cyclones%3Atropical_cyclone_observed_locations"/>
+            </LegendURL>
+          </Style>
+          <MaxScaleDenominator>3.5E7</MaxScaleDenominator>
+        </Layer>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>bluetopo:bathymetry</Name>
+        <Title>BlueTopo Bathymetric Data</Title>
+        <Abstract/>
+        <KeywordList>
+          <Keyword>hydrographic</Keyword>
+          <Keyword>BlueTopo</Keyword>
+          <Keyword>bathymetric surface</Keyword>
+          <Keyword>topo-bathy</Keyword>
+          <Keyword>hydrography</Keyword>
+          <Keyword>mapping</Keyword>
+          <Keyword>MSL</Keyword>
+          <Keyword>NAVD88</Keyword>
+          <Keyword>geoid</Keyword>
+          <Keyword>ocean</Keyword>
+          <Keyword>coastal</Keyword>
+          <Keyword>great lakes</Keyword>
+          <Keyword>bathymetry</Keyword>
+          <Keyword>elevation</Keyword>
+          <Keyword>uncertainty</Keyword>
+          <Keyword>contributor</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-138.09879914514408</westBoundLongitude>
+          <eastBoundLongitude>-64.19767058826523</eastBoundLongitude>
+          <southBoundLatitude>16.78577581054834</southBoundLatitude>
+          <northBoundLatitude>59.55048862948487</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-138.09879914514408" miny="16.78577581054834" maxx="-64.19767058826523" maxy="59.55048862948487"/>
+        <BoundingBox CRS="EPSG:3857" minx="-1.5373088E7" miny="1895902.2702702698" maxx="-7146452.0" maxy="8300332.0"/>
+        <Style>
+          <Name>nbs_elevation</Name>
+          <Title>Elevation</Title>
+          <Abstract>Bathymetric Color Map</Abstract>
+          <LegendURL width="293" height="24">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=293&amp;height=24&amp;layer=bluetopo%3Abathymetry"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>bluetopo:source_institution</Name>
+          <Title>bluetopo:source_institution</Title>
+          <LegendURL width="594" height="3049">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abathymetry&amp;style=source_institution"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>bluetopo:coverage</Name>
+          <Title>bluetopo:coverage</Title>
+          <LegendURL width="30" height="43">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abathymetry&amp;style=coverage"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>bluetopo:significant_features</Name>
+          <Title>bluetopo:significant_features</Title>
+          <LegendURL width="30" height="43">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abathymetry&amp;style=significant_features"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>nbs_uncertainty</Name>
+          <Title>Uncertainty</Title>
+          <Abstract>Bathymetric Uncertainty Color Map</Abstract>
+          <LegendURL width="280" height="21">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=280&amp;height=21&amp;layer=bluetopo%3Abathymetry&amp;style=nbs_uncertainty"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>bluetopo:survey_date_end</Name>
+          <Title>bluetopo:survey_date_end</Title>
+          <LegendURL width="96" height="114516">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abathymetry&amp;style=survey_date_end"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>bluetopo:bathy_coverage</Name>
+          <Title>bluetopo:bathy_coverage</Title>
+          <LegendURL width="30" height="43">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abathymetry&amp;style=bathy_coverage"/>
+          </LegendURL>
+        </Style>
+        <Style>
+          <Name>bluetopo:source_survey_id</Name>
+          <Title>bluetopo:source_survey_id</Title>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abathymetry&amp;style=source_survey_id"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>bluetopo:bluetopo_tile_scheme</Name>
+        <Title>BlueTopo Tile Scheme</Title>
+        <Abstract>BlueTopo tile scheme to access tile information, view coverage, and to download source BlueTopo datasets. Data Source: NOS/OCS</Abstract>
+        <KeywordList>
+          <Keyword>BlueTopo</Keyword>
+          <Keyword>NBS</Keyword>
+          <Keyword>NOS</Keyword>
+          <Keyword>tile scheme</Keyword>
+          <Keyword>coverage</Keyword>
+          <Keyword>grid</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-180.0</westBoundLongitude>
+          <eastBoundLongitude>180.0</eastBoundLongitude>
+          <southBoundLatitude>-85.05999999999999</southBoundLatitude>
+          <northBoundLatitude>85.05999999999999</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-180.0" miny="-85.05999999999999" maxx="180.0" maxy="85.05999999999999"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037508342789244E7" miny="-2.00489661040146E7" maxx="2.0037508342789244E7" maxy="2.0048966104014594E7"/>
+        <Style>
+          <Name>bluetopo_tile_scheme</Name>
+          <Title>BlueTopo Tile Scheme</Title>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=bluetopo%3Abluetopo_tile_scheme"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>cbofs:cbofs_sfc_currents</Name>
+        <Title>Chesapeake Bay Surface Water Currents</Title>
+        <Abstract>Latest forecast guidance of water currents at 4.5m from NOAA Operational Oceanographic Forecast Modeling Systems for oceans, coastal ocean and Great Lakes. Data Source: NOS and NWS/NCEP</Abstract>
+        <KeywordList>
+          <Keyword>model guidance</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>S-111</Keyword>
+          <Keyword>OFS</Keyword>
+          <Keyword>NOS</Keyword>
+          <Keyword>surface water currents</Keyword>
+          <Keyword>forecast guidance</Keyword>
+          <Keyword>oceanographic</Keyword>
+          <Keyword>coastal ocean</Keyword>
+          <Keyword>CBOFS</Keyword>
+          <Keyword>Chesapeake Bay</Keyword>
+          <Keyword>ocean</Keyword>
+          <Keyword>currents</Keyword>
+          <Keyword>hydrodynamic model</Keyword>
+          <Keyword>numerical ocean prediction</Keyword>
+          <Keyword>guidance</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-77.31563066450215</westBoundLongitude>
+          <eastBoundLongitude>-74.85085802822387</eastBoundLongitude>
+          <southBoundLatitude>36.21771248543176</southBoundLatitude>
+          <northBoundLatitude>39.61156471090989</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-77.31563066450215" miny="36.21771248543176" maxx="-74.85085802822387" maxy="39.61156471090989"/>
+        <BoundingBox CRS="EPSG:3857" minx="-8606736.635933187" miny="4330619.774145698" maxx="-8332359.401141494" maxy="4809655.438167262"/>
+        <Dimension name="time" default="2026-11-13T18:00:00Z" units="ISO8601" nearestValue="1">2026-11-11T01:00:00.000Z,2026-11-11T02:00:00.000Z,2026-11-11T03:00:00.000Z,2026-11-11T04:00:00.000Z,2026-11-11T05:00:00.000Z,2026-11-11T06:00:00.000Z,2026-11-11T07:00:00.000Z,2026-11-11T08:00:00.000Z,2026-11-11T09:00:00.000Z,2026-11-11T10:00:00.000Z,2026-11-11T11:00:00.000Z,2026-11-11T12:00:00.000Z,2026-11-11T13:00:00.000Z,2026-11-11T14:00:00.000Z,2026-11-11T15:00:00.000Z,2026-11-11T16:00:00.000Z,2026-11-11T17:00:00.000Z,2026-11-11T18:00:00.000Z,2026-11-11T19:00:00.000Z,2026-11-11T20:00:00.000Z,2026-11-11T21:00:00.000Z,2026-11-11T22:00:00.000Z,2026-11-11T23:00:00.000Z,2026-11-12T00:00:00.000Z,2026-11-12T01:00:00.000Z,2026-11-12T02:00:00.000Z,2026-11-12T03:00:00.000Z,2026-11-12T04:00:00.000Z,2026-11-12T05:00:00.000Z,2026-11-12T06:00:00.000Z,2026-11-12T07:00:00.000Z,2026-11-12T08:00:00.000Z,2026-11-12T09:00:00.000Z,2026-11-12T10:00:00.000Z,2026-11-12T11:00:00.000Z,2026-11-12T12:00:00.000Z,2026-11-12T13:00:00.000Z,2026-11-12T14:00:00.000Z,2026-11-12T15:00:00.000Z,2026-11-12T16:00:00.000Z,2026-11-12T17:00:00.000Z,2026-11-12T18:00:00.000Z,2026-11-12T19:00:00.000Z,2026-11-12T20:00:00.000Z,2026-11-12T21:00:00.000Z,2026-11-12T22:00:00.000Z,2026-11-12T23:00:00.000Z,2026-11-13T00:00:00.000Z,2026-11-13T01:00:00.000Z,2026-11-13T02:00:00.000Z,2026-11-13T03:00:00.000Z,2026-11-13T04:00:00.000Z,2026-11-13T05:00:00.000Z,2026-11-13T06:00:00.000Z,2026-11-13T07:00:00.000Z,2026-11-13T08:00:00.000Z,2026-11-13T09:00:00.000Z,2026-11-13T10:00:00.000Z,2026-11-13T11:00:00.000Z,2026-11-13T12:00:00.000Z,2026-11-13T13:00:00.000Z,2026-11-13T14:00:00.000Z,2026-11-13T15:00:00.000Z,2026-11-13T16:00:00.000Z,2026-11-13T17:00:00.000Z,2026-11-13T18:00:00.000Z</Dimension>
+        <Dimension name="REFERENCE_TIME" default="2026-11-11T18:00:00.000Z" units="ISO8601">2026-11-11T00:00:00.000Z,2026-11-11T06:00:00.000Z,2026-11-11T12:00:00.000Z,2026-11-11T18:00:00.000Z</Dimension>
+        <Style>
+          <Name>surface_current_speed</Name>
+          <Title>Surface Currents</Title>
+          <LegendURL width="255" height="21">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=255&amp;height=21&amp;layer=cbofs%3Acbofs_sfc_currents"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>marine_pathogen:chesbay_vibrio_vulnificus</Name>
+        <Title>Chesapeake Bay Probability of Vibrio Vulnificus</Title>
+        <Abstract>This nowCOAST map service provides maps of NOAA/NOS' latest forecast guidance for the probability of occurrence of Vibrio vulnificus (Vv), a marine pathogen which can cause illness and hospitalization.  The Vv model predicts the probability of Vv occurrence based on nowcasts and forecast guidance of water temperature and salinity from the 0000 UTC forecast cycle of the NOS Chesapeake Bay Operational Forecast System (CBOFS). The CBOFS temperature and salinity predictions are averaged over a 24-hour period and over the top 1 meter to provide averages centered around 0600 UTC. This is accomplished by using the hourly nowcasts valid from 1900 UTC to 2300 UTC from the previous day and the hourly forecast guidance valid at forecast projections 0- to 18-hr (i.e. valid for hours 0000 to 1800 UTC) of the present day. These 24-hour averages of temperature and salinity for the present day are then used by the Vv model to generate the Day 1 predictions. CBOFS' hourly guidance for forecast projections 19- to 42-hr are used to calculate average temperatures and salinities centered at the 30-hr forecast projection. These averages are used by the Vv model to generate its Day 2 predictions. Due to a bias in CBOFS' salinity predictions, the salinity predictions are automatically corrected based on near-real-time observations from several buoys in the bay before the predictions are used by the Vv model.</Abstract>
+        <KeywordList>
+          <Keyword>model guidance</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>OFS</Keyword>
+          <Keyword>NOS</Keyword>
+          <Keyword>NCCOS</Keyword>
+          <Keyword>forecast guidance</Keyword>
+          <Keyword>marine pathogen</Keyword>
+          <Keyword>guidance</Keyword>
+          <Keyword>CBOFS</Keyword>
+          <Keyword>Chesapeake Bay</Keyword>
+          <Keyword>vibrio vulnificus</Keyword>
+          <Keyword>prediction</Keyword>
+          <Keyword>probability of occurrence</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-77.3425</westBoundLongitude>
+          <eastBoundLongitude>-75.5600640733585</eastBoundLongitude>
+          <southBoundLatitude>36.847313238561014</southBoundLatitude>
+          <northBoundLatitude>39.63250000000001</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-77.3425" miny="36.847313238561014" maxx="-75.5600640733585" maxy="39.63250000000001"/>
+        <BoundingBox CRS="EPSG:3857" minx="-8609727.716678761" miny="4417845.537226957" maxx="-8411307.856953394" maxy="4812681.015670367"/>
+        <Dimension name="time" default="2026-11-12T00:00:00Z" units="ISO8601" nearestValue="1">2026-11-11T00:00:00.000Z,2026-11-12T00:00:00.000Z</Dimension>
+        <Dimension name="REFERENCE_TIME" default="2026-11-11T00:00:00.000Z" units="ISO8601">2026-11-11T00:00:00.000Z</Dimension>
+        <Style>
+          <Name>vibrio_cbofs</Name>
+          <Title>Chesapeake Bay Probability of Vibrio Vulnificus Occurrence</Title>
+          <Abstract>Chesapeake Bay Vibrio Probability Color Palette</Abstract>
+          <LegendURL width="293" height="25">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=293&amp;height=25&amp;layer=marine_pathogen%3Achesbay_vibrio_vulnificus"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>dbofs:dbofs_sfc_currents</Name>
+        <Title>Delaware Bay Surface Water Currents</Title>
+        <Abstract>Latest forecast guidance of water currents at 4.5m from NOAA Operational Oceanographic Forecast Modeling Systems for oceans, coastal ocean and Great Lakes. Data Source: NOS and NWS/NCEP</Abstract>
+        <KeywordList>
+          <Keyword>model guidance</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>S-111</Keyword>
+          <Keyword>OFS</Keyword>
+          <Keyword>NOS</Keyword>
+          <Keyword>surface water currents</Keyword>
+          <Keyword>forecast guidance</Keyword>
+          <Keyword>oceanographic</Keyword>
+          <Keyword>coastal ocean</Keyword>
+          <Keyword>DBOFS</Keyword>
+          <Keyword>Delaware Bay</Keyword>
+          <Keyword>ocean</Keyword>
+          <Keyword>currents</Keyword>
+          <Keyword>hydrodynamic model</Keyword>
+          <Keyword>numerical ocean prediction</Keyword>
+          <Keyword>guidance</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-75.8658468973889</westBoundLongitude>
+          <eastBoundLongitude>-73.27356445596232</eastBoundLongitude>
+          <southBoundLatitude>37.83327575311344</southBoundLatitude>
+          <northBoundLatitude>40.20564388929864</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-75.8658468973889" miny="37.83327575311344" maxx="-73.27356445596232" maxy="40.20564388929864"/>
+        <BoundingBox CRS="EPSG:3857" minx="-8445347.445217786" miny="4555899.967612261" maxx="-8156775.883845834" maxy="4895871.043732398"/>
+        <Dimension name="time" default="2026-11-13T18:00:00Z" units="ISO8601" nearestValue="1">2026-11-11T01:00:00.000Z,2026-11-11T02:00:00.000Z,2026-11-11T03:00:00.000Z,2026-11-11T04:00:00.000Z,2026-11-11T05:00:00.000Z,2026-11-11T06:00:00.000Z,2026-11-11T07:00:00.000Z,2026-11-11T08:00:00.000Z,2026-11-11T09:00:00.000Z,2026-11-11T10:00:00.000Z,2026-11-11T11:00:00.000Z,2026-11-11T12:00:00.000Z,2026-11-11T13:00:00.000Z,2026-11-11T14:00:00.000Z,2026-11-11T15:00:00.000Z,2026-11-11T16:00:00.000Z,2026-11-11T17:00:00.000Z,2026-11-11T18:00:00.000Z,2026-11-11T19:00:00.000Z,2026-11-11T20:00:00.000Z,2026-11-11T21:00:00.000Z,2026-11-11T22:00:00.000Z,2026-11-11T23:00:00.000Z,2026-11-12T00:00:00.000Z,2026-11-12T01:00:00.000Z,2026-11-12T02:00:00.000Z,2026-11-12T03:00:00.000Z,2026-11-12T04:00:00.000Z,2026-11-12T05:00:00.000Z,2026-11-12T06:00:00.000Z,2026-11-12T07:00:00.000Z,2026-11-12T08:00:00.000Z,2026-11-12T09:00:00.000Z,2026-11-12T10:00:00.000Z,2026-11-12T11:00:00.000Z,2026-11-12T12:00:00.000Z,2026-11-12T13:00:00.000Z,2026-11-12T14:00:00.000Z,2026-11-12T15:00:00.000Z,2026-11-12T16:00:00.000Z,2026-11-12T17:00:00.000Z,2026-11-12T18:00:00.000Z,2026-11-12T19:00:00.000Z,2026-11-12T20:00:00.000Z,2026-11-12T21:00:00.000Z,2026-11-12T22:00:00.000Z,2026-11-12T23:00:00.000Z,2026-11-13T00:00:00.000Z,2026-11-13T01:00:00.000Z,2026-11-13T02:00:00.000Z,2026-11-13T03:00:00.000Z,2026-11-13T04:00:00.000Z,2026-11-13T05:00:00.000Z,2026-11-13T06:00:00.000Z,2026-11-13T07:00:00.000Z,2026-11-13T08:00:00.000Z,2026-11-13T09:00:00.000Z,2026-11-13T10:00:00.000Z,2026-11-13T11:00:00.000Z,2026-11-13T12:00:00.000Z,2026-11-13T13:00:00.000Z,2026-11-13T14:00:00.000Z,2026-11-13T15:00:00.000Z,2026-11-13T16:00:00.000Z,2026-11-13T17:00:00.000Z,2026-11-13T18:00:00.000Z</Dimension>
+        <Dimension name="REFERENCE_TIME" default="2026-11-11T18:00:00.000Z" units="ISO8601">2026-11-11T00:00:00.000Z,2026-11-11T06:00:00.000Z,2026-11-11T12:00:00.000Z,2026-11-11T18:00:00.000Z</Dimension>
+        <Style>
+          <Name>surface_current_speed</Name>
+          <Title>Surface Currents</Title>
+          <LegendURL width="255" height="21">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=255&amp;height=21&amp;layer=dbofs%3Adbofs_sfc_currents"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>satellite:global_longwave_imagery_mosaic</Name>
+        <Title>Global Satellite Longwave Imagery</Title>
+        <Abstract>The NOAA/NESDIS Global Mosaic of Geostationary Satellite Imagery (GMGSI) longwave, thermal infrared band (~12.0 μm), has an hourly update frequency, approximately 3 km spatial resolution, the data latency is two to three hours and depicts cloud cover and land/sea temperature patterns. The channel is used in many baseline products, such as Fire Detection, Volcanic Ash Detection, and Derived Motion Wind Vector.</Abstract>
+        <KeywordList>
+          <Keyword>observations</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>GMGSI</Keyword>
+          <Keyword>satellite</Keyword>
+          <Keyword>longwave</Keyword>
+          <Keyword>cloud cover</Keyword>
+          <Keyword>infrared</Keyword>
+          <Keyword>thermal</Keyword>
+          <Keyword>global</Keyword>
+          <Keyword>Weather Satellites</Keyword>
+          <Keyword>present weather</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-179.99994344357404</westBoundLongitude>
+          <eastBoundLongitude>179.95499090311822</eastBoundLongitude>
+          <southBoundLatitude>-72.74472336303444</southBoundLatitude>
+          <northBoundLatitude>72.73681640625001</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-179.99994344357404" miny="-72.74472336303444" maxx="179.95499090311822" maxy="72.73681640625001"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037502046956703E7" miny="-1.2026983336708374E7" maxx="2.0032497953043297E7" maxy="1.2024016663291626E7"/>
+        <Dimension name="time" default="2026-11-11T22:00:00Z" units="ISO8601" nearestValue="1">2026-11-11T16:00:00.000Z,2026-11-11T17:00:00.000Z,2026-11-11T18:00:00.000Z,2026-11-11T19:00:00.000Z,2026-11-11T20:00:00.000Z,2026-11-11T21:00:00.000Z,2026-11-11T22:00:00.000Z</Dimension>
+        <Style>
+          <Name>reflectance</Name>
+          <Title>Reflectance</Title>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=satellite%3Aglobal_longwave_imagery_mosaic"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>sea_surface_temperature:global_sea_surface_temperature</Name>
+        <Title>NOAA GFS Sea Surface Temperature</Title>
+        <Abstract>The NWS Global SST Analysis is generated by the Near-Surface Sea Temperature (NSST) Scheme of the NWS/NCEP Global Data Assimilation System (GDAS) and the Global Forecast System (GFS).  The analysis provides estimates of surface water temperatures for the world oceans, seas (e.g. Black Sea) and the Great Lakes.  The NSST analysis is specifically the GDAS 1200 UTC NSST “foundation temperature” interpolated to the 1/12 degrees resolution grid of the decommissioned NWS Real-Time High Resolution SST Analysis.  The NSST global analysis is generated by NCEP once per day and is considered operational.</Abstract>
+        <KeywordList>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>GDAS</Keyword>
+          <Keyword>SST</Keyword>
+          <Keyword>NSST</Keyword>
+          <Keyword>global</Keyword>
+          <Keyword>sea surface temperature</Keyword>
+          <Keyword>analysis</Keyword>
+          <Keyword>NWS</Keyword>
+          <Keyword>NCEP</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-179.9999885408437</westBoundLongitude>
+          <eastBoundLongitude>179.9999885408437</eastBoundLongitude>
+          <southBoundLatitude>-85.00000000000003</southBoundLatitude>
+          <northBoundLatitude>85.00000000000003</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-179.9999885408437" miny="-85.00000000000003" maxx="179.9999885408437" maxy="85.00000000000003"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.00375070671618E7" miny="-1.99718688804086E7" maxx="2.00375070671618E7" maxy="1.99718688804086E7"/>
+        <Dimension name="time" default="2026-11-11T00:00:00Z" units="ISO8601" nearestValue="1">2026-11-08T00:00:00.000Z,2026-11-09T00:00:00.000Z,2026-11-10T00:00:00.000Z,2026-11-11T00:00:00.000Z</Dimension>
+        <Style>
+          <Name>global_sea_surface_temperature</Name>
+          <Title>global_sea_surface_temperature</Title>
+          <LegendURL width="275" height="32">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=275&amp;height=32&amp;layer=sea_surface_temperature%3Aglobal_sea_surface_temperature"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>satellite:global_shortwave_imagery_mosaic</Name>
+        <Title>Global Satellite Shortwave Imagery</Title>
+        <Abstract>The NOAA/NESDIS Global Mosaic of Geostationary Satellite Imagery (GMGSI) shortwave, mid-infrared band (~3.8 μm), has an hourly update frequency, approximately 3 km spatial resolution, and can be used to identify fog and low clouds at night, identify fire hot spots, detect volcanic ash, estimate sea-surface temperatures, and discriminate between ice crystal sizes during the day. Low-level atmospheric vector winds can be estimated with this band, and the band can be used to study urban heat islands.</Abstract>
+        <KeywordList>
+          <Keyword>observations</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>GMGSI</Keyword>
+          <Keyword>satellite</Keyword>
+          <Keyword>shortwave</Keyword>
+          <Keyword>fog</Keyword>
+          <Keyword>global</Keyword>
+          <Keyword>infrared</Keyword>
+          <Keyword>Weather Satellites</Keyword>
+          <Keyword>present weather</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-179.99994344357404</westBoundLongitude>
+          <eastBoundLongitude>179.95499090311822</eastBoundLongitude>
+          <southBoundLatitude>-72.74472336303444</southBoundLatitude>
+          <northBoundLatitude>72.73681640625001</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-179.99994344357404" miny="-72.74472336303444" maxx="179.95499090311822" maxy="72.73681640625001"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037502046956703E7" miny="-1.2026983336708374E7" maxx="2.0032497953043297E7" maxy="1.2024016663291626E7"/>
+        <Dimension name="time" default="2026-11-11T22:00:00Z" units="ISO8601" nearestValue="1">2026-11-11T16:00:00.000Z,2026-11-11T17:00:00.000Z,2026-11-11T18:00:00.000Z,2026-11-11T19:00:00.000Z,2026-11-11T20:00:00.000Z,2026-11-11T21:00:00.000Z,2026-11-11T22:00:00.000Z</Dimension>
+        <Style>
+          <Name>reflectance</Name>
+          <Title>Reflectance</Title>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=satellite%3Aglobal_shortwave_imagery_mosaic"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="1" opaque="0">
+        <Name>satellite:global_visible_imagery_mosaic</Name>
+        <Title>Global Satellite Visible Imagery</Title>
+        <Abstract>The NOAA/NESDIS Global Mosaic of Geostationary Satellite Imagery (GMGSI) visible band (~0.6 μm), has an hourly update frequency, approximately 3 km spatial resolution, the data latency is two to three hours, and provides detection and analysis of clouds and weather systems during daytime. Half-kilometer resolution allows detection of boundaries and small clouds, especially useful in mesoscale sectors for rapidly changing phenomena.</Abstract>
+        <KeywordList>
+          <Keyword>observations</Keyword>
+          <Keyword>time-enabled</Keyword>
+          <Keyword>GMGSI</Keyword>
+          <Keyword>Satellite</Keyword>
+          <Keyword>visible</Keyword>
+          <Keyword>global</Keyword>
+          <Keyword>Weather Satellites</Keyword>
+          <Keyword>present weather</Keyword>
+        </KeywordList>
+        <CRS>EPSG:3857</CRS>
+        <CRS>CRS:84</CRS>
+        <EX_GeographicBoundingBox>
+          <westBoundLongitude>-179.99994344357404</westBoundLongitude>
+          <eastBoundLongitude>179.95499090311822</eastBoundLongitude>
+          <southBoundLatitude>-72.74472336303444</southBoundLatitude>
+          <northBoundLatitude>72.73681640625001</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="CRS:84" minx="-179.99994344357404" miny="-72.74472336303444" maxx="179.95499090311822" maxy="72.73681640625001"/>
+        <BoundingBox CRS="EPSG:3857" minx="-2.0037502046956703E7" miny="-1.2026983336708374E7" maxx="2.0032497953043297E7" maxy="1.2024016663291626E7"/>
+        <Dimension name="time" default="2026-11-11T22:00:00Z" units="ISO8601" nearestValue="1">2026-11-11T16:00:00.000Z,2026-11-11T17:00:00.000Z,2026-11-11T18:00:00.000Z,2026-11-11T19:00:00.000Z,2026-11-11T20:00:00.000Z,2026-11-11T21:00:00.000Z,2026-11-11T22:00:00.000Z</Dimension>
+        <Style>
+          <Name>reflectance</Name>
+          <Title>Reflectance</Title>
+          <LegendURL width="20" height="20">
+            <Format>image/png</Format>
+            <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://nowcoast.noaa.gov/geoserver/ows?service=WMS&amp;version=1.3.0&amp;request=GetLegendGraphic&amp;format=image%2Fpng&amp;width=20&amp;height=20&amp;layer=satellite%3Aglobal_visible_imagery_mosaic"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMS_Capabilities>

@@ -1,0 +1,991 @@
+<?xml version='1.0' encoding="UTF-8" standalone="no" ?>
+<WMS_Capabilities version="1.3.0"  xmlns="http://www.opengis.net/wms"   xmlns:sld="http://www.opengis.net/sld"   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"   xmlns:ms="http://mapserver.gis.umn.edu/mapserver"   xsi:schemaLocation="http://www.opengis.net/wms http://schemas.opengis.net/wms/1.3.0/capabilities_1_3_0.xsd  http://www.opengis.net/sld http://schemas.opengis.net/sld/1.1.0/sld_capabilities.xsd  http://mapserver.gis.umn.edu/mapserver https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?service=WMS&amp;version=1.3.0&amp;request=GetSchemaExtension">
+<Service>
+  <Name>WMS</Name>
+  <Title>NASA Global Imagery Browse Services for EOSDIS WMS (EPSG:4326 / best)</Title>
+  <Abstract>The Global Imagery Browse Services (GIBS) system is a core EOSDIS component which provides a scalable, responsive, highly available, and community standards based set of imagery services. These services are designed with the goal of advancing user interactions with EOSDIS’ inter-disciplinary data through enhanced visual representation and discovery.</Abstract>
+  <KeywordList>
+      <Keyword>GIBS</Keyword>
+      <Keyword>NASA</Keyword>
+      <Keyword>WMS</Keyword>
+      <Keyword>Earth</Keyword>
+  </KeywordList>
+  <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?"/>
+  <Fees>none</Fees>
+  <AccessConstraints>none</AccessConstraints>
+  <LayerLimit>5</LayerLimit>
+  <MaxWidth>20000</MaxWidth>
+  <MaxHeight>20000</MaxHeight>
+</Service>
+
+<Capability>
+  <Request>
+    <GetCapabilities>
+      <Format>text/xml</Format>
+      <DCPType>
+        <HTTP>
+          <Get><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?"/></Get>
+          <Post><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?"/></Post>
+        </HTTP>
+      </DCPType>
+    </GetCapabilities>
+    <GetMap>
+      <Format>image/png</Format>
+      <Format>image/jpeg</Format>
+      <Format>application/vnd.google-earth.kml.xml</Format>
+      <Format>application/vnd.google-earth.kmz</Format>
+      <Format>image/png; mode=8bit</Format>
+      <Format>image/vnd.jpeg-png</Format>
+      <Format>image/vnd.jpeg-png8</Format>
+      <Format>application/x-pdf</Format>
+      <Format>image/svg+xml</Format>
+      <Format>image/tiff</Format>
+      <Format>application/json</Format>
+      <DCPType>
+        <HTTP>
+          <Get><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?"/></Get>
+          <Post><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?"/></Post>
+        </HTTP>
+      </DCPType>
+    </GetMap>
+  </Request>
+  <Exception>
+    <Format>XML</Format>
+    <Format>INIMAGE</Format>
+    <Format>BLANK</Format>
+  </Exception>
+  <sld:UserDefinedSymbolization SupportSLD="1" UserLayer="0" UserStyle="1" RemoteWFS="0" InlineFeature="0" RemoteWCS="0"/>
+  <Layer>
+    <Name>NASA_GIBS_EPSG4326_best</Name>
+    <Title>NASA Global Imagery Browse Services for EOSDIS WMS (EPSG:4326 / best)</Title>
+    <Abstract>The Global Imagery Browse Services (GIBS) system is a core EOSDIS component which provides a scalable, responsive, highly available, and community standards based set of imagery services. These services are designed with the goal of advancing user interactions with EOSDIS’ inter-disciplinary data through enhanced visual representation and discovery.</Abstract>
+    <KeywordList>
+        <Keyword>GIBS</Keyword>
+        <Keyword>NASA</Keyword>
+        <Keyword>WMS</Keyword>
+        <Keyword>Earth</Keyword>
+    </KeywordList>
+    <CRS>epsg:4326</CRS>
+    <EX_GeographicBoundingBox>
+        <westBoundLongitude>-180.000000</westBoundLongitude>
+        <eastBoundLongitude>180.000000</eastBoundLongitude>
+        <southBoundLatitude>-90.000000</southBoundLatitude>
+        <northBoundLatitude>90.000000</northBoundLatitude>
+    </EX_GeographicBoundingBox>
+    <BoundingBox CRS="EPSG:4326"
+                minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+    <Layer>
+      <Name>Temperature</Name>
+      <Title>Temperature</Title>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MERRA2_2m_Air_Temperature_Monthly</Name>
+        <Title>MERRA2_2m_Air_Temperature_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-08-01" nearestValue="0">1980-01-01/2023-11-01/P1M,2024-02-01/2024-04-01/P1M,2024-06-01/2026-08-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MERRA2_2m_Air_Temperature_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MERRA2_2m_Air_Temperature_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MERRA2_2m_Air_Temperature_Assimilated_Monthly</Name>
+        <Title>MERRA2_2m_Air_Temperature_Assimilated_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-08-01" nearestValue="0">1980-01-01/2026-08-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MERRA2_2m_Air_Temperature_Assimilated_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MERRA2_2m_Air_Temperature_Assimilated_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MLS_Temperature_46hPa_Day</Name>
+        <Title>MLS_Temperature_46hPa_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2013-05-09/2018-06-03/P1D,2018-06-12/2018-06-19/P1D,2018-06-26/2018-07-10/P1D,2018-07-18/2018-09-27/P1D,2018-09-30/2019-01-27/P1D,2019-01-31/2020-08-14/P1D,2020-08-16/2020-12-29/P1D,2021-01-03/2021-03-26/P1D,2021-03-28/2022-02-25/P1D,2022-02-27/2022-06-20/P1D,2022-06-23/2022-10-11/P1D,2022-10-13/2023-01-30/P1D,2023-02-02/2023-02-21/P1D,2023-03-03/2023-05-31/P1D,2023-06-04/2025-01-08/P1D,2025-01-10/2025-11-19/P1D,2025-11-21/2026-01-19/P1D,2026-01-21/2026-01-24/P1D,2026-01-26/2026-05-07/P1D,2026-05-11/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MLS_Temperature_46hPa_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MLS_Temperature_46hPa_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MLS_Temperature_46hPa_Night</Name>
+        <Title>MLS_Temperature_46hPa_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2013-05-09/2018-06-03/P1D,2018-06-12/2018-06-19/P1D,2018-06-26/2018-07-10/P1D,2018-07-18/2018-09-27/P1D,2018-09-30/2019-01-27/P1D,2019-01-31/2020-08-14/P1D,2020-08-16/2020-12-29/P1D,2021-01-03/2021-03-26/P1D,2021-03-28/2022-02-25/P1D,2022-02-27/2022-06-20/P1D,2022-06-23/2022-10-11/P1D,2022-10-13/2023-01-30/P1D,2023-02-02/2023-02-21/P1D,2023-03-03/2023-05-31/P1D,2023-06-04/2025-01-08/P1D,2025-01-10/2025-11-19/P1D,2025-11-21/2026-01-19/P1D,2026-01-21/2026-01-24/P1D,2026-01-26/2026-05-07/P1D,2026-05-11/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MLS_Temperature_46hPa_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MLS_Temperature_46hPa_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>GLDAS_Near_Surface_Air_Temperature_Monthly</Name>
+        <Title>GLDAS_Near_Surface_Air_Temperature_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-06-01" nearestValue="0">2000-01-01/2026-06-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=GLDAS_Near_Surface_Air_Temperature_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/GLDAS_Near_Surface_Air_Temperature_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>NLDAS_Near_Surface_Air_Temperature_Primary_Monthly</Name>
+        <Title>NLDAS_Near_Surface_Air_Temperature_Primary_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-09-01" nearestValue="0">1979-01-01/2026-09-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=NLDAS_Near_Surface_Air_Temperature_Primary_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/NLDAS_Near_Surface_Air_Temperature_Primary_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MERRA2_Air_Temperature_250hPa_Monthly</Name>
+        <Title>MERRA2_Air_Temperature_250hPa_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-08-01" nearestValue="0">1980-01-01/2026-08-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MERRA2_Air_Temperature_250hPa_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MERRA2_Air_Temperature_250hPa_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Air_Temperature_Daily_Day</Name>
+        <Title>AIRS_L3_Surface_Air_Temperature_Daily_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-08" nearestValue="0">2002-09-01/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-29/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-09-02/2022-03-31/P1D,2022-04-07/2022-10-19/P1D,2022-10-22/2024-07-25/P1D,2024-07-27/2026-01-19/P1D,2026-01-28/2026-11-08/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Air_Temperature_Daily_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Air_Temperature_Daily_Day_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Air_Temperature_Monthly_Day</Name>
+        <Title>AIRS_L3_Surface_Air_Temperature_Monthly_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-09-01" nearestValue="0">2002-09-01/2025-04-01/P1M,2025-07-01/2026-09-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Air_Temperature_Monthly_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Air_Temperature_Monthly_Day_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Air_Temperature_Daily_Night</Name>
+        <Title>AIRS_L3_Surface_Air_Temperature_Daily_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-08" nearestValue="0">2002-09-01/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-27/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-29/2016-09-25/P1D,2016-09-28/2020-08-16/P1D,2020-09-03/2022-03-31/P1D,2022-04-07/2022-10-19/P1D,2022-10-22/2024-07-25/P1D,2024-07-28/2026-01-19/P1D,2026-01-29/2026-11-08/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Air_Temperature_Daily_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Air_Temperature_Daily_Night_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Air_Temperature_Monthly_Night</Name>
+        <Title>AIRS_L3_Surface_Air_Temperature_Monthly_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-09-01" nearestValue="0">2002-09-01/2025-04-01/P1M,2025-07-01/2026-09-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Air_Temperature_Monthly_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Air_Temperature_Monthly_Night_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>PREFIRE_SAT1_Outgoing_Longwave_Radiative_Flux</Name>
+        <Title>PREFIRE_SAT1_Outgoing_Longwave_Radiative_Flux</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-01T06:34:08Z" nearestValue="0">2026-10-25T18:38:28Z/2026-10-25T18:38:28Z/PT90M,2026-10-25T20:13:06Z/2026-10-25T20:13:06Z/PT90M,2026-10-25T21:47:28Z/2026-10-25T21:47:28Z/PT90M,2026-10-25T23:21:58Z/2026-10-25T23:21:58Z/PT90M,2026-10-26T00:56:28Z/2026-10-26T00:56:28Z/PT90M,2026-10-26T02:31:06Z/2026-10-26T02:31:06Z/PT90M,2026-10-26T04:05:29Z/2026-10-26T04:05:29Z/PT90M,2026-10-26T05:39:58Z/2026-10-26T05:39:58Z/PT90M,2026-10-26T07:14:29Z/2026-10-26T07:14:29Z/PT90M,2026-10-26T08:48:59Z/2026-10-26T08:48:59Z/PT90M,2026-10-26T10:23:29Z/2026-10-26T10:23:29Z/PT90M,2026-10-26T11:58:00Z/2026-10-26T11:58:00Z/PT90M,2026-10-26T13:32:30Z/2026-10-26T13:32:30Z/PT90M,2026-10-26T15:07:00Z/2026-10-26T15:07:00Z/PT90M,2026-10-26T16:41:30Z/2026-10-26T16:41:30Z/PT90M,2026-10-26T18:16:00Z/2026-10-26T18:16:00Z/PT90M,2026-10-26T19:50:30Z/2026-10-26T19:50:30Z/PT90M,2026-10-26T21:25:01Z/2026-10-26T21:25:01Z/PT90M,2026-10-26T22:59:31Z/2026-10-26T22:59:31Z/PT90M,2026-10-27T00:34:00Z/2026-10-27T00:34:00Z/PT90M,2026-10-27T02:08:30Z/2026-10-27T02:08:30Z/PT90M,2026-10-27T03:43:01Z/2026-10-27T03:43:01Z/PT90M,2026-10-27T05:17:31Z/2026-10-27T05:17:31Z/PT90M,2026-10-27T06:52:01Z/2026-10-27T06:52:01Z/PT90M,2026-10-27T08:26:31Z/2026-10-27T08:26:31Z/PT90M,2026-10-27T10:01:02Z/2026-10-27T10:01:02Z/PT90M,2026-10-27T11:35:32Z/2026-10-27T11:35:32Z/PT90M,2026-10-27T13:10:02Z/2026-10-27T13:10:02Z/PT90M,2026-10-27T14:44:32Z/2026-10-27T14:44:32Z/PT90M,2026-10-27T16:19:02Z/2026-10-27T16:19:02Z/PT90M,2026-10-27T17:53:32Z/2026-10-27T17:53:32Z/PT90M,2026-10-27T19:28:02Z/2026-10-27T19:28:02Z/PT90M,2026-10-27T21:02:32Z/2026-10-27T21:02:32Z/PT90M,2026-10-27T22:37:03Z/2026-10-27T22:37:03Z/PT90M,2026-10-28T00:11:48Z/2026-10-28T00:11:48Z/PT90M,2026-10-28T01:46:03Z/2026-10-28T01:46:03Z/PT90M,2026-10-28T03:20:33Z/2026-10-28T03:20:33Z/PT90M,2026-10-28T04:55:03Z/2026-10-28T04:55:03Z/PT90M,2026-10-28T06:29:47Z/2026-10-28T06:29:47Z/PT90M,2026-10-28T08:04:03Z/2026-10-28T08:04:03Z/PT90M,2026-10-28T09:38:33Z/2026-10-28T09:38:33Z/PT90M,2026-10-28T11:13:03Z/2026-10-28T11:13:03Z/PT90M,2026-10-28T12:47:34Z/2026-10-28T12:47:34Z/PT90M,2026-10-28T14:22:04Z/2026-10-28T14:22:04Z/PT90M,2026-10-28T15:56:53Z/2026-10-28T15:56:53Z/PT90M,2026-10-28T17:31:04Z/2026-10-28T17:31:04Z/PT90M,2026-10-28T19:05:34Z/2026-10-28T19:05:34Z/PT90M,2026-10-28T20:40:04Z/2026-10-28T20:40:04Z/PT90M,2026-10-28T22:14:34Z/2026-10-28T22:14:34Z/PT90M,2026-10-28T23:49:05Z/2026-10-28T23:49:05Z/PT90M,2026-10-29T01:23:35Z/2026-10-29T01:23:35Z/PT90M,2026-10-29T02:58:05Z/2026-10-29T02:58:05Z/PT90M,2026-10-29T04:32:35Z/2026-10-29T04:32:35Z/PT90M,2026-10-29T06:07:05Z/2026-10-29T06:07:05Z/PT90M,2026-10-29T07:41:35Z/2026-10-29T07:41:35Z/PT90M,2026-10-29T09:16:05Z/2026-10-29T09:16:05Z/PT90M,2026-10-29T10:50:35Z/2026-10-29T10:50:35Z/PT90M,2026-10-29T12:25:05Z/2026-10-29T12:25:05Z/PT90M,2026-10-29T13:59:35Z/2026-10-29T13:59:35Z/PT90M,2026-10-29T15:34:06Z/2026-10-29T15:34:06Z/PT90M,2026-10-29T17:08:36Z/2026-10-29T17:08:36Z/PT90M,2026-10-29T18:43:06Z/2026-10-29T18:43:06Z/PT90M,2026-10-29T20:17:46Z/2026-10-29T20:17:46Z/PT90M,2026-10-29T21:52:06Z/2026-10-29T21:52:06Z/PT90M,2026-10-29T23:26:36Z/2026-10-29T23:26:36Z/PT90M,2026-10-30T01:01:06Z/2026-10-30T01:01:06Z/PT90M,2026-10-30T02:35:36Z/2026-10-30T02:35:36Z/PT90M,2026-10-30T04:10:06Z/2026-10-30T04:10:06Z/PT90M,2026-10-30T05:44:36Z/2026-10-30T05:44:36Z/PT90M,2026-10-30T07:19:06Z/2026-10-30T07:19:06Z/PT90M,2026-10-30T08:53:36Z/2026-10-30T08:53:36Z/PT90M,2026-10-30T10:28:06Z/2026-10-30T10:28:06Z/PT90M,2026-10-30T12:02:37Z/2026-10-30T12:02:37Z/PT90M,2026-10-30T13:37:07Z/2026-10-30T13:37:07Z/PT90M,2026-10-30T15:11:37Z/2026-10-30T15:11:37Z/PT90M,2026-10-30T16:46:07Z/2026-10-30T16:46:07Z/PT90M,2026-10-30T18:20:37Z/2026-10-30T18:20:37Z/PT90M,2026-10-30T19:55:07Z/2026-10-30T19:55:07Z/PT90M,2026-10-30T21:29:37Z/2026-10-30T21:29:37Z/PT90M,2026-10-30T23:04:07Z/2026-10-30T23:04:07Z/PT90M,2026-10-31T00:38:37Z/2026-10-31T00:38:37Z/PT90M,2026-10-31T02:13:07Z/2026-10-31T02:13:07Z/PT90M,2026-10-31T03:47:37Z/2026-10-31T03:47:37Z/PT90M,2026-10-31T05:22:07Z/2026-10-31T05:22:07Z/PT90M,2026-10-31T06:56:37Z/2026-10-31T06:56:37Z/PT90M,2026-10-31T08:31:07Z/2026-10-31T08:31:07Z/PT90M,2026-10-31T10:05:37Z/2026-10-31T10:05:37Z/PT90M,2026-10-31T11:40:07Z/2026-10-31T11:40:07Z/PT90M,2026-10-31T13:14:38Z/2026-10-31T13:14:38Z/PT90M,2026-10-31T14:49:08Z/2026-10-31T14:49:08Z/PT90M,2026-10-31T16:23:38Z/2026-10-31T16:23:38Z/PT90M,2026-10-31T17:58:08Z/2026-10-31T17:58:08Z/PT90M,2026-10-31T19:32:38Z/2026-10-31T19:32:38Z/PT90M,2026-10-31T21:07:08Z/2026-10-31T21:07:08Z/PT90M,2026-10-31T22:41:37Z/2026-10-31T22:41:37Z/PT90M,2026-11-01T00:16:07Z/2026-11-01T00:16:07Z/PT90M,2026-11-01T01:50:37Z/2026-11-01T01:50:37Z/PT90M,2026-11-01T03:25:07Z/2026-11-01T03:25:07Z/PT90M,2026-11-01T04:59:48Z/2026-11-01T04:59:48Z/PT90M,2026-11-01T06:34:08Z/2026-11-01T06:34:08Z/PT90M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=PREFIRE_SAT1_Outgoing_Longwave_Radiative_Flux"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/PREFIRE_Outgoing_Longwave_Radiative_Flux_LEO_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>PREFIRE_SAT2_Outgoing_Longwave_Radiative_Flux</Name>
+        <Title>PREFIRE_SAT2_Outgoing_Longwave_Radiative_Flux</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-01T07:43:58Z" nearestValue="0">2026-10-25T19:30:25Z/2026-10-25T19:30:25Z/PT90M,2026-10-25T21:04:57Z/2026-10-25T21:04:57Z/PT90M,2026-10-25T22:39:37Z/2026-10-25T22:39:37Z/PT90M,2026-10-26T00:14:19Z/2026-10-26T00:14:19Z/PT90M,2026-10-26T01:49:00Z/2026-10-26T01:49:00Z/PT90M,2026-10-26T03:23:41Z/2026-10-26T03:23:41Z/PT90M,2026-10-26T04:58:22Z/2026-10-26T04:58:22Z/PT90M,2026-10-26T06:33:03Z/2026-10-26T06:33:03Z/PT90M,2026-10-26T08:07:44Z/2026-10-26T08:07:44Z/PT90M,2026-10-26T09:42:25Z/2026-10-26T09:42:25Z/PT90M,2026-10-26T11:17:06Z/2026-10-26T11:17:06Z/PT90M,2026-10-26T12:51:48Z/2026-10-26T12:51:48Z/PT90M,2026-10-26T14:26:29Z/2026-10-26T14:26:29Z/PT90M,2026-10-26T16:01:09Z/2026-10-26T16:01:09Z/PT90M,2026-10-26T17:35:51Z/2026-10-26T17:35:51Z/PT90M,2026-10-26T19:10:32Z/2026-10-26T19:10:32Z/PT90M,2026-10-26T20:45:13Z/2026-10-26T20:45:13Z/PT90M,2026-10-26T22:19:54Z/2026-10-26T22:19:54Z/PT90M,2026-10-26T23:54:35Z/2026-10-26T23:54:35Z/PT90M,2026-10-27T01:29:16Z/2026-10-27T01:29:16Z/PT90M,2026-10-27T03:03:57Z/2026-10-27T03:03:57Z/PT90M,2026-10-27T04:38:38Z/2026-10-27T04:38:38Z/PT90M,2026-10-27T06:13:19Z/2026-10-27T06:13:19Z/PT90M,2026-10-27T07:48:01Z/2026-10-27T07:48:01Z/PT90M,2026-10-27T09:22:41Z/2026-10-27T09:22:41Z/PT90M,2026-10-27T10:57:22Z/2026-10-27T10:57:22Z/PT90M,2026-10-27T12:32:04Z/2026-10-27T12:32:04Z/PT90M,2026-10-27T14:06:45Z/2026-10-27T14:06:45Z/PT90M,2026-10-27T15:41:25Z/2026-10-27T15:41:25Z/PT90M,2026-10-27T17:16:06Z/2026-10-27T17:16:06Z/PT90M,2026-10-27T18:50:48Z/2026-10-27T18:50:48Z/PT90M,2026-10-27T20:25:28Z/2026-10-27T20:25:28Z/PT90M,2026-10-27T22:00:10Z/2026-10-27T22:00:10Z/PT90M,2026-10-27T23:34:51Z/2026-10-27T23:34:51Z/PT90M,2026-10-28T01:09:32Z/2026-10-28T01:09:32Z/PT90M,2026-10-28T02:44:13Z/2026-10-28T02:44:13Z/PT90M,2026-10-28T04:18:54Z/2026-10-28T04:18:54Z/PT90M,2026-10-28T05:53:35Z/2026-10-28T05:53:35Z/PT90M,2026-10-28T07:28:16Z/2026-10-28T07:28:16Z/PT90M,2026-10-28T09:02:57Z/2026-10-28T09:02:57Z/PT90M,2026-10-28T10:37:38Z/2026-10-28T10:37:38Z/PT90M,2026-10-28T12:12:20Z/2026-10-28T12:12:20Z/PT90M,2026-10-28T13:47:00Z/2026-10-28T13:47:00Z/PT90M,2026-10-28T15:21:41Z/2026-10-28T15:21:41Z/PT90M,2026-10-28T16:56:22Z/2026-10-28T16:56:22Z/PT90M,2026-10-28T18:31:04Z/2026-10-28T18:31:04Z/PT90M,2026-10-28T20:05:45Z/2026-10-28T20:05:45Z/PT90M,2026-10-28T21:40:26Z/2026-10-28T21:40:26Z/PT90M,2026-10-28T23:15:07Z/2026-10-28T23:15:07Z/PT90M,2026-10-29T00:49:47Z/2026-10-29T00:49:47Z/PT90M,2026-10-29T02:24:29Z/2026-10-29T02:24:29Z/PT90M,2026-10-29T03:59:10Z/2026-10-29T03:59:10Z/PT90M,2026-10-29T05:33:51Z/2026-10-29T05:33:51Z/PT90M,2026-10-29T07:08:31Z/2026-10-29T07:08:31Z/PT90M,2026-10-29T08:43:13Z/2026-10-29T08:43:13Z/PT90M,2026-10-29T10:17:54Z/2026-10-29T10:17:54Z/PT90M,2026-10-29T11:52:35Z/2026-10-29T11:52:35Z/PT90M,2026-10-29T13:27:27Z/2026-10-29T13:27:27Z/PT90M,2026-10-29T15:01:57Z/2026-10-29T15:01:57Z/PT90M,2026-10-29T16:36:38Z/2026-10-29T16:36:38Z/PT90M,2026-10-29T18:11:19Z/2026-10-29T18:11:19Z/PT90M,2026-10-29T19:46:00Z/2026-10-29T19:46:00Z/PT90M,2026-10-29T21:20:41Z/2026-10-29T21:20:41Z/PT90M,2026-10-29T22:55:22Z/2026-10-29T22:55:22Z/PT90M,2026-10-30T00:30:03Z/2026-10-30T00:30:03Z/PT90M,2026-10-30T02:04:44Z/2026-10-30T02:04:44Z/PT90M,2026-10-30T03:39:25Z/2026-10-30T03:39:25Z/PT90M,2026-10-30T05:14:06Z/2026-10-30T05:14:06Z/PT90M,2026-10-30T06:48:47Z/2026-10-30T06:48:47Z/PT90M,2026-10-30T08:23:28Z/2026-10-30T08:23:28Z/PT90M,2026-10-30T09:58:20Z/2026-10-30T09:58:20Z/PT90M,2026-10-30T11:32:50Z/2026-10-30T11:32:50Z/PT90M,2026-10-30T13:07:32Z/2026-10-30T13:07:32Z/PT90M,2026-10-30T14:42:12Z/2026-10-30T14:42:12Z/PT90M,2026-10-30T16:16:53Z/2026-10-30T16:16:53Z/PT90M,2026-10-30T17:51:34Z/2026-10-30T17:51:34Z/PT90M,2026-10-30T19:26:16Z/2026-10-30T19:26:16Z/PT90M,2026-10-30T21:00:56Z/2026-10-30T21:00:56Z/PT90M,2026-10-30T22:35:37Z/2026-10-30T22:35:37Z/PT90M,2026-10-31T00:10:19Z/2026-10-31T00:10:19Z/PT90M,2026-10-31T01:44:59Z/2026-10-31T01:44:59Z/PT90M,2026-10-31T03:19:40Z/2026-10-31T03:19:40Z/PT90M,2026-10-31T04:54:21Z/2026-10-31T04:54:21Z/PT90M,2026-10-31T06:29:03Z/2026-10-31T06:29:03Z/PT90M,2026-10-31T08:03:43Z/2026-10-31T08:03:43Z/PT90M,2026-10-31T09:38:24Z/2026-10-31T09:38:24Z/PT90M,2026-10-31T11:13:06Z/2026-10-31T11:13:06Z/PT90M,2026-10-31T12:47:46Z/2026-10-31T12:47:46Z/PT90M,2026-10-31T14:22:27Z/2026-10-31T14:22:27Z/PT90M,2026-10-31T15:57:08Z/2026-10-31T15:57:08Z/PT90M,2026-10-31T17:31:49Z/2026-10-31T17:31:49Z/PT90M,2026-10-31T19:06:30Z/2026-10-31T19:06:30Z/PT90M,2026-10-31T20:41:11Z/2026-10-31T20:41:11Z/PT90M,2026-10-31T22:15:52Z/2026-10-31T22:15:52Z/PT90M,2026-10-31T23:50:33Z/2026-10-31T23:50:33Z/PT90M,2026-11-01T01:25:14Z/2026-11-01T01:25:14Z/PT90M,2026-11-01T02:59:55Z/2026-11-01T02:59:55Z/PT90M,2026-11-01T04:34:36Z/2026-11-01T04:34:36Z/PT90M,2026-11-01T06:09:25Z/2026-11-01T06:09:25Z/PT90M,2026-11-01T07:43:58Z/2026-11-01T07:43:58Z/PT90M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=PREFIRE_SAT2_Outgoing_Longwave_Radiative_Flux"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/PREFIRE_Outgoing_Longwave_Radiative_Flux_LEO_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Surface_Air_Temperature_Day</Name>
+        <Title>AIRS_L2_Surface_Air_Temperature_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Surface_Air_Temperature_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Surface_Air_Temperature_Night</Name>
+        <Title>AIRS_L2_Surface_Air_Temperature_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Surface_Air_Temperature_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Surface_Skin_Temperature_Day</Name>
+        <Title>AIRS_L2_Surface_Skin_Temperature_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Surface_Skin_Temperature_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Surface_Skin_Temperature_Night</Name>
+        <Title>AIRS_L2_Surface_Skin_Temperature_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Surface_Skin_Temperature_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Skin_Temperature_Daily_Day</Name>
+        <Title>AIRS_L3_Surface_Skin_Temperature_Daily_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-08" nearestValue="0">2002-09-01/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-29/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-09-02/2022-03-31/P1D,2022-04-07/2022-10-19/P1D,2022-10-22/2024-07-25/P1D,2024-07-27/2026-01-19/P1D,2026-01-28/2026-11-08/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Skin_Temperature_Daily_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Skin_Temperature_Daily_Day_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Skin_Temperature_Monthly_Day</Name>
+        <Title>AIRS_L3_Surface_Skin_Temperature_Monthly_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-09-01" nearestValue="0">2002-09-01/2025-04-01/P1M,2025-07-01/2026-09-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Skin_Temperature_Monthly_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Skin_Temperature_Monthly_Day_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Skin_Temperature_Daily_Night</Name>
+        <Title>AIRS_L3_Surface_Skin_Temperature_Daily_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-08" nearestValue="0">2002-09-01/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-27/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-29/2016-09-25/P1D,2016-09-28/2020-08-16/P1D,2020-09-03/2022-03-31/P1D,2022-04-07/2022-10-19/P1D,2022-10-22/2024-07-25/P1D,2024-07-28/2025-10-10/P1D,2025-10-12/2026-01-19/P1D,2026-01-29/2026-11-08/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Skin_Temperature_Daily_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Skin_Temperature_Daily_Night_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L3_Surface_Skin_Temperature_Monthly_Night</Name>
+        <Title>AIRS_L3_Surface_Skin_Temperature_Monthly_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-09-01" nearestValue="0">2002-09-01/2025-04-01/P1M,2025-04-08/2025-04-08/P1M,2025-04-09/2025-04-09/P1M,2025-04-10/2025-04-10/P1M,2025-04-11/2025-04-11/P1M,2025-04-12/2025-04-12/P1M,2025-04-13/2025-04-13/P1M,2025-04-14/2025-04-14/P1M,2025-04-15/2025-04-15/P1M,2025-04-16/2025-04-16/P1M,2025-04-17/2025-04-17/P1M,2025-04-18/2025-04-18/P1M,2025-04-19/2025-04-19/P1M,2025-04-20/2025-04-20/P1M,2025-04-21/2025-04-21/P1M,2025-04-22/2025-04-22/P1M,2025-04-23/2025-04-23/P1M,2025-04-24/2025-04-24/P1M,2025-04-25/2025-04-25/P1M,2025-04-26/2025-04-26/P1M,2025-04-27/2025-04-27/P1M,2025-04-28/2025-04-28/P1M,2025-04-29/2025-04-29/P1M,2025-04-30/2025-04-30/P1M,2025-05-01/2025-05-01/P1M,2025-05-02/2025-05-02/P1M,2025-05-03/2025-05-03/P1M,2025-05-04/2025-05-04/P1M,2025-05-05/2025-05-05/P1M,2025-05-06/2025-05-06/P1M,2025-05-07/2025-05-07/P1M,2025-05-08/2025-05-08/P1M,2025-05-09/2025-05-09/P1M,2025-05-10/2025-05-10/P1M,2025-05-11/2025-05-11/P1M,2025-05-12/2025-05-12/P1M,2025-05-13/2025-05-13/P1M,2025-05-14/2025-05-14/P1M,2025-05-15/2025-05-15/P1M,2025-05-16/2025-05-16/P1M,2025-05-17/2025-05-17/P1M,2025-05-18/2025-05-18/P1M,2025-05-19/2025-05-19/P1M,2025-05-20/2025-05-20/P1M,2025-05-21/2025-05-21/P1M,2025-05-22/2025-05-22/P1M,2025-05-23/2025-05-23/P1M,2025-05-24/2025-05-24/P1M,2025-05-25/2025-05-25/P1M,2025-05-26/2025-05-26/P1M,2025-05-27/2025-05-27/P1M,2025-05-28/2025-05-28/P1M,2025-05-29/2025-05-29/P1M,2025-05-30/2025-05-30/P1M,2025-05-31/2025-05-31/P1M,2025-06-01/2025-06-01/P1M,2025-06-02/2025-06-02/P1M,2025-06-03/2025-06-03/P1M,2025-06-04/2025-06-04/P1M,2025-06-05/2025-06-05/P1M,2025-07-01/2026-09-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L3_Surface_Skin_Temperature_Monthly_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Surface_Skin_Temperature_Monthly_Night_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MERRA_Surface_Skin_Temperature_Monthly</Name>
+        <Title>MERRA_Surface_Skin_Temperature_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2016-02-01" nearestValue="0">1979-01-01/2016-02-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MERRA_Surface_Skin_Temperature_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MERRA_Surface_Skin_Temperature_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>MERRA2_Surface_Skin_Temperature_Monthly</Name>
+        <Title>MERRA2_Surface_Skin_Temperature_Monthly</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-08-01" nearestValue="0">1980-01-01/2023-11-01/P1M,2024-02-01/2024-04-01/P1M,2024-06-01/2026-08-01/P1M</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=MERRA2_Surface_Skin_Temperature_Monthly"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/MERRA2_Surface_Skin_Temperature_Monthly_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Temperature_500hPa_Day</Name>
+        <Title>AIRS_L2_Temperature_500hPa_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Temperature_500hPa_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Temperature_500hPa_Night</Name>
+        <Title>AIRS_L2_Temperature_500hPa_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Temperature_500hPa_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Temperature_700hPa_Day</Name>
+        <Title>AIRS_L2_Temperature_700hPa_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Temperature_700hPa_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Temperature_700hPa_Night</Name>
+        <Title>AIRS_L2_Temperature_700hPa_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Temperature_700hPa_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Temperature_850hPa_Day</Name>
+        <Title>AIRS_L2_Temperature_850hPa_Day</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Temperature_850hPa_Day"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+      <Layer queryable="0" opaque="0" cascaded="0">
+        <Name>AIRS_L2_Temperature_850hPa_Night</Name>
+        <Title>AIRS_L2_Temperature_850hPa_Night</Title>
+        <CRS>EPSG:4326</CRS>
+        <CRS>EPSG:3857</CRS>
+        <EX_GeographicBoundingBox>
+            <westBoundLongitude>-180.000000</westBoundLongitude>
+            <eastBoundLongitude>180.000000</eastBoundLongitude>
+            <southBoundLatitude>-90.000000</southBoundLatitude>
+            <northBoundLatitude>90.000000</northBoundLatitude>
+        </EX_GeographicBoundingBox>
+        <BoundingBox CRS="EPSG:4326"
+                    minx="-90.000000" miny="-180.000000" maxx="90.000000" maxy="180.000000" />
+        <Dimension name="time" units="ISO8601" default="2026-11-11" nearestValue="0">2002-08-30/2002-10-19/P1D,2002-10-22/2003-10-29/P1D,2003-11-19/2010-01-09/P1D,2010-01-26/2013-02-08/P1D,2013-02-10/2014-03-22/P1D,2014-03-28/2016-09-25/P1D,2016-09-27/2020-08-16/P1D,2020-08-31/2022-03-31/P1D,2022-04-07/2025-12-31/P1D,2026-01-29/2026-08-11/P1D,2026-08-13/2026-11-11/P1D</Dimension>
+        <MetadataURL type="TC211">
+          <Format>text/xml</Format>
+          <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/wms/epsg4326/best/?request=GetMetadata&amp;layer=AIRS_L2_Temperature_850hPa_Night"/>
+        </MetadataURL>
+        <Style>
+          <Name>default</Name>
+          <Title>default</Title>
+          <LegendURL width="378" height="86">
+             <Format>image/png</Format>
+             <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:type="simple" xlink:href="https://gibs.earthdata.nasa.gov/legends/AIRS_Temperature_H.png"/>
+          </LegendURL>
+        </Style>
+      </Layer>
+    </Layer>
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+  </Layer>
+</Capability>
+</WMS_Capabilities>

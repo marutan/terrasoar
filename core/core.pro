@@ -70,6 +70,10 @@ HEADERS += \
     include/ts/vector/vectormesh.h \
     include/ts/vector/vectorstyle.h \
     include/ts/vector/vectortileloader.h \
+    include/ts/wms/wmscapabilities.h \
+    include/ts/wms/wmscatalogue.h \
+    include/ts/wms/wmsimageryprovider.h \
+    include/ts/wms/wmssource.h \
     src/globe/globeuniforms.h \
     src/providers/sqlitestatementpool.h
 
@@ -121,4 +125,8 @@ SOURCES += \
     src/tiling/tileselector.cpp \
     src/vector/vectormesh.cpp \
     src/vector/vectorstyle.cpp \
-    src/vector/vectortileloader.cpp
+    src/vector/vectortileloader.cpp \
+    src/wms/wmscapabilities.cpp \
+    src/wms/wmscatalogue.cpp \
+    src/wms/wmsimageryprovider.cpp \
+    src/wms/wmssource.cpp
