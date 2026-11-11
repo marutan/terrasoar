@@ -17,9 +17,11 @@
 #include <QSurfaceFormat>
 #include <QWheelEvent>
 
+#include "ts/camera/scalebar.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/globerenderer.h"
 #include "ts/globe/tilerenderer.h"
+#include "ts/projection/projection.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/render/glrenderdevice.h"
 
@@ -31,6 +33,13 @@ namespace
 
 /** Range factor for a double click: fly three times closer. */
 constexpr double doubleClickZoom = 1.0 / 3.0;
+
+/** The change between globe and map on a software renderer, seconds:
+ *  shorter, since every frame of it is expensive there. */
+constexpr double softwareMorphDurationS = 0.5;
+
+/** Longest scale bar, logical pixels. */
+constexpr double scaleBarMaximumWidthPx = 140.0;
 
 /** Wheel angle of one notch, in eighths of a degree (Qt's unit). */
 constexpr double wheelNotch = 120.0;
@@ -202,6 +211,47 @@ bool GlobeView::isGroupCompositingAvailable() const
   return !m_deviceInfo.softwareRenderer;
 }
 
+void GlobeView::setViewMode(ViewMode mode, bool animate)
+{
+  if (mode == m_controller.viewMode()) {
+    return;
+  }
+  m_controller.setViewMode(mode, animate ? morphDurationS() : 0.0);
+  emit viewModeChanged(mode);
+  requestFrame();
+  update();
+}
+
+void GlobeView::setMapProjection(const Projection* projection)
+{
+  if (projection == nullptr || projection == mapProjection()) {
+    return;
+  }
+  m_controller.setMapProjection(projection);
+  emit mapProjectionChanged(projection);
+  update();
+}
+
+const Projection* GlobeView::mapProjection() const
+{
+  return m_controller.camera().mapProjection();
+}
+
+double GlobeView::morphDurationS() const
+{
+  return m_deviceInfo.softwareRenderer
+             ? softwareMorphDurationS
+             : CameraController::defaultMorphDurationS;
+}
+
+void GlobeView::setScaleBarVisible(bool visible)
+{
+  if (m_scaleBarVisible != visible) {
+    m_scaleBarVisible = visible;
+    update();
+  }
+}
+
 void GlobeView::setPose(const CameraPose& pose)
 {
   m_controller.setPose(pose);
@@ -301,6 +351,7 @@ void GlobeView::paintGL()
   ++m_framesRendered;
 
   drawAttributions();
+  drawScaleBar();
   if (m_overlayVisible) {
     drawOverlay();
   }
@@ -520,6 +571,11 @@ void GlobeView::drawOverlay()
                     locale.toString(pose.tiltDeg, 'f', 1));
   lines << tr("Eye height: %1")
                .arg(formatDistance(camera.eyeGeodetic().heightM, locale));
+  if (camera.morph() > 0.0) {
+    lines << tr("Map: %1, %2 % of the way from the globe")
+                 .arg(camera.mapProjection()->displayName(),
+                      locale.toString(camera.morph() * 100.0, 'f', 0));
+  }
 
   QPainter painter(this);
   painter.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
@@ -571,6 +627,46 @@ void GlobeView::drawAttributions()
                      line);
     y += lineHeight;
   }
+}
+
+void GlobeView::drawScaleBar()
+{
+  m_scaleBarText.clear();
+  if (!m_scaleBarVisible || m_controller.isMorphing()) {
+    return;
+  }
+  const std::optional<ScaleBar> bar =
+      scaleBarFor(m_controller.camera(), scaleBarMaximumWidthPx);
+  if (!bar) {
+    return;
+  }
+  const QLocale locale;
+  // Where the scale changes over the view, say where the bar holds.
+  m_scaleBarText = bar->variesAcrossView
+                       ? tr("%1 at %2")
+                             .arg(formatRoundDistance(bar->lengthM, locale),
+                                  formatWholeLatitude(bar->latDeg, locale))
+                       : formatRoundDistance(bar->lengthM, locale);
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::Antialiasing, false);
+  const QFontMetrics metrics = painter.fontMetrics();
+  const int margin = 6;
+  const int tick = 5;
+  const int barWidth = qRound(bar->widthPx);
+  const int boxWidth =
+      std::max(barWidth, metrics.horizontalAdvance(m_scaleBarText)) +
+      2 * margin;
+  const int boxHeight = metrics.lineSpacing() + tick + 2 * margin;
+  const QRect box(margin, height() - boxHeight - margin, boxWidth, boxHeight);
+  painter.fillRect(box, QColor(0, 0, 0, 120));
+  painter.setPen(QColor(235, 238, 245));
+  painter.drawText(box.left() + margin, box.top() + margin + metrics.ascent(),
+                   m_scaleBarText);
+  const int left = box.left() + margin;
+  const int bottom = box.bottom() - margin;
+  painter.drawLine(left, bottom, left + barWidth, bottom);
+  painter.drawLine(left, bottom - tick, left, bottom);
+  painter.drawLine(left + barWidth, bottom - tick, left + barWidth, bottom);
 }
 
 void GlobeView::drawError()

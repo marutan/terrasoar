@@ -53,6 +53,14 @@
             <translation>--idle-seconds needs a whole number of seconds.
 </translation>
         </message>
+        <message>
+            <source>Project file to open.</source>
+            <translation>Project file to open.</translation>
+        </message>
+        <message>
+            <source>[project]</source>
+            <translation>[project]</translation>
+        </message>
     </context>
     <context>
         <name>ts</name>
@@ -114,6 +122,10 @@
         <message>
             <source>%1 km</source>
             <translation>%1 km</translation>
+        </message>
+        <message>
+            <source>%1 cm</source>
+            <translation>%1 cm</translation>
         </message>
     </context>
     <context>
@@ -197,6 +209,14 @@
         <message>
             <source>Vectors: %1 tiles drawn, %2 triangles, %3 segments, %4 on the GPU (%5 MB)</source>
             <translation>Vectors: %1 tiles drawn, %2 triangles, %3 segments, %4 on the GPU (%5 MB)</translation>
+        </message>
+        <message>
+            <source>Map: %1, %2 % of the way from the globe</source>
+            <translation>Map: %1, %2 % of the way from the globe</translation>
+        </message>
+        <message>
+            <source>%1 at %2</source>
+            <translation>%1 at %2</translation>
         </message>
     </context>
     <context>
@@ -418,6 +438,34 @@
             <source>The base pack is damaged (%1). Reinstall %2 to repair it.</source>
             <translation>The base pack is damaged (%1). Reinstall %2 to repair it.</translation>
         </message>
+        <message>
+            <source>2D &amp;Map</source>
+            <translation>2D &amp;Map</translation>
+        </message>
+        <message>
+            <source>Change between the 3D globe and a flat map</source>
+            <translation>Change between the 3D globe and a flat map</translation>
+        </message>
+        <message>
+            <source>Map &amp;Projection</source>
+            <translation>Map &amp;Projection</translation>
+        </message>
+        <message>
+            <source>Draw the flat map in the %1 projection</source>
+            <translation>Draw the flat map in the %1 projection</translation>
+        </message>
+        <message>
+            <source>&amp;Scale Bar</source>
+            <translation>&amp;Scale Bar</translation>
+        </message>
+        <message>
+            <source>Show a ground distance at the centre of the view</source>
+            <translation>Show a ground distance at the centre of the view</translation>
+        </message>
+        <message>
+            <source>Pointer not on the map</source>
+            <translation>Pointer not on the map</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectFile</name>
@@ -444,6 +492,21 @@
         <message>
             <source>Could not read %1: %2</source>
             <translation>Could not read %1: %2</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::Projection</name>
+        <message>
+            <source>Mercator</source>
+            <translation>Mercator</translation>
+        </message>
+        <message>
+            <source>Web Mercator</source>
+            <translation>Web Mercator</translation>
+        </message>
+        <message>
+            <source>Miller Cylindrical</source>
+            <translation>Miller Cylindrical</translation>
         </message>
     </context>
     <context>

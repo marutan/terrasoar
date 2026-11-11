@@ -19,6 +19,7 @@
 #include "ts/packs/packmanifest.h"
 
 class QAction;
+class QActionGroup;
 class QEvent;
 class QLabel;
 class QMenu;
@@ -35,8 +36,9 @@ class ProviderRegistry;
 /**
  * The top-level window: the globe view, the layer tree dock, menus and
  * the status bar, which shows the position under the pointer and the eye
- * height. Projects (layer tree and camera) are opened and saved from the
- * File menu.
+ * height. Projects (layer tree, camera and view) are opened and saved
+ * from the File menu. The View menu changes between the 3D globe and the
+ * 2D map and picks the map's projection.
  *
  * All text is set in retranslateUi(), which runs again when the language
  * changes, so installing a translator at run time updates the window.
@@ -90,7 +92,8 @@ public:
 
   /**
    * Returns what the window shows, as JSON for `--measure`: the base
-   * pack's state, the layers drawn (top first), the attributions and the
+   * pack's state, the layers drawn (top first), the attributions, the
+   * view (globe or map, the projection, the scale bar's text) and the
    * last frame's tile counts.
    */
   QJsonObject stateReport() const;
@@ -111,6 +114,7 @@ private:
   void showPointerPosition(bool onGlobe, double latDeg, double lonDeg);
   void showEyeHeight(double eyeHeightM);
   void refreshLayers();
+  void syncViewActions();
   void openProjectDialog();
   void saveProjectDialog(bool askForPath);
   void findBasePack();
@@ -127,6 +131,10 @@ private:
   QAction* m_quitAction = nullptr;
   QAction* m_debugOverlayAction = nullptr;
   QAction* m_resetViewAction = nullptr;
+  QAction* m_mapViewAction = nullptr;
+  QAction* m_scaleBarAction = nullptr;
+  QMenu* m_projectionMenu = nullptr;
+  QActionGroup* m_projectionGroup = nullptr;
   QAction* m_openAction = nullptr;
   QAction* m_saveAction = nullptr;
   QAction* m_saveAsAction = nullptr;

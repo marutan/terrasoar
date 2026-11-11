@@ -30,6 +30,7 @@ namespace ts
 
 class GlRenderDevice;
 class GlobeRenderer;
+class Projection;
 
 /**
  * Shows the globe and turns mouse and keyboard input into camera motion.
@@ -44,6 +45,12 @@ class GlobeRenderer;
  * the pointer; a double click flies to the point, closer. Keys: arrows or
  * W/A/S/D move, Page Up/Down or +/− zoom, Q/E turn, R/F tilt, Home goes
  * back to the start view.
+ *
+ * The view is the 3D globe or a flat map in one of the projections()
+ * (setViewMode(), setMapProjection()); changing between them is animated.
+ * The map looks straight down with north up, so there dragging and the
+ * keys slide it and turning and tilting do nothing. A scale bar in the
+ * bottom-left corner shows a ground distance at the centre of the view.
  *
  * @guithread
  */
@@ -122,6 +129,36 @@ public:
    */
   bool isGroupCompositingAvailable() const;
 
+  /**
+   * Shows the globe or the flat map. @p animate true changes over about a
+   * second (less on software renderers), false at once.
+   */
+  void setViewMode(ViewMode mode, bool animate);
+
+  /** Returns what is shown (what is being changed to, during a change). */
+  ViewMode viewMode() const { return m_controller.viewMode(); }
+
+  /** Sets the projection of the flat map; null is ignored. */
+  void setMapProjection(const Projection* projection);
+
+  /** Returns the projection of the flat map. */
+  const Projection* mapProjection() const;
+
+  /** Returns how long an animated change of view mode takes, seconds. */
+  double morphDurationS() const;
+
+  /** Shows or hides the scale bar. */
+  void setScaleBarVisible(bool visible);
+
+  /** Returns true if the scale bar is shown. */
+  bool isScaleBarVisible() const { return m_scaleBarVisible; }
+
+  /**
+   * Returns the text of the scale bar as last drawn, e.g. "500 km"; empty
+   * if it wasn't drawn.
+   */
+  const QString& scaleBarText() const { return m_scaleBarText; }
+
   /** Moves the camera to @p pose at once, stopping any motion. */
   void setPose(const CameraPose& pose);
 
@@ -160,6 +197,12 @@ signals:
   /** The camera moved; @p eyeHeightM is its height above the ellipsoid. */
   void cameraChanged(double eyeHeightM);
 
+  /** setViewMode() changed what the view shows (or is changing to). */
+  void viewModeChanged(ts::ViewMode mode);
+
+  /** setMapProjection() changed the flat map's projection. */
+  void mapProjectionChanged(const ts::Projection* projection);
+
 protected:
   /** Creates the renderer. */
   void initializeGL() override;
@@ -194,6 +237,7 @@ private:
   void updatePointerReadout();
   void drawOverlay();
   void drawAttributions();
+  void drawScaleBar();
   void drawError();
 
   CameraController m_controller;
@@ -217,6 +261,8 @@ private:
   QPointF m_pointerPx;
 
   bool m_overlayVisible = false;
+  bool m_scaleBarVisible = true;
+  QString m_scaleBarText;
   FrameTimeStats m_cpuFrameStats;
   FrameTimeStats m_intervalStats;
   double m_lastFrameStartS = -1.0;
