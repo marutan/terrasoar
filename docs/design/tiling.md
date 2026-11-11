@@ -91,6 +91,26 @@ view of a city: every pixel showing the globe is covered by a selected
 tile, no selected tile contains another, every drawn tile's error is
 within the limit, and fixed cameras select fixed tile sets.
 
+**On the flat map** (the camera's morph factor is 1, see
+[morph.md](morph.md)) the same walk uses the map instead of the globe:
+
+- *Culling*: a tile is skipped when its rectangle on the map is outside
+  the view in every copy of the world (the map repeats in longitude), or
+  it lies wholly beyond the projection's latitude limits. There is no
+  horizon.
+- *Screen-space error*: the size of a texel along a meridian of the map,
+  the tile's projected height over its height in texels. It depends on
+  the latitude and the zoom, not on the distance from the centre:
+  Mercator's stretching towards the poles asks for finer tiles there.
+- *Geometry*: a tile is also split while its mesh, straight between grid
+  rows, is more than half a pixel from the projection's curve
+  (`mapGeometryErrorPx()`), whatever the deepest level of the data.
+
+While the view changes between the two (0 < morph < 1) a tile is drawn
+if either view would show it, without the horizon test, at the larger
+error, and never coarser than level 2. The same tests run for maps in all
+three projections, across the wrap and at the edges of the map.
+
 ## Geometry and imagery
 
 Tile meshes depend only on the key, so `ts::TileRenderer` builds them on

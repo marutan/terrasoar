@@ -105,9 +105,10 @@ A project (`*.terrasoar`) is an indented JSON document:
 ```json
 {
   "format": "terrasoar-project",
-  "version": 1,
+  "version": 2,
   "camera": { "targetLatDeg": 48, "targetLonDeg": 10, "rangeM": 2500000,
               "headingDeg": 10, "tiltDeg": 35 },
+  "view": { "mode": "globe", "projection": "mercator" },
   "layers": [
     { "kind": "collection", "id": "…", "name": "Overlays",
       "visible": true, "opacity": 0.75, "compositeAsGroup": true,
@@ -120,6 +121,10 @@ A project (`*.terrasoar`) is an indented JSON document:
 ```
 
 - `layers` lists entries top to bottom, like the tree.
+- `view.mode` is `"globe"` or `"map"`; `view.projection` is the flat
+  map's projection by its identifier ([projections.md](projections.md)),
+  kept also while the globe is shown. A projection this build doesn't
+  know leaves the current one.
 - Writing is deterministic (sorted keys): save → load → save gives the
   same bytes. Saving goes through `QSaveFile`, so a failed save never
   leaves a half-written file.
@@ -128,13 +133,15 @@ A project (`*.terrasoar`) is an indented JSON document:
 
 ### Versions
 
-- `version` is the format version, `ts::projectFormatVersion` (1).
+- `version` is the format version, `ts::projectFormatVersion` (2).
+  Version 2 added `view`; a version 1 file opens as the globe with
+  Mercator ready for the map.
 - A file of a **newer** version is refused ("saved by a newer version of
   the program"), never half-read.
 - Files of **every earlier** version must keep loading. A change to the
   format increments the version, adds a step to `migrate()` in
   `projectfile.cpp`, and adds a fixture of the old version to
-  `tests/data/projects/`. `tests/layers` loads every fixture there; the
-  first is `v1-basic.terrasoar`.
+  `tests/data/projects/`. `tests/layers` loads every fixture there:
+  `v1-basic.terrasoar`, `v2-map.terrasoar`.
 - Optional members may be added without a new version as long as older
   files load with the right defaults.

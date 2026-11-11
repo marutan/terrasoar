@@ -35,7 +35,10 @@ loadFeatures(stored key) ───────► VectorMesher::build ───�
 
 ## Meshing
 
-**Fill.** Each polygon is made valid if needed, then cut down a quadtree
+**Fill.** Each polygon's edges are first split like its outline (below),
+so fill and outline have the same vertices along a long edge and follow
+the same curve on the globe and in every map projection. The polygon is
+made valid if needed, then cut down a quadtree
 of cells (each level clips its parent's pieces, as in the packager) until
 the cells are at most `cellSizeDeg()` wide: 1/16 of the stored tile, at
 most 5.625°. Each cell's piece is triangulated with GEOS's constrained
@@ -44,9 +47,11 @@ spans more than a cell, its straight edges stay close to the curved
 surface: at most about 7.6 km below it for the coarsest cells (5.6° at
 levels 0–1, where a pixel is 20 km or more), 30 m for the high
 resolution's 0.18° cells. Vertices are computed in double precision as
-ECEF metres, then stored as float offsets from the tile's centre (with the
-longitude and latitude, for clipping), as the imagery tiles do
-([camera-and-precision.md](camera-and-precision.md)).
+ECEF metres, then stored as float offsets from the tile's centre, as the
+imagery tiles do ([camera-and-precision.md](camera-and-precision.md)),
+together with the offset in longitude and latitude from the tile's
+centre, which clips draws to a tile and places the vertex on the flat
+map ([morph.md](morph.md)).
 
 **Outlines.** Every ring of every polygon, and every line string, is cut
 into segments of at most a quarter cell, so they follow the surface too.
@@ -79,6 +84,15 @@ the graticule among them (below). They don't use the depth test:
   1e-5° of slack so neighbours leave no cracks.
 - **Fills** are plain triangles in the layer's fill colour, premultiplied
   by its opacity.
+- **On the flat map** and during the change to it ([morph.md](morph.md))
+  each vertex is placed by the projection from its longitude and
+  latitude, which it stores as an offset from its tile's centre (the
+  same offset the clipping uses). The far-side test gives way to a test
+  against the tiles' depth, and a piece that straddles the edge where
+  the map wraps around is drawn once on each side. Features are cut at
+  the antimeridian in their tiles, so nothing is stretched across the
+  map; outlines are split into short segments and fills into small
+  cells (above), so they follow the projection's curves.
 - **Outlines** are drawn one quad per segment (instanced, no per-vertex
   buffer). The quad is built in screen space around the projected segment,
   so lines keep their width in pixels at any distance. The fragment shader
@@ -109,6 +123,12 @@ Lines closer than a few pixels fade out, and the edge is antialiased with
 (tests). Below about 2 km eye height it fades out: its float positions
 are only good to about half a metre there.
 
+On the flat map, and while the globe unrolls into it, there is no
+ellipsoid to cast rays against. The same lines are then drawn on the
+tile meshes, from each fragment's longitude and latitude, so the
+graticule is in the current projection and moves with the tiles
+([morph.md](morph.md)).
+
 ## Attribution
 
 The application shows, in the view's bottom-right corner, the attribution
@@ -119,7 +139,8 @@ when the layer is hidden.
 ## Tests
 
 - `tests/vector`: meshing (area covered, triangles within a cell, vertices
-  on the ellipsoid, lakes left open, outlines without tile-edge segments
+  on the ellipsoid, lakes left open, fill vertices along a long edge as
+  close as the outline's, outlines without tile-edge segments
   at the antimeridian and the pole, line strings split, small rings
   dropped unless at the tile edge, cancellation), concurrent meshers, the
   loader (loading, empty tiles, cancellation, a stress test under TSan).
