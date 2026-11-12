@@ -28,6 +28,7 @@
 
 class QKeyEvent;
 class QMouseEvent;
+class QPainter;
 class QWheelEvent;
 
 namespace ts
@@ -290,6 +291,8 @@ private:
   void drawScaleBar();
   void drawError();
   void drawRegions();
+  void drawRegionInProgress(QPainter& painter) const;
+  void drawRegionHint(QPainter& painter) const;
   void finishPolygon();
   std::optional<LonLat> pickLonLat(QPointF positionPx) const;
   std::vector<QPolygonF> outlineOnScreen(const std::vector<LonLat>& points,

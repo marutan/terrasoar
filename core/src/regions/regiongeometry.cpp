@@ -185,7 +185,8 @@ RegionGeometry RegionGeometry::rectangle(double westDeg, double southDeg,
 }
 
 std::optional<RegionGeometry>
-RegionGeometry::polygon(std::vector<LonLat> vertices, QString* errorString)
+RegionGeometry::polygon(const std::vector<LonLat>& vertices,
+                        QString* errorString)
 {
   // Drop repeated vertices, including a closing copy of the first.
   std::vector<LonLat> ring;
@@ -440,7 +441,7 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
       }
       vertices.push_back(LonLat{pair.at(0).toDouble(), pair.at(1).toDouble()});
     }
-    return polygon(std::move(vertices), errorString);
+    return polygon(vertices, errorString);
   }
   fail(errorString, translated("The region's area is of an unknown kind."));
   return std::nullopt;

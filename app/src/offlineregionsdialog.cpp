@@ -90,6 +90,8 @@ OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
   resize(760, 360);
 }
 
+OfflineRegionsDialog::~OfflineRegionsDialog() = default;
+
 void OfflineRegionsDialog::changeEvent(QEvent* event)
 {
   if (event->type() == QEvent::LanguageChange) {

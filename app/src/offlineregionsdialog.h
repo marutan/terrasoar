@@ -45,6 +45,9 @@ public:
   OfflineRegionsDialog(OfflineRegionManager& manager, GlobeView* view,
                        QWidget* parent = nullptr);
 
+  /** Destroys the dialog. */
+  ~OfflineRegionsDialog() override;
+
   /** Returns the list (tests). */
   QTreeWidget* list() const { return m_list; }
 

@@ -103,6 +103,61 @@ bool isCorruption(int code)
   return primary == SQLITE_CORRUPT || primary == SQLITE_NOTADB;
 }
 
+/**
+ * Sets @p bytes to the size of the stored tile @p tile, or nothing if it
+ * isn't stored. Returns SQLITE_DONE, or the error.
+ */
+int storedBytes(sqlite3* db, long long tile, std::optional<long long>& bytes)
+{
+  Statement size(db, "SELECT bytes FROM tiles WHERE tile = ?1");
+  if (size.code() != SQLITE_OK) {
+    return size.code();
+  }
+  size.bind(1, tile);
+  const int code = size.step();
+  if (code == SQLITE_ROW) {
+    bytes = size.integer(0);
+    return SQLITE_DONE;
+  }
+  bytes.reset();
+  return code;
+}
+
+/** Writes @p tile as @p key, used at @p clock. SQLITE_DONE or the error. */
+int insertTile(sqlite3* db, long long key, const CachedTile& tile,
+               long long clock)
+{
+  Statement insert(db, "INSERT OR REPLACE INTO tiles (tile, data, "
+                       "content_type, expires, etag, last_modified, "
+                       "last_used, bytes) VALUES (?1, ?2, ?3, ?4, ?5, "
+                       "?6, ?7, ?8)");
+  if (insert.code() != SQLITE_OK) {
+    return insert.code();
+  }
+  insert.bind(1, key);
+  insert.bind(2, tile.data);
+  insert.bind(3, tile.contentType);
+  insert.bind(4, tile.expiresS);
+  insert.bind(5, tile.etag);
+  insert.bind(6, tile.lastModified);
+  insert.bind(7, clock);
+  insert.bind(8, static_cast<long long>(tile.data.size()));
+  return insert.step();
+}
+
+/** Pins @p tile for @p region. SQLITE_DONE or the error. */
+int insertPin(sqlite3* db, long long region, long long tile)
+{
+  Statement pin(db, "INSERT OR IGNORE INTO pins (region, tile) VALUES "
+                    "(?1, ?2)");
+  if (pin.code() != SQLITE_OK) {
+    return pin.code();
+  }
+  pin.bind(1, region);
+  pin.bind(2, tile);
+  return pin.step();
+}
+
 } // namespace
 
 struct TileDiskCache::Database {
@@ -185,9 +240,6 @@ TileDiskCache::SetUp TileDiskCache::setUp(SqliteConnection& connection)
   if (!ok) {
     return SetUp::Damaged;
   }
-  if (!ok) {
-    return SetUp::Damaged;
-  }
   m_pinnedBytes = connection.queryInteger(
       QStringLiteral("SELECT coalesce(sum(bytes), 0) FROM tiles WHERE tile "
                      "IN (SELECT tile FROM pins)"),
@@ -266,53 +318,18 @@ bool TileDiskCache::store(TileKey key, const CachedTile& tile,
   const std::lock_guard<std::mutex> lock(m_mutex);
   for (int attempt = 0; attempt < 2 && ensureOpen(); ++attempt) {
     sqlite3* db = m_db->connection.get();
-    long long previousBytes = 0;
-    bool stored = false;
-    int code = SQLITE_OK;
-    {
-      Statement size(db, "SELECT bytes FROM tiles WHERE tile = ?1");
-      code = size.code();
-      if (code == SQLITE_OK) {
-        size.bind(1, rowId(key));
-        code = size.step();
-        if (code == SQLITE_ROW) {
-          previousBytes = size.integer(0);
-          stored = true;
-          code = SQLITE_DONE;
-        }
-      }
-    }
-    const bool wasPinned = stored && isPinnedLocked(rowId(key));
+    std::optional<long long> previous;
+    int code = storedBytes(db, rowId(key), previous);
+    const bool wasPinned = previous && isPinnedLocked(rowId(key));
     if (code == SQLITE_DONE) {
-      Statement insert(db, "INSERT OR REPLACE INTO tiles (tile, data, "
-                           "content_type, expires, etag, last_modified, "
-                           "last_used, bytes) VALUES (?1, ?2, ?3, ?4, ?5, "
-                           "?6, ?7, ?8)");
-      code = insert.code();
-      if (code == SQLITE_OK) {
-        insert.bind(1, rowId(key));
-        insert.bind(2, tile.data);
-        insert.bind(3, tile.contentType);
-        insert.bind(4, tile.expiresS);
-        insert.bind(5, tile.etag);
-        insert.bind(6, tile.lastModified);
-        insert.bind(7, ++m_clock);
-        insert.bind(8, static_cast<long long>(tile.data.size()));
-        code = insert.step();
-      }
+      code = insertTile(db, rowId(key), tile, ++m_clock);
     }
     if (code == SQLITE_DONE && pinRegion != 0) {
-      Statement pinIt(db, "INSERT OR IGNORE INTO pins (region, tile) VALUES "
-                          "(?1, ?2)");
-      code = pinIt.code();
-      if (code == SQLITE_OK) {
-        pinIt.bind(1, pinRegion);
-        pinIt.bind(2, rowId(key));
-        code = pinIt.step();
-      }
+      code = insertPin(db, pinRegion, rowId(key));
     }
     if (code == SQLITE_DONE) {
       const long long bytes = static_cast<long long>(tile.data.size());
+      const long long previousBytes = previous.value_or(0);
       m_bytes += bytes - previousBytes;
       if (wasPinned) {
         m_pinnedBytes += bytes - previousBytes;
@@ -486,11 +503,7 @@ bool TileDiskCache::pin(long long region, TileKey key)
     bytes = size.integer(0);
   }
   const bool wasPinned = isPinnedLocked(rowId(key));
-  Statement insert(db,
-                   "INSERT OR IGNORE INTO pins (region, tile) VALUES (?1, ?2)");
-  insert.bind(1, region);
-  insert.bind(2, rowId(key));
-  const int code = insert.step();
+  const int code = insertPin(db, region, rowId(key));
   if (code != SQLITE_DONE) {
     handleFailure(code);
     return false;

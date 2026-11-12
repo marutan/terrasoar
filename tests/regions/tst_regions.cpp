@@ -55,6 +55,8 @@ ts::WmsSource mockSource(const QUrl& url)
   return source;
 }
 
+// Size, then the byte to fill with, as QByteArray(int, char).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 ts::CachedTile tileOf(int bytes, char fill, long long expiresS = 0)
 {
   ts::CachedTile tile;
@@ -108,6 +110,14 @@ std::vector<ts::LonLat> britishIsles()
 }
 
 const std::atomic<bool> notCancelled{false};
+
+/** The polygon through @p vertices, or an empty geometry (isValid() false). */
+ts::RegionGeometry polygonOf(std::vector<ts::LonLat> vertices)
+{
+  QString error;
+  return ts::RegionGeometry::polygon(std::move(vertices), &error)
+      .value_or(ts::RegionGeometry());
+}
 
 } // namespace
 
@@ -166,41 +176,38 @@ private slots:
   {
     QString error;
     // Unwrapped across the antimeridian, whichever side it starts.
-    const std::optional<ts::RegionGeometry> fiji = ts::RegionGeometry::polygon(
-        {{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}, {176.0, -15.0}},
-        &error);
-    QVERIFY2(fiji, qPrintable(error));
-    QCOMPARE(fiji->extent().westDeg, 176.0);
-    QCOMPARE(fiji->extent().eastDeg, 182.0);
-    QVERIFY(fiji->contains(-17.0, 179.0));
-    QVERIFY(fiji->contains(-17.0, -179.0));
-    QVERIFY(!fiji->contains(-17.0, -177.0));
-    const std::optional<ts::RegionGeometry> fromEast =
-        ts::RegionGeometry::polygon({{-178.0, -20.0},
-                                     {-178.0, -15.0},
-                                     {176.0, -15.0},
-                                     {176.0, -20.0},
-                                     {-178.0, -20.0}}, // closed: dropped
-                                    &error);
-    QVERIFY(fromEast);
-    QCOMPARE(fromEast->vertices().size(), std::size_t{4});
-    QCOMPARE(fromEast->extent().westDeg, 176.0);
-    QCOMPARE(fromEast->extent().eastDeg, 182.0);
+    const ts::RegionGeometry fiji = polygonOf(
+        {{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}, {176.0, -15.0}});
+    QVERIFY(fiji.isValid());
+    QCOMPARE(fiji.extent().westDeg, 176.0);
+    QCOMPARE(fiji.extent().eastDeg, 182.0);
+    QVERIFY(fiji.contains(-17.0, 179.0));
+    QVERIFY(fiji.contains(-17.0, -179.0));
+    QVERIFY(!fiji.contains(-17.0, -177.0));
+    const ts::RegionGeometry fromEast =
+        polygonOf({{-178.0, -20.0},
+                   {-178.0, -15.0},
+                   {176.0, -15.0},
+                   {176.0, -20.0},
+                   {-178.0, -20.0}}); // closed: dropped
+    QVERIFY(fromEast.isValid());
+    QCOMPARE(fromEast.vertices().size(), std::size_t{4});
+    QCOMPARE(fromEast.extent().westDeg, 176.0);
+    QCOMPARE(fromEast.extent().eastDeg, 182.0);
 
     // A triangle; contains() by the even–odd rule.
-    const std::optional<ts::RegionGeometry> triangle =
-        ts::RegionGeometry::polygon({{0.0, 0.0}, {40.0, 0.0}, {0.0, 40.0}},
-                                    &error);
-    QVERIFY(triangle);
-    QVERIFY(triangle->contains(10.0, 10.0));
-    QVERIFY(!triangle->contains(30.0, 30.0));
-    QVERIFY(triangle->intersects(ts::GeoRect{15.0, 15.0, 25.0, 25.0}));
-    QVERIFY(!triangle->intersects(ts::GeoRect{25.0, 25.0, 30.0, 30.0}));
-    QVERIFY(triangle->covers(ts::GeoRect{1.0, 1.0, 5.0, 5.0}));
-    QVERIFY(!triangle->covers(ts::GeoRect{15.0, 15.0, 25.0, 25.0}));
+    const ts::RegionGeometry triangle =
+        polygonOf({{0.0, 0.0}, {40.0, 0.0}, {0.0, 40.0}});
+    QVERIFY(triangle.isValid());
+    QVERIFY(triangle.contains(10.0, 10.0));
+    QVERIFY(!triangle.contains(30.0, 30.0));
+    QVERIFY(triangle.intersects(ts::GeoRect{15.0, 15.0, 25.0, 25.0}));
+    QVERIFY(!triangle.intersects(ts::GeoRect{25.0, 25.0, 30.0, 30.0}));
+    QVERIFY(triangle.covers(ts::GeoRect{1.0, 1.0, 5.0, 5.0}));
+    QVERIFY(!triangle.covers(ts::GeoRect{15.0, 15.0, 25.0, 25.0}));
     // The rectangle holds the whole triangle: intersecting, not covered.
-    QVERIFY(triangle->intersects(ts::GeoRect{-5.0, -5.0, 45.0, 45.0}));
-    QVERIFY(!triangle->covers(ts::GeoRect{-5.0, -5.0, 45.0, 45.0}));
+    QVERIFY(triangle.intersects(ts::GeoRect{-5.0, -5.0, 45.0, 45.0}));
+    QVERIFY(!triangle.covers(ts::GeoRect{-5.0, -5.0, 45.0, 45.0}));
 
     // Refused: too few points, off the Earth, round a pole.
     QVERIFY(!ts::RegionGeometry::polygon({{0.0, 0.0}, {1.0, 1.0}}, &error));
@@ -222,14 +229,13 @@ private slots:
         ts::RegionGeometry::rectangle(-10.0, 49.0, 2.0, 61.0),
         ts::RegionGeometry::rectangle(170.0, -10.0, -170.0, 10.0),
         ts::RegionGeometry::rectangle(-180.0, -90.0, 180.0, 90.0),
-        *ts::RegionGeometry::polygon(britishIsles(), &error),
-        *ts::RegionGeometry::polygon(
-            {{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}}, &error)};
+        polygonOf(britishIsles()),
+        polygonOf({{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}})};
     for (const ts::RegionGeometry& geometry : geometries) {
       const std::optional<ts::RegionGeometry> back =
           ts::RegionGeometry::fromJson(geometry.toJson(), &error);
       QVERIFY2(back, qPrintable(error));
-      QVERIFY(*back == geometry);
+      QVERIFY(back.value_or(ts::RegionGeometry()) == geometry);
     }
     QVERIFY(!ts::RegionGeometry::fromJson(QJsonObject{}, &error));
     QVERIFY(!ts::RegionGeometry::fromJson(
@@ -302,41 +308,38 @@ private slots:
     // iterator give exactly the tiles a test of every tile gives.
     QFETCH(int, which);
     QString error;
-    std::optional<ts::RegionGeometry> region;
+    ts::RegionGeometry region;
     std::optional<ts::GeoRect> data;
     switch (which) {
     case 0:
     case 5:
-      region = ts::RegionGeometry::polygon(britishIsles(), &error);
+      region = polygonOf(britishIsles());
       if (which == 5) {
         data = ts::GeoRect{-8.0, 50.0, 0.0, 70.0};
       }
       break;
     case 1:
-      region = ts::RegionGeometry::polygon(
-          {{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}, {176.0, -15.0}},
-          &error);
+      region = polygonOf(
+          {{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}, {176.0, -15.0}});
       break;
     case 2:
-      region = ts::RegionGeometry::polygon(
-          {{160.0, 50.0}, {-150.0, 52.0}, {-160.0, 70.0}, {175.0, 68.0}},
-          &error);
+      region = polygonOf(
+          {{160.0, 50.0}, {-150.0, 52.0}, {-160.0, 70.0}, {175.0, 68.0}});
       break;
     case 3:
       region = ts::RegionGeometry::rectangle(150.0, -40.0, -120.0, 25.0);
       break;
     default:
-      region = ts::RegionGeometry::polygon(
-          {{0.0, 0.0}, {40.0, 0.0}, {40.0, 40.0}, {20.0, 10.0}, {0.0, 40.0}},
-          &error);
+      region = polygonOf(
+          {{0.0, 0.0}, {40.0, 0.0}, {40.0, 40.0}, {20.0, 10.0}, {0.0, 40.0}});
       break;
     }
-    QVERIFY2(region, qPrintable(error));
+    QVERIFY(region.isValid());
     const int maxLevel = 7;
     const ts::RegionTileCount counts =
-        ts::countRegionTiles(*region, 0, maxLevel, data);
+        ts::countRegionTiles(region, 0, maxLevel, data);
     const std::vector<ts::TileKey> keys =
-        iterate(ts::RegionTileIterator(*region, 0, maxLevel, data));
+        iterate(ts::RegionTileIterator(region, 0, maxLevel, data));
     QCOMPARE(static_cast<long long>(keys.size()), counts.total());
     for (int level = 0; level <= maxLevel; ++level) {
       std::set<ts::TileKey> fromIterator;
@@ -345,7 +348,7 @@ private slots:
           QVERIFY(fromIterator.insert(key).second); // no duplicates
         }
       }
-      const std::set<ts::TileKey> expected = bruteForce(*region, level, data);
+      const std::set<ts::TileKey> expected = bruteForce(region, level, data);
       QCOMPARE(fromIterator, expected);
       QCOMPARE(counts.perLevel.at(static_cast<std::size_t>(level)),
                static_cast<long long>(expected.size()));
@@ -357,13 +360,12 @@ private slots:
     // The British Isles to level 16: millions of tiles, counted without
     // visiting them all.
     QString error;
-    const std::optional<ts::RegionGeometry> isles =
-        ts::RegionGeometry::polygon(britishIsles(), &error);
-    QVERIFY(isles);
+    const ts::RegionGeometry isles = polygonOf(britishIsles());
+    QVERIFY(isles.isValid());
     QElapsedTimer timer;
     timer.start();
     const ts::RegionTileCount counts =
-        ts::countRegionTiles(*isles, 0, 16, std::nullopt);
+        ts::countRegionTiles(isles, 0, 16, std::nullopt);
     QVERIFY2(timer.elapsed() < 5000,
              qPrintable(QString::number(timer.elapsed())));
     // Each level about four times the one before, near the end.
@@ -373,7 +375,7 @@ private slots:
     // Level 16 tiles are 0.00275° square: the area over the tile area,
     // plus the tiles along the edge.
     const double tileKm2 =
-        isles->areaKm2() / static_cast<double>(counts.perLevel.at(16));
+        isles.areaKm2() / static_cast<double>(counts.perLevel.at(16));
     const double expectedKm2 = std::pow(ts::TileKey::sizeDeg(16) * 111.2, 2.0) *
                                std::cos(54.5 * 3.14159265358979 / 180.0);
     QVERIFY2(std::abs(tileKm2 / expectedKm2 - 1.0) < 0.02,
@@ -383,21 +385,22 @@ private slots:
   void samplesLieInTheRegion()
   {
     QString error;
-    const std::optional<ts::RegionGeometry> isles =
-        ts::RegionGeometry::polygon(britishIsles(), &error);
-    QVERIFY(isles);
+    const ts::RegionGeometry isles = polygonOf(britishIsles());
+    QVERIFY(isles.isValid());
     const ts::RegionTileCount counts =
-        ts::countRegionTiles(*isles, 2, 9, std::nullopt);
+        ts::countRegionTiles(isles, 2, 9, std::nullopt);
+    // A fixed seed: the same samples every run.
+    // NOLINTNEXTLINE(cert-msc32-c,cert-msc51-cpp)
     std::mt19937_64 random(7);
     const std::vector<ts::TileKey> samples =
-        ts::sampleRegionTiles(*isles, counts, std::nullopt, 40, random);
+        ts::sampleRegionTiles(isles, counts, std::nullopt, 40, random);
     QCOMPARE(samples.size(), std::size_t{40});
     std::set<ts::TileKey> distinct(samples.begin(), samples.end());
     QCOMPARE(distinct.size(), samples.size());
     int deepest = 0;
     for (const ts::TileKey key : samples) {
       QVERIFY(key.level >= 2 && key.level <= 9);
-      QVERIFY(isles->intersects(key.bounds()));
+      QVERIFY(isles.intersects(key.bounds()));
       deepest += key.level == 9 ? 1 : 0;
     }
     // Level 9 holds three quarters of the tiles.
@@ -428,10 +431,12 @@ private slots:
         {QStringLiteral("kind"), QStringLiteral("wms")},
         {QStringLiteral("url"), QStringLiteral("https://example.org/wms")}};
     uk.sourceName = QStringLiteral("Example");
-    uk.geometry = *ts::RegionGeometry::polygon(britishIsles(), &error);
+    uk.geometry = polygonOf(britishIsles());
     uk.minimumLevel = 2;
     uk.maximumLevel = 11;
-    uk.created = QDateTime(QDate(2026, 11, 12), QTime(10, 0), Qt::UTC);
+    uk.created = QDateTime::fromString(QStringLiteral("2026-11-12T10:00:00Z"),
+                                       Qt::ISODate);
+    QVERIFY(uk.created.isValid());
     uk.tiles = 12345;
     uk.bytes = 678901234;
     const long long first = store.add(uk);
@@ -470,6 +475,8 @@ private slots:
     // Not a region file, or a newer one: refused.
     QFile file(path);
     QVERIFY(file.open(QIODevice::WriteOnly));
+    // Not a raw string: moc can't read this file with one in it.
+    // NOLINTNEXTLINE(modernize-raw-string-literal)
     file.write("{\"format\": \"terrasoar-offline-regions\", \"version\": 99}");
     file.close();
     QVERIFY(!third.load(&error));
@@ -594,7 +601,7 @@ private slots:
   void bulkDownloadPolicy()
   {
     QString error;
-    const std::optional<std::vector<ts::WmsCatalogueEntry>> catalogue =
+    const std::optional<std::vector<ts::WmsCatalogueEntry>> parsed =
         ts::parseWmsCatalogue(
             "{\"format\": \"terrasoar-wms-catalogue\", \"version\": 1,"
             " \"services\": ["
@@ -606,13 +613,15 @@ private slots:
             "  {\"title\": \"Silent\", \"url\": "
             "\"https://silent.example/wms\"}]}",
             &error);
-    QVERIFY2(catalogue, qPrintable(error));
-    QCOMPARE(catalogue->at(0).allowBulkDownload, std::optional<bool>(true));
-    QCOMPARE(catalogue->at(1).allowBulkDownload, std::optional<bool>(false));
-    QVERIFY(!catalogue->at(2).allowBulkDownload);
+    QVERIFY2(parsed, qPrintable(error));
+    const std::vector<ts::WmsCatalogueEntry> catalogue =
+        parsed.value_or(std::vector<ts::WmsCatalogueEntry>{});
+    QCOMPARE(catalogue.at(0).allowBulkDownload, std::optional<bool>(true));
+    QCOMPARE(catalogue.at(1).allowBulkDownload, std::optional<bool>(false));
+    QVERIFY(!catalogue.at(2).allowBulkDownload);
     using Policy = ts::BulkDownloadPolicy;
     const std::function<Policy(const char*)> policy = [&](const char* url) {
-      return ts::bulkDownloadPolicy(QUrl(QLatin1String(url)), *catalogue);
+      return ts::bulkDownloadPolicy(QUrl(QLatin1String(url)), catalogue);
     };
     // Query, scheme, host case and a trailing slash don't matter.
     QCOMPARE(policy("https://open.example/wms?map=x&REQUEST=GetMap"),
@@ -627,7 +636,7 @@ private slots:
     QCOMPARE(policy("https://unlisted.example/wms"), Policy::Unknown);
     QCOMPARE(ts::findWmsCatalogueEntry(
                  QUrl(QStringLiteral("https://closed.example/osm/service")),
-                 *catalogue)
+                 catalogue)
                  ->title,
              QStringLiteral("Closed"));
 
@@ -635,18 +644,19 @@ private slots:
     // downloaded in bulk; NASA GIBS may.
     QFile file(QStringLiteral(TS_REPO_DATA_DIR "/wms-catalogue.json"));
     QVERIFY(file.open(QIODevice::ReadOnly));
-    const std::optional<std::vector<ts::WmsCatalogueEntry>> shipped =
-        ts::parseWmsCatalogue(file.readAll(), &error);
-    QVERIFY(shipped);
+    const std::vector<ts::WmsCatalogueEntry> shipped =
+        ts::parseWmsCatalogue(file.readAll(), &error)
+            .value_or(std::vector<ts::WmsCatalogueEntry>{});
+    QVERIFY(!shipped.empty());
     QCOMPARE(ts::bulkDownloadPolicy(
                  QUrl(QStringLiteral("https://ows.terrestris.de/osm/service")),
-                 *shipped),
+                 shipped),
              Policy::Forbidden);
     QCOMPARE(ts::bulkDownloadPolicy(
                  QUrl(QStringLiteral(
                      "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/"
                      "wms.cgi")),
-                 *shipped),
+                 shipped),
              Policy::Allowed);
   }
 
@@ -708,8 +718,7 @@ private slots:
         std::make_shared<ts::WmsImageryProvider>(
             mockSource(server.url(QStringLiteral("/wms"))), network, settings);
     QString error;
-    const ts::RegionGeometry isles =
-        *ts::RegionGeometry::polygon(britishIsles(), &error);
+    const ts::RegionGeometry isles = polygonOf(britishIsles());
     ts::RegionDownload download(provider, 4, isles, 0, 6);
     QVERIFY(download.start({}, &error));
     QVERIFY(download.waitUntilSettled(std::chrono::seconds(60)));
@@ -867,8 +876,7 @@ private slots:
             mockSource(server.url(QStringLiteral("/wms"))),
             std::make_shared<ts::NetworkClient>(testNetwork()), settings);
     QString error;
-    const ts::RegionGeometry isles =
-        *ts::RegionGeometry::polygon(britishIsles(), &error);
+    const ts::RegionGeometry isles = polygonOf(britishIsles());
     const ts::RegionGeometry wide =
         ts::RegionGeometry::rectangle(10.0, 20.0, 50.0, 50.0);
     int which = 0;
@@ -917,7 +925,7 @@ private slots:
         source, std::make_shared<ts::NetworkClient>(testNetwork()), {});
     const std::optional<ts::GeoRect> bounds = provider.dataBounds();
     QVERIFY(bounds);
-    QVERIFY(std::abs(bounds->northDeg - 85.0511) < 1e-3);
+    QVERIFY(std::abs(bounds.value_or(ts::GeoRect{}).northDeg - 85.0511) < 1e-3);
     // Beyond Web Mercator's limit there are no tiles.
     const ts::RegionGeometry arctic =
         ts::RegionGeometry::rectangle(-180.0, 86.0, 180.0, 90.0);

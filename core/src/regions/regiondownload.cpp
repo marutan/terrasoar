@@ -20,7 +20,7 @@ constexpr int unreachableAttempts = 2;
 } // namespace
 
 RegionDownload::RegionDownload(std::shared_ptr<WmsImageryProvider> provider,
-                               long long region, RegionGeometry geometry,
+                               long long region, const RegionGeometry& geometry,
                                int minimumLevel, int maximumLevel,
                                RegionDownloadSettings settings)
     : m_provider(std::move(provider)), m_region(region), m_settings(settings),
@@ -203,9 +203,11 @@ void RegionDownload::work()
       }
       break;
     }
-    if (result.outcome != Outcome::Cancelled &&
-        !(result.outcome == Outcome::Failed && result.unreachable &&
-          attempts + 1 < unreachableAttempts)) {
+    // A tile handed back to try again isn't done yet.
+    const bool triedAgain = result.outcome == Outcome::Failed &&
+                            result.unreachable &&
+                            attempts + 1 < unreachableAttempts;
+    if (result.outcome != Outcome::Cancelled && !triedAgain) {
       ++progress.doneTiles;
     }
     m_changed.notify_all();
@@ -227,10 +229,12 @@ long long typicalTileBytes(const WmsImageryProvider& provider)
   return static_cast<long long>(perPixel * pixels);
 }
 
+// NOLINTBEGIN(bugprone-easily-swappable-parameters): as in the header.
 RegionEstimate
 estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
                    int minimumLevel, int maximumLevel, int samples,
                    const std::atomic<bool>& cancelled, std::uint64_t seed)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   RegionEstimate estimate;
   const std::optional<GeoRect> dataBounds = provider.dataBounds();
@@ -247,6 +251,7 @@ estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
   int sampled = 0;
   std::vector<std::thread> threads;
   const int threadCount = std::min<int>(4, static_cast<int>(keys.size()));
+  threads.reserve(static_cast<std::size_t>(threadCount));
   for (int i = 0; i < threadCount; ++i) {
     threads.emplace_back([&]() {
       for (;;) {

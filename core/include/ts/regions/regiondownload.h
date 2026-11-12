@@ -119,8 +119,8 @@ public:
    * region @p region (an id, not 0). Counts the tiles at once.
    */
   RegionDownload(std::shared_ptr<WmsImageryProvider> provider, long long region,
-                 RegionGeometry geometry, int minimumLevel, int maximumLevel,
-                 RegionDownloadSettings settings = {});
+                 const RegionGeometry& geometry, int minimumLevel,
+                 int maximumLevel, RegionDownloadSettings settings = {});
 
   /** Cancels the download and waits for its threads. */
   ~RegionDownload();
@@ -215,10 +215,13 @@ long long typicalTileBytes(const WmsImageryProvider& provider);
  *
  * @threadsafe
  */
+// The levels come in the same order as everywhere (countRegionTiles()).
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 RegionEstimate
 estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
                    int minimumLevel, int maximumLevel, int samples,
                    const std::atomic<bool>& cancelled, std::uint64_t seed = 1);
+// NOLINTEND(bugprone-easily-swappable-parameters)
 
 } // namespace ts
 

@@ -70,8 +70,8 @@ public:
    * than three distinct vertices, a latitude beyond ±90°, or goes round a
    * pole.
    */
-  static std::optional<RegionGeometry> polygon(std::vector<LonLat> vertices,
-                                               QString* errorString);
+  static std::optional<RegionGeometry>
+  polygon(const std::vector<LonLat>& vertices, QString* errorString);
 
   /** Returns the kind. */
   Kind kind() const { return m_kind; }
@@ -182,9 +182,9 @@ private:
   bool wanted(TileKey key) const;
   void startLevel();
 
-  const RegionGeometry m_region;
-  const int m_maximumLevel;
-  const std::optional<GeoRect> m_dataBounds;
+  RegionGeometry m_region;
+  int m_maximumLevel;
+  std::optional<GeoRect> m_dataBounds;
   int m_level;
   std::vector<TileKey> m_stack;
 };
