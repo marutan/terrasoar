@@ -83,7 +83,8 @@ struct ShorelineLodStats {
  * Reads the GSHHG shapefiles of each level of detail, builds land
  * polygons (land minus lakes plus islands in lakes minus ponds, Antarctica
  * by its ice front), cuts them to quadtree tiles and writes them to
- * @p writer as tables `land_<resolution>`, one multipolygon per tile.
+ * @p writer as tables named by shorelineTableName(), one multipolygon per
+ * tile.
  *
  * There are no separate shoreline lines: the shore is the polygons'
  * boundary without the segments lying on their tile's edges, which are
@@ -95,6 +96,15 @@ bool buildShoreline(const ShorelineOptions& options,
                     GeoPackageFeatureWriter* writer,
                     std::vector<ShorelineLodStats>* stats,
                     QString* errorString);
+
+/**
+ * Returns the table name of level of detail @p index of @p lods:
+ * `land_<resolution>`, or `land_<resolution>_<storage level>` for a
+ * resolution an earlier level of detail already uses (one resolution
+ * stored at two levels, so that deep levels get small tiles).
+ */
+QString shorelineTableName(const std::vector<ShorelineLod>& lods,
+                           std::size_t index);
 
 /**
  * Returns the area of the ring @p lonLatDeg (longitude, latitude pairs,

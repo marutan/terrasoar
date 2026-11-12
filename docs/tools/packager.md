@@ -23,7 +23,7 @@ This runs `tools/packager/build_basepack.py`, which
 3. replaces `<build>/basepack` with it if the packager succeeded.
 
 The application in `<build>/app` finds `<build>/basepack` by itself. The
-build takes about 55 s and 400 MB of memory on one core.
+build takes about 30 s and 400 MB of memory on one core.
 
 Run the steps separately to use other directories:
 
@@ -101,7 +101,7 @@ basepack.json ──► check sources' SHA-256
                   │                for each level up to 0 ► JPEG q85
                   │              ► bluemarble.sqlite
                   │
-                  ├─ shoreline ► per resolution (c, l, i, h): GDAL reads
+                  ├─ shoreline ► per level of detail (c, l, i, i): GDAL reads
                   │              GSHHS_<r>_L1..L5 straight from the zip
                   │              (/vsizip/) ► rebuild Antarctica's closure
                   │              along the pole ► GEOS: repair invalid polygons
@@ -171,7 +171,7 @@ area and GSHHG's area.
 | Key | Meaning |
 | --- | --- |
 | `id`, `version` | Copied to the manifest |
-| `sizeLimitBytes`, `reservedBytes` | Size budget (75 MB, 20 MB kept for the DEM) |
+| `sizeLimitBytes`, `reservedBytes` | Size budget (75 MB, 35 MB kept for Phase 7's DEM and geoid grids) |
 | `sources[]` | `id`, `file` (name in the sources directory), `url`, `sha256`, `name`, `version`; `notices` (files inside the zip to ship), `localNotices` (files relative to the config to ship) |
 | `imagery` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `maxLevel` (at most 8), `tileSize`, `jpegQuality` |
 | `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |

@@ -61,7 +61,7 @@ Blue Marble Next Generation with topography and bathymetry (July 2004)
   https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/
 
 GSHHG 2.3.7 (Global Self-consistent, Hierarchical, High-resolution
-Geography Database), resolutions c, l, i and h, cut to tiles
+Geography Database), resolutions c, l and i, cut to tiles
   Paul Wessel (University of Hawaii) and Walter H. F. Smith (NOAA)
   Licence: GNU LGPL v3 or later; the licence texts (LICENSE.TXT,
   COPYING.LESSERv3, gpl-3.0.txt) are in basepack/licences/gshhg/

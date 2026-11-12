@@ -584,6 +584,22 @@ private slots:
     }
   }
 
+  void tableNames()
+  {
+    // One resolution at two storage levels: the second table is told
+    // apart by its level.
+    const std::vector<ts::packager::ShorelineLod> lods{
+        {QStringLiteral("c"), 0, 0, 3},
+        {QStringLiteral("i"), 4, 4, 5},
+        {QStringLiteral("i"), 6, 6, -1}};
+    QCOMPARE(ts::packager::shorelineTableName(lods, 0),
+             QStringLiteral("land_c"));
+    QCOMPARE(ts::packager::shorelineTableName(lods, 1),
+             QStringLiteral("land_i"));
+    QCOMPARE(ts::packager::shorelineTableName(lods, 2),
+             QStringLiteral("land_i_6"));
+  }
+
   void minimumArea()
   {
     const QTemporaryDir dir;
