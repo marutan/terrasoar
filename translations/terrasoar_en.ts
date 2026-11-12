@@ -308,6 +308,14 @@
             <source>%1 at %2</source>
             <translation>%1 at %2</translation>
         </message>
+        <message>
+            <source>Drag across the area to keep for offline use. Esc cancels.</source>
+            <translation>Drag across the area to keep for offline use. Esc cancels.</translation>
+        </message>
+        <message>
+            <source>Click each corner of the area; double-click or press Enter to finish. Backspace removes a corner, Esc cancels.</source>
+            <translation>Click each corner of the area; double-click or press Enter to finish. Backspace removes a corner, Esc cancels.</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerDefinition</name>
@@ -572,6 +580,264 @@
             <source>%1: %2</source>
             <translation>%1: %2</translation>
         </message>
+        <message>
+            <source>Offline &amp;Regions…</source>
+            <translation>Offline &amp;Regions…</translation>
+        </message>
+        <message>
+            <source>Keep areas of WMS layers on this computer for use without a network</source>
+            <translation>Keep areas of WMS layers on this computer for use without a network</translation>
+        </message>
+        <message>
+            <source>New Offline Region</source>
+            <translation>New Offline Region</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS servers can be kept for offline use. Add a WMS layer first (File → Add WMS Layer…).</source>
+            <translation>Only layers from WMS servers can be kept for offline use. Add a WMS layer first (File → Add WMS Layer…).</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::NewRegionDialog</name>
+        <message>
+            <source>Region %1</source>
+            <translation>Region %1</translation>
+        </message>
+        <message>
+            <source>New Offline Region</source>
+            <translation>New Offline Region</translation>
+        </message>
+        <message>
+            <source>&amp;Name:</source>
+            <translation>&amp;Name:</translation>
+        </message>
+        <message>
+            <source>&amp;Layer:</source>
+            <translation>&amp;Layer:</translation>
+        </message>
+        <message>
+            <source>Area:</source>
+            <translation>Area:</translation>
+        </message>
+        <message>
+            <source>&amp;Current View</source>
+            <translation>&amp;Current View</translation>
+        </message>
+        <message>
+            <source>The part of the Earth the view shows now</source>
+            <translation>The part of the Earth the view shows now</translation>
+        </message>
+        <message>
+            <source>Draw &amp;Rectangle</source>
+            <translation>Draw &amp;Rectangle</translation>
+        </message>
+        <message>
+            <source>Drag across the area on the globe</source>
+            <translation>Drag across the area on the globe</translation>
+        </message>
+        <message>
+            <source>Draw &amp;Polygon</source>
+            <translation>Draw &amp;Polygon</translation>
+        </message>
+        <message>
+            <source>Click the corners of the area on the globe; double-click to finish</source>
+            <translation>Click the corners of the area on the globe; double-click to finish</translation>
+        </message>
+        <message>
+            <source>L&amp;evels:</source>
+            <translation>L&amp;evels:</translation>
+        </message>
+        <message>
+            <source>to</source>
+            <translation>to</translation>
+        </message>
+        <message>
+            <source>&amp;Download</source>
+            <translation>&amp;Download</translation>
+        </message>
+        <message>
+            <source>None yet: use the current view or draw one on the globe.</source>
+            <translation>None yet: use the current view or draw one on the globe.</translation>
+        </message>
+        <message>
+            <source>Rectangle from %1 to %2 and from %3 to %4 (%5 km²)</source>
+            <translation>Rectangle from %1 to %2 and from %3 to %4 (%5 km²)</translation>
+        </message>
+        <message numerus="yes">
+            <source>Polygon with %n corner(s) (%1 km²)</source>
+            <translation>
+                <numerusform>Polygon with %n corner (%1 km²)</numerusform>
+                <numerusform>Polygon with %n corners (%1 km²)</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Down to about %1 per pixel</source>
+            <translation>Down to about %1 per pixel</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>&lt;b&gt;The terms of use of %1 don't allow downloading regions for offline use.&lt;/b&gt;</source>
+            <translation>&lt;b&gt;The terms of use of %1 don't allow downloading regions for offline use.&lt;/b&gt;</translation>
+        </message>
+        <message>
+            <source>Check that the terms of use of %1 allow downloading many tiles at once before you go on.</source>
+            <translation>Check that the terms of use of %1 allow downloading many tiles at once before you go on.</translation>
+        </message>
+        <message>
+            <source>&lt;b&gt;This layer can't be kept for offline use.&lt;/b&gt;</source>
+            <translation>&lt;b&gt;This layer can't be kept for offline use.&lt;/b&gt;</translation>
+        </message>
+        <message>
+            <source>&lt;b&gt;%1 tiles: too many.&lt;/b&gt; Choose fewer levels or a smaller area (at most %2 tiles).</source>
+            <translation>&lt;b&gt;%1 tiles: too many.&lt;/b&gt; Choose fewer levels or a smaller area (at most %2 tiles).</translation>
+        </message>
+        <message>
+            <source>%1 tiles; estimating the size…</source>
+            <translation>%1 tiles; estimating the size…</translation>
+        </message>
+        <message>
+            <source>%1 tiles</source>
+            <translation>%1 tiles</translation>
+        </message>
+        <message>
+            <source>%1 tiles, about %2.</source>
+            <translation>%1 tiles, about %2.</translation>
+        </message>
+        <message>
+            <source>%1 tiles, roughly %2 (the server couldn't be asked for samples).</source>
+            <translation>%1 tiles, roughly %2 (the server couldn't be asked for samples).</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::OfflineRegionManager</name>
+        <message>
+            <source>Only layers from WMS servers can be kept for offline use.</source>
+            <translation>Only layers from WMS servers can be kept for offline use.</translation>
+        </message>
+        <message>
+            <source>There is no disk cache to keep tiles in.</source>
+            <translation>There is no disk cache to keep tiles in.</translation>
+        </message>
+        <message>
+            <source>Downloading “%1”: %2 %</source>
+            <translation>Downloading “%1”: %2 %</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::OfflineRegionStore</name>
+        <message>
+            <source>The list of offline regions is damaged.</source>
+            <translation>The list of offline regions is damaged.</translation>
+        </message>
+        <message>
+            <source>The list of offline regions was written by a newer version of this program.</source>
+            <translation>The list of offline regions was written by a newer version of this program.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::OfflineRegionsDialog</name>
+        <message>
+            <source>Offline Regions</source>
+            <translation>Offline Regions</translation>
+        </message>
+        <message>
+            <source>Name</source>
+            <translation>Name</translation>
+        </message>
+        <message>
+            <source>Layer</source>
+            <translation>Layer</translation>
+        </message>
+        <message>
+            <source>Levels</source>
+            <translation>Levels</translation>
+        </message>
+        <message>
+            <source>Tiles</source>
+            <translation>Tiles</translation>
+        </message>
+        <message>
+            <source>Size</source>
+            <translation>Size</translation>
+        </message>
+        <message>
+            <source>State</source>
+            <translation>State</translation>
+        </message>
+        <message>
+            <source>No regions yet. A region keeps a WMS layer's tiles for an area on this computer, so the area can be seen without a network.</source>
+            <translation>No regions yet. A region keeps a WMS layer's tiles for an area on this computer, so the area can be seen without a network.</translation>
+        </message>
+        <message>
+            <source>&amp;New Region…</source>
+            <translation>&amp;New Region…</translation>
+        </message>
+        <message>
+            <source>&amp;Delete</source>
+            <translation>&amp;Delete</translation>
+        </message>
+        <message>
+            <source>Close</source>
+            <translation>Close</translation>
+        </message>
+        <message>
+            <source>Downloading: %1 % (%2 of %3 tiles)</source>
+            <translation>Downloading: %1 % (%2 of %3 tiles)</translation>
+        </message>
+        <message>
+            <source>Paused at %1 %</source>
+            <translation>Paused at %1 %</translation>
+        </message>
+        <message>
+            <source>Paused at %1 %: %2</source>
+            <translation>Paused at %1 %: %2</translation>
+        </message>
+        <message>
+            <source>Finishing…</source>
+            <translation>Finishing…</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n tile(s) missing; update to try again</source>
+            <translation>
+                <numerusform>%n tile missing; update to try again</numerusform>
+                <numerusform>%n tiles missing; update to try again</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Ready offline (downloaded %1)</source>
+            <translation>Ready offline (downloaded %1)</translation>
+        </message>
+        <message>
+            <source>Not finished; resume to carry on</source>
+            <translation>Not finished; resume to carry on</translation>
+        </message>
+        <message>
+            <source>&amp;Pause</source>
+            <translation>&amp;Pause</translation>
+        </message>
+        <message>
+            <source>&amp;Resume</source>
+            <translation>&amp;Resume</translation>
+        </message>
+        <message>
+            <source>&amp;Update</source>
+            <translation>&amp;Update</translation>
+        </message>
+        <message>
+            <source>Update fetches the tiles that are missing or out of date</source>
+            <translation>Update fetches the tiles that are missing or out of date</translation>
+        </message>
+        <message>
+            <source>Delete Region</source>
+            <translation>Delete Region</translation>
+        </message>
+        <message>
+            <source>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</source>
+            <translation>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectFile</name>
@@ -632,6 +898,13 @@
         <message>
             <source>Unknown or invalid feature source: %1</source>
             <translation>Unknown or invalid feature source: %1</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::RegionDownload</name>
+        <message>
+            <source>The terms of use of %1 don't allow downloading regions for offline use.</source>
+            <translation>The terms of use of %1 don't allow downloading regions for offline use.</translation>
         </message>
     </context>
     <context>
@@ -708,6 +981,22 @@
         <message>
             <source>The server sent something that isn't an image (%1).</source>
             <translation>The server sent something that isn't an image (%1).</translation>
+        </message>
+        <message>
+            <source>There is no disk cache to keep tiles in.</source>
+            <translation>There is no disk cache to keep tiles in.</translation>
+        </message>
+        <message>
+            <source>Can't reach %1 (%2).</source>
+            <translation>Can't reach %1 (%2).</translation>
+        </message>
+        <message>
+            <source>The server doesn't allow its tiles to be kept (no-store).</source>
+            <translation>The server doesn't allow its tiles to be kept (no-store).</translation>
+        </message>
+        <message>
+            <source>The tile could not be saved: %1</source>
+            <translation>The tile could not be saved: %1</translation>
         </message>
     </context>
     <context>

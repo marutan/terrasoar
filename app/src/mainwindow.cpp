@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "mainwindow.h"
 
+#include <algorithm>
 #include <memory>
 #include <optional>
 
@@ -28,6 +29,9 @@
 #include "addwmsdialog.h"
 #include "globeview.h"
 #include "layertreedock.h"
+#include "newregiondialog.h"
+#include "offlineregionmanager.h"
+#include "offlineregionsdialog.h"
 #include "ts/base/buildinfo.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/layerstackdraws.h"
@@ -56,6 +60,9 @@ MainWindow::MainWindow(QWidget* parent)
       QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
           .filePath(QStringLiteral("wms"));
   m_registry->setWmsNetwork(nullptr, wms);
+  m_offlineRegions = std::make_unique<OfflineRegionManager>(
+      *m_registry,
+      QDir(wms.cacheDirectory).filePath(QStringLiteral("regions.json")));
   m_layers->setStatusIcons(
       style()->standardIcon(QStyle::SP_MessageBoxWarning),
       style()->standardIcon(QStyle::SP_MessageBoxCritical));
@@ -133,6 +140,16 @@ MainWindow::MainWindow(QWidget* parent)
   statusBar()->addPermanentWidget(m_pointerLabel);
   m_eyeLabel->setObjectName(QStringLiteral("eyeLabel"));
   statusBar()->addPermanentWidget(m_eyeLabel);
+  m_downloadLabel = new QLabel(this);
+  m_downloadLabel->setObjectName(QStringLiteral("downloadLabel"));
+  statusBar()->addPermanentWidget(m_downloadLabel);
+  connect(m_offlineRegions.get(), &OfflineRegionManager::progressChanged, this,
+          [this]() {
+            const QString text = m_offlineRegions->statusText();
+            m_downloadLabel->setText(text);
+            m_downloadLabel->setVisible(!text.isEmpty());
+          });
+  m_downloadLabel->hide();
 
   createActions();
   createMenus();
@@ -143,6 +160,10 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+  // Dialogs first: they refer to the regions, which go before the registry.
+  delete m_newRegionDialog;
+  delete m_offlineRegionsDialog;
+  m_offlineRegions.reset();
   for (const std::pair<QString, std::shared_ptr<ImageryProvider>>& layer :
        m_layerProviders) {
     layer.second->setStatusCallback({});
@@ -363,6 +384,11 @@ void MainWindow::createActions()
   connect(m_addWmsAction, &QAction::triggered, this,
           [this]() { addWmsLayer(); });
 
+  m_offlineRegionsAction = new QAction(this);
+  m_offlineRegionsAction->setObjectName(QStringLiteral("offlineRegionsAction"));
+  connect(m_offlineRegionsAction, &QAction::triggered, this,
+          [this]() { showOfflineRegions(); });
+
   m_openAction = new QAction(this);
   m_openAction->setObjectName(QStringLiteral("openProjectAction"));
   m_openAction->setShortcut(QKeySequence::Open);
@@ -399,6 +425,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_saveAsAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
+  m_fileMenu->addAction(m_offlineRegionsAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_quitAction);
 
@@ -452,6 +479,10 @@ void MainWindow::retranslateUi()
   m_addWmsAction->setText(tr("Add &WMS Layer…"));
   m_addWmsAction->setStatusTip(
       tr("Add a layer from a web map server (WMS) to the layer tree"));
+  m_offlineRegionsAction->setText(tr("Offline &Regions…"));
+  m_offlineRegionsAction->setStatusTip(
+      tr("Keep areas of WMS layers on this computer for use without a "
+         "network"));
   m_openAction->setText(tr("&Open Project…"));
   m_openAction->setStatusTip(
       tr("Replace the layers and view with a saved project"));
@@ -615,6 +646,69 @@ void MainWindow::addWmsLayer(const QString& address)
   if (definition) {
     m_layerDock->addLayer(*definition);
   }
+}
+
+OfflineRegionsDialog* MainWindow::showOfflineRegions()
+{
+  if (!m_offlineRegionsDialog) {
+    m_offlineRegionsDialog =
+        new OfflineRegionsDialog(*m_offlineRegions, m_globeView, this);
+    m_offlineRegionsDialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(m_offlineRegionsDialog, &OfflineRegionsDialog::newRegionRequested,
+            this, [this]() { newOfflineRegion(); });
+  }
+  m_offlineRegionsDialog->show();
+  m_offlineRegionsDialog->raise();
+  m_offlineRegionsDialog->activateWindow();
+  return m_offlineRegionsDialog;
+}
+
+NewRegionDialog* MainWindow::newOfflineRegion()
+{
+  if (m_newRegionDialog) {
+    m_newRegionDialog->show();
+    m_newRegionDialog->raise();
+    return m_newRegionDialog;
+  }
+  // The WMS layers of the project, each source once, top first.
+  std::vector<RegionLayerChoice> layers;
+  const LayerStack stack = m_layers->layerStack();
+  for (std::size_t i = stack.imagery.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.imagery[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wms")) {
+      continue;
+    }
+    const bool seen = std::any_of(layers.begin(), layers.end(),
+                                  [&](const RegionLayerChoice& layer) {
+                                    return layer.source == definition.source;
+                                  });
+    if (!seen) {
+      layers.push_back(RegionLayerChoice{definition.name, definition.source});
+    }
+  }
+  if (layers.empty()) {
+    QMessageBox::information(
+        this, tr("New Offline Region"),
+        tr("Only layers from WMS servers can be kept for offline use. Add a "
+           "WMS layer first (File → Add WMS Layer…)."));
+    return nullptr;
+  }
+  m_newRegionDialog = new NewRegionDialog(*m_offlineRegions, std::move(layers),
+                                          m_globeView, this);
+  m_newRegionDialog->setAttribute(Qt::WA_DeleteOnClose);
+  connect(m_newRegionDialog, &QDialog::accepted, this, [this]() {
+    QString error;
+    const long long id =
+        m_offlineRegions->addRegion(m_newRegionDialog->region(), &error);
+    if (id == 0) {
+      QMessageBox::warning(this, tr("New Offline Region"), error);
+      return;
+    }
+    showOfflineRegions()->selectRegion(id);
+  });
+  m_newRegionDialog->show();
+  return m_newRegionDialog;
 }
 
 bool MainWindow::openProject(const QString& path, QString* errorString)

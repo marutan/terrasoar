@@ -7,10 +7,14 @@
 #define TS_APP_GLOBEVIEW_H
 
 #include <memory>
+#include <optional>
+#include <vector>
 
 #include <QElapsedTimer>
+#include <QMetaType>
 #include <QOpenGLWidget>
 #include <QPointF>
+#include <QPolygonF>
 #include <QString>
 #include <QStringList>
 #include <QTimer>
@@ -18,6 +22,7 @@
 #include "ts/camera/cameracontroller.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/perf/frametimestats.h"
+#include "ts/regions/regiongeometry.h"
 #include "ts/render/framepacer.h"
 #include "ts/render/renderdevice.h"
 
@@ -51,6 +56,13 @@ class Projection;
  * The map looks straight down with north up, so there dragging and the
  * keys slide it and turning and tilting do nothing. A scale bar in the
  * bottom-left corner shows a ground distance at the centre of the view.
+ *
+ * For offline regions the view can draw a region's outline
+ * (setRegionOutlines()) and let the user draw a new one
+ * (startRegionDrawing()): a rectangle by dragging, or a polygon by
+ * clicking its corners (double-click or Enter finishes, Backspace takes
+ * the last corner back); Esc cancels. Right drags and the wheel still
+ * move the camera meanwhile.
  *
  * @guithread
  */
@@ -186,6 +198,38 @@ public:
   /** Returns the number of frames drawn so far. */
   int framesRendered() const { return m_framesRendered; }
 
+  /** How the user draws a region, see startRegionDrawing(). */
+  enum class RegionDrawing {
+    None,      ///< Not drawing.
+    Rectangle, ///< Drag from corner to corner.
+    Polygon,   ///< Click each corner; double-click or Enter finishes.
+  };
+
+  /**
+   * Lets the user draw a region with the left button (see the class
+   * description); regionDrawn() or regionDrawingCancelled() follows.
+   * RegionDrawing::None cancels drawing.
+   */
+  void startRegionDrawing(RegionDrawing mode);
+
+  /** Returns how a region is being drawn (None when not). */
+  RegionDrawing regionDrawing() const { return m_drawing; }
+
+  /** Draws the outlines of @p regions over the globe (none: nothing). */
+  void setRegionOutlines(const std::vector<RegionGeometry>& regions);
+
+  /** Returns the outlines being drawn. */
+  const std::vector<RegionGeometry>& regionOutlines() const
+  {
+    return m_outlines;
+  }
+
+  /**
+   * Returns the latitude/longitude rectangle around what the view shows
+   * of the Earth, or nothing if the Earth isn't in view.
+   */
+  std::optional<RegionGeometry> visibleArea() const;
+
 signals:
   /**
    * The point under the pointer changed. @p onGlobe is false when the
@@ -202,6 +246,12 @@ signals:
 
   /** setMapProjection() changed the flat map's projection. */
   void mapProjectionChanged(const ts::Projection* projection);
+
+  /** The user finished drawing a region (startRegionDrawing()). */
+  void regionDrawn(const ts::RegionGeometry& region);
+
+  /** The user cancelled drawing a region, or it was cancelled. */
+  void regionDrawingCancelled();
 
 protected:
   /** Creates the renderer. */
@@ -239,6 +289,11 @@ private:
   void drawAttributions();
   void drawScaleBar();
   void drawError();
+  void drawRegions();
+  void finishPolygon();
+  std::optional<LonLat> pickLonLat(QPointF positionPx) const;
+  std::vector<QPolygonF> outlineOnScreen(const std::vector<LonLat>& points,
+                                         bool closed) const;
 
   CameraController m_controller;
   QMetaObject::Connection m_contextConnection;
@@ -267,8 +322,18 @@ private:
   FrameTimeStats m_intervalStats;
   double m_lastFrameStartS = -1.0;
   int m_framesRendered = 0;
+
+  RegionDrawing m_drawing = RegionDrawing::None;
+  /** Corners drawn so far (a rectangle's first corner, a polygon's). */
+  std::vector<LonLat> m_drawnPoints;
+  /** True while dragging out a rectangle. */
+  bool m_drawingDrag = false;
+  std::vector<RegionGeometry> m_outlines;
 };
 
 } // namespace ts
+
+// For queued connections and QSignalSpy (Qt 5 needs it declared).
+Q_DECLARE_METATYPE(ts::RegionGeometry)
 
 #endif // TS_APP_GLOBEVIEW_H

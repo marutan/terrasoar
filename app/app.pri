@@ -14,14 +14,22 @@ HEADERS += \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
     $$PWD/src/mainwindow.h \
-    $$PWD/src/startupmeasurement.h
+    $$PWD/src/newregiondialog.h \
+    $$PWD/src/offlineregionmanager.h \
+    $$PWD/src/offlineregionsdialog.h \
+    $$PWD/src/startupmeasurement.h \
+    $$PWD/src/wmscataloguefile.h
 
 SOURCES += \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \
-    $$PWD/src/startupmeasurement.cpp
+    $$PWD/src/newregiondialog.cpp \
+    $$PWD/src/offlineregionmanager.cpp \
+    $$PWD/src/offlineregionsdialog.cpp \
+    $$PWD/src/startupmeasurement.cpp \
+    $$PWD/src/wmscataloguefile.cpp
 
 # Translations: compiled by lrelease during the build and embedded as
 # :/i18n/terrasoar_<locale>.qm.

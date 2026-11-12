@@ -70,7 +70,11 @@ and the message also appears in the status bar.
 The saved tiles are in your cache folder: on Linux
 `~/.cache/Terra Soar/terrasoar/wms`, on Windows
 `%LOCALAPPDATA%\Terra Soar\terrasoar\cache\wms`. You can delete that
-folder at any time; it fills up again as you browse.
+folder at any time; it fills up again as you browse (but it also holds
+your offline regions).
+
+To keep an area for certain, whatever else you look at, download it as an
+offline region: see [Using Terra Soar offline](offline-use.md).
 
 ## Things to know
 

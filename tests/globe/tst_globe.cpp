@@ -28,11 +28,13 @@
 #include "ts/layers/layerdefinition.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
+#include "ts/network/tilediskcache.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/testproviders.h"
+#include "ts/regions/regiondownload.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 
@@ -954,6 +956,96 @@ private slots:
     QVERIFY(coloured > 20);
     QVERIFY2(difference.differingFraction < 0.01,
              qPrintable(QString::number(difference.differingFraction)));
+  }
+
+  void offlineRegionGolden()
+  {
+    // A region over the British Isles downloaded from the mock WMS, then
+    // drawn with no network at all (every request goes to a proxy on a
+    // closed port): the same picture as online, from the pinned tiles.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QTemporaryDir cacheDir;
+    ts::WmsProviderSettings settings;
+    settings.cacheDirectory = cacheDir.path();
+    ts::WmsSource source;
+    source.layers = QStringList{QStringLiteral("pattern")};
+    source.styles = QStringList{QString()};
+    source.title = QStringLiteral("Mock overlay");
+    const ts::RegionGeometry region =
+        ts::RegionGeometry::rectangle(-12.0, 49.0, 8.0, 62.0);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{55.0, -2.0, 7.0e5, 0.0, 0.0});
+    const std::shared_ptr<ts::ImageryProvider> background =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(40, 80, 130), 64,
+                                                        12);
+    std::array<QImage, 2> images;
+    {
+      ts::test::MockHttpServer server(ts::test::mockWmsHandler(
+          std::make_shared<ts::test::MockWmsBehaviour>()));
+      source.url = server.url(QStringLiteral("/wms"));
+      ts::NetworkSettings online;
+      online.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+      std::shared_ptr<ts::WmsImageryProvider> provider =
+          std::make_shared<ts::WmsImageryProvider>(
+              source, std::make_shared<ts::NetworkClient>(online), settings);
+      ts::RegionDownload download(provider, 1, region, 0, 8);
+      QString error;
+      QVERIFY(download.start({}, &error));
+      QVERIFY(download.waitUntilSettled(std::chrono::seconds(120)));
+      QCOMPARE(download.progress().state,
+               ts::RegionDownloadProgress::State::Finished);
+      QCOMPARE(download.progress().failedTiles, 0LL);
+      m_gl->makeCurrent();
+      ts::GlobeStyle style;
+      style.graticule = false;
+      m_renderer->setStyle(style);
+      m_renderer->setImageryLayers({ts::ImageryLayerDraw{background, 1.0, -1},
+                                    ts::ImageryLayerDraw{provider, 0.5, -1}},
+                                   {});
+      images[0] = renderSettled(camera);
+      qInfo("online: deepest level %d",
+            m_renderer->tileStatistics().deepestLevel);
+      m_gl->makeCurrent();
+      m_renderer->setImageryLayers({}, {});
+    }
+    // The server is gone, and the network is unusable anyway.
+    ts::test::MockHttpServer closed;
+    ts::NetworkSettings offline;
+    offline.proxy = QNetworkProxy(QNetworkProxy::HttpProxy,
+                                  QStringLiteral("127.0.0.1"), closed.port());
+    offline.attempts = 1;
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(offline);
+    std::shared_ptr<ts::WmsImageryProvider> provider =
+        std::make_shared<ts::WmsImageryProvider>(source, network, settings);
+    QCOMPARE(provider->diskCache()->regionUsage(1).tiles,
+             ts::countRegionTiles(region, 0, 8, std::nullopt).total());
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({ts::ImageryLayerDraw{background, 1.0, -1},
+                                  ts::ImageryLayerDraw{provider, 0.5, -1}},
+                                 {});
+    images[1] = renderSettled(camera);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(!images[0].isNull() && !images[1].isNull());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("offline: %d tiles drawn, deepest level %d", tiles.rendered,
+          tiles.deepestLevel);
+    QVERIFY(tiles.deepestLevel >= 5);
+    // Not one request, and every tile from the disk.
+    QCOMPARE(network->attemptsSent(), 0);
+    QCOMPARE(provider->statistics().requests, 0);
+    QVERIFY(provider->statistics().cacheHits > 0);
+    QCOMPARE(images[1], images[0]);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        images[1], QStringLiteral("offline-region-uk"), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
   void basePackWmsGolden_data()

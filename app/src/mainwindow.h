@@ -16,6 +16,7 @@
 
 #include <QJsonObject>
 #include <QMainWindow>
+#include <QPointer>
 #include <QString>
 
 #include "ts/packs/packmanifest.h"
@@ -35,6 +36,9 @@ class GlobeView;
 class ImageryProvider;
 class LayerTreeDock;
 class LayerTreeModel;
+class NewRegionDialog;
+class OfflineRegionManager;
+class OfflineRegionsDialog;
 class ProviderRegistry;
 struct LayerStack;
 
@@ -42,8 +46,9 @@ struct LayerStack;
  * The top-level window: the globe view, the layer tree dock, menus and
  * the status bar, which shows the position under the pointer and the eye
  * height. Projects (layer tree, camera and view) are opened and saved
- * from the File menu. The View menu changes between the 3D globe and the
- * 2D map and picks the map's projection.
+ * from the File menu, which also opens the offline regions (areas of WMS
+ * layers kept for use without a network). The View menu changes between the 3D
+ * globe and the 2D map and picks the map's projection.
  *
  * All text is set in retranslateUi(), which runs again when the language
  * changes, so installing a translator at run time updates the window.
@@ -83,6 +88,24 @@ public:
    * @p address, connects to it at once (tests).
    */
   void addWmsLayer(const QString& address = QString());
+
+  /**
+   * Shows the Offline Regions window (not modal) and returns it.
+   */
+  OfflineRegionsDialog* showOfflineRegions();
+
+  /**
+   * Opens the New Offline Region dialog (not modal) for the WMS layers in
+   * the project and returns it; null (after telling the user) if there
+   * are none. Accepting it adds the region and starts its download.
+   */
+  NewRegionDialog* newOfflineRegion();
+
+  /** Returns the offline regions. */
+  OfflineRegionManager& offlineRegions() const { return *m_offlineRegions; }
+
+  /** Returns the globe view, or null without OpenGL (tests). */
+  GlobeView* globeView() const { return m_globeView; }
 
   /**
    * Returns true while the globe view is loading tiles (false without
@@ -171,6 +194,12 @@ private:
   LayerTreeModel* m_layers = nullptr;
   std::unique_ptr<ProviderRegistry> m_registry;
   QAction* m_addWmsAction = nullptr;
+  QAction* m_offlineRegionsAction = nullptr;
+  /** Destroyed before the registry. */
+  std::unique_ptr<OfflineRegionManager> m_offlineRegions;
+  QPointer<OfflineRegionsDialog> m_offlineRegionsDialog;
+  QPointer<NewRegionDialog> m_newRegionDialog;
+  QLabel* m_downloadLabel = nullptr;
   /** The imagery layers' providers, by node id, for their status. */
   std::vector<std::pair<QString, std::shared_ptr<ImageryProvider>>>
       m_layerProviders;

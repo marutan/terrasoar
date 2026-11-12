@@ -26,7 +26,8 @@ SUBDIRS = \
     vector \
     projection \
     network \
-    wms
+    wms \
+    regions
 
 # The smoke tests launch the application with QProcess, whose vfork-based
 # start-up the ThreadSanitizer runtime cannot follow (it aborts with a CHECK

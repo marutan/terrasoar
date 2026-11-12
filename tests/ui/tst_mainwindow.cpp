@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QMouseEvent>
 #include <QNetworkProxy>
 #include <QPointer>
@@ -18,6 +19,7 @@
 #include <QSlider>
 #include <QStandardPaths>
 #include <QTemporaryDir>
+#include <QTimer>
 #include <QTreeView>
 #include <QTreeWidget>
 #include <QUrlQuery>
@@ -30,9 +32,13 @@
 #include "mainwindow.h"
 #include "mockhttpserver.h"
 #include "mockwms.h"
+#include "newregiondialog.h"
+#include "offlineregionmanager.h"
+#include "offlineregionsdialog.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
+#include "ts/network/tilediskcache.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/wms/wmsimageryprovider.h"
@@ -111,6 +117,11 @@ QList<QPair<QString, QString>> visibleTexts(QMainWindow& window)
   }
   const QList<QLabel*> labels = window.findChildren<QLabel*>();
   for (QLabel* label : labels) {
+    // A label hidden while it has nothing to say (the download progress)
+    // shows no text.
+    if (label->isHidden() && label->text().isEmpty()) {
+      continue;
+    }
     texts << qMakePair(describe(label) + QStringLiteral(" text"),
                        label->text());
   }
@@ -187,6 +198,10 @@ private slots:
     // catalogue isn't fetched from the internet.
     QStandardPaths::setTestModeEnabled(true);
     qputenv("TS_WMS_CATALOGUE_URL", QByteArray());
+    // No offline regions left over from an earlier run.
+    QFile::remove(
+        QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+            .filePath(QStringLiteral("wms/regions.json")));
     QVERIFY(m_basePack.isValid());
     ts::test::writeFixtureBasePack(m_basePack.path());
     qputenv("TS_BASEPACK_DIR", m_basePack.path().toUtf8());
@@ -1029,6 +1044,211 @@ private slots:
       QTest::qWait(300);
       globe->grabFramebuffer().save(
           QDir(shots).filePath(QStringLiteral("wms-layer.png")));
+    }
+  }
+
+  void offlineRegionEndToEnd()
+  {
+    // A WMS layer's region set up in the dialog, estimated, downloaded
+    // and listed; refused for a server whose terms forbid it; deleted.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    window.registry().setWmsNetwork(
+        std::make_shared<ts::NetworkClient>(settings), wms);
+    ts::OfflineRegionManager& regions = window.offlineRegions();
+    regions.setCatalogue([]() { return std::vector<ts::WmsCatalogueEntry>{}; });
+
+    // No WMS layer yet: nothing to keep (a message box says so).
+    QTimer::singleShot(0, [&]() {
+      for (QWidget* widget : QApplication::topLevelWidgets()) {
+        if (QMessageBox* box = qobject_cast<QMessageBox*>(widget)) {
+          box->accept();
+        }
+      }
+    });
+    QVERIFY(window.newOfflineRegion() == nullptr);
+
+    ts::WmsSource source;
+    source.url = server.url(QStringLiteral("/wms"));
+    source.layers = QStringList{QStringLiteral("pattern")};
+    source.styles = QStringList{QString()};
+    source.title = QStringLiteral("Test pattern");
+    source.maximumLevel = 12;
+    ts::LayerDefinition definition;
+    definition.id = QStringLiteral("wms:test-pattern");
+    definition.origin = ts::LayerOrigin::Catalogue;
+    definition.type = ts::LayerType::Imagery;
+    definition.name = source.title;
+    definition.source = source.toJson();
+    window.layerModel()->addLayer(definition);
+
+    QPointer<ts::NewRegionDialog> dialog = window.newOfflineRegion();
+    QVERIFY(dialog);
+    QVERIFY(dialog->isVisible());
+    const ts::RegionGeometry uk =
+        ts::RegionGeometry::rectangle(-10.0, 49.0, 2.0, 61.0);
+    dialog->setArea(uk);
+    dialog->setLevels(0, 6);
+    QCOMPARE(dialog->tileCount(),
+             ts::countRegionTiles(uk, 0, 6, std::nullopt).total());
+    // Not in the catalogue: a warning, but allowed.
+    QLabel* terms =
+        dialog->findChild<QLabel*>(QStringLiteral("regionTermsLabel"));
+    QVERIFY(terms->isVisibleTo(dialog));
+    QVERIFY(terms->text().contains(QStringLiteral("terms of use")));
+    QVERIFY(QTest::qWaitFor([&]() { return dialog->estimate().has_value(); },
+                            20000));
+    QVERIFY(dialog->estimate()->sampledTiles > 0);
+    QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("regionSizeLabel"))
+                ->text()
+                .contains(QStringLiteral("about")));
+    if (ts::GlobeView* globe = globeOf(window)) {
+      QCOMPARE(globe->regionOutlines().size(), std::size_t{1});
+    }
+    QVERIFY(dialog->canDownload());
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      dialog->grab().save(
+          QDir(shots).filePath(QStringLiteral("new-region-dialog.png")));
+    }
+    dialog->findChild<QPushButton*>(QStringLiteral("regionDownloadButton"))
+        ->click();
+    QVERIFY(QTest::qWaitFor([&]() { return dialog.isNull(); }, 5000));
+    QCOMPARE(regions.regions().size(), std::size_t{1});
+    const long long id = regions.regions().front().id;
+    ts::OfflineRegionsDialog* list =
+        window.findChild<ts::OfflineRegionsDialog*>();
+    QVERIFY(list && list->isVisible());
+    QCOMPARE(list->selectedRegion(), id);
+    QVERIFY(QTest::qWaitFor([&]() { return !regions.progress(id); }, 60000));
+    const ts::OfflineRegion* region = regions.region(id);
+    QVERIFY(region->complete);
+    QCOMPARE(region->failedTiles, 0LL);
+    QCOMPARE(region->tiles,
+             ts::countRegionTiles(uk, 0, 6, std::nullopt).total());
+    QVERIFY(region->bytes > 0);
+    QVERIFY(list->list()->topLevelItem(0)->text(5).startsWith(
+        QStringLiteral("Ready offline")));
+    if (!shots.isEmpty()) {
+      list->grab().save(
+          QDir(shots).filePath(QStringLiteral("offline-regions-dialog.png")));
+    }
+    std::shared_ptr<ts::WmsImageryProvider> provider =
+        regions.providerFor(source.toJson(), nullptr);
+    QCOMPARE(provider->diskCache()->regionUsage(id).tiles, region->tiles);
+
+    // A server whose terms forbid bulk downloads: refused in the dialog.
+    regions.setCatalogue([&]() {
+      ts::WmsCatalogueEntry entry;
+      entry.title = QStringLiteral("Mock");
+      entry.url = server.url(QStringLiteral("/wms"));
+      entry.termsUrl = QUrl(QStringLiteral("https://example.org/terms"));
+      entry.allowBulkDownload = false;
+      return std::vector<ts::WmsCatalogueEntry>{entry};
+    });
+    dialog = window.newOfflineRegion();
+    QVERIFY(dialog);
+    dialog->setArea(uk);
+    QVERIFY(!dialog->canDownload());
+    QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("regionTermsLabel"))
+                ->text()
+                .contains(QStringLiteral("don't allow")));
+    // Too many tiles: refused too.
+    regions.setCatalogue([]() { return std::vector<ts::WmsCatalogueEntry>{}; });
+    dialog->setArea(ts::RegionGeometry::rectangle(-180.0, -60.0, 180.0, 60.0));
+    dialog->setLevels(0, 12);
+    QVERIFY(dialog->tileCount() > ts::NewRegionDialog::maximumTiles);
+    QVERIFY(!dialog->canDownload());
+    dialog->reject();
+
+    // Deleting unpins its tiles.
+    regions.remove(id);
+    QVERIFY(regions.regions().empty());
+    QCOMPARE(provider->diskCache()->regionUsage(id).tiles, 0LL);
+    QCOMPARE(list->list()->topLevelItemCount(), 0);
+  }
+
+  void drawRegionOnTheGlobe()
+  {
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QVERIFY(
+        QTest::qWaitFor([&]() { return globe->framesRendered() > 0; }, 5000));
+    QSignalSpy drawn(globe, &ts::GlobeView::regionDrawn);
+    QSignalSpy cancelled(globe, &ts::GlobeView::regionDrawingCancelled);
+    const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
+
+    // A rectangle: drag from one corner to the other; the camera stays.
+    const ts::CameraPose before = globe->controller().camera().pose();
+    globe->startRegionDrawing(ts::GlobeView::RegionDrawing::Rectangle);
+    sendMouse(globe, QEvent::MouseButtonPress, centre - QPointF(60, 40),
+              Qt::LeftButton, Qt::LeftButton);
+    sendMouse(globe, QEvent::MouseMove, centre, Qt::NoButton, Qt::LeftButton);
+    sendMouse(globe, QEvent::MouseButtonRelease, centre + QPointF(60, 40),
+              Qt::LeftButton, Qt::NoButton);
+    QCOMPARE(drawn.count(), 1);
+    const ts::RegionGeometry rectangle =
+        drawn.at(0).at(0).value<ts::RegionGeometry>();
+    QCOMPARE(rectangle.kind(), ts::RegionGeometry::Kind::Rectangle);
+    const std::optional<ts::Geodetic> middle =
+        globe->controller().camera().pickGeodetic(centre.x(), centre.y());
+    QVERIFY(middle);
+    QVERIFY(rectangle.contains(middle->latDeg, middle->lonDeg));
+    QCOMPARE(globe->controller().camera().pose().targetLonDeg,
+             before.targetLonDeg);
+    QCOMPARE(globe->regionDrawing(), ts::GlobeView::RegionDrawing::None);
+
+    // A polygon: three clicks, then a double-click on the fourth corner.
+    globe->startRegionDrawing(ts::GlobeView::RegionDrawing::Polygon);
+    const std::vector<QPointF> corners{
+        centre + QPointF(-50, -50), centre + QPointF(50, -50),
+        centre + QPointF(60, 50), centre + QPointF(-40, 40)};
+    for (const QPointF corner : corners) {
+      sendMouse(globe, QEvent::MouseButtonPress, corner, Qt::LeftButton,
+                Qt::LeftButton);
+      sendMouse(globe, QEvent::MouseButtonRelease, corner, Qt::LeftButton,
+                Qt::NoButton);
+    }
+    sendMouse(globe, QEvent::MouseButtonDblClick, corners.back(),
+              Qt::LeftButton, Qt::LeftButton);
+    QCOMPARE(drawn.count(), 2);
+    const ts::RegionGeometry polygon =
+        drawn.at(1).at(0).value<ts::RegionGeometry>();
+    QCOMPARE(polygon.kind(), ts::RegionGeometry::Kind::Polygon);
+    QCOMPARE(polygon.vertices().size(), std::size_t{4});
+    QVERIFY(polygon.contains(middle->latDeg, middle->lonDeg));
+
+    // Esc cancels.
+    globe->startRegionDrawing(ts::GlobeView::RegionDrawing::Polygon);
+    QTest::keyClick(globe, Qt::Key_Escape);
+    QCOMPARE(cancelled.count(), 1);
+    QCOMPARE(globe->regionDrawing(), ts::GlobeView::RegionDrawing::None);
+
+    // The visible area holds the centre of the view.
+    const std::optional<ts::RegionGeometry> visible = globe->visibleArea();
+    QVERIFY(visible);
+    QVERIFY(visible->contains(middle->latDeg, middle->lonDeg));
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      globe->setRegionOutlines({rectangle, polygon});
+      globe->startRegionDrawing(ts::GlobeView::RegionDrawing::Polygon);
+      QTest::qWait(300);
+      globe->grabFramebuffer().save(
+          QDir(shots).filePath(QStringLiteral("region-outlines.png")));
     }
   }
 
