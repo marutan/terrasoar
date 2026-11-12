@@ -6,11 +6,14 @@
 #include <QDir>
 #include <QJsonDocument>
 
+#include "ts/network/networkclient.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/tilekey.h"
+#include "ts/wms/wmsimageryprovider.h"
+#include "ts/wms/wmssource.h"
 
 namespace ts
 {
@@ -87,6 +90,47 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
     return QString();
   }
   return QDir(m_basePackDirectory).filePath(file->second);
+}
+
+ProviderRegistry::ProviderRegistry()
+    : m_wmsSettings(std::make_unique<WmsProviderSettings>())
+{
+}
+
+ProviderRegistry::~ProviderRegistry() = default;
+
+void ProviderRegistry::setWmsNetwork(std::shared_ptr<NetworkClient> network,
+                                     const WmsProviderSettings& settings)
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  m_network = std::move(network);
+  *m_wmsSettings = settings;
+}
+
+std::shared_ptr<NetworkClient> ProviderRegistry::network()
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  return networkLocked();
+}
+
+std::shared_ptr<NetworkClient> ProviderRegistry::networkLocked()
+{
+  if (!m_network) {
+    m_network = std::make_shared<NetworkClient>();
+  }
+  return m_network;
+}
+
+std::shared_ptr<ImageryProvider>
+ProviderRegistry::createWmsImagery(const QJsonObject& source,
+                                   QString* errorString)
+{
+  const std::optional<WmsSource> wms = WmsSource::fromJson(source, errorString);
+  if (!wms) {
+    return nullptr;
+  }
+  return std::make_shared<WmsImageryProvider>(*wms, networkLocked(),
+                                              *m_wmsSettings);
 }
 
 std::shared_ptr<ImageryProvider>
@@ -175,6 +219,9 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 
 QString ProviderRegistry::attribution(const QJsonObject& source) const
 {
+  if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wms")) {
+    return source.value(QStringLiteral("attribution")).toString();
+  }
   const std::lock_guard<std::mutex> lock(m_mutex);
   if (!isBasePackSource(source) || m_basePackDirectory.isEmpty()) {
     return QString();
@@ -207,9 +254,15 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
       return live;
     }
   }
-  std::shared_ptr<ImageryProvider> provider =
-      isBasePackSource(source) ? createBasePackImagery(source, errorString)
-                               : createImageryProvider(source, errorString);
+  std::shared_ptr<ImageryProvider> provider;
+  if (isBasePackSource(source)) {
+    provider = createBasePackImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("wms")) {
+    provider = createWmsImagery(source, errorString);
+  } else {
+    provider = createImageryProvider(source, errorString);
+  }
   if (provider) {
     m_imagery[key] = provider;
   }

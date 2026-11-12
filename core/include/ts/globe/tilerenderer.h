@@ -101,7 +101,10 @@ struct TileStatistics {
  * order or opacity shows in the next frame.
  *
  * Layers are blended bottom to top in the tile fragment shader, up to 8
- * per draw (a tile is drawn again for each further 8). A composite group
+ * per draw (a tile is drawn again for each further 8). Images in Web
+ * Mercator (a WMS server without EPSG:4326) are reprojected per pixel
+ * there: each fragment's latitude becomes a row of the image through the
+ * projection's GLSL (see docs/design/wms.md). A composite group
  * is drawn into an offscreen target and faded onto the scene as one
  * image. See docs/design/tiling.md and docs/design/layer-model.md.
  *
@@ -219,6 +222,7 @@ private:
     int group = -1;
   };
   struct DrawTile;
+  struct LayerImage;
   /** A run of layers, by index into m_layers. */
   struct LayerRange {
     std::size_t first = 0;
@@ -229,6 +233,7 @@ private:
   void buildMeshes(const std::vector<TileLoadRequest>& wanted);
   void requestImages();
   void bindImages();
+  static void setMercatorImage(LayerImage& image, TileKey imageKey);
   void evict();
   double layerAlpha(const Layer& layer, bool hasImage) const;
   std::vector<bool> writeBatchUniforms(LayerRange batch, bool base);

@@ -167,9 +167,64 @@ QVariant LayerTreeModel::data(const QModelIndex& index, int role) const
     return node->effectivelyVisible();
   case LayerTypeRole:
     return collection ? -1 : static_cast<int>(node->definition.type);
+  case StatusRole:
+  case StatusMessageRole:
+  case Qt::DecorationRole:
+  case Qt::ToolTipRole: {
+    const std::map<QString, ProviderStatus>::const_iterator status =
+        m_status.find(node->id);
+    if (status == m_status.end()) {
+      if (role == StatusRole) {
+        return static_cast<int>(ProviderStatus::State::Ok);
+      }
+      if (role == StatusMessageRole) {
+        return QString();
+      }
+      return QVariant();
+    }
+    if (role == StatusRole) {
+      return static_cast<int>(status->second.state);
+    }
+    if (role == Qt::DecorationRole) {
+      return status->second.state == ProviderStatus::State::Error
+                 ? m_errorIcon
+                 : m_offlineIcon;
+    }
+    return status->second.message;
+  }
   default:
     return QVariant();
   }
+}
+
+void LayerTreeModel::setLayerStatus(const QString& nodeId,
+                                    const ProviderStatus& status)
+{
+  const QModelIndex index = indexOfId(nodeId);
+  if (!index.isValid()) {
+    return;
+  }
+  const std::map<QString, ProviderStatus>::iterator known =
+      m_status.find(nodeId);
+  if (status.state == ProviderStatus::State::Ok) {
+    if (known == m_status.end()) {
+      return;
+    }
+    m_status.erase(known);
+  } else if (known != m_status.end() && known->second == status) {
+    return;
+  } else {
+    m_status[nodeId] = status;
+  }
+  emit dataChanged(
+      index, index,
+      {Qt::DecorationRole, Qt::ToolTipRole, StatusRole, StatusMessageRole});
+}
+
+void LayerTreeModel::setStatusIcons(const QIcon& offline, const QIcon& error)
+{
+  m_offlineIcon = offline;
+  m_errorIcon = error;
 }
 
 bool LayerTreeModel::setData(const QModelIndex& index, const QVariant& value,

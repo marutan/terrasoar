@@ -21,10 +21,14 @@ HEADERS += \
     $$PWD/support/concurrency.h \
     $$PWD/support/fixturepack.h \
     $$PWD/support/goldenimage.h \
+    $$PWD/support/mockhttpserver.h \
+    $$PWD/support/mockwms.h \
     $$PWD/support/offscreengl.h
 
 # Absolute path of tests/data, for sample files.
 DEFINES += TS_TEST_DATA_DIR=\\\"$$PWD/data\\\"
+# Absolute path of the repository's data directory (the WMS catalogue).
+DEFINES += TS_REPO_DATA_DIR=\\\"$$TS_ROOT/data\\\"
 
 # Tests run from their build directory; `make check` uses
 # TESTRUNNER/TESTARGS from the environment if set.

@@ -10,10 +10,13 @@
 #include <QColor>
 #include <QDir>
 #include <QImage>
+#include <QNetworkProxy>
 #include <QTemporaryDir>
 #include <QtTest>
 
 #include "goldenimage.h"
+#include "mockhttpserver.h"
+#include "mockwms.h"
 #include "offscreengl.h"
 #include "ts/camera/camera.h"
 #include "ts/geo/ellipsoid.h"
@@ -24,11 +27,14 @@
 #include "ts/globe/vectorrenderer.h"
 #include "ts/layers/layerdefinition.h"
 #include "ts/layers/layertreemodel.h"
+#include "ts/network/networkclient.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/testproviders.h"
+#include "ts/wms/wmsimageryprovider.h"
+#include "ts/wms/wmssource.h"
 
 namespace
 {
@@ -195,6 +201,28 @@ private:
     return m_gl->device().readPixels(*m_target);
   }
 
+  /** A WMS overlay from the mock server, in @p crs. */
+  std::shared_ptr<ts::WmsImageryProvider> mockWms(const QString& crs)
+  {
+    if (!m_wmsServer) {
+      m_wmsServer =
+          std::make_unique<ts::test::MockHttpServer>(ts::test::mockWmsHandler(
+              std::make_shared<ts::test::MockWmsBehaviour>()));
+      ts::NetworkSettings settings;
+      settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+      m_network = std::make_shared<ts::NetworkClient>(settings);
+    }
+    ts::WmsSource source;
+    source.url = m_wmsServer->url(QStringLiteral("/wms"));
+    source.layers = QStringList{QStringLiteral("pattern")};
+    source.styles = QStringList{QString()};
+    source.crs = crs;
+    source.title = QStringLiteral("Mock overlay");
+    return std::make_shared<ts::WmsImageryProvider>(source, m_network);
+  }
+
+  std::unique_ptr<ts::test::MockHttpServer> m_wmsServer;
+  std::shared_ptr<ts::NetworkClient> m_network;
   std::unique_ptr<ts::test::OffscreenGl> m_gl;
   std::unique_ptr<ts::GlobeRenderer> m_renderer;
   std::unique_ptr<ts::RenderTarget> m_target;
@@ -783,6 +811,240 @@ private slots:
 #else
     QVERIFY2(quartileS < 0.1, "the morph is below 10 frames per second");
 #endif
+  }
+
+  void wmsGolden_data()
+  {
+    QTest::addColumn<QString>("crs");
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("morph");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    const QString geographic = QStringLiteral("EPSG:4326");
+    const QString webMercator = QStringLiteral("EPSG:3857");
+    const QString none;
+    const QString mercator = QStringLiteral("mercator");
+    const QString miller = QStringLiteral("miller");
+    // The mock WMS's test pattern at 50 % over plain imagery: red discs at
+    // every 30° intersection, yellow bands at 45° N and 60° E.
+    QTest::newRow("wms-overlay-globe")
+        << geographic << none << 0.0 << 30.0 << 20.0 << 1.6e7;
+    QTest::newRow("wms-overlay-close")
+        << geographic << none << 0.0 << 45.0 << 60.0 << 1.5e6;
+    QTest::newRow("wms-overlay-mercator")
+        << geographic << mercator << 1.0 << 30.0 << 20.0 << 2.6e7;
+    QTest::newRow("wms-overlay-miller")
+        << geographic << miller << 1.0 << 0.0 << 0.0 << 5.0e7;
+    QTest::newRow("wms-overlay-morph-half")
+        << geographic << mercator << 0.5 << 30.0 << 20.0 << 2.6e7;
+    // A server with Web Mercator only: reprojected, the same picture.
+    QTest::newRow("wms-web-mercator-globe")
+        << webMercator << none << 0.0 << 30.0 << 20.0 << 1.6e7;
+    QTest::newRow("wms-web-mercator-close")
+        << webMercator << none << 0.0 << 60.0 << 30.0 << 1.2e6;
+    QTest::newRow("wms-web-mercator-miller")
+        << webMercator << miller << 1.0 << 0.0 << 0.0 << 5.0e7;
+  }
+
+  void wmsGolden()
+  {
+    // A WMS layer at 50 % over plain imagery, through the network client
+    // and the provider, from a local mock server.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(QString, crs);
+    QFETCH(QString, projection);
+    QFETCH(double, morph);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    if (!projection.isEmpty()) {
+      camera.setMapProjection(ts::projectionById(projection));
+      camera.setMorph(morph);
+    }
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryLayers(
+        {ts::ImageryLayerDraw{std::make_shared<ts::SolidColorImageryProvider>(
+                                  QColor(40, 80, 130), 64, 12),
+                              1.0, -1},
+         ts::ImageryLayerDraw{mockWms(crs), 0.5, -1}},
+        {});
+    const QImage image = renderSettled(camera);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(!image.isNull());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("%d tiles drawn, deepest level %d", tiles.rendered,
+          tiles.deepestLevel);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void wmsWebMercatorMatchesGeographic_data()
+  {
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<double>("morph");
+    QTest::newRow("whole globe") << 30.0 << 20.0 << 1.6e7 << 0.0;
+    QTest::newRow("60 N close") << 60.0 << 30.0 << 1.2e6 << 0.0;
+    // Up to 86° N, near the Mercator limit (the pole itself has no
+    // Mercator picture, so it is left out of view).
+    QTest::newRow("near the limit") << 72.0 << -30.0 << 4.0e6 << 0.0;
+    QTest::newRow("deep") << 45.0 << 60.0 << 2.0e4 << 0.0;
+    QTest::newRow("Mercator map") << 30.0 << 0.0 << 2.0e7 << 1.0;
+  }
+
+  void wmsWebMercatorMatchesGeographic()
+  {
+    // The same test pattern from a server in EPSG:4326 and from one in
+    // Web Mercator, reprojected in the shader: the two pictures agree
+    // except along the edges of the discs and lines, where the two images'
+    // pixels fall differently.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(double, morph);
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    camera.setMorph(morph);
+    std::array<QImage, 2> images;
+    for (std::size_t i = 0; i < images.size(); ++i) {
+      m_gl->makeCurrent();
+      ts::GlobeStyle style;
+      style.graticule = false;
+      m_renderer->setStyle(style);
+      m_renderer->setImageryLayers(
+          {ts::ImageryLayerDraw{mockWms(i == 0 ? QStringLiteral("EPSG:4326")
+                                               : QStringLiteral("EPSG:3857")),
+                                1.0, -1}},
+          {});
+      images.at(i) = renderSettled(camera);
+      QVERIFY(!images.at(i).isNull());
+    }
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    const ts::test::ImageDifference difference =
+        ts::test::compareImages(images[1], images[0], 40);
+    qInfo("%.2f %% of pixels differ by more than 40",
+          100.0 * difference.differingFraction);
+    // Something is drawn at all: the pattern covers part of the view.
+    int coloured = 0;
+    for (int y = 0; y < images[0].height(); y += 4) {
+      for (int x = 0; x < images[0].width(); x += 4) {
+        const QColor c(images[0].pixel(x, y));
+        coloured += c.red() > c.blue() + 60 ? 1 : 0;
+      }
+    }
+    QVERIFY(coloured > 20);
+    QVERIFY2(difference.differingFraction < 0.01,
+             qPrintable(QString::number(difference.differingFraction)));
+  }
+
+  void basePackWmsGolden_data()
+  {
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("morph");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::newRow("base-wms-globe")
+        << QString() << 0.0 << 30.0 << 20.0 << 1.6e7;
+    QTest::newRow("base-wms-mercator")
+        << QStringLiteral("mercator") << 1.0 << 30.0 << 20.0 << 2.6e7;
+    QTest::newRow("base-wms-miller")
+        << QStringLiteral("miller") << 1.0 << 0.0 << 0.0 << 5.0e7;
+    QTest::newRow("base-wms-morph-half")
+        << QStringLiteral("mercator") << 0.5 << 30.0 << 20.0 << 2.6e7;
+  }
+
+  void basePackWmsGolden()
+  {
+    // The mock WMS overlay at 50 % over Blue Marble, set up through the
+    // layer tree and the provider registry like the application.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const QString directory = qEnvironmentVariable("TS_BASEPACK_DIR");
+    if (directory.isEmpty()) {
+      QSKIP("TS_BASEPACK_DIR is not set.");
+    }
+    QFETCH(QString, projection);
+    QFETCH(double, morph);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QString error;
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(directory, &error);
+    if (!manifest) {
+      QFAIL(qPrintable(error));
+    }
+    const std::shared_ptr<ts::WmsImageryProvider> mock =
+        mockWms(QStringLiteral("EPSG:4326"));
+    ts::ProviderRegistry registry;
+    registry.setBasePack(directory, *manifest);
+    registry.setWmsNetwork(m_network, ts::WmsProviderSettings());
+    ts::LayerTreeModel model;
+    for (const ts::LayerDefinition& definition :
+         ts::builtinLayerDefinitions()) {
+      if (definition.id == QLatin1String("builtin:bluemarble")) {
+        model.addLayer(definition);
+      }
+    }
+    ts::LayerDefinition wms;
+    wms.id = QStringLiteral("user:mock-wms");
+    wms.origin = ts::LayerOrigin::User;
+    wms.type = ts::LayerType::Imagery;
+    wms.name = QStringLiteral("Mock overlay");
+    wms.source = mock->source().toJson();
+    const QModelIndex overlay = model.addLayer(wms);
+    model.setData(overlay, 0.5, ts::LayerTreeModel::OpacityRole);
+    const ts::LayerStack stack = model.layerStack();
+    QStringList errors;
+    const ts::ImageryDraws imagery =
+        ts::imageryDrawsForStack(stack, registry, &errors);
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char(' '))));
+    QCOMPARE(imagery.layers.size(), std::size_t{2});
+    QCOMPARE(imagery.layers.back().alpha, 0.5);
+
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryLayers(imagery.layers, imagery.groupAlphas);
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    if (!projection.isEmpty()) {
+      camera.setMapProjection(ts::projectionById(projection));
+      camera.setMorph(morph);
+    }
+    const QImage image = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(!image.isNull());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
   void basePackGolden_data()

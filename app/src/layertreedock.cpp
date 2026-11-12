@@ -154,6 +154,9 @@ void LayerTreeDock::rebuildAddLayerMenu()
             [this, definition]() { addLayer(definition); });
   }
   m_addLayerMenu->addSeparator();
+  QAction* wms = m_addLayerMenu->addAction(tr("WMS Layer…"));
+  wms->setObjectName(QStringLiteral("addWmsLayerAction"));
+  connect(wms, &QAction::triggered, this, &LayerTreeDock::addWmsLayerRequested);
   QAction* solid = m_addLayerMenu->addAction(tr("Solid Colour…"));
   solid->setObjectName(QStringLiteral("addSolidColourAction"));
   connect(solid, &QAction::triggered, this, &LayerTreeDock::addSolidColorLayer);

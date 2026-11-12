@@ -10,7 +10,7 @@ TARGET = tscore
 CONFIG += staticlib
 CONFIG -= app_bundle
 
-QT = core gui $$TS_QT_OPENGL
+QT = core gui network $$TS_QT_OPENGL
 
 INCLUDEPATH += $$PWD/include
 
@@ -46,6 +46,9 @@ HEADERS += \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
+    include/ts/network/httpcache.h \
+    include/ts/network/networkclient.h \
+    include/ts/network/tilediskcache.h \
     include/ts/packs/basepack.h \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
@@ -67,6 +70,10 @@ HEADERS += \
     include/ts/vector/vectormesh.h \
     include/ts/vector/vectorstyle.h \
     include/ts/vector/vectortileloader.h \
+    include/ts/wms/wmscapabilities.h \
+    include/ts/wms/wmscatalogue.h \
+    include/ts/wms/wmsimageryprovider.h \
+    include/ts/wms/wmssource.h \
     src/globe/globeuniforms.h \
     src/providers/sqlitestatementpool.h
 
@@ -96,6 +103,9 @@ SOURCES += \
     src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
+    src/network/httpcache.cpp \
+    src/network/networkclient.cpp \
+    src/network/tilediskcache.cpp \
     src/packs/basepack.cpp \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
@@ -115,4 +125,8 @@ SOURCES += \
     src/tiling/tileselector.cpp \
     src/vector/vectormesh.cpp \
     src/vector/vectorstyle.cpp \
-    src/vector/vectortileloader.cpp
+    src/vector/vectortileloader.cpp \
+    src/wms/wmscapabilities.cpp \
+    src/wms/wmscatalogue.cpp \
+    src/wms/wmsimageryprovider.cpp \
+    src/wms/wmssource.cpp

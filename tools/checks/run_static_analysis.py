@@ -167,6 +167,33 @@ def configure_and_build(build_dir, jobs):
         sys.exit(build.stdout[-4000:] + build.stderr[-4000:] + "\nBuild failed.")
 
 
+INCLUDE_FLAGS = ("-I", "-isystem", "-iquote")
+
+
+def absolute_includes(arguments, directory):
+    """The arguments with each relative include directory (-I dir, -Idir,
+    -isystem, -iquote) made absolute against the compile directory."""
+    def absolute(path):
+        return path if os.path.isabs(path) else \
+            os.path.normpath(os.path.join(directory, path))
+
+    result = []
+    follows_flag = False
+    for argument in arguments:
+        if follows_flag:
+            result.append(absolute(argument))
+            follows_flag = False
+        elif argument in INCLUDE_FLAGS:
+            result.append(argument)
+            follows_flag = True
+        else:
+            # The joined form, "-Idir". No flag is a prefix of another.
+            flag = next((f for f in INCLUDE_FLAGS
+                         if argument.startswith(f) and len(argument) > len(f)), None)
+            result.append(flag + absolute(argument[len(flag):]) if flag else argument)
+    return result
+
+
 def compile_database(build_dir):
     """Merges the -MJ fragments into compile_commands.json; returns entries
     for our own sources."""
@@ -187,6 +214,12 @@ def compile_database(build_dir):
             entry["arguments"] = [absolute if argument == source else argument
                                   for argument in entry["arguments"]]
             entry["file"] = absolute
+        # Include directories too: the tools print a header's path as it was
+        # found, and parse() can't tell which directory "../../core/include"
+        # was relative to, so findings in our own headers would be taken for
+        # third-party ones and dropped.
+        entry["arguments"] = absolute_includes(entry["arguments"],
+                                               entry["directory"])
         if is_ours(entry["file"], build_dir):
             entries[os.path.realpath(entry["file"])] = entry
     if not fragments:

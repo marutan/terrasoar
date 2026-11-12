@@ -7,10 +7,16 @@
 #include <QJsonObject>
 #include <QProcess>
 #include <QProcessEnvironment>
+#include <QTcpServer>
 #include <QTemporaryDir>
 #include <QtTest>
 
 #include "fixturepack.h"
+#include "mockhttpserver.h"
+#include "mockwms.h"
+#include "ts/layers/layertreemodel.h"
+#include "ts/layers/projectfile.h"
+#include "ts/wms/wmssource.h"
 
 namespace
 {
@@ -87,10 +93,35 @@ QJsonObject parseJson(const QByteArray& out)
                                                  : QJsonObject();
 }
 
+/** Writes a project with one WMS layer of the mock server at @p url. */
+bool writeWmsProject(const QString& path, const QUrl& url, const QString& name)
+{
+  ts::WmsSource source;
+  source.url = url;
+  source.layers = QStringList{QStringLiteral("pattern")};
+  source.styles = QStringList{QString()};
+  source.title = name;
+  source.attribution = QStringLiteral("Mock Agency");
+  ts::LayerDefinition definition;
+  definition.id = QStringLiteral("wms:smoke");
+  definition.origin = ts::LayerOrigin::Catalogue;
+  definition.type = ts::LayerType::Imagery;
+  definition.name = name;
+  definition.source = source.toJson();
+  ts::LayerTreeModel model;
+  model.addLayer(definition);
+  ts::Project project;
+  project.camera = ts::CameraPose{20.0, 10.0, 2.0e7, 0.0, 0.0};
+  project.layers = model.toJson();
+  QString error;
+  return ts::saveProject(path, project, &error);
+}
+
 void verifyCleanExit(const Run& run)
 {
   QVERIFY2(run.finished, run.err.constData());
-  QCOMPARE(run.status, QProcess::NormalExit);
+  // A crash: show what it printed (a sanitizer report, a Qt fatal).
+  QVERIFY2(run.status == QProcess::NormalExit, run.err.constData());
   QVERIFY2(run.exitCode == 0, run.err.constData());
   const QStringList warnings = qtWarnings(run.err);
   QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join(QLatin1Char('\n'))));
@@ -189,7 +220,8 @@ private slots:
     }
     const Run run = runApp({QStringLiteral("--smoke-test")}, false);
     QVERIFY2(run.finished, run.err.constData());
-    QCOMPARE(run.status, QProcess::NormalExit);
+    // A crash: show what it printed (a sanitizer report, a Qt fatal).
+    QVERIFY2(run.status == QProcess::NormalExit, run.err.constData());
     QCOMPARE(run.exitCode, 0);
     const QStringList warnings = qtWarnings(run.err);
     QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join(QLatin1Char('\n'))));
@@ -282,9 +314,94 @@ private slots:
     const Run run = runApp({QStringLiteral("--smoke-test"),
                             QStringLiteral("no-such-file.terrasoar")});
     QVERIFY(run.finished);
-    QCOMPARE(run.status, QProcess::NormalExit);
+    // A crash: show what it printed (a sanitizer report, a Qt fatal).
+    QVERIFY2(run.status == QProcess::NormalExit, run.err.constData());
     QCOMPARE(run.exitCode, 1);
     QVERIFY2(run.err.contains("no-such-file.terrasoar"), run.err.constData());
+  }
+
+  /**
+   * A project with a WMS layer: the program fetches tiles from a local
+   * mock server, draws them, credits the source and still goes idle.
+   */
+  void drawsWmsLayer()
+  {
+    const Run glCheck = runApp({QStringLiteral("--gl-check")}, false);
+    if (glCheck.exitCode != 0 &&
+        qEnvironmentVariableIntValue("TS_REQUIRE_GL") == 0) {
+      QSKIP("No OpenGL 3.3 here; set TS_REQUIRE_GL=1 to fail instead.");
+    }
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(
+        std::make_shared<ts::test::MockWmsBehaviour>()));
+    const QTemporaryDir dir;
+    const QString project =
+        QDir(dir.path()).filePath(QStringLiteral("wms.terrasoar"));
+    QVERIFY(writeWmsProject(project, server.url(QStringLiteral("/wms")),
+                            QStringLiteral("Test pattern")));
+    QProcessEnvironment environment;
+    environment.insert(QStringLiteral("XDG_CACHE_HOME"), dir.path());
+    for (const char* name :
+         {"http_proxy", "HTTP_PROXY", "all_proxy", "ALL_PROXY"}) {
+      environment.insert(QLatin1String(name), QString());
+    }
+    const Run run =
+        runApp({QStringLiteral("--measure"), QStringLiteral("-"),
+                QStringLiteral("--idle-seconds"), QStringLiteral("1"), project},
+               false, 60000, environment);
+    verifyCleanExit(run);
+    const QJsonObject state =
+        parseJson(run.out).value(QStringLiteral("state")).toObject();
+    qInfo("%s",
+          QJsonDocument(state).toJson(QJsonDocument::Compact).constData());
+    QCOMPARE(state.value(QStringLiteral("layers")).toArray(),
+             QJsonArray{QStringLiteral("Test pattern")});
+    QVERIFY(state.value(QStringLiteral("imagery_tiles_drawn")).toInt() > 0);
+    QVERIFY(state.value(QStringLiteral("layer_problems")).toObject().isEmpty());
+    QVERIFY(state.value(QStringLiteral("attributions"))
+                .toArray()
+                .contains(QStringLiteral("Mock Agency")));
+    QVERIFY(ts::test::mockGetMapCount(server) > 0);
+  }
+
+  /**
+   * The same with the server gone: the layer is reported offline, and the
+   * program still settles and exits (failed tiles aren't asked for every
+   * frame).
+   */
+  void wmsServerUnreachable()
+  {
+    const Run glCheck = runApp({QStringLiteral("--gl-check")}, false);
+    if (glCheck.exitCode != 0 &&
+        qEnvironmentVariableIntValue("TS_REQUIRE_GL") == 0) {
+      QSKIP("No OpenGL 3.3 here; set TS_REQUIRE_GL=1 to fail instead.");
+    }
+    quint16 closedPort = 0;
+    {
+      QTcpServer probe;
+      QVERIFY(probe.listen(QHostAddress::LocalHost, 0));
+      closedPort = probe.serverPort();
+    }
+    const QTemporaryDir dir;
+    const QString project =
+        QDir(dir.path()).filePath(QStringLiteral("gone.terrasoar"));
+    QVERIFY(writeWmsProject(
+        project,
+        QUrl(QStringLiteral("http://127.0.0.1:%1/wms").arg(closedPort)),
+        QStringLiteral("Unreachable")));
+    QProcessEnvironment environment;
+    environment.insert(QStringLiteral("XDG_CACHE_HOME"), dir.path());
+    const Run run =
+        runApp({QStringLiteral("--measure"), QStringLiteral("-"),
+                QStringLiteral("--idle-seconds"), QStringLiteral("1"), project},
+               false, 90000, environment);
+    verifyCleanExit(run);
+    const QJsonObject state =
+        parseJson(run.out).value(QStringLiteral("state")).toObject();
+    qInfo("%s",
+          QJsonDocument(state).toJson(QJsonDocument::Compact).constData());
+    QCOMPARE(state.value(QStringLiteral("layer_problems")).toObject(),
+             (QJsonObject{
+                 {QStringLiteral("Unreachable"), QStringLiteral("offline")}}));
   }
 
   /**

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic WMS 1.1.1 document for tests: inheritance, SRS lists,
+     ScaleHint, a group without a name, a GetMap URL without "?". -->
+<!DOCTYPE WMT_MS_Capabilities SYSTEM "http://schemas.opengis.net/wms/1.1.1/WMS_MS_Capabilities.dtd" [
+ <!ELEMENT VendorSpecificCapabilities EMPTY>
+]>
+<WMT_MS_Capabilities version="1.1.1">
+  <Service>
+    <Name>OGC:WMS</Name>
+    <Title>Synthetic inheritance test</Title>
+    <Abstract>Layers inherit SRS, styles, boxes and attribution.</Abstract>
+    <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/"/>
+    <Fees>none</Fees>
+    <AccessConstraints>none</AccessConstraints>
+  </Service>
+  <Capability>
+    <Request>
+      <GetCapabilities>
+        <Format>application/vnd.ogc.wms_xml</Format>
+        <DCPType><HTTP><Get><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/caps"/></Get></HTTP></DCPType>
+      </GetCapabilities>
+      <GetMap>
+        <Format>image/png</Format>
+        <Format> image/jpeg </Format>
+        <DCPType>
+          <HTTP>
+            <Post><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/post"/></Post>
+            <Get><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/cgi-bin/mapserv?map=/maps/world.map"/></Get>
+          </HTTP>
+        </DCPType>
+      </GetMap>
+    </Request>
+    <Exception><Format>application/vnd.ogc.se_xml</Format></Exception>
+    <Layer>
+      <Title>Root</Title>
+      <SRS>EPSG:4326 EPSG:3857</SRS>
+      <SRS></SRS>
+      <LatLonBoundingBox minx="-180" miny="-90" maxx="180" maxy="90"/>
+      <Attribution>
+        <Title>Example Agency</Title>
+        <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/about"/>
+      </Attribution>
+      <Style><Name>default</Name><Title>Default</Title></Style>
+      <Layer queryable="1">
+        <Title>Group without a name</Title>
+        <SRS>EPSG:32633</SRS>
+        <Layer opaque="1">
+          <Name>relief</Name>
+          <Title>Shaded relief</Title>
+          <LatLonBoundingBox minx="5" miny="45" maxx="15" maxy="55"/>
+          <BoundingBox SRS="EPSG:4326" minx="5" miny="45" maxx="15" maxy="55"/>
+          <Style>
+            <Name>grey</Name><Title>Grey</Title>
+            <LegendURL width="20" height="20"><Format>image/png</Format>
+              <OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/legend.png"/>
+            </LegendURL>
+          </Style>
+          <ScaleHint min="0.5" max="5000"/>
+        </Layer>
+        <Layer queryable="0">
+          <Name>rivers</Name>
+          <Title>Rivers</Title>
+          <Attribution><Title>River Survey</Title></Attribution>
+        </Layer>
+      </Layer>
+      <Layer noSubsets="1">
+        <Name>poster</Name>
+        <Title>Whole-world poster</Title>
+      </Layer>
+      <Layer fixedWidth="512" fixedHeight="256">
+        <Name>fixed</Name>
+        <Title>Fixed-size image</Title>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMT_MS_Capabilities>

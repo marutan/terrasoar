@@ -7,6 +7,7 @@
 #include <QAbstractItemModelTester>
 #include <QColor>
 #include <QDir>
+#include <QIcon>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -342,6 +343,63 @@ private slots:
                     {QStringLiteral("origin"), QStringLiteral("user")}});
     QVERIFY(!model.fromJson(QJsonArray{noSource}, &error));
     QCOMPARE(model.toJson(), before);
+  }
+
+  void layerStatus()
+  {
+    // A layer's source status shows as an icon and tooltip; it is neither
+    // saved nor a change of the stack.
+    ts::LayerTreeModel model;
+    // Icons named after files that don't exist: enough to tell them
+    // apart (no images without a GUI application).
+    const QIcon offlineIcon(QStringLiteral(":/test/offline.png"));
+    const QIcon errorIcon(QStringLiteral(":/test/error.png"));
+    model.setStatusIcons(offlineIcon, errorIcon);
+    const QModelIndex layer = model.addLayer(
+        imagery(QStringLiteral("w"), QStringLiteral("#ff0000ff")));
+    const QString id =
+        model.data(layer, ts::LayerTreeModel::NodeIdRole).toString();
+    QCOMPARE(model.data(layer, ts::LayerTreeModel::StatusRole).toInt(),
+             static_cast<int>(ts::ProviderStatus::State::Ok));
+    QVERIFY(model.data(layer, Qt::DecorationRole).isNull());
+    QVERIFY(model.data(layer, Qt::ToolTipRole).isNull());
+    const QJsonArray before = model.toJson();
+    QSignalSpy changed(&model, &QAbstractItemModel::dataChanged);
+    QSignalSpy stack(&model, &ts::LayerTreeModel::layerStackChanged);
+    model.setLayerStatus(id,
+                         ts::ProviderStatus{ts::ProviderStatus::State::Offline,
+                                            QStringLiteral("Can't reach it")});
+    QCOMPARE(changed.size(), 1);
+    QCOMPARE(model.data(layer, ts::LayerTreeModel::StatusRole).toInt(),
+             static_cast<int>(ts::ProviderStatus::State::Offline));
+    QCOMPARE(model.data(layer, Qt::ToolTipRole).toString(),
+             QStringLiteral("Can't reach it"));
+    QCOMPARE(
+        model.data(layer, ts::LayerTreeModel::StatusMessageRole).toString(),
+        QStringLiteral("Can't reach it"));
+    QCOMPARE(model.data(layer, Qt::DecorationRole).value<QIcon>().cacheKey(),
+             offlineIcon.cacheKey());
+    // The same again changes nothing.
+    model.setLayerStatus(id,
+                         ts::ProviderStatus{ts::ProviderStatus::State::Offline,
+                                            QStringLiteral("Can't reach it")});
+    QCOMPARE(changed.size(), 1);
+    model.setLayerStatus(id,
+                         ts::ProviderStatus{ts::ProviderStatus::State::Error,
+                                            QStringLiteral("Bad")});
+    QCOMPARE(model.data(layer, Qt::DecorationRole).value<QIcon>().cacheKey(),
+             errorIcon.cacheKey());
+    // Ok again: no icon, no tooltip.
+    model.setLayerStatus(id, ts::ProviderStatus{});
+    QCOMPARE(changed.size(), 3);
+    QVERIFY(model.data(layer, Qt::DecorationRole).isNull());
+    QCOMPARE(stack.size(), 0);
+    QCOMPARE(model.toJson(), before);
+    // Unknown ids are ignored.
+    model.setLayerStatus(
+        QStringLiteral("nothing"),
+        ts::ProviderStatus{ts::ProviderStatus::State::Error, {}});
+    QCOMPARE(changed.size(), 3);
   }
 
   void projectRoundTripIsIdentical()

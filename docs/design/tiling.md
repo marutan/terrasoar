@@ -143,11 +143,16 @@ draw()                                  callback → GUI thread: new frame
 ```
 
 - **Loader** (`ts::TileLoader`, thread-safe): two worker threads by
-  default (the reference PC has four hardware threads). Each frame the
+  default (the reference PC has four hardware threads), more for a
+  provider that asks (network sources wait on servers, not the CPU). Each frame the
   render thread replaces the wanted list; queued tiles not wanted any more
   are dropped, and tiles being loaded that aren't wanted are told to
   cancel through their flag. Finished tiles wait until the render thread
-  takes them.
+  takes them. A tile whose load *failed* (a network error, as opposed to
+  a tile with no data) isn't delivered: the renderer keeps showing a
+  coarser image there, and the tile is left out of the requests for 30 s
+  before it is asked for again if still wanted. It doesn't count as
+  loading meanwhile, so an unreachable server can't keep frames coming.
 - **Decoded-image cache** (`ts::LruCache`, thread-safe, 48 MB): a tile
   evicted from the GPU comes back without asking the provider again.
 - **Upload queue**: at most 8 tiles go to the GPU per frame, so a burst

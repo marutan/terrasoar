@@ -2,7 +2,6 @@
 #include "ts/tiling/tileloader.h"
 
 #include <algorithm>
-#include <optional>
 #include <utility>
 
 #include "ts/providers/tileprovider.h"
@@ -15,7 +14,10 @@ TileLoader::TileLoader(std::shared_ptr<ImageryProvider> provider,
     : m_provider(std::move(provider)), m_settings(settings),
       m_cache(settings.cacheBytes)
 {
-  const int threads = std::clamp(m_settings.threads, 1, 16);
+  const int threads = std::clamp(
+      std::max(m_settings.threads,
+               m_provider ? m_provider->preferredLoaderThreads() : 0),
+      1, 16);
   m_workers.reserve(static_cast<std::size_t>(threads));
   for (int i = 0; i < threads; ++i) {
     m_workers.emplace_back(&TileLoader::work, this);
@@ -49,11 +51,22 @@ void TileLoader::setRequests(const std::vector<TileLoadRequest>& requests)
 {
   {
     const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::chrono::steady_clock::time_point now =
+        std::chrono::steady_clock::now();
     std::unordered_set<TileKey, TileKeyHash> wanted;
     m_queue.clear();
     for (const TileLoadRequest& request : requests) {
       if (!wanted.insert(request.key).second) {
         continue;
+      }
+      const std::unordered_map<TileKey, std::chrono::steady_clock::time_point,
+                               TileKeyHash>::iterator failed =
+          m_failed.find(request.key);
+      if (failed != m_failed.end()) {
+        if (now < failed->second) {
+          continue; // not yet
+        }
+        m_failed.erase(failed);
       }
       if (m_inFlight.count(request.key) == 0 &&
           m_doneKeys.count(request.key) == 0) {
@@ -88,6 +101,12 @@ int TileLoader::outstanding() const
   return static_cast<int>(m_queue.size() + m_inFlight.size() + m_done.size());
 }
 
+void TileLoader::retryFailed()
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  m_failed.clear();
+}
+
 void TileLoader::work()
 {
   for (;;) {
@@ -105,7 +124,7 @@ void TileLoader::work()
       m_inFlight.emplace(key, cancelled);
     }
 
-    LoadedTile tile = load(key, *cancelled);
+    std::optional<LoadedTile> tile = load(key, *cancelled);
 
     std::function<void()> callback;
     {
@@ -115,8 +134,15 @@ void TileLoader::work()
         ++m_cancelledCount;
         continue;
       }
+      if (!tile) {
+        // Failed: try again later if it is still wanted then.
+        m_failed[key] =
+            std::chrono::steady_clock::now() + m_settings.failureRetryDelay;
+        ++m_failedCount;
+        continue;
+      }
       m_doneKeys.insert(key);
-      m_done.push_back(std::move(tile));
+      m_done.push_back(std::move(*tile));
       callback = m_callback;
     }
     ++m_loadedCount;
@@ -126,7 +152,8 @@ void TileLoader::work()
   }
 }
 
-LoadedTile TileLoader::load(TileKey key, const std::atomic<bool>& cancelled)
+std::optional<LoadedTile> TileLoader::load(TileKey key,
+                                           const std::atomic<bool>& cancelled)
 {
   LoadedTile tile;
   tile.key = key;
@@ -134,7 +161,12 @@ LoadedTile TileLoader::load(TileKey key, const std::atomic<bool>& cancelled)
   if (cached) {
     tile.image = *cached;
   } else {
-    tile.image = m_provider->loadImage(key, cancelled);
+    const ImageLoadResult result = m_provider->loadTileImage(key, cancelled);
+    if (result.outcome == ImageLoadResult::Outcome::Failed ||
+        result.outcome == ImageLoadResult::Outcome::Cancelled) {
+      return std::nullopt;
+    }
+    tile.image = result.image;
     if (!tile.image.isNull() && !cancelled.load()) {
       m_cache.insert(key, tile.image,
                      static_cast<std::size_t>(tile.image.sizeInBytes()));

@@ -5,6 +5,18 @@
 # own code: fix it.
 #
 # Format: https://github.com/google/sanitizers/wiki/ThreadSanitizerSuppressions
+#
+# Run with TSAN_OPTIONS=ignore_noninstrumented_modules=1 as well (CI does).
+# Qt and glib are not built with TSan, so TSan can't see the locks of Qt's
+# event queue (QMutex is a futex). QNetworkAccessManager runs HTTP on a
+# thread of its own and hands every request, reply and header list to ours
+# through that queue, so without the option each fetch is reported as a race
+# between free, memcpy or realloc inside Qt and the other thread, with only
+# Qt's innermost frame named: too little to suppress by name without hiding
+# our own code. The option makes TSan ignore the memory those uninstrumented
+# libraries touch themselves; accesses compiled into our code, including
+# Qt's inline functions such as QByteArray::append, are still checked, so a
+# race between two of our threads on a Qt container is still reported.
 
 # Mesa's llvmpipe worker threads (software OpenGL, uninstrumented).
 race:libLLVM

@@ -1,0 +1,8 @@
+<!DOCTYPE RCC>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<RCC version="1.0">
+    <!-- The WMS catalogue built into the program (see data/wms-catalogue.json). -->
+    <qresource prefix="/data">
+        <file alias="wms-catalogue.json">../data/wms-catalogue.json</file>
+    </qresource>
+</RCC>

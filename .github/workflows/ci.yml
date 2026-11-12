@@ -301,8 +301,10 @@ jobs:
 
       - name: Test
         env:
+          # ignore_noninstrumented_modules: see tests/tsan.supp.
           TSAN_OPTIONS: >-
             halt_on_error=1 second_deadlock_stack=1
+            ignore_noninstrumented_modules=1
             suppressions=${{ github.workspace }}/tests/tsan.supp
           QT_QPA_PLATFORM: offscreen
         run: make -C build-tsan check

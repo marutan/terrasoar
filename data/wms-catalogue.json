@@ -1,0 +1,41 @@
+{
+    "format": "terrasoar-wms-catalogue",
+    "version": 1,
+    "services": [
+        {
+            "title": "NASA GIBS: satellite imagery",
+            "url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
+            "description": "Daily and historical satellite imagery of the whole Earth (MODIS, VIIRS, Landsat and more) from NASA's Global Imagery Browse Services.",
+            "attribution": "NASA EOSDIS GIBS",
+            "terms": "https://nasa-gibs.github.io/gibs-api-docs/"
+        },
+        {
+            "title": "OpenStreetMap (terrestris)",
+            "url": "https://ows.terrestris.de/osm/service",
+            "description": "A street map of the whole world from OpenStreetMap data, with relief, run by terrestris.",
+            "attribution": "© OpenStreetMap contributors, © terrestris",
+            "terms": "https://www.terrestris.de/en/openstreetmap-wms/"
+        },
+        {
+            "title": "GEBCO: ocean depths",
+            "url": "https://wms.gebco.net/mapserv",
+            "description": "The General Bathymetric Chart of the Oceans: depths of the oceans and heights of the land. Not for navigation.",
+            "attribution": "GEBCO Compilation Group",
+            "terms": "https://wms.gebco.net/"
+        },
+        {
+            "title": "USGS The National Map: topographic",
+            "url": "https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer",
+            "description": "Topographic maps of the United States from the U.S. Geological Survey.",
+            "attribution": "USGS The National Map",
+            "terms": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
+        },
+        {
+            "title": "NOAA nowCOAST: weather and ocean",
+            "url": "https://nowcoast.noaa.gov/geoserver/ows",
+            "description": "Near-real-time weather, ocean and coastal observations and forecasts, mostly for the United States.",
+            "attribution": "NOAA nowCOAST",
+            "terms": "https://nowcoast.noaa.gov/"
+        }
+    ]
+}

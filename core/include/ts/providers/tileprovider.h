@@ -7,6 +7,8 @@
 #define TS_PROVIDERS_TILEPROVIDER_H
 
 #include <atomic>
+#include <functional>
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -18,6 +20,35 @@
 
 namespace ts
 {
+
+/**
+ * How a source is doing, for the user: shown next to its layers.
+ *
+ * @reentrant
+ */
+struct ProviderStatus {
+  /** The state. */
+  enum class State {
+    Ok,      ///< Working (or nothing has been asked of it yet).
+    Offline, ///< Its server can't be reached; saved tiles are shown.
+    Error,   ///< It can't deliver tiles; message() says why.
+  };
+  /** The state. */
+  State state = State::Ok;
+  /** What is wrong, for the user (translated); empty when Ok. */
+  QString message;
+
+  /** Returns true if both have the same state and message. */
+  bool operator==(const ProviderStatus& other) const
+  {
+    return state == other.state && message == other.message;
+  }
+  /** Returns true if they differ. */
+  bool operator!=(const ProviderStatus& other) const
+  {
+    return !(*this == other);
+  }
+};
 
 /**
  * What every tile source has: an identity, a name and a deepest level.
@@ -54,9 +85,64 @@ public:
   /** Returns the deepest level the source has data for. */
   virtual int maximumLevel() const = 0;
 
+  /**
+   * Returns how many loader threads the source wants: 0 for the loader's
+   * default. Sources that wait on a network rather than a disk or the CPU
+   * ask for more, so that several requests are in flight at once.
+   */
+  virtual int preferredLoaderThreads() const { return 0; }
+
+  /** Returns how the source is doing (Ok until it says otherwise). */
+  ProviderStatus status() const;
+
+  /**
+   * Sets the function called when status() changes. It is called on the
+   * thread that changed it, often a loader thread, so it must only hand
+   * over (see GlobeView's tiles-ready callback).
+   */
+  void setStatusCallback(std::function<void()> callback);
+
 protected:
   /** For subclasses. */
   TileProvider() = default;
+
+  /** Sets the status, calling the status callback if it changed. */
+  void reportStatus(const ProviderStatus& status);
+
+private:
+  mutable std::mutex m_statusMutex;
+  ProviderStatus m_status;
+  std::function<void()> m_statusCallback;
+};
+
+/** What became of a request for one tile's image. */
+struct ImageLoadResult {
+  /** The outcome. */
+  enum class Outcome {
+    Image,     ///< image holds the tile.
+    NoData,    ///< The source has nothing there (for good).
+    Failed,    ///< Nothing now; worth asking again later (a network error).
+    Cancelled, ///< Given up because it was cancelled.
+  };
+  /** The outcome. */
+  Outcome outcome = Outcome::NoData;
+  /** The image (Outcome::Image only). */
+  QImage image;
+};
+
+/** How a tile's image maps to its latitude/longitude rectangle. */
+enum class TileImageProjection {
+  /**
+   * Equirectangular: rows evenly spaced in latitude, row 0 at the north
+   * edge.
+   */
+  Geographic,
+  /**
+   * Web Mercator (EPSG:3857): rows evenly spaced in Mercator northing,
+   * covering the tile's rectangle clipped to the Mercator limit
+   * (±85.051 129°). The renderer reprojects it per pixel.
+   */
+  WebMercator,
 };
 
 /**
@@ -71,6 +157,20 @@ class ImageryProvider : public TileProvider
 public:
   /** Returns the width and height of the tiles in pixels. */
   virtual int tileSizePx() const = 0;
+
+  /** Returns how the images map to their tiles (Geographic by default). */
+  virtual TileImageProjection imageProjection() const
+  {
+    return TileImageProjection::Geographic;
+  }
+
+  /**
+   * Loads the image of @p key, blocking, like loadImage(), but tells a
+   * failure that is worth retrying from a tile with no data. The default
+   * calls loadImage(): a null image is NoData.
+   */
+  virtual ImageLoadResult loadTileImage(TileKey key,
+                                        const std::atomic<bool>& cancelled);
 
   /**
    * Loads the image of @p key, blocking; called on worker threads, often

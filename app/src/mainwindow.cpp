@@ -8,6 +8,7 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QCoreApplication>
+#include <QDir>
 #include <QEvent>
 #include <QFileDialog>
 #include <QJsonArray>
@@ -17,10 +18,14 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QStandardPaths>
 #include <QStatusBar>
+#include <QStyle>
+#include <QThread>
 #include <QTimer>
 #include <QWidget>
 
+#include "addwmsdialog.h"
 #include "globeview.h"
 #include "layertreedock.h"
 #include "ts/base/buildinfo.h"
@@ -32,6 +37,7 @@
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/wms/wmsimageryprovider.h"
 
 namespace ts
 {
@@ -43,6 +49,33 @@ MainWindow::MainWindow(QWidget* parent)
       m_registry(std::make_unique<ProviderRegistry>())
 {
   setObjectName(QStringLiteral("mainWindow"));
+  // WMS tiles are kept on disk between runs; the network client starts
+  // with the first WMS layer.
+  WmsProviderSettings wms;
+  wms.cacheDirectory =
+      QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+          .filePath(QStringLiteral("wms"));
+  m_registry->setWmsNetwork(nullptr, wms);
+  m_layers->setStatusIcons(
+      style()->standardIcon(QStyle::SP_MessageBoxWarning),
+      style()->standardIcon(QStyle::SP_MessageBoxCritical));
+  // Status changes arrive on loader threads; a single-shot timer on this
+  // thread hands them over (and several at once become one update). Loader
+  // threads hold it only through a weak pointer. When the last owner lets go
+  // on this thread (normally the window, often after the event loop has
+  // ended) it is deleted at once, which also drops queued calls to it; on a
+  // loader thread, it is deleted later on this one.
+  QTimer* relay = new QTimer;
+  relay->setSingleShot(true);
+  relay->setInterval(0);
+  connect(relay, &QTimer::timeout, this, &MainWindow::updateLayerStatus);
+  m_statusRelay = std::shared_ptr<QTimer>(relay, [](QTimer* timer) {
+    if (QThread::currentThread() == timer->thread()) {
+      delete timer;
+    } else {
+      timer->deleteLater();
+    }
+  });
   if (GlobeView::isOpenGlAvailable()) {
     m_globeView = new GlobeView(this);
     setCentralWidget(m_globeView);
@@ -84,6 +117,8 @@ MainWindow::MainWindow(QWidget* parent)
   }
   m_layerDock = new LayerTreeDock(m_layers, this);
   addDockWidget(Qt::LeftDockWidgetArea, m_layerDock);
+  connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
+          [this]() { addWmsLayer(); });
   connect(m_layers, &LayerTreeModel::layerStackChanged, this,
           &MainWindow::refreshLayers);
   if (m_globeView) {
@@ -108,6 +143,10 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+  for (const std::pair<QString, std::shared_ptr<ImageryProvider>>& layer :
+       m_layerProviders) {
+    layer.second->setStatusCallback({});
+  }
   m_cancelBasePackCheck.store(true);
   if (m_basePackCheck.joinable()) {
     m_basePackCheck.join();
@@ -200,6 +239,19 @@ QJsonObject MainWindow::stateReport() const
     layers.append(stack.imagery[i].definition.name);
   }
   state.insert(QStringLiteral("layers"), layers);
+  // Layers whose source isn't Ok: name → "offline" or "error".
+  QJsonObject problems;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    const QModelIndex index = m_layers->indexOfId(entry.nodeId);
+    const int status =
+        m_layers->data(index, LayerTreeModel::StatusRole).toInt();
+    if (status == static_cast<int>(ProviderStatus::State::Offline)) {
+      problems.insert(entry.definition.name, QStringLiteral("offline"));
+    } else if (status == static_cast<int>(ProviderStatus::State::Error)) {
+      problems.insert(entry.definition.name, QStringLiteral("error"));
+    }
+  }
+  state.insert(QStringLiteral("layer_problems"), problems);
   state.insert(
       QStringLiteral("attributions"),
       QJsonArray::fromStringList(attributionsForStack(stack, *m_registry)));
@@ -306,6 +358,11 @@ void MainWindow::createActions()
   }
   syncViewActions();
 
+  m_addWmsAction = new QAction(this);
+  m_addWmsAction->setObjectName(QStringLiteral("addWmsAction"));
+  connect(m_addWmsAction, &QAction::triggered, this,
+          [this]() { addWmsLayer(); });
+
   m_openAction = new QAction(this);
   m_openAction->setObjectName(QStringLiteral("openProjectAction"));
   m_openAction->setShortcut(QKeySequence::Open);
@@ -340,6 +397,8 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_openAction);
   m_fileMenu->addAction(m_saveAction);
   m_fileMenu->addAction(m_saveAsAction);
+  m_fileMenu->addSeparator();
+  m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_quitAction);
 
@@ -390,6 +449,9 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_addWmsAction->setText(tr("Add &WMS Layer…"));
+  m_addWmsAction->setStatusTip(
+      tr("Add a layer from a web map server (WMS) to the layer tree"));
   m_openAction->setText(tr("&Open Project…"));
   m_openAction->setStatusTip(
       tr("Replace the layers and view with a saved project"));
@@ -466,17 +528,92 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
 
 void MainWindow::refreshLayers()
 {
+  const LayerStack stack = m_layers->layerStack();
   if (!m_globeView) {
+    // No OpenGL view: nothing is drawn, but layers that can't be opened are
+    // still marked in the dock.
+    watchLayerStatus(stack);
     return;
   }
   QStringList errors;
-  const LayerStack stack = m_layers->layerStack();
   m_globeView->setImageryDraws(
       imageryDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setAttributions(attributionsForStack(stack, *m_registry));
   if (!errors.isEmpty()) {
     statusBar()->showMessage(errors.join(QLatin1Char(' ')), 10000);
+  }
+  watchLayerStatus(stack);
+}
+
+void MainWindow::watchLayerStatus(const LayerStack& stack)
+{
+  // Each imagery layer's provider (shared through the registry) tells the
+  // relay when its status changes; the relay calls updateLayerStatus().
+  std::vector<std::pair<QString, std::shared_ptr<ImageryProvider>>> providers;
+  std::vector<std::pair<QString, QString>> broken;
+  const std::weak_ptr<QTimer> relay = m_statusRelay;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    QString error;
+    std::shared_ptr<ImageryProvider> provider =
+        m_registry->imagery(entry.definition.source, &error);
+    if (!provider) {
+      broken.emplace_back(entry.nodeId, error);
+      continue;
+    }
+    provider->setStatusCallback([relay]() {
+      if (const std::shared_ptr<QTimer> timer = relay.lock()) {
+        QMetaObject::invokeMethod(timer.get(), qOverload<>(&QTimer::start),
+                                  Qt::QueuedConnection);
+      }
+    });
+    providers.emplace_back(entry.nodeId, std::move(provider));
+  }
+  m_layerProviders = std::move(providers);
+  m_brokenLayers = std::move(broken);
+  updateLayerStatus();
+}
+
+void MainWindow::updateLayerStatus()
+{
+  for (const std::pair<QString, std::shared_ptr<ImageryProvider>>& layer :
+       m_layerProviders) {
+    const ProviderStatus status = layer.second->status();
+    const QModelIndex index = m_layers->indexOfId(layer.first);
+    const int before =
+        m_layers->data(index, LayerTreeModel::StatusRole).toInt();
+    m_layers->setLayerStatus(layer.first, status);
+    if (status.state == ProviderStatus::State::Error &&
+        before != static_cast<int>(ProviderStatus::State::Error)) {
+      statusBar()->showMessage(
+          tr("%1: %2").arg(m_layers->data(index).toString(), status.message),
+          10000);
+    }
+  }
+  for (const std::pair<QString, QString>& layer : m_brokenLayers) {
+    m_layers->setLayerStatus(
+        layer.first,
+        ProviderStatus{ProviderStatus::State::Error, layer.second});
+  }
+}
+
+bool MainWindow::isLoadingTiles() const
+{
+  return m_globeView != nullptr && m_globeView->isLoadingTiles();
+}
+
+void MainWindow::addWmsLayer(const QString& address)
+{
+  AddWmsDialog dialog(m_registry->network(), this);
+  if (!address.isEmpty()) {
+    dialog.connectTo(address);
+  }
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
   }
 }
 
