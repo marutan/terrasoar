@@ -342,11 +342,79 @@ QUrl capabilitiesUrl(const QUrl& serviceUrl, const QString& version)
   return url;
 }
 
+namespace
+{
+
+QString layerTitle(const WmsLayer& layer)
+{
+  return layer.title.isEmpty() ? layer.name : layer.title;
+}
+
+/** Why @p layer (asked for as @p name) can't be drawn as tiles, or empty. */
+QString unusableLayerReason(const WmsLayer* layer, const QString& name)
+{
+  if (layer == nullptr) {
+    return QCoreApplication::translate("ts::WmsSource",
+                                       "The server has no layer \"%1\".")
+        .arg(name);
+  }
+  if (layer->noSubsets || layer->fixedWidth > 0 || layer->fixedHeight > 0) {
+    return QCoreApplication::translate(
+               "ts::WmsSource",
+               "\"%1\" can only be drawn whole, at a fixed size, "
+               "which doesn't work as tiles.")
+        .arg(layerTitle(*layer));
+  }
+  return QString();
+}
+
+/** The codes in @p crs that @p layer supports too. */
+QStringList crsInCommon(const QStringList& crs, const WmsLayer& layer)
+{
+  QStringList both;
+  for (const QString& code : crs) {
+    if (layer.supportsCrs(code)) {
+      both.append(code);
+    }
+  }
+  return both;
+}
+
+/** The rectangle around both, or none if either is unknown. */
+std::optional<GeoRect> unitedBounds(const std::optional<GeoRect>& a,
+                                    const std::optional<GeoRect>& b)
+{
+  if (!a || !b) {
+    return std::nullopt;
+  }
+  return GeoRect{
+      std::min(a->westDeg, b->westDeg), std::min(a->southDeg, b->southDeg),
+      std::max(a->eastDeg, b->eastDeg), std::max(a->northDeg, b->northDeg)};
+}
+
+/** @p tileSizePx halved until the server can draw it. */
+int tileSizeWithin(const WmsCapabilities& capabilities, int tileSizePx)
+{
+  const int limit =
+      std::min(capabilities.maxWidth > 0 ? capabilities.maxWidth : 4096,
+               capabilities.maxHeight > 0 ? capabilities.maxHeight : 4096);
+  while (tileSizePx > limit && tileSizePx > 16) {
+    tileSizePx /= 2;
+  }
+  return tileSizePx;
+}
+
+} // namespace
+
+// Layers and their styles are parallel lists, as LAYERS and STYLES are in
+// the request itself.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 std::optional<WmsSource> wmsSourceFor(const WmsCapabilities& capabilities,
                                       const QStringList& layerNames,
                                       const QStringList& styles,
                                       const QString& format,
                                       QString* errorString)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   if (layerNames.isEmpty()) {
     return fail(errorString, QCoreApplication::translate("ts::WmsSource",
@@ -369,46 +437,19 @@ std::optional<WmsSource> wmsSourceFor(const WmsCapabilities& capabilities,
   QStringList attributions;
   for (int i = 0; i < layerNames.size(); ++i) {
     const WmsLayer* layer = capabilities.findLayer(layerNames.at(i));
-    if (layer == nullptr) {
-      return fail(errorString,
-                  QCoreApplication::translate("ts::WmsSource",
-                                              "The server has no layer \"%1\".")
-                      .arg(layerNames.at(i)));
-    }
-    if (layer->noSubsets || layer->fixedWidth > 0 || layer->fixedHeight > 0) {
-      return fail(
-          errorString,
-          QCoreApplication::translate(
-              "ts::WmsSource",
-              "\"%1\" can only be drawn whole, at a fixed size, "
-              "which doesn't work as tiles.")
-              .arg(layer->title.isEmpty() ? layer->name : layer->title));
+    const QString problem = unusableLayerReason(layer, layerNames.at(i));
+    if (!problem.isEmpty()) {
+      return fail(errorString, problem);
     }
     if (i == 0) {
       commonCrs = layer->crs;
       source.bounds = layer->geographicBounds;
     } else {
-      QStringList both;
-      for (const QString& code : commonCrs) {
-        if (layer->supportsCrs(code)) {
-          both.append(code);
-        }
-      }
-      commonCrs = both;
-      if (source.bounds && layer->geographicBounds) {
-        source.bounds = GeoRect{
-            std::min(source.bounds->westDeg, layer->geographicBounds->westDeg),
-            std::min(source.bounds->southDeg,
-                     layer->geographicBounds->southDeg),
-            std::max(source.bounds->eastDeg, layer->geographicBounds->eastDeg),
-            std::max(source.bounds->northDeg,
-                     layer->geographicBounds->northDeg)};
-      } else {
-        source.bounds.reset();
-      }
+      commonCrs = crsInCommon(commonCrs, *layer);
+      source.bounds = unitedBounds(source.bounds, layer->geographicBounds);
     }
     opaque = opaque || layer->opaque;
-    titles.append(layer->title.isEmpty() ? layer->name : layer->title);
+    titles.append(layerTitle(*layer));
     if (!layer->attributionTitle.isEmpty() &&
         !attributions.contains(layer->attributionTitle)) {
       attributions.append(layer->attributionTitle);
@@ -437,12 +478,7 @@ std::optional<WmsSource> wmsSourceFor(const WmsCapabilities& capabilities,
   }
   source.transparent = isTransparentFormat(source.format) && !opaque;
   // Tiles no larger than the server draws.
-  const int limit =
-      std::min(capabilities.maxWidth > 0 ? capabilities.maxWidth : 4096,
-               capabilities.maxHeight > 0 ? capabilities.maxHeight : 4096);
-  while (source.tileSizePx > limit && source.tileSizePx > 16) {
-    source.tileSizePx /= 2;
-  }
+  source.tileSizePx = tileSizeWithin(capabilities, source.tileSizePx);
   source.title = titles.join(QStringLiteral(", "));
   source.attribution = attributions.join(QStringLiteral("; "));
   return source;

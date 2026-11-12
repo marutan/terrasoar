@@ -285,9 +285,12 @@ private:
 };
 
 /** Returns a response of @p status with @p body and @p contentType. */
+// The body, then its type, as in the response itself.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 inline MockHttpResponse
 mockResponse(int status, const QByteArray& body,
              const QByteArray& contentType = QByteArrayLiteral("text/plain"))
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   MockHttpResponse response;
   response.status = status;

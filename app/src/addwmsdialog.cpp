@@ -97,49 +97,42 @@ QTreeWidgetItem* addLayerItems(const WmsLayer& layer, QTreeWidgetItem* parent,
 
 AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
                            QWidget* parent)
-    : QDialog(parent), m_network(std::move(network))
+    : QDialog(parent), m_network(std::move(network)),
+      m_serviceBox(new QComboBox(this)), m_connectButton(new QPushButton(this)),
+      m_serviceLabel(new QLabel(this)), m_aboutLabel(new QLabel(this)),
+      m_statusLabel(new QLabel(this)), m_layersLabel(new QLabel(this)),
+      m_layerTree(new QTreeWidget(this)), m_styleLabel(new QLabel(this)),
+      m_styleBox(new QComboBox(this)), m_formatLabel(new QLabel(this)),
+      m_formatBox(new QComboBox(this)), m_detailsLabel(new QLabel(this)),
+      m_buttons(new QDialogButtonBox(this)), m_pollTimer(new QTimer(this))
 {
   setObjectName(QStringLiteral("addWmsDialog"));
-  m_serviceLabel = new QLabel(this);
-  m_serviceBox = new QComboBox(this);
   m_serviceBox->setObjectName(QStringLiteral("wmsServiceBox"));
   m_serviceBox->setEditable(true);
   m_serviceBox->setInsertPolicy(QComboBox::NoInsert);
   m_serviceBox->setMinimumContentsLength(40);
   m_serviceLabel->setBuddy(m_serviceBox);
-  m_connectButton = new QPushButton(this);
   m_connectButton->setObjectName(QStringLiteral("wmsConnectButton"));
-  m_aboutLabel = new QLabel(this);
   m_aboutLabel->setObjectName(QStringLiteral("wmsAboutLabel"));
   m_aboutLabel->setWordWrap(true);
   m_aboutLabel->setOpenExternalLinks(true);
   m_aboutLabel->setTextFormat(Qt::RichText);
-  m_statusLabel = new QLabel(this);
   m_statusLabel->setObjectName(QStringLiteral("wmsStatusLabel"));
   m_statusLabel->setWordWrap(true);
-  m_layersLabel = new QLabel(this);
-  m_layerTree = new QTreeWidget(this);
   m_layerTree->setObjectName(QStringLiteral("wmsLayerTree"));
   m_layerTree->setHeaderHidden(true);
   m_layerTree->setColumnCount(1);
   m_layersLabel->setBuddy(m_layerTree);
-  m_styleLabel = new QLabel(this);
-  m_styleBox = new QComboBox(this);
   m_styleBox->setObjectName(QStringLiteral("wmsStyleBox"));
   m_styleLabel->setBuddy(m_styleBox);
-  m_formatLabel = new QLabel(this);
-  m_formatBox = new QComboBox(this);
   m_formatBox->setObjectName(QStringLiteral("wmsFormatBox"));
   m_formatLabel->setBuddy(m_formatBox);
-  m_detailsLabel = new QLabel(this);
   m_detailsLabel->setObjectName(QStringLiteral("wmsDetailsLabel"));
   m_detailsLabel->setWordWrap(true);
-  m_buttons = new QDialogButtonBox(this);
   m_addButton = m_buttons->addButton(QString(), QDialogButtonBox::AcceptRole);
   m_addButton->setObjectName(QStringLiteral("wmsAddButton"));
   m_addButton->setEnabled(false);
   m_buttons->addButton(QDialogButtonBox::Cancel);
-  m_pollTimer = new QTimer(this);
   m_pollTimer->setInterval(pollIntervalMs);
 
   QHBoxLayout* service = new QHBoxLayout;
@@ -405,6 +398,9 @@ void AddWmsDialog::capabilitiesArrived()
 void AddWmsDialog::fillLayers()
 {
   m_layerTree->clear();
+  if (!m_capabilities) {
+    return;
+  }
   for (const WmsLayer& layer : m_capabilities->layers) {
     addLayerItems(layer, nullptr, m_layerTree);
   }
@@ -424,13 +420,15 @@ bool AddWmsDialog::selectLayer(const QString& name)
 {
   const QList<QTreeWidgetItem*> items = m_layerTree->findItems(
       QStringLiteral("*"), Qt::MatchWildcard | Qt::MatchRecursive);
-  for (QTreeWidgetItem* item : items) {
-    if (item->data(0, layerNameRole).toString() == name) {
-      m_layerTree->setCurrentItem(item);
-      return true;
-    }
+  const QList<QTreeWidgetItem*>::const_iterator found = std::find_if(
+      items.cbegin(), items.cend(), [&name](const QTreeWidgetItem* item) {
+        return item->data(0, layerNameRole).toString() == name;
+      });
+  if (found == items.cend()) {
+    return false;
   }
-  return false;
+  m_layerTree->setCurrentItem(*found);
+  return true;
 }
 
 void AddWmsDialog::layerChosen()
@@ -495,7 +493,7 @@ void AddWmsDialog::layerChosen()
 std::optional<WmsSource> AddWmsDialog::chosenSource(QString* errorString) const
 {
   const QTreeWidgetItem* item = m_layerTree->currentItem();
-  if (!m_capabilities || !item ||
+  if (!m_capabilities || item == nullptr ||
       item->data(0, layerNameRole).toString().isEmpty()) {
     return std::nullopt;
   }

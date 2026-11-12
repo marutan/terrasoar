@@ -11,6 +11,7 @@
 #include <cmath>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 #include <QBuffer>
 #include <QImage>
@@ -152,98 +153,133 @@ inline QByteArray mockWmsCapabilities(const QString& version, const QUrl& url,
   return xml.toUtf8();
 }
 
+/** The capabilities document in the version @p query asks for. */
+inline MockHttpResponse mockWmsCapabilitiesResponse(
+    const MockHttpRequest& request, const QUrlQuery& query,
+    const MockWmsBehaviour& behaviour, const QString& crs)
+{
+  QString version = query.queryItemValue(QStringLiteral("VERSION"));
+  if (behaviour.refuse130.load() && version == QLatin1String("1.3.0")) {
+    return mockResponse(
+        200,
+        "<?xml version=\"1.0\"?><ServiceExceptionReport version=\"1.1.1\">"
+        "<ServiceException>Unsupported VERSION 1.3.0</ServiceException>"
+        "</ServiceExceptionReport>",
+        "application/vnd.ogc.se_xml");
+  }
+  if (version != QLatin1String("1.1.1")) {
+    version = QStringLiteral("1.3.0");
+  }
+  QUrl self = request.url;
+  self.setQuery(QString());
+  self.setScheme(QStringLiteral("http"));
+  self.setHost(QStringLiteral("127.0.0.1"));
+  const QByteArray host = request.header("host");
+  self.setPort(host.mid(host.lastIndexOf(':') + 1).toInt());
+  return mockResponse(200, mockWmsCapabilities(version, self, crs), "text/xml");
+}
+
+/** The failure @p behaviour asks for instead of a GetMap image, if any. */
+inline std::optional<MockHttpResponse>
+mockWmsFailure(const MockWmsBehaviour& behaviour)
+{
+  constexpr int threeMiB = 3 * 1024 * 1024;
+  MockHttpResponse response;
+  response.delayMs = behaviour.delayMs.load();
+  if (behaviour.failStatus.load() != 0) {
+    response.status = behaviour.failStatus.load();
+    response.body = "failed";
+    return response;
+  }
+  if (behaviour.serviceException.load()) {
+    response.status = 200;
+    response.headers.emplace_back("Content-Type", "application/vnd.ogc.se_xml");
+    response.body =
+        "<?xml version=\"1.0\"?><ServiceExceptionReport version=\"1.3.0\">"
+        "<ServiceException code=\"LayerNotDefined\">Layer 'x' is not "
+        "defined</ServiceException></ServiceExceptionReport>";
+    return response;
+  }
+  if (behaviour.html.load()) {
+    return mockResponse(200, "<html><body>Maintenance</body></html>",
+                        "text/html");
+  }
+  if (behaviour.oversized.load()) {
+    return mockResponse(200, QByteArray(threeMiB, 'x'), "image/png");
+  }
+  return std::nullopt;
+}
+
+/** The Cache-Control header @p behaviour asks for, if any. */
+inline QByteArray mockWmsCacheControl(const MockWmsBehaviour& behaviour)
+{
+  if (behaviour.noStore.load()) {
+    return QByteArrayLiteral("no-store");
+  }
+  if (behaviour.maxAgeS.load() >= 0) {
+    return "max-age=" + QByteArray::number(behaviour.maxAgeS.load());
+  }
+  return QByteArray();
+}
+
+/** A GetMap answer: the image, or 304 if the client has it already. */
+inline MockHttpResponse mockWmsGetMap(const MockHttpRequest& request,
+                                      const QUrlQuery& query,
+                                      const MockWmsBehaviour& behaviour)
+{
+  MockHttpResponse response;
+  response.delayMs = behaviour.delayMs.load();
+  const QByteArray cacheControl = mockWmsCacheControl(behaviour);
+  const QByteArray etag = QStringLiteral("\"%1\"")
+                              .arg(qHash(request.url.query(QUrl::FullyEncoded)))
+                              .toLatin1();
+  if (behaviour.etag.load() && request.header("if-none-match") == etag) {
+    response.status = 304;
+    // A 304 carries max-age only, never no-store.
+    if (behaviour.maxAgeS.load() >= 0) {
+      response.headers.emplace_back(
+          "Cache-Control",
+          "max-age=" + QByteArray::number(behaviour.maxAgeS.load()));
+    }
+    return response;
+  }
+  const QImage image = mockWmsImage(query);
+  const bool jpeg = query.queryItemValue(QStringLiteral("FORMAT")) ==
+                    QLatin1String("image/jpeg");
+  QBuffer buffer(&response.body);
+  buffer.open(QIODevice::WriteOnly);
+  image.save(&buffer, jpeg ? "JPG" : "PNG");
+  response.status = 200;
+  response.headers.emplace_back("Content-Type",
+                                jpeg ? "image/jpeg" : "image/png");
+  if (!cacheControl.isEmpty()) {
+    response.headers.emplace_back("Cache-Control", cacheControl);
+  }
+  if (behaviour.etag.load()) {
+    response.headers.emplace_back("ETag", etag);
+  }
+  return response;
+}
+
 /**
  * Returns a handler that serves the mock WMS: GetCapabilities (in the
  * version asked for, offering @p crs) and GetMap (mockWmsImage(), as PNG or
  * JPEG), behaving as @p behaviour says.
  */
 inline MockHttpServer::Handler
-mockWmsHandler(std::shared_ptr<MockWmsBehaviour> behaviour,
-               QString crs = QStringLiteral("EPSG:4326"))
+mockWmsHandler(const std::shared_ptr<MockWmsBehaviour>& behaviour,
+               const QString& crs = QStringLiteral("EPSG:4326"))
 {
   return [behaviour, crs](const MockHttpRequest& request) {
     const QUrlQuery query(request.url);
-    const QString kind = query.queryItemValue(QStringLiteral("REQUEST"));
-    if (kind == QLatin1String("GetCapabilities")) {
-      QString version = query.queryItemValue(QStringLiteral("VERSION"));
-      if (behaviour->refuse130.load() && version == QLatin1String("1.3.0")) {
-        return mockResponse(
-            200,
-            "<?xml version=\"1.0\"?><ServiceExceptionReport version=\"1.1.1\">"
-            "<ServiceException>Unsupported VERSION 1.3.0</ServiceException>"
-            "</ServiceExceptionReport>",
-            "application/vnd.ogc.se_xml");
-      }
-      if (version != QLatin1String("1.1.1")) {
-        version = QStringLiteral("1.3.0");
-      }
-      QUrl self = request.url;
-      self.setQuery(QString());
-      self.setScheme(QStringLiteral("http"));
-      self.setHost(QStringLiteral("127.0.0.1"));
-      const QByteArray host = request.header("host");
-      self.setPort(host.mid(host.lastIndexOf(':') + 1).toInt());
-      return mockResponse(200, mockWmsCapabilities(version, self, crs),
-                          "text/xml");
+    if (query.queryItemValue(QStringLiteral("REQUEST")) ==
+        QLatin1String("GetCapabilities")) {
+      return mockWmsCapabilitiesResponse(request, query, *behaviour, crs);
     }
-    MockHttpResponse response;
-    response.delayMs = behaviour->delayMs.load();
-    if (behaviour->failStatus.load() != 0) {
-      response.status = behaviour->failStatus.load();
-      response.body = "failed";
-      return response;
+    if (std::optional<MockHttpResponse> failure = mockWmsFailure(*behaviour)) {
+      return std::move(*failure);
     }
-    if (behaviour->serviceException.load()) {
-      response.status = 200;
-      response.headers.emplace_back("Content-Type",
-                                    "application/vnd.ogc.se_xml");
-      response.body =
-          "<?xml version=\"1.0\"?><ServiceExceptionReport version=\"1.3.0\">"
-          "<ServiceException code=\"LayerNotDefined\">Layer 'x' is not "
-          "defined</ServiceException></ServiceExceptionReport>";
-      return response;
-    }
-    if (behaviour->html.load()) {
-      return mockResponse(200, "<html><body>Maintenance</body></html>",
-                          "text/html");
-    }
-    if (behaviour->oversized.load()) {
-      return mockResponse(200, QByteArray(3 * 1024 * 1024, 'x'), "image/png");
-    }
-    const QString etag = QStringLiteral("\"%1\"").arg(
-        qHash(request.url.query(QUrl::FullyEncoded)));
-    if (behaviour->etag.load() &&
-        request.header("if-none-match") == etag.toLatin1()) {
-      MockHttpResponse notModified;
-      notModified.status = 304;
-      notModified.delayMs = response.delayMs;
-      if (behaviour->maxAgeS.load() >= 0) {
-        notModified.headers.emplace_back(
-            "Cache-Control",
-            "max-age=" + QByteArray::number(behaviour->maxAgeS.load()));
-      }
-      return notModified;
-    }
-    const QImage image = mockWmsImage(query);
-    const bool jpeg = query.queryItemValue(QStringLiteral("FORMAT")) ==
-                      QLatin1String("image/jpeg");
-    QBuffer buffer(&response.body);
-    buffer.open(QIODevice::WriteOnly);
-    image.save(&buffer, jpeg ? "JPG" : "PNG");
-    response.status = 200;
-    response.headers.emplace_back("Content-Type",
-                                  jpeg ? "image/jpeg" : "image/png");
-    if (behaviour->noStore.load()) {
-      response.headers.emplace_back("Cache-Control", "no-store");
-    } else if (behaviour->maxAgeS.load() >= 0) {
-      response.headers.emplace_back(
-          "Cache-Control",
-          "max-age=" + QByteArray::number(behaviour->maxAgeS.load()));
-    }
-    if (behaviour->etag.load()) {
-      response.headers.emplace_back("ETag", etag.toLatin1());
-    }
-    return response;
+    return mockWmsGetMap(request, query, *behaviour);
   };
 }
 

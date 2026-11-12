@@ -84,8 +84,11 @@ CacheControl parseCacheControl(const QByteArray& header)
 }
 
 /** The response's lifetime in seconds, and how old it already is. */
+// Now, then the default.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 long long lifetimeS(const HttpResponse& response, const CacheControl& control,
                     long long nowS, long long defaultLifetimeS)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   if (control.noCache) {
     return 0;
@@ -114,6 +117,55 @@ long long ageS(const HttpResponse& response)
   return ok && age > 0 ? age : 0;
 }
 
+/** The fields of an HTTP date, as they are found. */
+struct DateFields {
+  int month = 0;
+  int day = -1;
+  long long year = -1;
+  int hour = -1;
+  int minute = -1;
+  int second = -1;
+};
+
+/** Reads "hh:mm:ss"; false if it isn't one. */
+bool readClock(const QByteArray& token, DateFields& date)
+{
+  const QList<QByteArray> parts = token.split(':');
+  if (parts.size() != 3 || !isDigits(parts.at(0)) || !isDigits(parts.at(1)) ||
+      !isDigits(parts.at(2))) {
+    return false;
+  }
+  date.hour = parts.at(0).toInt();
+  date.minute = parts.at(1).toInt();
+  date.second = parts.at(2).toInt();
+  return true;
+}
+
+/** Reads the day, then the year (two digits in RFC 850 dates); false for a
+ * third number. */
+bool readNumber(const QByteArray& token, DateFields& date)
+{
+  if (token.size() <= 2 && date.day < 0) {
+    date.day = token.toInt();
+    return true;
+  }
+  if (date.year >= 0) {
+    return false;
+  }
+  date.year = token.toLongLong();
+  if (token.size() == 2) {
+    date.year += date.year < 70 ? 2000 : 1900;
+  }
+  return true;
+}
+
+bool isComplete(const DateFields& date)
+{
+  return date.month != 0 && date.day >= 1 && date.day <= 31 &&
+         date.year >= 1970 && date.hour >= 0 && date.hour <= 23 &&
+         date.minute <= 59 && date.second <= 60;
+}
+
 } // namespace
 
 std::optional<long long> parseHttpDate(const QByteArray& value)
@@ -125,45 +177,27 @@ std::optional<long long> parseHttpDate(const QByteArray& value)
       c = ' ';
     }
   }
-  int month = 0;
-  int day = -1;
-  long long year = -1;
-  int hour = -1;
-  int minute = -1;
-  int second = -1;
+  DateFields date;
   const QList<QByteArray> tokens = text.simplified().split(' ');
   for (const QByteArray& token : tokens) {
     if (token.contains(':')) {
-      const QList<QByteArray> parts = token.split(':');
-      if (parts.size() != 3 || !isDigits(parts.at(0)) ||
-          !isDigits(parts.at(1)) || !isDigits(parts.at(2))) {
+      if (!readClock(token, date)) {
         return std::nullopt;
       }
-      hour = parts.at(0).toInt();
-      minute = parts.at(1).toInt();
-      second = parts.at(2).toInt();
     } else if (isDigits(token)) {
-      if (token.size() <= 2 && day < 0) {
-        day = token.toInt();
-      } else if (year < 0) {
-        year = token.toLongLong();
-        if (token.size() == 2) {
-          year += year < 70 ? 2000 : 1900;
-        }
-      } else {
+      if (!readNumber(token, date)) {
         return std::nullopt;
       }
-    } else if (month == 0) {
+    } else if (date.month == 0) {
       // The weekday and "GMT" are no month and change nothing.
-      month = monthNumber(token);
+      date.month = monthNumber(token);
     }
   }
-  if (month == 0 || day < 1 || day > 31 || year < 1970 || hour < 0 ||
-      hour > 23 || minute > 59 || second > 60) {
+  if (!isComplete(date)) {
     return std::nullopt;
   }
-  return ((daysFromCivil(year, month, day) * 24 + hour) * 60 + minute) * 60 +
-         second;
+  const long long days = daysFromCivil(date.year, date.month, date.day);
+  return ((days * 24 + date.hour) * 60 + date.minute) * 60 + date.second;
 }
 
 HttpFreshness httpFreshness(const HttpResponse& response, long long nowS,

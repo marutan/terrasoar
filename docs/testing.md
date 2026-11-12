@@ -35,7 +35,7 @@ directly. Qt Test options work as usual:
 | `LIBGL_ALWAYS_SOFTWARE=1` | Make Mesa use llvmpipe |
 | `QT_OPENGL=software` | Windows: Qt loads `opengl32sw.dll` instead of the system OpenGL |
 | `GALLIUM_DRIVER=llvmpipe` | Windows Mesa: use llvmpipe rather than another Gallium driver |
-| `TSAN_OPTIONS=suppressions=tests/tsan.supp` | ThreadSanitizer suppressions for third-party code |
+| `TSAN_OPTIONS=ignore_noninstrumented_modules=1 suppressions=tests/tsan.supp` | ThreadSanitizer: ignore what uninstrumented libraries (Qt, glib) do in memory, and suppressions for third-party code |
 | `TS_UPDATE_GOLDEN=1` | Golden-image tests write the rendered images as the new golden images instead of comparing |
 | `TS_GOLDEN_OUTPUT=<dir>` | Golden-image tests that fail save `<name>-actual.png` and `<name>-diff.png` there (CI uploads them as an artefact) |
 
@@ -162,8 +162,8 @@ Rules:
 mkdir -p build/tsan && cd build/tsan
 qmake6 -spec linux-clang ../../terrasoar.pro CONFIG+=tsan
 make -j"$(nproc)"
-TSAN_OPTIONS="halt_on_error=1 suppressions=$PWD/../../tests/tsan.supp" \
-    QT_QPA_PLATFORM=offscreen make check
+TSAN_OPTIONS="halt_on_error=1 ignore_noninstrumented_modules=1 \
+suppressions=$PWD/../../tests/tsan.supp" QT_QPA_PLATFORM=offscreen make check
 ```
 
 TSan builds run the unit and stress tests. They leave out `tests/smoke`,

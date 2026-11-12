@@ -30,10 +30,14 @@ Requests come from two kinds of caller:
 
 Every hand-over between threads goes through a `std::mutex` (the queue,
 each ticket's result) and the network thread is woken with a queued call
-that carries no data. ThreadSanitizer sees `std::mutex` but not Qt's
-event queue, so data handed over through queued calls would be reported
-as races (the reason for this design; `tests/network` runs under TSan in
-CI).
+that carries no data: `drain()` invoked by name, so that not even a
+functor is written on one thread and read on the other. ThreadSanitizer
+sees `std::mutex` but not Qt's event queue, so data handed over through
+queued calls would be reported as races (the reason for this design;
+`tests/network` runs under TSan in CI). Qt's own HTTP thread hands replies
+to ours through that queue too; TSan runs with
+`ignore_noninstrumented_modules=1` so that what Qt does there isn't
+reported (see `tests/tsan.supp`).
 
 ## The life of a request
 

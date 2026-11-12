@@ -88,10 +88,10 @@ struct WmsLayer {
   std::vector<WmsLayer> children;
 
   /**
-   * Returns true if it can be drawn in @p crs (codes compared without
+   * Returns true if it can be drawn in @p code (codes compared without
    * regard to case).
    */
-  bool supportsCrs(const QString& crs) const;
+  bool supportsCrs(const QString& code) const;
 };
 
 /**

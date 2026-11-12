@@ -60,6 +60,8 @@ withHeaders(std::vector<std::pair<QByteArray, QByteArray>> headers)
 constexpr long long nowS = 1714564800;
 constexpr long long dayS = 86400;
 
+// Size, then the byte to fill with, as QByteArray(int, char).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 ts::CachedTile tileOf(int bytes, char fill, long long expiresS = 0)
 {
   ts::CachedTile tile;
@@ -244,11 +246,12 @@ private slots:
 
   void refusesOversizedResponses()
   {
+    constexpr int threeMiB = 3 * 1024 * 1024;
     MockHttpServer server([](const MockHttpRequest&) {
-      return mockResponse(200, QByteArray(3 * 1024 * 1024, 'x'), "image/png");
+      return mockResponse(200, QByteArray(threeMiB, 'x'), "image/png");
     });
     ts::NetworkSettings settings = testSettings();
-    settings.maximumResponseBytes = 1024 * 1024;
+    settings.maximumResponseBytes = qint64{1024} * 1024;
     ts::NetworkClient client(settings);
     const ts::HttpResponse response = get(client, server.url());
     QCOMPARE(response.error, ts::NetworkError::TooLarge);
@@ -336,6 +339,7 @@ private slots:
     settings.maximumInFlight = 3;
     ts::NetworkClient client(settings);
     std::vector<std::shared_ptr<ts::NetworkTicket>> tickets;
+    tickets.reserve(12);
     for (int i = 0; i < 12; ++i) {
       tickets.push_back(client.start(
           ts::HttpRequest{server.url(QStringLiteral("/%1").arg(i)), {}}));
@@ -350,6 +354,7 @@ private slots:
     // Cancelled while still queued: finished at once, never sent.
     server.resetLog();
     std::vector<std::shared_ptr<ts::NetworkTicket>> more;
+    more.reserve(9);
     for (int i = 0; i < 9; ++i) {
       more.push_back(client.start(
           ts::HttpRequest{server.url(QStringLiteral("/%1").arg(i)), {}}));
@@ -525,7 +530,7 @@ private slots:
   {
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("sub/dir/c.sqlite")),
-                            1024 * 1024);
+                            1024LL * 1024);
     const ts::TileKey key{5, 17, 9};
     QVERIFY(!cache.find(key));
     ts::CachedTile tile = tileOf(1000, 'a', nowS + 60);
@@ -570,7 +575,7 @@ private slots:
     // 10 KB tiles into a 50 KB cache: the oldest go, unless used lately.
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            50 * 1000);
+                            50LL * 1000);
     for (int i = 0; i < 5; ++i) {
       QVERIFY(cache.store(ts::TileKey{3, i, 0}, tileOf(10000, 'a')));
     }
@@ -592,12 +597,12 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 50 * 1000);
+      ts::TileDiskCache cache(path, 50LL * 1000);
       QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(10000, 'x', nowS)));
       QVERIFY(cache.store(ts::TileKey{1, 1, 0}, tileOf(10000, 'y', nowS)));
       QVERIFY(cache.find(ts::TileKey{1, 0, 0}));
     }
-    ts::TileDiskCache cache(path, 50 * 1000);
+    ts::TileDiskCache cache(path, 50LL * 1000);
     QCOMPARE(cache.count(), 2);
     QCOMPARE(cache.sizeBytes(), 20000LL);
     QCOMPARE(cache.find(ts::TileKey{1, 1, 0}).value_or(ts::CachedTile{}).data,
@@ -629,7 +634,7 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 10 * 1000 * 1000);
+      ts::TileDiskCache cache(path, 10LL * 1000 * 1000);
       for (int i = 0; i < 200; ++i) {
         QVERIFY(cache.store(ts::TileKey{8, i, 3}, tileOf(5000, 'q')));
       }
@@ -645,7 +650,7 @@ private slots:
     } else if (damage == 1) {
       file.resize(size / 3);
     } else if (damage == 2) {
-      for (qint64 at = 0; at < size; at += 4096 * 3) {
+      for (qint64 at = 0; at < size; at += qint64{4096} * 3) {
         file.seek(at);
         file.write(QByteArray(512, '\x01'));
       }
@@ -657,7 +662,7 @@ private slots:
       QFile::remove(path + QLatin1String(suffix));
     }
 
-    ts::TileDiskCache cache(path, 10 * 1000 * 1000);
+    ts::TileDiskCache cache(path, 10LL * 1000 * 1000);
     // Reading may meet the damage now or later; either way it recovers.
     for (int i = 0; i < 200; ++i) {
       cache.find(ts::TileKey{8, i, 3});
@@ -675,14 +680,14 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 1000 * 1000);
+      ts::TileDiskCache cache(path, 1000LL * 1000);
       QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(10, 'a')));
     }
     {
       ts::SqliteConnection db(path, ts::SqliteConnection::OpenMode::ReadWrite);
       QVERIFY(db.execute(QStringLiteral("PRAGMA user_version=99")));
     }
-    ts::TileDiskCache cache(path, 1000 * 1000);
+    ts::TileDiskCache cache(path, 1000LL * 1000);
     QCOMPARE(cache.count(), 0);
     QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(10, 'b')));
   }
@@ -691,7 +696,7 @@ private slots:
   {
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            200 * 1000);
+                            200LL * 1000);
     const int failures = ts::test::runConcurrently(
         ts::test::concurrentThreadCount, [&cache](int thread) {
           bool ok = true;
@@ -713,7 +718,7 @@ private slots:
   {
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            100 * 1000 * 1000);
+                            100LL * 1000 * 1000);
     for (int i = 0; i < 256; ++i) {
       cache.store(ts::TileKey{8, i, 0}, tileOf(20000, 'b'));
     }

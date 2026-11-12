@@ -83,8 +83,8 @@ class NetworkDispatcher;
 class NetworkCore
 {
 public:
-  explicit NetworkCore(const NetworkSettings& networkSettings)
-      : settings(networkSettings)
+  explicit NetworkCore(NetworkSettings networkSettings)
+      : settings(std::move(networkSettings))
   {
   }
 
@@ -112,6 +112,8 @@ public:
  */
 class NetworkDispatcher : public QObject
 {
+  Q_OBJECT
+
 public:
   NetworkDispatcher(NetworkCore& core, QNetworkAccessManager& manager)
       : m_core(core), m_manager(manager)
@@ -119,7 +121,7 @@ public:
   }
 
   /** Starts what the limit allows and drops what was cancelled. */
-  void drain();
+  Q_INVOKABLE void drain();
 
   /** Finishes everything open as cancelled (the client is going away). */
   void abortAll();
@@ -152,9 +154,12 @@ void NetworkCore::wake()
   }
   const std::lock_guard<std::mutex> lock(mutex);
   if (dispatcher != nullptr) {
-    NetworkDispatcher* target = dispatcher;
-    QMetaObject::invokeMethod(
-        target, [target]() { target->drain(); }, Qt::QueuedConnection);
+    // By name, not with a functor: the queued call is then made entirely
+    // inside Qt. A functor's slot object would be written here and read on
+    // the network thread, handed over by Qt's event queue, whose locking
+    // ThreadSanitizer can't see (Qt isn't instrumented), so every wake-up
+    // would be reported as a race.
+    QMetaObject::invokeMethod(dispatcher, "drain", Qt::QueuedConnection);
   }
 }
 
@@ -385,8 +390,9 @@ protected:
   void run() override
   {
     QNetworkAccessManager manager;
-    if (m_core->settings.proxy) {
-      manager.setProxy(*m_core->settings.proxy);
+    const std::optional<QNetworkProxy>& proxy = m_core->settings.proxy;
+    if (proxy) {
+      manager.setProxy(*proxy);
     } else {
       static std::once_flag systemProxy;
       std::call_once(systemProxy, []() {
@@ -552,3 +558,5 @@ int NetworkClient::peakInFlight() const
 }
 
 } // namespace ts
+
+#include "networkclient.moc"

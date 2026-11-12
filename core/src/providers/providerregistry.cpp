@@ -254,12 +254,15 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
       return live;
     }
   }
-  const bool wms =
-      source.value(QStringLiteral("kind")).toString() == QLatin1String("wms");
-  std::shared_ptr<ImageryProvider> provider =
-      isBasePackSource(source) ? createBasePackImagery(source, errorString)
-      : wms                    ? createWmsImagery(source, errorString)
-                               : createImageryProvider(source, errorString);
+  std::shared_ptr<ImageryProvider> provider;
+  if (isBasePackSource(source)) {
+    provider = createBasePackImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("wms")) {
+    provider = createWmsImagery(source, errorString);
+  } else {
+    provider = createImageryProvider(source, errorString);
+  }
   if (provider) {
     m_imagery[key] = provider;
   }

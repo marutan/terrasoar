@@ -248,8 +248,8 @@ private slots:
     QVERIFY(relief->queryable);
     // Its own box replaces the root's.
     QVERIFY(relief->geographicBounds.has_value());
-    QCOMPARE(relief->geographicBounds->westDeg, 5.0);
-    QCOMPARE(relief->geographicBounds->northDeg, 55.0);
+    QCOMPARE(relief->geographicBounds.value_or(ts::GeoRect{}).westDeg, 5.0);
+    QCOMPARE(relief->geographicBounds.value_or(ts::GeoRect{}).northDeg, 55.0);
     // ScaleHint in pixel diagonals to scale denominators.
     QVERIFY(std::abs(relief->minScaleDenominator -
                      0.5 / std::sqrt(2.0) / 0.00028) < 1e-6);
@@ -263,7 +263,8 @@ private slots:
     QVERIFY(!rivers->queryable); // its own attribute wins
     QVERIFY(!rivers->opaque);
     QCOMPARE(rivers->attributionTitle, QStringLiteral("River Survey"));
-    QCOMPARE(rivers->geographicBounds->westDeg, -180.0); // from the root
+    QCOMPARE(rivers->geographicBounds.value_or(ts::GeoRect{}).westDeg,
+             -180.0); // from the root
     QCOMPARE(caps.findLayer(QStringLiteral("poster"))->noSubsets, true);
     QCOMPARE(caps.findLayer(QStringLiteral("fixed"))->fixedWidth, 512);
     QVERIFY(caps.findLayer(QStringLiteral("nothing")) == nullptr);
@@ -280,16 +281,17 @@ private slots:
     // A latitude-first EPSG:4326 box is read as such.
     const ts::WmsLayer* lakes = caps.findLayer(QStringLiteral("lakes"));
     QVERIFY(lakes->geographicBounds.has_value());
-    QCOMPARE(lakes->geographicBounds->westDeg, -10.0);
-    QCOMPARE(lakes->geographicBounds->southDeg, 40.0);
-    QCOMPARE(lakes->geographicBounds->eastDeg, 30.0);
-    QCOMPARE(lakes->geographicBounds->northDeg, 60.0);
+    QCOMPARE(lakes->geographicBounds.value_or(ts::GeoRect{}).westDeg, -10.0);
+    QCOMPARE(lakes->geographicBounds.value_or(ts::GeoRect{}).southDeg, 40.0);
+    QCOMPARE(lakes->geographicBounds.value_or(ts::GeoRect{}).eastDeg, 30.0);
+    QCOMPARE(lakes->geographicBounds.value_or(ts::GeoRect{}).northDeg, 60.0);
     QCOMPARE(lakes->minScaleDenominator, 1000.0);
     QCOMPARE(lakes->maxScaleDenominator, 5.0e7);
     // CRS:84 boxes are longitude first.
     const ts::WmsLayer* cities = caps.findLayer(QStringLiteral("cities"));
-    QCOMPARE(cities->geographicBounds->westDeg, -10.0);
-    QCOMPARE(cities->geographicBounds->southDeg, 40.0);
+    QVERIFY(cities->geographicBounds.has_value());
+    QCOMPARE(cities->geographicBounds.value_or(ts::GeoRect{}).westDeg, -10.0);
+    QCOMPARE(cities->geographicBounds.value_or(ts::GeoRect{}).southDeg, 40.0);
     QVERIFY(!caps.findLayer(QStringLiteral("roads"))->geographicBounds);
     // The lower-case code counts; the empty element doesn't.
     QCOMPARE(lakes->crs, QStringList{QStringLiteral("epsg:4326")});
@@ -552,7 +554,7 @@ private slots:
     QCOMPARE(s.title, QStringLiteral("Shaded relief, Rivers"));
     QCOMPARE(s.attribution, QStringLiteral("Example Agency; River Survey"));
     QVERIFY(s.bounds.has_value());
-    QCOMPARE(s.bounds->westDeg, -180.0);
+    QCOMPARE(s.bounds.value_or(ts::GeoRect{}).westDeg, -180.0);
     // An opaque layer: JPEG, not transparent.
     QCOMPARE(s.format, QStringLiteral("image/jpeg"));
     QVERIFY(!s.transparent);
@@ -601,8 +603,8 @@ private slots:
     ts::WmsSource source;
     source.url = QUrl(QStringLiteral("https://example.invalid/wms?map=a"));
     source.version = QStringLiteral("1.1.1");
-    source.layers = {QStringLiteral("a"), QStringLiteral("b")};
-    source.styles = {QString(), QStringLiteral("s")};
+    source.layers = QStringList{QStringLiteral("a"), QStringLiteral("b")};
+    source.styles = QStringList{QString(), QStringLiteral("s")};
     source.format = QStringLiteral("image/jpeg");
     source.transparent = false;
     source.crs = QStringLiteral("EPSG:3857");
@@ -621,11 +623,11 @@ private slots:
     const ts::WmsSource b = back.value_or(ts::WmsSource{});
     QCOMPARE(b.id(), source.id());
     QCOMPARE(b.toJson(), json);
-    QCOMPARE(b.bounds->northDeg, 40.0);
+    QCOMPARE(b.bounds.value_or(ts::GeoRect{}).northDeg, 40.0);
     QCOMPARE(b.imageProjection(), ts::TileImageProjection::WebMercator);
     // Different requests, different ids.
     ts::WmsSource other = source;
-    other.styles = {QString(), QString()};
+    other.styles = QStringList{QString(), QString()};
     QVERIFY(other.id() != source.id());
 
     QJsonObject bad = json;
@@ -652,8 +654,10 @@ private slots:
     const std::optional<std::vector<ts::WmsCatalogueEntry>> entries =
         ts::parseWmsCatalogue(file.readAll(), &error);
     QVERIFY2(entries.has_value(), qPrintable(error));
-    QVERIFY(entries->size() >= 3);
-    for (const ts::WmsCatalogueEntry& entry : *entries) {
+    const std::vector<ts::WmsCatalogueEntry> list =
+        entries.value_or(std::vector<ts::WmsCatalogueEntry>{});
+    QVERIFY(list.size() >= 3);
+    for (const ts::WmsCatalogueEntry& entry : list) {
       QVERIFY(!entry.title.isEmpty());
       QCOMPARE(entry.url.scheme(), QStringLiteral("https"));
       QVERIFY(!entry.description.isEmpty());
@@ -863,7 +867,7 @@ private slots:
     behaviour->oversized = mode == 3;
     MockHttpServer server(ts::test::mockWmsHandler(behaviour));
     ts::NetworkSettings networkSettings = testNetwork();
-    networkSettings.maximumResponseBytes = 1024 * 1024;
+    networkSettings.maximumResponseBytes = qint64{1024} * 1024;
     ts::WmsImageryProvider provider(
         mockSource(server),
         std::make_shared<ts::NetworkClient>(networkSettings));
@@ -925,6 +929,7 @@ private slots:
     ts::TileLoader loader(provider, loaderSettings);
     QCOMPARE(loader.threadCount(), 6);
     std::vector<ts::TileLoadRequest> wanted;
+    wanted.reserve(6);
     for (int x = 0; x < 6; ++x) {
       wanted.push_back(ts::TileLoadRequest{ts::TileKey{3, x, 1}, 0.0});
     }

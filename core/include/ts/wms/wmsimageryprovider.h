@@ -22,6 +22,8 @@ namespace ts
 
 class NetworkClient;
 class TileDiskCache;
+struct CachedTile;
+struct HttpResponse;
 
 /** Behaviour of a WmsImageryProvider. */
 struct WmsProviderSettings {
@@ -94,7 +96,7 @@ class WmsImageryProvider : public ImageryProvider
 public:
   /** Requests @p source's tiles through @p network. */
   WmsImageryProvider(WmsSource source, std::shared_ptr<NetworkClient> network,
-                     const WmsProviderSettings& settings = {});
+                     WmsProviderSettings settings = {});
 
   /** Closes the disk cache. */
   ~WmsImageryProvider() override;
@@ -134,6 +136,15 @@ public:
 private:
   long long now() const;
   ImageLoadResult fromCache(TileKey key, bool stale);
+  /** The saved tile, marked stale, if there is one; else a failure. */
+  ImageLoadResult staleOrFailed(TileKey key, bool haveCached);
+  /** True (and counted) while the server is left alone after failures. */
+  bool leftAlone();
+  /** Renews @p cached after a 304 and returns it. */
+  ImageLoadResult revalidated(TileKey key, const CachedTile& cached,
+                              const HttpResponse& response, long long nowS);
+  /** Saves a freshly fetched tile, if it may be stored. */
+  void store(TileKey key, const HttpResponse& response, long long nowS);
   void noteSuccess();
   void noteUnreachable(const QString& detail);
   void noteServerError(const QString& message);

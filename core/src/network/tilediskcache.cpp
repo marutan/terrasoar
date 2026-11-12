@@ -41,8 +41,8 @@ class Statement
 {
 public:
   Statement(sqlite3* db, const char* sql)
+      : m_code(sqlite3_prepare_v2(db, sql, -1, &m_statement, nullptr))
   {
-    m_code = sqlite3_prepare_v2(db, sql, -1, &m_statement, nullptr);
   }
   ~Statement() { sqlite3_finalize(m_statement); }
   Statement(const Statement&) = delete;

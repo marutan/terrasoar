@@ -519,11 +519,14 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
 
 void MainWindow::refreshLayers()
 {
+  const LayerStack stack = m_layers->layerStack();
   if (!m_globeView) {
+    // No OpenGL view: nothing is drawn, but layers that can't be opened are
+    // still marked in the dock.
+    watchLayerStatus(stack);
     return;
   }
   QStringList errors;
-  const LayerStack stack = m_layers->layerStack();
   m_globeView->setImageryDraws(
       imageryDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
@@ -596,8 +599,12 @@ void MainWindow::addWmsLayer(const QString& address)
   if (!address.isEmpty()) {
     dialog.connectTo(address);
   }
-  if (dialog.exec() == QDialog::Accepted && dialog.layerDefinition()) {
-    m_layerDock->addLayer(*dialog.layerDefinition());
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
   }
 }
 

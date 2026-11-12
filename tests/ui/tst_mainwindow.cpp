@@ -827,13 +827,14 @@ private slots:
     const std::optional<ts::WmsSource> source =
         ts::WmsSource::fromJson(definition.source, &error);
     QVERIFY2(source.has_value(), qPrintable(error));
-    QCOMPARE(source->layers, QStringList{QStringLiteral("background")});
-    QCOMPARE(source->format, QStringLiteral("image/jpeg"));
-    QVERIFY(!source->transparent);
-    QCOMPARE(source->crs, QStringLiteral("EPSG:4326")); // all the mock offers
-    QCOMPARE(source->url, serviceUrl);
+    const ts::WmsSource added = source.value_or(ts::WmsSource{});
+    QCOMPARE(added.layers, QStringList{QStringLiteral("background")});
+    QCOMPARE(added.format, QStringLiteral("image/jpeg"));
+    QVERIFY(!added.transparent);
+    QCOMPARE(added.crs, QStringLiteral("EPSG:4326")); // all the mock offers
+    QCOMPARE(added.url, serviceUrl);
     // The layer names no credit; the catalogue's is used.
-    QCOMPARE(source->attribution, QStringLiteral("Mock Agency"));
+    QCOMPARE(added.attribution, QStringLiteral("Mock Agency"));
   }
 
   void addWmsDialogErrors()
@@ -853,7 +854,9 @@ private slots:
     // A server that refuses 1.3.0 is asked again in 1.1.1.
     dialog.connectTo(server.url(QStringLiteral("/wms")).toString());
     QVERIFY(loaded.wait(5000));
-    QCOMPARE(dialog.capabilities()->version, QStringLiteral("1.1.1"));
+    QVERIFY(dialog.capabilities().has_value());
+    QCOMPARE(dialog.capabilities().value_or(ts::WmsCapabilities{}).version,
+             QStringLiteral("1.1.1"));
     QCOMPARE(server.requestCount(), 2);
     // Not a web address.
     dialog.connectTo(QStringLiteral("ftp://example.invalid/wms"));
