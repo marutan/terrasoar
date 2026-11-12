@@ -112,10 +112,10 @@ std::vector<ts::LonLat> britishIsles()
 const std::atomic<bool> notCancelled{false};
 
 /** The polygon through @p vertices, or an empty geometry (isValid() false). */
-ts::RegionGeometry polygonOf(std::vector<ts::LonLat> vertices)
+ts::RegionGeometry polygonOf(const std::vector<ts::LonLat>& vertices)
 {
   QString error;
-  return ts::RegionGeometry::polygon(std::move(vertices), &error)
+  return ts::RegionGeometry::polygon(vertices, &error)
       .value_or(ts::RegionGeometry());
 }
 
@@ -307,7 +307,6 @@ private slots:
     // countRegionTiles() (with its shortcut for covered tiles) and the
     // iterator give exactly the tiles a test of every tile gives.
     QFETCH(int, which);
-    QString error;
     ts::RegionGeometry region;
     std::optional<ts::GeoRect> data;
     switch (which) {
@@ -359,7 +358,6 @@ private slots:
   {
     // The British Isles to level 16: millions of tiles, counted without
     // visiting them all.
-    QString error;
     const ts::RegionGeometry isles = polygonOf(britishIsles());
     QVERIFY(isles.isValid());
     QElapsedTimer timer;
@@ -384,7 +382,6 @@ private slots:
 
   void samplesLieInTheRegion()
   {
-    QString error;
     const ts::RegionGeometry isles = polygonOf(britishIsles());
     QVERIFY(isles.isValid());
     const ts::RegionTileCount counts =

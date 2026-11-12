@@ -173,7 +173,7 @@ class RegionTileIterator
 public:
   /** Iterates the tiles of @p region, see countRegionTiles(). */
   RegionTileIterator(RegionGeometry region, int minimumLevel, int maximumLevel,
-                     std::optional<GeoRect> dataBounds);
+                     const std::optional<GeoRect>& dataBounds);
 
   /** Returns the next tile, or nothing at the end. */
   std::optional<TileKey> next();

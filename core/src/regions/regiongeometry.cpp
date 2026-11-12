@@ -71,8 +71,8 @@ bool strictlyInside(const GeoRect& rect, double lonDeg, double latDeg)
  * Clips the segment @p a – @p b to @p rect (Liang–Barsky). Returns true
  * and the clipped part's parameters if some of it lies in the rectangle.
  */
-bool clipSegment(const LonLat& a, const LonLat& b, const GeoRect& rect,
-                 double& t0, double& t1)
+bool clipSegment(LonLat a, LonLat b, const GeoRect& rect, double& t0,
+                 double& t1)
 {
   const double dx = b.lonDeg - a.lonDeg;
   const double dy = b.latDeg - a.latDeg;
@@ -83,13 +83,13 @@ bool clipSegment(const LonLat& a, const LonLat& b, const GeoRect& rect,
   t0 = 0.0;
   t1 = 1.0;
   for (std::size_t i = 0; i < 4; ++i) {
-    if (p[i] == 0.0) {
-      if (q[i] < 0.0) {
+    if (p.at(i) == 0.0) {
+      if (q.at(i) < 0.0) {
         return false;
       }
     } else {
-      const double t = q[i] / p[i];
-      if (p[i] < 0.0) {
+      const double t = q.at(i) / p.at(i);
+      if (p.at(i) < 0.0) {
         t0 = std::max(t0, t);
       } else {
         t1 = std::min(t1, t);
@@ -157,8 +157,11 @@ long long pow4(int exponent)
 
 } // namespace
 
+// The edges in GeoRect's order (west, south, east, north), as declared.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 RegionGeometry RegionGeometry::rectangle(double westDeg, double southDeg,
                                          double eastDeg, double northDeg)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   double south = std::clamp(southDeg, -90.0, 90.0);
   double north = std::clamp(northDeg, -90.0, 90.0);
@@ -276,6 +279,8 @@ bool RegionGeometry::containsUnwrapped(double latDeg, double lonDeg) const
   return inside;
 }
 
+// Latitude first, as GeoRect::contains().
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool RegionGeometry::contains(double latDeg, double lonDeg) const
 {
   if (!isValid()) {
@@ -483,7 +488,7 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
   if (last < first || !region.isValid()) {
     return counts;
   }
-  counts.perLevel.assign(static_cast<std::size_t>(last - first + 1), 0);
+  counts.perLevel.assign(static_cast<std::size_t>(last - first) + 1, 0);
   std::vector<TileKey> stack;
   for (const TileKey root : TileKey::roots()) {
     stack.push_back(root);
@@ -517,7 +522,7 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
 
 RegionTileIterator::RegionTileIterator(RegionGeometry region, int minimumLevel,
                                        int maximumLevel,
-                                       std::optional<GeoRect> dataBounds)
+                                       const std::optional<GeoRect>& dataBounds)
     : m_region(std::move(region)),
       m_maximumLevel(std::clamp(maximumLevel, 0, TileKey::maximumLevel)),
       m_dataBounds(dataBounds),
@@ -574,6 +579,7 @@ std::vector<TileKey> sampleRegionTiles(const RegionGeometry& region,
     return samples;
   }
   std::vector<double> weights;
+  weights.reserve(counts.perLevel.size());
   for (const long long levelCount : counts.perLevel) {
     weights.push_back(static_cast<double>(levelCount));
   }

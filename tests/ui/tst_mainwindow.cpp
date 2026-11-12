@@ -1068,7 +1068,7 @@ private slots:
     regions.setCatalogue([]() { return std::vector<ts::WmsCatalogueEntry>{}; });
 
     // No WMS layer yet: nothing to keep (a message box says so).
-    QTimer::singleShot(0, [&]() {
+    QTimer::singleShot(0, &window, [&]() {
       for (QWidget* widget : QApplication::topLevelWidgets()) {
         if (QMessageBox* box = qobject_cast<QMessageBox*>(widget)) {
           box->accept();
@@ -1107,7 +1107,7 @@ private slots:
     QVERIFY(terms->text().contains(QStringLiteral("terms of use")));
     QVERIFY(QTest::qWaitFor([&]() { return dialog->estimate().has_value(); },
                             20000));
-    QVERIFY(dialog->estimate()->sampledTiles > 0);
+    QVERIFY(dialog->estimate().value_or(ts::RegionEstimate{}).sampledTiles > 0);
     QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("regionSizeLabel"))
                 ->text()
                 .contains(QStringLiteral("about")));
@@ -1204,10 +1204,11 @@ private slots:
     const ts::RegionGeometry rectangle =
         drawn.at(0).at(0).value<ts::RegionGeometry>();
     QCOMPARE(rectangle.kind(), ts::RegionGeometry::Kind::Rectangle);
-    const std::optional<ts::Geodetic> middle =
+    const std::optional<ts::Geodetic> picked =
         globe->controller().camera().pickGeodetic(centre.x(), centre.y());
-    QVERIFY(middle);
-    QVERIFY(rectangle.contains(middle->latDeg, middle->lonDeg));
+    QVERIFY(picked);
+    const ts::Geodetic middle = picked.value_or(ts::Geodetic{});
+    QVERIFY(rectangle.contains(middle.latDeg, middle.lonDeg));
     QCOMPARE(globe->controller().camera().pose().targetLonDeg,
              before.targetLonDeg);
     QCOMPARE(globe->regionDrawing(), ts::GlobeView::RegionDrawing::None);
@@ -1230,7 +1231,7 @@ private slots:
         drawn.at(1).at(0).value<ts::RegionGeometry>();
     QCOMPARE(polygon.kind(), ts::RegionGeometry::Kind::Polygon);
     QCOMPARE(polygon.vertices().size(), std::size_t{4});
-    QVERIFY(polygon.contains(middle->latDeg, middle->lonDeg));
+    QVERIFY(polygon.contains(middle.latDeg, middle.lonDeg));
 
     // Esc cancels.
     globe->startRegionDrawing(ts::GlobeView::RegionDrawing::Polygon);
@@ -1241,7 +1242,8 @@ private slots:
     // The visible area holds the centre of the view.
     const std::optional<ts::RegionGeometry> visible = globe->visibleArea();
     QVERIFY(visible);
-    QVERIFY(visible->contains(middle->latDeg, middle->lonDeg));
+    QVERIFY(visible.value_or(ts::RegionGeometry())
+                .contains(middle.latDeg, middle.lonDeg));
     const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
     if (!shots.isEmpty()) {
       globe->setRegionOutlines({rectangle, polygon});
