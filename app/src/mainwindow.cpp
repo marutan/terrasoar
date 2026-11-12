@@ -21,6 +21,7 @@
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
+#include <QThread>
 #include <QTimer>
 #include <QWidget>
 
@@ -59,14 +60,22 @@ MainWindow::MainWindow(QWidget* parent)
       style()->standardIcon(QStyle::SP_MessageBoxWarning),
       style()->standardIcon(QStyle::SP_MessageBoxCritical));
   // Status changes arrive on loader threads; a single-shot timer on this
-  // thread hands them over (and several at once become one update). It is
-  // deleted on this thread, after any queued call to it.
+  // thread hands them over (and several at once become one update). Loader
+  // threads hold it only through a weak pointer. When the last owner lets go
+  // on this thread (normally the window, often after the event loop has
+  // ended) it is deleted at once, which also drops queued calls to it; on a
+  // loader thread, it is deleted later on this one.
   QTimer* relay = new QTimer;
   relay->setSingleShot(true);
   relay->setInterval(0);
   connect(relay, &QTimer::timeout, this, &MainWindow::updateLayerStatus);
-  m_statusRelay = std::shared_ptr<QTimer>(
-      relay, [](QTimer* timer) { timer->deleteLater(); });
+  m_statusRelay = std::shared_ptr<QTimer>(relay, [](QTimer* timer) {
+    if (QThread::currentThread() == timer->thread()) {
+      delete timer;
+    } else {
+      timer->deleteLater();
+    }
+  });
   if (GlobeView::isOpenGlAvailable()) {
     m_globeView = new GlobeView(this);
     setCentralWidget(m_globeView);
