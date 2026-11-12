@@ -29,6 +29,18 @@ struct WmsCatalogueEntry {
   QString attribution;
   /** Where its terms of use are. */
   QUrl termsUrl;
+  /**
+   * Whether the terms allow downloading regions for offline use; nothing
+   * if the catalogue doesn't say.
+   */
+  std::optional<bool> allowBulkDownload;
+};
+
+/** Whether tiles of a WMS may be downloaded in bulk (offline regions). */
+enum class BulkDownloadPolicy {
+  Allowed,   ///< The catalogue says its terms allow it.
+  Unknown,   ///< Not in the catalogue, or it doesn't say: warn first.
+  Forbidden, ///< The catalogue says its terms forbid it: refuse.
 };
 
 /** Format name in every catalogue file. */
@@ -52,7 +64,10 @@ inline constexpr const char* wmsCatalogueUrl =
  *
  *     {"format": "terrasoar-wms-catalogue", "version": 1,
  *      "services": [{"title": …, "url": …, "description": …,
- *                    "attribution": …, "terms": …}, …]}
+ *                    "attribution": …, "terms": …,
+ *                    "allowBulkDownload": true|false}, …]}
+ *
+ * allowBulkDownload is optional (older programs ignore it).
  *
  * Entries without a title or an http(s) URL are skipped. Returns
  * nothing and sets @p errorString (translated) if it isn't a catalogue
@@ -62,6 +77,30 @@ inline constexpr const char* wmsCatalogueUrl =
  */
 std::optional<std::vector<WmsCatalogueEntry>>
 parseWmsCatalogue(const QByteArray& json, QString* errorString);
+
+/**
+ * Returns the catalogue entry for the service at @p url (a GetMap or
+ * GetCapabilities address): the entry with the same host and path, else
+ * the first with the same host; null if none. Query, scheme, case of the
+ * host and a trailing slash don't matter.
+ *
+ * @reentrant
+ */
+const WmsCatalogueEntry*
+findWmsCatalogueEntry(const QUrl& url,
+                      const std::vector<WmsCatalogueEntry>& catalogue);
+
+/**
+ * Returns whether the service at @p url may be downloaded in bulk,
+ * according to its entry in @p catalogue (findWmsCatalogueEntry()). An
+ * entry found by host alone can forbid but not allow: another service on
+ * the same host may have other terms.
+ *
+ * @reentrant
+ */
+BulkDownloadPolicy
+bulkDownloadPolicy(const QUrl& url,
+                   const std::vector<WmsCatalogueEntry>& catalogue);
 
 } // namespace ts
 

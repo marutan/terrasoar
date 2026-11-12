@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "globeview.h"
 
+#include <algorithm>
 #include <cmath>
 #include <optional>
 
@@ -18,6 +19,7 @@
 #include <QWheelEvent>
 
 #include "ts/camera/scalebar.h"
+#include "ts/geo/geodetic.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/globerenderer.h"
 #include "ts/globe/tilerenderer.h"
@@ -43,6 +45,37 @@ constexpr double scaleBarMaximumWidthPx = 140.0;
 
 /** Wheel angle of one notch, in eighths of a degree (Qt's unit). */
 constexpr double wheelNotch = 120.0;
+
+/** Brings a longitude difference into [−180°, 180°]: the short way round. */
+double shortLonDelta(double deltaDeg)
+{
+  const double delta = std::fmod(deltaDeg, 360.0);
+  if (delta > 180.0) {
+    return delta - 360.0;
+  }
+  return delta < -180.0 ? delta + 360.0 : delta;
+}
+
+/**
+ * Where the surface point (@p latDeg, @p lonDeg) is on the screen, or
+ * nothing if it is behind the globe (or the eye).
+ */
+std::optional<QPointF> visibleOnScreen(const Camera& camera, double latDeg,
+                                       double lonDeg)
+{
+  if (camera.morph() == 0.0) {
+    const Vec3 point = geodeticToEcef(Geodetic{latDeg, lonDeg, 0.0});
+    if (dot(point - camera.eyeEcef(), point) >= 0.0) {
+      return std::nullopt;
+    }
+  }
+  const std::optional<ScreenPoint> screen =
+      camera.projectGeodetic(latDeg, lonDeg);
+  if (!screen) {
+    return std::nullopt;
+  }
+  return QPointF(screen->xPx, screen->yPx);
+}
 
 QPointF eventPosition(const QMouseEvent* event)
 {
@@ -94,6 +127,9 @@ unsigned int keyMotion(int key)
 GlobeView::GlobeView(QWidget* parent) : QOpenGLWidget(parent)
 {
   setObjectName(QStringLiteral("globeView"));
+  // Qt 5 needs the type registered by name for queued connections and
+  // QSignalSpy.
+  qRegisterMetaType<ts::RegionGeometry>("ts::RegionGeometry");
   QSurfaceFormat format = QSurfaceFormat::defaultFormat();
   format.setRenderableType(QSurfaceFormat::OpenGL);
   format.setVersion(3, 3);
@@ -352,6 +388,7 @@ void GlobeView::paintGL()
 
   drawAttributions();
   drawScaleBar();
+  drawRegions();
   if (m_overlayVisible) {
     drawOverlay();
   }
@@ -401,6 +438,22 @@ void GlobeView::mousePressEvent(QMouseEvent* event)
 {
   setFocus(Qt::MouseFocusReason);
   const QPointF position = eventPosition(event);
+  if (m_drawing != RegionDrawing::None && event->button() == Qt::LeftButton &&
+      (event->modifiers() & Qt::ControlModifier) == 0) {
+    const std::optional<LonLat> point = pickLonLat(position);
+    if (point) {
+      if (m_drawing == RegionDrawing::Rectangle) {
+        m_drawnPoints = {*point};
+        m_drawingDrag = true;
+      } else {
+        m_drawnPoints.push_back(*point);
+      }
+    }
+    m_pointerPx = position;
+    update();
+    event->accept();
+    return;
+  }
   const bool rotate = event->button() == Qt::RightButton ||
                       event->button() == Qt::MiddleButton ||
                       (event->button() == Qt::LeftButton &&
@@ -418,6 +471,9 @@ void GlobeView::mouseMoveEvent(QMouseEvent* event)
 {
   m_pointerInside = true;
   m_pointerPx = eventPosition(event);
+  if (m_drawing != RegionDrawing::None && !m_drawnPoints.empty()) {
+    update(); // the rubber band follows the pointer
+  }
   if (m_controller.isDragging()) {
     m_controller.dragTo(m_pointerPx, nowS());
     requestFrame();
@@ -429,6 +485,33 @@ void GlobeView::mouseMoveEvent(QMouseEvent* event)
 
 void GlobeView::mouseReleaseEvent(QMouseEvent* event)
 {
+  if (m_drawing == RegionDrawing::Rectangle && m_drawingDrag &&
+      event->button() == Qt::LeftButton) {
+    m_drawingDrag = false;
+    const std::optional<LonLat> picked = pickLonLat(eventPosition(event));
+    if (picked && !m_drawnPoints.empty()) {
+      const LonLat start = m_drawnPoints.front();
+      const LonLat end = *picked;
+      // The shorter way round between the two corners.
+      const double delta = shortLonDelta(end.lonDeg - start.lonDeg);
+      const double west = delta >= 0.0 ? start.lonDeg : end.lonDeg;
+      const RegionGeometry rectangle = RegionGeometry::rectangle(
+          west, std::min(start.latDeg, end.latDeg), west + std::abs(delta),
+          std::max(start.latDeg, end.latDeg));
+      if (rectangle.isValid()) {
+        m_drawing = RegionDrawing::None;
+        m_drawnPoints.clear();
+        update();
+        emit regionDrawn(rectangle);
+        event->accept();
+        return;
+      }
+    }
+    m_drawnPoints.clear();
+    update();
+    event->accept();
+    return;
+  }
   if (m_controller.isDragging() && event->buttons() == Qt::NoButton) {
     m_controller.endDrag(nowS());
     requestFrame();
@@ -440,6 +523,16 @@ void GlobeView::mouseDoubleClickEvent(QMouseEvent* event)
 {
   if (event->button() != Qt::LeftButton) {
     QOpenGLWidget::mouseDoubleClickEvent(event);
+    return;
+  }
+  if (m_drawing == RegionDrawing::Polygon) {
+    // The first click of the two added the last corner.
+    finishPolygon();
+    event->accept();
+    return;
+  }
+  if (m_drawing != RegionDrawing::None) {
+    event->accept();
     return;
   }
   const QPointF position = eventPosition(event);
@@ -465,6 +558,28 @@ void GlobeView::wheelEvent(QWheelEvent* event)
 
 void GlobeView::keyPressEvent(QKeyEvent* event)
 {
+  if (m_drawing != RegionDrawing::None) {
+    if (event->key() == Qt::Key_Escape) {
+      startRegionDrawing(RegionDrawing::None);
+      event->accept();
+      return;
+    }
+    if (m_drawing == RegionDrawing::Polygon &&
+        (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)) {
+      finishPolygon();
+      event->accept();
+      return;
+    }
+    if (m_drawing == RegionDrawing::Polygon &&
+        event->key() == Qt::Key_Backspace) {
+      if (!m_drawnPoints.empty()) {
+        m_drawnPoints.pop_back();
+        update();
+      }
+      event->accept();
+      return;
+    }
+  }
   const unsigned int motion = keyMotion(event->key());
   if (motion != NoMotion) {
     if (!event->isAutoRepeat()) {
@@ -509,6 +624,206 @@ void GlobeView::leaveEvent(QEvent* event)
   m_pointerInside = false;
   emit pointerPositionChanged(false, 0.0, 0.0);
   QOpenGLWidget::leaveEvent(event);
+}
+
+// --- Offline regions
+// ------------------------------------------------------------
+
+void GlobeView::startRegionDrawing(RegionDrawing mode)
+{
+  const bool wasDrawing = m_drawing != RegionDrawing::None;
+  m_drawing = mode;
+  m_drawnPoints.clear();
+  m_drawingDrag = false;
+  if (mode != RegionDrawing::None) {
+    setFocus(Qt::OtherFocusReason);
+  }
+  update();
+  if (wasDrawing && mode == RegionDrawing::None) {
+    emit regionDrawingCancelled();
+  }
+}
+
+void GlobeView::finishPolygon()
+{
+  QString error;
+  std::optional<RegionGeometry> polygon =
+      RegionGeometry::polygon(m_drawnPoints, &error);
+  if (!polygon) {
+    return; // too few corners yet: carry on drawing
+  }
+  m_drawing = RegionDrawing::None;
+  m_drawnPoints.clear();
+  update();
+  emit regionDrawn(*polygon);
+}
+
+void GlobeView::setRegionOutlines(const std::vector<RegionGeometry>& regions)
+{
+  m_outlines = regions;
+  update();
+}
+
+std::optional<LonLat> GlobeView::pickLonLat(QPointF positionPx) const
+{
+  const std::optional<Geodetic> hit =
+      m_controller.camera().pickGeodetic(positionPx.x(), positionPx.y());
+  if (!hit) {
+    return std::nullopt;
+  }
+  return LonLat{hit->lonDeg, hit->latDeg};
+}
+
+std::optional<RegionGeometry> GlobeView::visibleArea() const
+{
+  // Sample the view on a grid; longitudes relative to the first hit so
+  // that a view across the antimeridian stays in one piece.
+  const int steps = 16;
+  bool any = false;
+  double centreLon = 0.0;
+  GeoRect box{0.0, 0.0, 0.0, 0.0};
+  for (int row = 0; row <= steps; ++row) {
+    for (int column = 0; column <= steps; ++column) {
+      const std::optional<LonLat> hit = pickLonLat(QPointF(
+          width() * column / double(steps), height() * row / double(steps)));
+      if (!hit) {
+        continue;
+      }
+      if (!any) {
+        any = true;
+        centreLon = hit->lonDeg;
+        box = GeoRect{hit->lonDeg, hit->latDeg, hit->lonDeg, hit->latDeg};
+        continue;
+      }
+      const double lon = centreLon + shortLonDelta(hit->lonDeg - centreLon);
+      box.westDeg = std::min(box.westDeg, lon);
+      box.eastDeg = std::max(box.eastDeg, lon);
+      box.southDeg = std::min(box.southDeg, hit->latDeg);
+      box.northDeg = std::max(box.northDeg, hit->latDeg);
+    }
+  }
+  if (!any) {
+    return std::nullopt;
+  }
+  const RegionGeometry area = RegionGeometry::rectangle(
+      box.westDeg, box.southDeg, box.eastDeg, box.northDeg);
+  return area.isValid() ? std::optional<RegionGeometry>(area) : std::nullopt;
+}
+
+std::vector<QPolygonF>
+GlobeView::outlineOnScreen(const std::vector<LonLat>& points, bool closed) const
+{
+  // Each edge straight in longitude and latitude, in steps of at most a
+  // degree; broken where it goes behind the globe or jumps across the
+  // map's wrap.
+  const Camera& camera = m_controller.camera();
+  std::vector<QPolygonF> pieces(1);
+  const std::size_t n = points.size();
+  std::size_t edges = closed ? n : n - 1;
+  if (n < 2) {
+    edges = 0;
+  }
+  for (std::size_t i = 0; i < edges; ++i) {
+    const LonLat a = points[i];
+    const LonLat b = points[(i + 1) % n];
+    const double length =
+        std::max(std::abs(b.lonDeg - a.lonDeg), std::abs(b.latDeg - a.latDeg));
+    const int samples = std::max(1, static_cast<int>(std::ceil(length)));
+    for (int step = i == 0 ? 0 : 1; step <= samples; ++step) {
+      const double t = step / static_cast<double>(samples);
+      const std::optional<QPointF> here =
+          visibleOnScreen(camera, a.latDeg + t * (b.latDeg - a.latDeg),
+                          a.lonDeg + t * (b.lonDeg - a.lonDeg));
+      const QPolygonF& piece = pieces.back();
+      const bool jumps = here && !piece.isEmpty() &&
+                         std::abs(here->x() - piece.last().x()) > 0.5 * width();
+      if ((!here || jumps) && !piece.isEmpty()) {
+        pieces.emplace_back();
+      }
+      if (here) {
+        pieces.back().append(*here);
+      }
+    }
+  }
+  pieces.erase(
+      std::remove_if(pieces.begin(), pieces.end(),
+                     [](const QPolygonF& piece) { return piece.size() < 2; }),
+      pieces.end());
+  return pieces;
+}
+
+void GlobeView::drawRegions()
+{
+  if (m_outlines.empty() && m_drawing == RegionDrawing::None) {
+    return;
+  }
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  painter.setPen(QPen(QColor(255, 200, 40), 2.0));
+  for (const RegionGeometry& region : m_outlines) {
+    for (const QPolygonF& piece : outlineOnScreen(region.vertices(), true)) {
+      painter.drawPolyline(piece);
+    }
+  }
+  if (m_drawing != RegionDrawing::None) {
+    drawRegionInProgress(painter);
+    drawRegionHint(painter);
+  }
+}
+
+void GlobeView::drawRegionInProgress(QPainter& painter) const
+{
+  // What is being drawn, with a rubber band to the pointer.
+  std::vector<LonLat> drawn = m_drawnPoints;
+  const std::optional<LonLat> pointer =
+      m_pointerInside ? pickLonLat(m_pointerPx) : std::nullopt;
+  if (pointer && !drawn.empty()) {
+    if (m_drawing == RegionDrawing::Rectangle && m_drawingDrag) {
+      const LonLat start = drawn.front();
+      drawn = {start, LonLat{pointer->lonDeg, start.latDeg}, *pointer,
+               LonLat{start.lonDeg, pointer->latDeg}};
+    } else if (m_drawing == RegionDrawing::Polygon) {
+      drawn.push_back(*pointer);
+    }
+  }
+  painter.setPen(QPen(QColor(80, 220, 255), 2.0, Qt::DashLine));
+  // Corners may lie either way round the antimeridian: keep each edge the
+  // short way.
+  for (std::size_t i = 1; i < drawn.size(); ++i) {
+    drawn[i].lonDeg = drawn[i - 1].lonDeg +
+                      shortLonDelta(drawn[i].lonDeg - drawn[i - 1].lonDeg);
+  }
+  const bool closed = m_drawing == RegionDrawing::Rectangle || drawn.size() > 2;
+  for (const QPolygonF& piece : outlineOnScreen(drawn, closed)) {
+    painter.drawPolyline(piece);
+  }
+  for (const LonLat& corner : m_drawnPoints) {
+    const std::optional<ScreenPoint> screen =
+        m_controller.camera().projectGeodetic(corner.latDeg, corner.lonDeg);
+    if (screen) {
+      painter.drawEllipse(QPointF(screen->xPx, screen->yPx), 3.0, 3.0);
+    }
+  }
+}
+
+void GlobeView::drawRegionHint(QPainter& painter) const
+{
+  // How to draw, at the top.
+  const QString text =
+      m_drawing == RegionDrawing::Rectangle
+          ? tr("Drag across the area to keep for offline use. Esc cancels.")
+          : tr("Click each corner of the area; double-click or press Enter "
+               "to finish. Backspace removes a corner, Esc cancels.");
+  const QFontMetrics metrics(painter.font());
+  const int margin = 6;
+  const int textWidth =
+      std::min(width() - 4 * margin, metrics.horizontalAdvance(text));
+  const QRect box((width() - textWidth) / 2 - margin, margin,
+                  textWidth + 2 * margin, metrics.height() + 2 * margin);
+  painter.fillRect(box, QColor(0, 0, 0, 160));
+  painter.setPen(QColor(235, 240, 250));
+  painter.drawText(box, Qt::AlignCenter,
+                   metrics.elidedText(text, Qt::ElideRight, textWidth));
 }
 
 void GlobeView::updatePointerReadout()

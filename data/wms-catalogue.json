@@ -7,14 +7,16 @@
             "url": "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi",
             "description": "Daily and historical satellite imagery of the whole Earth (MODIS, VIIRS, Landsat and more) from NASA's Global Imagery Browse Services.",
             "attribution": "NASA EOSDIS GIBS",
-            "terms": "https://nasa-gibs.github.io/gibs-api-docs/"
+            "terms": "https://nasa-gibs.github.io/gibs-api-docs/",
+            "allowBulkDownload": true
         },
         {
             "title": "OpenStreetMap (terrestris)",
             "url": "https://ows.terrestris.de/osm/service",
             "description": "A street map of the whole world from OpenStreetMap data, with relief, run by terrestris.",
             "attribution": "© OpenStreetMap contributors, © terrestris",
-            "terms": "https://www.terrestris.de/en/openstreetmap-wms/"
+            "terms": "https://www.terrestris.de/en/openstreetmap-wms/",
+            "allowBulkDownload": false
         },
         {
             "title": "GEBCO: ocean depths",
@@ -28,7 +30,8 @@
             "url": "https://basemap.nationalmap.gov/arcgis/services/USGSTopo/MapServer/WMSServer",
             "description": "Topographic maps of the United States from the U.S. Geological Survey.",
             "attribution": "USGS The National Map",
-            "terms": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits"
+            "terms": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+            "allowBulkDownload": true
         },
         {
             "title": "NOAA nowCOAST: weather and ocean",

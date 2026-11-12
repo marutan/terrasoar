@@ -344,4 +344,114 @@ WmsImageryProvider::loadTileImage(TileKey key,
   return imageResult(std::move(image));
 }
 
+std::optional<GeoRect> WmsImageryProvider::dataBounds() const
+{
+  std::optional<GeoRect> bounds = m_source.bounds;
+  if (m_source.imageProjection() == TileImageProjection::WebMercator) {
+    bounds = webMercatorCoverage(
+        bounds.value_or(GeoRect{-180.0, -90.0, 180.0, 90.0}));
+    if (!bounds) {
+      // Nothing at all: an empty rectangle no tile overlaps.
+      return GeoRect{0.0, 0.0, 0.0, 0.0};
+    }
+  }
+  return bounds;
+}
+
+RegionTileResult
+WmsImageryProvider::fetchForRegion(TileKey key, long long region,
+                                   const std::atomic<bool>& cancelled)
+{
+  using Outcome = RegionTileResult::Outcome;
+  RegionTileResult result;
+  const QUrl url = getMapUrl(m_source, key);
+  if (url.isEmpty()) {
+    result.outcome = Outcome::NoData;
+    return result;
+  }
+  if (!m_cache) {
+    result.errorString = QCoreApplication::translate(
+        "ts::WmsImageryProvider", "There is no disk cache to keep tiles in.");
+    return result;
+  }
+  const long long nowS = now();
+  const std::optional<CachedTile> cached = m_cache->find(key);
+  if (cached && nowS < cached->expiresS &&
+      (region == 0 || m_cache->pin(region, key))) {
+    result.outcome = Outcome::AlreadyCached;
+    result.bytes = cached->data.size();
+    return result;
+  }
+
+  HttpRequest request;
+  request.url = url;
+  if (cached) {
+    request.headers = revalidationHeaders(cached->etag, cached->lastModified);
+  }
+  {
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    ++m_statistics.requests;
+  }
+  const HttpResponse response = m_network->fetch(request, cancelled);
+  if (response.error == NetworkError::Cancelled || cancelled.load()) {
+    result.outcome = Outcome::Cancelled;
+    return result;
+  }
+  if (response.error == NetworkError::TooLarge) {
+    result.errorString = QCoreApplication::translate(
+        "ts::WmsImageryProvider",
+        "The server sent a tile that is far too large.");
+    return result;
+  }
+  if (response.error != NetworkError::None) {
+    result.unreachable = true;
+    result.errorString = QCoreApplication::translate("ts::WmsImageryProvider",
+                                                     "Can't reach %1 (%2).")
+                             .arg(m_source.url.host(), response.errorString);
+    return result;
+  }
+  if (response.status == 304 && cached) {
+    const HttpFreshness renewed =
+        revalidatedFreshness(HttpFreshness{true, cached->expiresS, cached->etag,
+                                           cached->lastModified},
+                             response, nowS, m_settings.defaultLifetimeS);
+    m_cache->refresh(key, renewed.expiresS, renewed.etag, renewed.lastModified);
+    if (region == 0 || m_cache->pin(region, key)) {
+      result.outcome = Outcome::Revalidated;
+      result.bytes = cached->data.size();
+    }
+    return result;
+  }
+  if (response.status < 200 || response.status >= 300) {
+    result.errorString = statusErrorMessage(response);
+    return result;
+  }
+  if (decode(response.body).isNull()) {
+    result.errorString = notAnImageMessage(response);
+    return result;
+  }
+  const HttpFreshness freshness =
+      httpFreshness(response, nowS, m_settings.defaultLifetimeS);
+  if (!freshness.storable) {
+    result.errorString = QCoreApplication::translate(
+        "ts::WmsImageryProvider",
+        "The server doesn't allow its tiles to be kept (no-store).");
+    return result;
+  }
+  if (!m_cache->store(key,
+                      CachedTile{response.body, response.header("content-type"),
+                                 freshness.expiresS, freshness.etag,
+                                 freshness.lastModified},
+                      region)) {
+    result.errorString =
+        QCoreApplication::translate("ts::WmsImageryProvider",
+                                    "The tile could not be saved: %1")
+            .arg(m_cache->errorString());
+    return result;
+  }
+  result.outcome = Outcome::Downloaded;
+  result.bytes = response.body.size();
+  return result;
+}
+
 } // namespace ts

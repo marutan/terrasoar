@@ -11,6 +11,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 
 #include <QString>
 
@@ -66,6 +67,27 @@ struct WmsStatistics {
   int failures = 0;
   /** Requests skipped while the server is left alone. */
   int skippedOffline = 0;
+};
+
+/** What became of one tile of an offline region (fetchForRegion()). */
+struct RegionTileResult {
+  /** What happened. */
+  enum class Outcome {
+    Downloaded,    ///< Fetched and stored.
+    Revalidated,   ///< Stored but stale; the server confirmed it (304).
+    AlreadyCached, ///< Stored and fresh; nothing fetched.
+    NoData,        ///< The source has nothing there.
+    Failed,        ///< Not stored (see errorString).
+    Cancelled,     ///< Cancelled while fetching.
+  };
+  /** What happened. */
+  Outcome outcome = Outcome::Failed;
+  /** The tile's size on disk, when stored. */
+  long long bytes = 0;
+  /** True if it failed because the server couldn't be reached. */
+  bool unreachable = false;
+  /** Why it failed (translated), or empty. */
+  QString errorString;
 };
 
 /**
@@ -126,6 +148,24 @@ public:
 
   /** Returns the source. */
   const WmsSource& source() const { return m_source; }
+
+  /**
+   * Returns where the source has tiles (its bounds, and for Web Mercator
+   * the latitudes the projection reaches), or nothing for everywhere.
+   */
+  std::optional<GeoRect> dataBounds() const;
+
+  /**
+   * Makes sure tile @p key is in the disk cache and fresh, and pins it
+   * for the offline region @p region (unless 0, as for the samples of a
+   * size estimate). A fresh stored tile isn't fetched again; a stale one
+   * is revalidated. The tile isn't decoded for the view, only checked to
+   * be an image. Doesn't change status(): a failing download is reported
+   * to its caller. Fails without a disk cache, and for responses the
+   * server forbids storing (no-store). Called on download threads.
+   */
+  RegionTileResult fetchForRegion(TileKey key, long long region,
+                                  const std::atomic<bool>& cancelled);
 
   /** Returns the disk cache, or null without one. */
   TileDiskCache* diskCache() const { return m_cache.get(); }

@@ -112,7 +112,13 @@ CREATE TABLE tiles (
   last_used     INTEGER NOT NULL,     -- a counter, for LRU
   bytes         INTEGER NOT NULL);
 CREATE INDEX tiles_last_used ON tiles(last_used);
-PRAGMA user_version = 1;              -- the cache's format
+CREATE TABLE pins (                   -- tiles kept for offline regions
+  region INTEGER NOT NULL,
+  tile   INTEGER NOT NULL,
+  PRIMARY KEY (region, tile)) WITHOUT ROWID;
+CREATE INDEX pins_tile ON pins(tile);
+PRAGMA user_version = 2;              -- the cache's format (1: no pins,
+                                      -- upgraded in place)
 ```
 
 - **Encoded, not decoded.** Tiles are stored as they came (PNG or JPEG),
@@ -124,6 +130,9 @@ PRAGMA user_version = 1;              -- the cache's format
   deleted, in batches, until it is under nine tenths of it (so not every
   store evicts). "Recently used" is a counter stored with each tile, so
   the order survives a restart and doesn't depend on the clock.
+- **Pinned tiles.** Tiles of offline regions are pinned with the region's
+  id: never evicted, and not counted against the limit, until their last
+  region is deleted ([offline-regions.md](offline-regions.md#pinning)).
 - **Opened lazily**, on the first tile, on a loader thread: nothing blocks
   the GUI, and a program without WMS layers opens nothing.
 - **Write-ahead log**, `synchronous=NORMAL`: a crash can lose the last
@@ -136,8 +145,10 @@ PRAGMA user_version = 1;              -- the cache's format
 **Damage.** A cache is only a cache: if SQLite reports the file corrupt or
 not a database, when opening it or later in use, the file (and its WAL)
 is deleted and an empty cache starts in its place (`recoveries()` counts
-how often). A file of another format version starts over the same way.
-The user never sees an error from the cache.
+how often). A file of another format version starts over the same way
+(except version 1, which is upgraded). The user never sees an error from
+the cache. Offline regions' tiles go with a damaged file; the regions stay
+listed and Update fetches them again.
 
 ## Tests
 
@@ -160,3 +171,5 @@ much, redirect or act as a proxy):
   the limit; the order of use surviving a restart; recovery from a
   garbage file, a truncated one, overwritten pages and an empty file; a
   file of another version; many threads sharing it; a lookup benchmark.
+  Pinned tiles are tested in `tests/regions`
+  ([offline-regions.md](offline-regions.md#tests)).

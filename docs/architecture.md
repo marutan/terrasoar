@@ -61,14 +61,15 @@ Subsections so far:
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `packs` | Data pack manifests (files with checksums, datasets with sources, licences and attribution), verification, finding the base pack (`docs/data/base-pack.md`) |
-| `network` | The HTTP client on its own thread (in-flight limit, retries, timeouts, cancellation, proxies), HTTP freshness rules, the SQLite tile disk cache (`docs/design/network-and-cache.md`) |
+| `network` | The HTTP client on its own thread (in-flight limit, retries, timeouts, cancellation, proxies), HTTP freshness rules, the SQLite tile disk cache with tiles pinned for offline regions (`docs/design/network-and-cache.md`) |
 | `perf` | Frame-time statistics, process memory and CPU readings |
 | `projection` | Map projections for the 2D views (Mercator, Web Mercator, Miller): forward and inverse, domains, scale factors, and each projection as GLSL (`docs/design/projections.md`) |
 | `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers (`docs/design/providers.md`) |
+| `regions` | Offline regions: rectangles and polygons (across the antimeridian) to quadtree tiles, tile counts and size estimates, the background download that pins tiles in the disk cache, the list of regions (`docs/design/offline-regions.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling on the globe and on the flat map, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 | `vector` | Vector styles, meshing feature tiles into triangles and outline segments on the ellipsoid, the worker-thread feature loader (`docs/design/vector-rendering.md`) |
-| `wms` | WMS capabilities (1.1.1, 1.3.0), GetMap requests with the axis-order rules, the WMS imagery provider with its disk cache and offline behaviour, the catalogue of open services (`docs/design/wms.md`) |
+| `wms` | WMS capabilities (1.1.1, 1.3.0), GetMap requests with the axis-order rules, the WMS imagery provider with its disk cache and offline behaviour, the catalogue of open services and their bulk-download terms (`docs/design/wms.md`) |
 
 ### app (`terrasoar`)
 
@@ -84,9 +85,14 @@ in core.
   draws and opens and saves projects.
 - `AddWmsDialog` adds a layer from a WMS server: the catalogue, the
   server's layers, style and format (`docs/user/adding-wms-layers.md`).
+- `OfflineRegionManager` keeps the offline regions and runs their
+  downloads whatever window is open; `OfflineRegionsDialog` lists them
+  and `NewRegionDialog` sets one up, with the area drawn in the
+  `GlobeView` (`docs/user/offline-use.md`).
 - `GlobeView` (a `QOpenGLWidget`) owns the camera controller and the
   globe renderer, maps mouse and keyboard input to the controller, paces
-  frames and draws the debug overlay. Where the platform can't show an
+  frames and draws the debug overlay and region outlines (and lets the
+  user draw a region). Where the platform can't show an
   OpenGL view (the headless `offscreen` platform), the main window shows a
   message instead and everything else still works.
 - `main.cpp` handles the command line, installs translators and creates

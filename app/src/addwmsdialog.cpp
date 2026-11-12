@@ -24,6 +24,7 @@
 
 #include "ts/network/networkclient.h"
 #include "ts/wms/wmssource.h"
+#include "wmscataloguefile.h"
 
 namespace ts
 {
@@ -37,29 +38,12 @@ constexpr int pollIntervalMs = 50;
 /** Item data: the server's layer name (empty for groups). */
 constexpr int layerNameRole = Qt::UserRole + 1;
 
-QString catalogueCachePath()
-{
-  return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
-      .filePath(QStringLiteral("wms-catalogue.json"));
-}
-
 QUrl catalogueSourceUrl()
 {
   if (qEnvironmentVariableIsSet("TS_WMS_CATALOGUE_URL")) {
     return QUrl(qEnvironmentVariable("TS_WMS_CATALOGUE_URL"));
   }
   return QUrl(QString::fromLatin1(wmsCatalogueUrl));
-}
-
-std::vector<WmsCatalogueEntry> readCatalogue(const QString& path)
-{
-  QFile file(path);
-  if (!file.open(QIODevice::ReadOnly)) {
-    return {};
-  }
-  QString error;
-  return parseWmsCatalogue(file.readAll(), &error)
-      .value_or(std::vector<WmsCatalogueEntry>{});
 }
 
 bool isImageFormat(const QString& format)
@@ -220,10 +204,7 @@ void AddWmsDialog::retranslateUi()
 void AddWmsDialog::loadCatalogue()
 {
   // The last copy fetched, else the one built in; then ask for the current.
-  m_catalogue = readCatalogue(catalogueCachePath());
-  if (m_catalogue.empty()) {
-    m_catalogue = readCatalogue(QStringLiteral(":/data/wms-catalogue.json"));
-  }
+  m_catalogue = currentWmsCatalogue();
   fillCatalogueBox();
   const QUrl source = catalogueSourceUrl();
   if (m_network && source.isValid() && !source.isEmpty()) {
@@ -260,8 +241,8 @@ void AddWmsDialog::catalogueArrived()
     return;
   }
   m_catalogue = *entries;
-  QDir().mkpath(QFileInfo(catalogueCachePath()).absolutePath());
-  QSaveFile file(catalogueCachePath());
+  QDir().mkpath(QFileInfo(wmsCatalogueCachePath()).absolutePath());
+  QSaveFile file(wmsCatalogueCachePath());
   if (file.open(QIODevice::WriteOnly)) {
     file.write(response.body);
     file.commit();

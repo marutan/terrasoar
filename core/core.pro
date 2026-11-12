@@ -59,6 +59,9 @@ HEADERS += \
     include/ts/providers/sqlitetileimageryprovider.h \
     include/ts/providers/testproviders.h \
     include/ts/providers/tileprovider.h \
+    include/ts/regions/offlineregionstore.h \
+    include/ts/regions/regiondownload.h \
+    include/ts/regions/regiongeometry.h \
     include/ts/render/framepacer.h \
     include/ts/render/glrenderdevice.h \
     include/ts/render/renderdevice.h \
@@ -117,6 +120,9 @@ SOURCES += \
     src/providers/sqlitetileimageryprovider.cpp \
     src/providers/testproviders.cpp \
     src/providers/tileprovider.cpp \
+    src/regions/offlineregionstore.cpp \
+    src/regions/regiondownload.cpp \
+    src/regions/regiongeometry.cpp \
     src/render/framepacer.cpp \
     src/render/glrenderdevice.cpp \
     src/tiling/tilekey.cpp \

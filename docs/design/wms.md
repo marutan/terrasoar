@@ -189,8 +189,14 @@ hand-edited project) is marked Error at once.
 ```json
 {"format": "terrasoar-wms-catalogue", "version": 1,
  "services": [{"title": "…", "url": "…", "description": "…",
-               "attribution": "…", "terms": "…"}]}
+               "attribution": "…", "terms": "…",
+               "allowBulkDownload": true}]}
 ```
+
+`allowBulkDownload` (optional) says whether the service's terms allow
+downloading regions for offline use; `false` makes the program refuse,
+and without it the user is warned
+([offline-regions.md](offline-regions.md#terms-of-use-allowbulkdownload)).
 
 It is built into the program (`app/app.qrc`) and also fetched from the
 repository's main branch (`ts::wmsCatalogueUrl`) when the dialog opens,
