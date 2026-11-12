@@ -121,6 +121,13 @@ A project (`*.terrasoar`) is an indented JSON document:
 ```
 
 - `layers` lists entries top to bottom, like the tree.
+- A WMS layer's `definition.source` is `{"kind": "wms", "url": …,
+  "version": …, "layers": […], "styles": […], "format": …,
+  "transparent": …, "crs": …, "tileSize": …, "maximumLevel": …,
+  "bounds": [w, s, e, n], "title": …, "attribution": …}`
+  ([wms.md](wms.md)); its `origin` is `"catalogue"`. Everything needed to
+  draw it is there: opening a project asks the server for nothing but
+  tiles.
 - `view.mode` is `"globe"` or `"map"`; `view.projection` is the flat
   map's projection by its identifier ([projections.md](projections.md)),
   kept also while the globe is shown. A projection this build doesn't

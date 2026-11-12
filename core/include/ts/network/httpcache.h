@@ -44,7 +44,7 @@ struct HttpFreshness {
  *   stale at once).
  * - Otherwise, with `Last-Modified`, a tenth of the time since then, at
  *   most @p defaultLifetimeS (the usual heuristic).
- * - Otherwise @p defaultLifetimeS (map servers rarely send any of these).
+ * - Otherwise @p defaultLifetimeS (some map servers send none of these).
  *
  * @threadsafe
  */

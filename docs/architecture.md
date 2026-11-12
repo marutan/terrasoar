@@ -61,12 +61,14 @@ Subsections so far:
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `packs` | Data pack manifests (files with checksums, datasets with sources, licences and attribution), verification, finding the base pack (`docs/data/base-pack.md`) |
+| `network` | The HTTP client on its own thread (in-flight limit, retries, timeouts, cancellation, proxies), HTTP freshness rules, the SQLite tile disk cache (`docs/design/network-and-cache.md`) |
 | `perf` | Frame-time statistics, process memory and CPU readings |
 | `projection` | Map projections for the 2D views (Mercator, Web Mercator, Miller): forward and inverse, domains, scale factors, and each projection as GLSL (`docs/design/projections.md`) |
 | `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers (`docs/design/providers.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling on the globe and on the flat map, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 | `vector` | Vector styles, meshing feature tiles into triangles and outline segments on the ellipsoid, the worker-thread feature loader (`docs/design/vector-rendering.md`) |
+| `wms` | WMS capabilities (1.1.1, 1.3.0), GetMap requests with the axis-order rules, the WMS imagery provider with its disk cache and offline behaviour, the catalogue of open services (`docs/design/wms.md`) |
 
 ### app (`terrasoar`)
 
@@ -77,8 +79,11 @@ in core.
 - `app.pri` lists the shell's sources without `main()`, so the UI tests in
   `tests/ui` build exactly the same code.
 - `LayerTreeDock` shows the layer tree (`ts::LayerTreeModel`, owned by the
-  main window with the provider registry); the main window turns the tree
-  into what the globe draws and opens and saves projects.
+  main window with the provider registry), with each layer's source status
+  (offline, error); the main window turns the tree into what the globe
+  draws and opens and saves projects.
+- `AddWmsDialog` adds a layer from a WMS server: the catalogue, the
+  server's layers, style and format (`docs/user/adding-wms-layers.md`).
 - `GlobeView` (a `QOpenGLWidget`) owns the camera controller and the
   globe renderer, maps mouse and keyboard input to the controller, paces
   frames and draws the debug overlay. Where the platform can't show an
@@ -98,7 +103,7 @@ library.
 ### Dependency rules
 
 ```
-app ──► core ──► Qt Core/Gui/OpenGL, GDAL, PROJ, GEOS, SQLite, GeographicLib
+app ──► core ──► Qt Core/Gui/Network/OpenGL, GDAL, PROJ, GEOS, SQLite, GeographicLib
 tools ─► core
 tests ─► core (+ app sources for UI tests)
 ```

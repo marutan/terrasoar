@@ -8,8 +8,11 @@ server). Code: `core/include/ts/providers/`.
 ## Interfaces
 
 ```
-TileProvider            id(), name(), maximumLevel()
-├── ImageryProvider     tileSizePx(), loadImage(key, cancelled) → QImage
+TileProvider            id(), name(), maximumLevel(), preferredLoaderThreads(),
+│                       status(), setStatusCallback()
+├── ImageryProvider     tileSizePx(), imageProjection(),
+│                       loadImage(key, cancelled) → QImage,
+│                       loadTileImage(key, cancelled) → ImageLoadResult
 ├── ElevationProvider   loadHeights(key, cancelled) → optional<HeightTile>
 └── FeatureProvider     loadFeatures(key, cancelled) → optional<FeatureTile>
 ```
@@ -20,6 +23,10 @@ TileProvider            id(), name(), maximumLevel()
 | `name()` | For the user; translated where it is fixed text. |
 | `maximumLevel()` | Deepest level with data. Selection stops there, and the deepest tiles are stretched further as the camera comes closer. |
 | `loadImage()` | A square image of `tileSizePx()` pixels covering exactly the tile's rectangle, row 0 at the north edge, linear in latitude and longitude. A null image means no data there (or failure); the tile is then not drawn and the globe shows through. |
+| `loadTileImage()` | The same, telling apart an image, no data (for good), a failure worth retrying (a network error) and a cancelled load. The loader uses this; the default calls `loadImage()`, a null image meaning no data. A failed tile is asked for again later instead of staying empty ([tiling.md](tiling.md)). |
+| `imageProjection()` | Geographic (above), or Web Mercator: rows evenly spaced in Mercator northing over the tile's rectangle clipped to ±85.051°. The tile shader reprojects such images per pixel ([wms.md](wms.md)). |
+| `preferredLoaderThreads()` | 0 for the loader's default (two). Network sources ask for more (six), since their threads wait on servers. |
+| `status()` | How the source is doing, for the user: Ok, Offline (its server can't be reached; saved tiles shown) or Error with a message. A change calls the status callback on the thread that made it, usually a loader thread, so the callback must only hand over to the GUI thread. The Layers dock shows it as an icon and tooltip. |
 | `loadHeights()` | A square grid of heights above the ellipsoid, edges included, row 0 north. Used from Phase 6. |
 | `loadFeatures()` | The features intersecting the tile at this level of detail, as points, line strings or polygons in latitude/longitude with attributes. A source may answer for a coarser ancestor (`FeatureTile::key` says which). Used from Phase 3 (the base pack's shoreline). |
 | `storedKey()` | The tile whose features serve a key (the key itself, or that coarser ancestor), so the vector renderer loads and meshes each stored tile once for all the drawn tiles it serves. |
@@ -63,6 +70,14 @@ used by the tests and for development until real data arrives:
 levels, cancellation, a shared instance on many threads); `tests/tiling`
 loads thousands of checkerboard tiles while a simulated camera flies
 around, under ThreadSanitizer in CI.
+
+## Network providers
+
+`ts::WmsImageryProvider` (`core/include/ts/wms/`) loads one GetMap per
+tile through the shared `ts::NetworkClient`, keeps responses in a
+`ts::TileDiskCache`, and reports Offline or Error. Created by the registry
+for sources `{"kind": "wms", …}`; see [wms.md](wms.md) and
+[network-and-cache.md](network-and-cache.md).
 
 ## File providers
 
