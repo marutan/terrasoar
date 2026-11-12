@@ -70,6 +70,13 @@ Geography Database), resolutions c, l, i and h, cut to tiles
   The program that turns it into the pack's form is tools/packager in
   this source tree.
 
+Natural Earth 1:10m Cultural Vectors, Admin 0 – Countries, version 5.1.2,
+widened by about 5 km and simplified
+  Natural Earth (naturalearthdata.com)
+  Licence: public domain; credit requested
+  Attribution: "Countries: Made with Natural Earth"
+  Source: https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2
+
 The source tree also has test data that is not distributed:
 tests/data/geodtest-sample.dat, a sample of C. F. F. Karney's "Test set
 for geodesics", CC0 1.0, https://doi.org/10.5281/zenodo.32156.

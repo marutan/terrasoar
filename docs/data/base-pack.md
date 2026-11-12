@@ -2,7 +2,8 @@
 
 The base pack is the data Terra Soar ships with, so that the globe looks
 right on first launch with no network: Blue Marble imagery and the world's
-shorelines as land polygons. It is built at build time by the packager
+shorelines as land polygons, and the outlines of the countries for choosing
+an offline region by country. It is built at build time by the packager
 ([docs/tools/packager.md](../tools/packager.md)) from pinned downloads, not
 stored in Git.
 
@@ -12,6 +13,7 @@ stored in Git.
 | --- | --- | --- | --- |
 | `bluemarble.sqlite` | `bluemarble` | Blue Marble Next Generation (July 2004, topography and bathymetry) as JPEG tiles of 256 × 256 px, quadtree levels 0–4 (682 tiles; level 4 is 8192 × 4096 px for the world, about 4.9 km per pixel) | 6.1 MB |
 | `shoreline.gpkg` | `shoreline` | GSHHG 2.3.7 land polygons at four resolutions, cut to quadtree tiles | 45.6 MB |
+| `countries.gpkg` | `countries` | Natural Earth 5.1.2 admin-0 countries (257; Antarctica left out), each widened by 0.05° (about 5 km) and simplified within 0.02° | 1.4 MB |
 | `licences/gshhg/` | | GSHHG's `LICENSE.TXT`, the LGPL v3 (`COPYING.LESSERv3`) and the GPL v3 it builds on (`gpl-3.0.txt`) | 44 kB |
 | `manifest.json` | | Files with SHA-256 and size, datasets with source, licence and attribution | 3 kB |
 
@@ -29,12 +31,36 @@ level and shown over a range of display levels:
 | `land_h` | high | 0.2 km | 6 | 6 and deeper | 3 955 | 1 964 004 |
 
 The full resolution (about 10 million vertices) does not fit the budget;
-it is planned as a downloadable pack (Phase 6).
+it is the downloadable pack `shoreline-full`
+([packs.md](../design/packs.md#the-first-packs)).
 
 Land is GSHHG's hierarchy resolved into one polygon set: land (level 1)
 and Antarctica by its ice front (level 5), minus lakes (2), plus islands in
 lakes (3), minus ponds on those islands (4). The grounding line (level 6)
 is not used.
+
+### Countries
+
+`countries.gpkg` has one table, `countries`: `id` (Natural Earth's
+`ADM0_A3`, e.g. `GBR`), `name` (`ADMIN`, e.g. "United Kingdom"), `iso_a2`
+and `iso_a3` (empty where Natural Earth has none) and a MULTIPOLYGON. It
+exists to choose an offline region by country
+([offline-regions.md](../design/offline-regions.md#countries)), not to
+draw borders, so each outline is made to cover the whole country:
+
+- the country's polygons widened by 0.05° and then simplified within
+  0.02°, which keeps the original inside (the packager checks that every
+  outline covers its country, and fails otherwise). Islands near each
+  other merge; a country's lakes stay holes only if wider than 0.1°;
+- a country on both sides of the antimeridian (Russia, Fiji, the United
+  States, Kiribati, New Zealand) has its western parts moved by 360°, so
+  its outline is one piece with longitudes past 180°;
+- Antarctica is left out: a polygon can't go round a pole, and a
+  rectangle reaching the pole covers it anyway.
+
+The 1:10m scale has the small islands the coarser ones drop. Natural
+Earth draws borders as they are on the ground ("de facto"); the outlines
+are for choosing an area, not a statement about any border.
 
 There are no separate shoreline lines: they would double the size. The
 shore is the polygons' boundary without the segments lying on their tile's
@@ -48,6 +74,7 @@ is such a segment. The vector renderer draws outlines that way
 | --- | --- | --- | --- |
 | Blue Marble | NASA Earth Observatory, Blue Marble Next Generation, `world.topo.bathy.200407.3x21600x10800.jpg` from `assets.science.nasa.gov` | Public domain (NASA); NASA asks for credit | "Blue Marble: NASA Earth Observatory" |
 | Shoreline | GSHHG 2.3.7 by Paul Wessel and Walter H. F. Smith (shapefiles, `gshhg-shp-2.3.7.zip` from the GMT project's GitHub release) | LGPL v3 or later | "Shoreline: GSHHG 2.3.7, P. Wessel and W. H. F. Smith (LGPL)" |
+| Countries | Natural Earth 1:10m admin-0 countries 5.1.2 (`geojson/ne_10m_admin_0_countries.geojson` at tag `v5.1.2` of `nvkelso/natural-earth-vector`) | Public domain; credit requested | "Countries: Made with Natural Earth" (in the manifest; not drawn) |
 
 The roadmap planned NGA's World Vector Shoreline (WVS). Its original
 distribution is no longer available (NOAA's datasheet and the NGDC
@@ -71,8 +98,14 @@ every change.
 | --- | --- |
 | Shoreline | 45.6 MB |
 | Blue Marble | 6.1 MB |
+| Countries | 1.4 MB |
 | Licences, manifest | < 0.1 MB |
-| **Total** | **51.8 MB** of 55 MB |
+| **Total** | **53.2 MB** of 55 MB |
+
+Phase 7 needs more than the reserve: the DEM (about 20 MB) and the
+EGM2008 and EGM96 geoid grids (about 13 MB). Dropping the high-resolution
+shoreline (`land_h`), now that `shoreline-full` has it and more, is the
+obvious way to make room.
 
 ## File formats
 
@@ -92,8 +125,9 @@ the features of the key's ancestor at their storage level. GIS programs
 
 **Manifest** (`manifest.json`, read by `ts::PackManifest`): format 1;
 `id` (`terrasoar-base`), `version`, `files` (path, sha256, bytes),
-`datasets` (id, kind, file, name, licence, attribution, source with name,
-version, url and sha256) and `notices`. Paths are relative, `/`-separated
+`datasets` (id, kind — `imagery`, `features` (tiled) or `areas` (the
+countries) — file, name, licence, attribution, source with name, version,
+url and sha256, and for extra packs `replaces`) and `notices`. Paths are relative, `/`-separated
 and may not leave the pack directory.
 
 ## In the application

@@ -1174,6 +1174,40 @@ private slots:
     dialog->setLevels(0, 12);
     QVERIFY(dialog->tileCount() > ts::NewRegionDialog::maximumTiles);
     QVERIFY(!dialog->canDownload());
+    // A country from the base pack, by name: the area and the region's
+    // name follow it.
+    QComboBox* countries =
+        dialog->findChild<QComboBox*>(QStringLiteral("regionCountryBox"));
+    QVERIFY(countries && countries->isVisibleTo(dialog));
+    QCOMPARE(countries->count(), 2);
+    QCOMPARE(countries->itemText(0), QStringLiteral("Fixture Atoll"));
+    QVERIFY(!dialog->chooseCountry(QStringLiteral("XXX")));
+    QVERIFY(dialog->chooseCountry(QStringLiteral("FIX")));
+    QCOMPARE(dialog->areaCountry(), QStringLiteral("Fixture Island"));
+    QCOMPARE(dialog->region().name, QStringLiteral("Fixture Island"));
+    QCOMPARE(countries->currentText(), QStringLiteral("Fixture Island"));
+    const ts::RegionGeometry island =
+        dialog->area().value_or(ts::RegionGeometry());
+    QVERIFY(island.contains(45.0, 15.0));
+    QVERIFY(!island.contains(45.0, 25.0));
+    dialog->setLevels(0, 6);
+    QCOMPARE(dialog->tileCount(),
+             ts::countRegionTiles(island, 0, 6, std::nullopt).total());
+    QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("regionAreaLabel"))
+                ->text()
+                .startsWith(QStringLiteral("Fixture Island")));
+    // Across the antimeridian, in one piece.
+    QVERIFY(dialog->chooseCountry(QStringLiteral("ATL")));
+    QCOMPARE(dialog->region().name, QStringLiteral("Fixture Atoll"));
+    const ts::RegionGeometry atoll =
+        dialog->area().value_or(ts::RegionGeometry());
+    QVERIFY(atoll.contains(-7.0, 179.5));
+    QVERIFY(atoll.contains(-7.0, -179.5));
+    // Another way of choosing the area forgets the country, not the name.
+    dialog->setArea(uk);
+    QVERIFY(dialog->areaCountry().isEmpty());
+    QCOMPARE(countries->currentIndex(), -1);
+    QCOMPARE(dialog->region().name, QStringLiteral("Fixture Atoll"));
     dialog->reject();
 
     // Deleting unpins its tiles.

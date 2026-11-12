@@ -32,6 +32,7 @@ class QTimer;
 namespace ts
 {
 
+class CountryAreas;
 class GlobeView;
 class ImageryProvider;
 class LayerTreeDock;
@@ -220,6 +221,9 @@ private:
   /** Passes status changes from loader threads to this window. */
   std::shared_ptr<QTimer> m_statusRelay;
   QString m_basePackDirectory;
+  /** The base pack's country outlines, if it has them (read when needed). */
+  QString m_countriesFile;
+  std::shared_ptr<const CountryAreas> m_countries;
   BasePackState m_basePackState = BasePackState::Missing;
   QString m_basePackProblem;
   /** Verifies the base pack off the GUI thread; joined on destruction. */

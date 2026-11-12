@@ -57,6 +57,11 @@ struct PackDataset {
   enum class Kind {
     Imagery,  ///< Tiles in a SQLite tile store.
     Features, ///< Tiled vector features in a GeoPackage.
+    /**
+     * Named areas (countries) in one GeoPackage table, not tiled, for
+     * choosing an offline region (ts::CountryAreas).
+     */
+    Areas,
   };
   /** Identifier within the pack, e.g. "bluemarble". */
   QString id;

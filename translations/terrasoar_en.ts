@@ -188,6 +188,13 @@
         </message>
     </context>
     <context>
+        <name>ts::CountryAreas</name>
+        <message>
+            <source>The country's outline can't be read.</source>
+            <translation>The country's outline can't be read.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::GeoFormat</name>
         <message>
             <source>%1° S</source>
@@ -664,10 +671,6 @@
             <translation>&amp;Download</translation>
         </message>
         <message>
-            <source>None yet: use the current view or draw one on the globe.</source>
-            <translation>None yet: use the current view or draw one on the globe.</translation>
-        </message>
-        <message>
             <source>Rectangle from %1 to %2 and from %3 to %4 (%5 km²)</source>
             <translation>Rectangle from %1 to %2 and from %3 to %4 (%5 km²)</translation>
         </message>
@@ -699,10 +702,6 @@
             <translation>&lt;b&gt;This layer can't be kept for offline use.&lt;/b&gt;</translation>
         </message>
         <message>
-            <source>&lt;b&gt;%1 tiles: too many.&lt;/b&gt; Choose fewer levels or a smaller area (at most %2 tiles).</source>
-            <translation>&lt;b&gt;%1 tiles: too many.&lt;/b&gt; Choose fewer levels or a smaller area (at most %2 tiles).</translation>
-        </message>
-        <message>
             <source>%1 tiles; estimating the size…</source>
             <translation>%1 tiles; estimating the size…</translation>
         </message>
@@ -717,6 +716,37 @@
         <message>
             <source>%1 tiles, roughly %2 (the server couldn't be asked for samples).</source>
             <translation>%1 tiles, roughly %2 (the server couldn't be asked for samples).</translation>
+        </message>
+        <message>
+            <source>Or c&amp;ountry:</source>
+            <translation>Or c&amp;ountry:</translation>
+        </message>
+        <message>
+            <source>Type a country's name</source>
+            <translation>Type a country's name</translation>
+        </message>
+        <message>
+            <source>The whole country with its islands, and about 5 km around its coasts and borders</source>
+            <translation>The whole country with its islands, and about 5 km around its coasts and borders</translation>
+        </message>
+        <message>
+            <source>None yet: use the current view, draw one on the globe or choose a country.</source>
+            <translation>None yet: use the current view, draw one on the globe or choose a country.</translation>
+        </message>
+        <message>
+            <source>%1 with about 5 km around its coasts and borders (%2 km²)</source>
+            <translation>%1 with about 5 km around its coasts and borders (%2 km²)</translation>
+        </message>
+        <message numerus="yes">
+            <source>Polygon in %n part(s) (%1 km²)</source>
+            <translation>
+                <numerusform>Polygon in %n part (%1 km²)</numerusform>
+                <numerusform>Polygon in %n parts (%1 km²)</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>&lt;b&gt;More than %1 tiles: too many.&lt;/b&gt; Choose fewer levels or a smaller area.</source>
+            <translation>&lt;b&gt;More than %1 tiles: too many.&lt;/b&gt; Choose fewer levels or a smaller area.</translation>
         </message>
     </context>
     <context>

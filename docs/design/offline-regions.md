@@ -31,9 +31,19 @@ are straight lines in longitude and latitude, like tile edges, not
 geodesics: a region is a set of tiles, and the tiles' own edges are
 straight in those coordinates.
 
+A polygon may have several **rings**, combined by the even–odd rule: a
+point is inside if it is inside an odd number of rings. That covers a
+country's islands and its holes (South Africa round Lesotho) without
+telling outer rings from holes. One ring is what the user draws; a
+country has up to a few hundred.
+
 **The antimeridian.** Longitudes are kept *unwrapped*: the first vertex in
 [−180°, 180°) and each next one within 180° of the one before it, so a
-region never jumps from 179° to −179°. A rectangle from 170° E to 170° W is
+region never jumps from 179° to −179°. Each further ring starts within
+180° of the first ring's first vertex, so rings on either side of 180°
+(Natural Earth's halves of Fiji) end up side by side; the whole is then
+moved so that its western edge is in [−180°, 180°), and refused if it
+spans 360° or more. A rectangle from 170° E to 170° W is
 170° to 190°; the polygon round Fiji runs 176° to 182°. The extent's west
 edge is in [−180°, 180°) and its east edge up to 360° further. A tile
 (always within ±180°) is tested as it is and one turn (360°) to the east,
@@ -52,8 +62,34 @@ on a tile boundary doesn't pull in the next row of tiles. `covers()` asks
 whether the tile lies wholly inside: its centre inside and no vertex or
 edge in its interior.
 
-Stored as `{"kind": "rectangle", "west", "south", "east", "north"}` or
-`{"kind": "polygon", "vertices": [[lon, lat], …]}`.
+**The edge index.** A country has tens of thousands of edges, and the
+tests above would visit all of them for every tile. A polygon therefore
+keeps its edges sorted into latitude bands (about eight edges per band, at
+most 4096 bands; shared by copies of the geometry). The even–odd test
+only looks at the edges of the point's band, since only those can cross a
+ray along its latitude; the tile tests only at the bands the tile spans.
+Counting Canada's tiles to level 12 (1.3 million) went from 5.5 s to
+0.1 s.
+
+Stored as `{"kind": "rectangle", "west", "south", "east", "north"}`,
+`{"kind": "polygon", "vertices": [[lon, lat], …]}` for one ring, or
+`{"kind": "polygon", "rings": [[[lon, lat], …], …]}` for several (older
+versions read only the first two).
+
+## Countries
+
+The New Region dialog offers the countries of the base pack's `countries`
+dataset ([base-pack.md](../data/base-pack.md#countries)), read by
+`ts::CountryAreas`: the list (id, name, ISO codes) when the dialog first
+opens, an outline when one is picked. The outline is a polygon of all the
+country's rings, widened by about 5 km so that tiles along the coast and
+the border are included; the region is stored like a drawn one, so the
+base pack's outlines can change without changing saved regions.
+
+Choosing a country names the region after it, unless the user has
+changed the name; choosing an area any other way forgets the country.
+The list is searchable by any part of the name. Without the dataset (an
+older or missing base pack) the choice is hidden.
 
 ## From a region to tiles
 
@@ -79,7 +115,8 @@ different places isn't counted.
 `tests/regions` checks both against a test of every tile, level by level,
 for polygons over the British Isles, round Fiji and across the Bering
 Strait (both across the antimeridian), a concave polygon, a Pacific
-rectangle and a source with bounds.
+rectangle, a source with bounds, islands with a lake and rings either
+side of the antimeridian.
 
 ## How big: the estimate
 
@@ -103,7 +140,11 @@ dialog says "about".
 
 The dialog counts as the user types, waits 0.4 s after the last change,
 then estimates on a thread of its own (cancelled when anything changes
-again). It refuses regions of more than a million tiles.
+again). It refuses regions of more than a million tiles, and so stops
+counting past a million (`countRegionTiles()`'s `stopAbove`): the exact
+number of a country's tiles to level 16, hundreds of millions, would
+take a second to count and be no use. With that limit any country counts
+in under 10 ms.
 
 ## Pinning
 

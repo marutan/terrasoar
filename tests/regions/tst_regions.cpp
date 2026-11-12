@@ -119,6 +119,34 @@ ts::RegionGeometry polygonOf(const std::vector<ts::LonLat>& vertices)
       .value_or(ts::RegionGeometry());
 }
 
+/**
+ * Two islands, the first (0°–20°E, 0°–20°N) with a lake (5°–15°E,
+ * 5°–15°N), the second 30°–35°E, 0°–5°N.
+ */
+ts::RegionGeometry islandsWithALake()
+{
+  QString error;
+  return ts::RegionGeometry::polygons({{{0, 0}, {20, 0}, {20, 20}, {0, 20}},
+                                       {{5, 5}, {15, 5}, {15, 15}, {5, 15}},
+                                       {{30, 0}, {35, 0}, {35, 5}, {30, 5}}},
+                                      &error)
+      .value_or(ts::RegionGeometry());
+}
+
+/**
+ * A country split at the antimeridian as Natural Earth gives one: a ring
+ * 175°E–180° and one 180°–175°W, written with wrapped longitudes.
+ */
+ts::RegionGeometry ringsAcrossTheAntimeridian()
+{
+  QString error;
+  return ts::RegionGeometry::polygons(
+             {{{175, 60}, {180, 60}, {180, 65}, {175, 65}},
+              {{-180, 60}, {-175, 60}, {-175, 66}, {-180, 66}}},
+             &error)
+      .value_or(ts::RegionGeometry());
+}
+
 } // namespace
 
 /** Unit tests for ts/regions. */
@@ -222,6 +250,68 @@ private slots:
     QVERIFY(error.contains(QStringLiteral("pole")));
   }
 
+  void multipleRings()
+  {
+    // Even–odd over all rings: the lake is a hole, the second island land.
+    const ts::RegionGeometry islands = islandsWithALake();
+    QVERIFY(islands.isValid());
+    QCOMPARE(islands.kind(), ts::RegionGeometry::Kind::Polygon);
+    QCOMPARE(islands.rings().size(), std::size_t{3});
+    QCOMPARE(islands.vertices().size(), std::size_t{4});
+    QVERIFY(islands.contains(2.0, 2.0));
+    QVERIFY(!islands.contains(10.0, 10.0)); // the lake
+    QVERIFY(islands.contains(2.0, 32.0));
+    QVERIFY(!islands.contains(2.0, 25.0)); // between the islands
+    const ts::GeoRect inLake{8.0, 8.0, 12.0, 12.0};
+    QVERIFY(!islands.intersects(inLake));
+    QVERIFY(islands.covers(ts::GeoRect{1.0, 1.0, 4.0, 4.0}));
+    QVERIFY(!islands.covers(ts::GeoRect{1.0, 1.0, 9.0, 9.0})); // lake edge
+    QCOMPARE(islands.extent().westDeg, 0.0);
+    QCOMPARE(islands.extent().eastDeg, 35.0);
+    // The area: island minus lake, plus the second island.
+    QString error;
+    const double outer = ts::RegionGeometry::polygon(
+                             {{0, 0}, {20, 0}, {20, 20}, {0, 20}}, &error)
+                             .value_or(ts::RegionGeometry())
+                             .areaKm2();
+    const double lake = ts::RegionGeometry::polygon(
+                            {{5, 5}, {15, 5}, {15, 15}, {5, 15}}, &error)
+                            .value_or(ts::RegionGeometry())
+                            .areaKm2();
+    const double second = ts::RegionGeometry::polygon(
+                              {{30, 0}, {35, 0}, {35, 5}, {30, 5}}, &error)
+                              .value_or(ts::RegionGeometry())
+                              .areaKm2();
+    QVERIFY(std::abs(islands.areaKm2() - (outer - lake + second)) < 1e-6);
+
+    // Rings either side of the antimeridian stay together: 175°E to 185°.
+    const ts::RegionGeometry split = ringsAcrossTheAntimeridian();
+    QVERIFY(split.isValid());
+    QCOMPARE(split.extent().westDeg, 175.0);
+    QCOMPARE(split.extent().eastDeg, 185.0);
+    QVERIFY(split.contains(62.0, 179.0));
+    QVERIFY(split.contains(62.0, -179.0));
+    QVERIFY(split.contains(65.5, -176.0));
+    QVERIFY(!split.contains(65.5, 176.0));
+    QVERIFY(split.intersects(ts::GeoRect{-180.0, 60.0, -177.0, 63.0}));
+    QVERIFY(split.intersects(ts::GeoRect{177.0, 60.0, 180.0, 63.0}));
+    QVERIFY(split.covers(ts::GeoRect{-180.0, 61.0, -177.0, 63.0}));
+    QVERIFY(!split.intersects(ts::GeoRect{170.0, 60.0, 174.0, 63.0}));
+
+    // More than the whole way round is refused.
+    QVERIFY(!ts::RegionGeometry::polygons({{{0, 0}, {10, 0}, {10, 5}},
+                                           {{170, 0}, {-100, 0}, {-100, 5}},
+                                           {{-170, 0}, {100, 0}, {100, 5}}},
+                                          &error)
+                 .has_value());
+    QVERIFY(!error.isEmpty());
+    QVERIFY(!ts::RegionGeometry::polygons({}, &error).has_value());
+    // A bad ring spoils the whole.
+    QVERIFY(!ts::RegionGeometry::polygons(
+                 {{{0, 0}, {1, 0}, {1, 1}}, {{0, 0}, {1, 0}}}, &error)
+                 .has_value());
+  }
+
   void geometryJson()
   {
     QString error;
@@ -230,7 +320,9 @@ private slots:
         ts::RegionGeometry::rectangle(170.0, -10.0, -170.0, 10.0),
         ts::RegionGeometry::rectangle(-180.0, -90.0, 180.0, 90.0),
         polygonOf(britishIsles()),
-        polygonOf({{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}})};
+        polygonOf({{176.0, -20.0}, {-178.0, -20.0}, {-178.0, -15.0}}),
+        islandsWithALake(),
+        ringsAcrossTheAntimeridian()};
     for (const ts::RegionGeometry& geometry : geometries) {
       const std::optional<ts::RegionGeometry> back =
           ts::RegionGeometry::fromJson(geometry.toJson(), &error);
@@ -300,6 +392,8 @@ private slots:
     QTest::newRow("Pacific rectangle") << 3;
     QTest::newRow("concave") << 4;
     QTest::newRow("with data bounds") << 5;
+    QTest::newRow("islands with a lake") << 6;
+    QTest::newRow("rings either side of the antimeridian") << 7;
   }
 
   void tileSetsMatchBruteForce()
@@ -328,6 +422,12 @@ private slots:
     case 3:
       region = ts::RegionGeometry::rectangle(150.0, -40.0, -120.0, 25.0);
       break;
+    case 6:
+      region = islandsWithALake();
+      break;
+    case 7:
+      region = ringsAcrossTheAntimeridian();
+      break;
     default:
       region = polygonOf(
           {{0.0, 0.0}, {40.0, 0.0}, {40.0, 40.0}, {20.0, 10.0}, {0.0, 40.0}});
@@ -352,6 +452,24 @@ private slots:
       QCOMPARE(counts.perLevel.at(static_cast<std::size_t>(level)),
                static_cast<long long>(expected.size()));
     }
+  }
+
+  void countingStopsPastALimit()
+  {
+    const ts::RegionGeometry islands = islandsWithALake();
+    const ts::RegionTileCount all =
+        ts::countRegionTiles(islands, 0, 12, std::nullopt);
+    QVERIFY(all.complete);
+    QVERIFY(all.total() > 100000);
+    const ts::RegionTileCount stopped =
+        ts::countRegionTiles(islands, 0, 12, std::nullopt, 1000);
+    QVERIFY(!stopped.complete);
+    QVERIFY(stopped.total() > 1000);
+    QVERIFY(stopped.total() < all.total());
+    const ts::RegionTileCount under =
+        ts::countRegionTiles(islands, 0, 12, std::nullopt, all.total());
+    QVERIFY(under.complete);
+    QCOMPARE(under.total(), all.total());
   }
 
   void largeCountsAreFast()

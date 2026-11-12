@@ -64,6 +64,7 @@ HEADERS += \
     include/ts/providers/tileprovider.h \
     include/ts/regions/offlineregionstore.h \
     include/ts/regions/regiondownload.h \
+    include/ts/regions/countryareas.h \
     include/ts/regions/regiongeometry.h \
     include/ts/render/framepacer.h \
     include/ts/render/glrenderdevice.h \
@@ -128,6 +129,7 @@ SOURCES += \
     src/providers/tileprovider.cpp \
     src/regions/offlineregionstore.cpp \
     src/regions/regiondownload.cpp \
+    src/regions/countryareas.cpp \
     src/regions/regiongeometry.cpp \
     src/render/framepacer.cpp \
     src/render/glrenderdevice.cpp \

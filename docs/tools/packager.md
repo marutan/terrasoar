@@ -17,13 +17,13 @@ This runs `tools/packager/build_basepack.py`, which
 
 1. downloads the sources listed in `tools/packager/basepack.json` into
    `$TS_BASEPACK_SOURCES` (default `<build>/basepack-sources`), about
-   176 MB, and checks each against its pinned SHA-256; files already there
+   189 MB, and checks each against its pinned SHA-256; files already there
    with the right checksum are kept;
 2. runs the packager into `<build>/basepack.new`;
 3. replaces `<build>/basepack` with it if the packager succeeded.
 
 The application in `<build>/app` finds `<build>/basepack` by itself. The
-build takes about 40 s and 400 MB of memory on one core.
+build takes about 55 s and 400 MB of memory on one core.
 
 Run the steps separately to use other directories:
 
@@ -112,9 +112,14 @@ basepack.json ──► check sources' SHA-256
                   │              ► per tile: land = L1 ∪ L5 − L2 ∪ L3 − L4
                   │              ► shoreline.gpkg (GDAL, R-tree, VACUUM)
                   │
+                  ├─ countries ► Natural Earth admin-0 (GeoJSON): join the
+                  │              halves of countries across 180° ► GEOS:
+                  │              widen by 0.05°, simplify within 0.02°,
+                  │              check it covers the country ► countries.gpkg
+                  │
                   ├─ licence notices from the zip and tools/packager/notices
                   ├─ manifest.json: every file with size and SHA-256
-                  └─ checks: area, size budget
+                  └─ checks: area, coverage, size budget
 ```
 
 ### Antarctica at full resolution
@@ -144,6 +149,10 @@ crude to high, come out the same.
   0.44 % off; high 0.007 %), so it is information, not a check. GSHHG
   gives both halves of a polygon split at the antimeridian (Eurasia,
   Antarctica) the whole polygon's area; the report counts it once.
+- **Coverage**: every country's outline must be a valid polygon that
+  covers the country's own polygons (GEOS `covers`): the outline is what
+  an offline region by country downloads, and a missed island would be
+  missing offline.
 - **Size**: the pack must fit `sizeLimitBytes − reservedBytes`.
 - **Sources**: their SHA-256 must match `basepack.json`
   (`--no-verify-sources` skips this, for development only).
@@ -166,6 +175,7 @@ area and GSHHG's area.
 | `sources[]` | `id`, `file` (name in the sources directory), `url`, `sha256`, `name`, `version`; `notices` (files inside the zip to ship), `localNotices` (files relative to the config to ship) |
 | `imagery` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `maxLevel` (at most 8), `tileSize`, `jpegQuality` |
 | `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |
+| `countries` | `dataset`, `source` (Natural Earth admin-0 countries, with `ADM0_A3`, `ADMIN`, `ISO_A2_EH`, `ISO_A3_EH`), `name`, `licence`, `attribution`, `bufferDeg` (0.05), `simplifyDeg` (0.02; must be smaller), `exclude` (`ADM0_A3` codes left out: `ATA`) |
 
 ### Changing a source
 
@@ -179,7 +189,7 @@ area and GSHHG's area.
 ## Code and tests
 
 The packager's code is in `tools/packager/src/` (`imagerytiler`,
-`shorelinebuilder`, `packbuilder`; `main.cpp` is only the command line);
+`shorelinebuilder`, `countrybuilder`, `packbuilder`; `main.cpp` is only the command line);
 `packager.pri` shares it with `tests/packager`. It links `tscore` for the
 tile store and GeoPackage writers, the manifest and the dependency
 wrappers.
@@ -191,12 +201,21 @@ pole, and test images — and checks that the land polygons are valid
 (GEOS `isValid`), closed and inside their tiles, that the areas match,
 that every tile of the pyramid exists, decodes and is its exact square of
 the mosaic, and that a whole pack builds, verifies, refuses a full output
-directory and fails over budget.
+directory and fails over budget. A GeoJSON of four countries (one with a
+lake, one split at the antimeridian, one without ISO codes, and
+Antarctica) checks the country outlines: read back with
+`ts::CountryAreas`, the lake is still a hole, the split country is one
+piece, and the coast is covered.
 
 With `TS_BASEPACK_DIR` set it also checks a real pack: manifest and
 checksums, the budget, the complete pyramid with tiles lining up with
 their neighbours (across the antimeridian too), every polygon of every
 table valid and inside its tile, and spot checks at levels 0–8 (London is
 land; the North Sea, the Pacific and the Caspian Sea are not; the South
-Pole is; Wrangel Island at the antimeridian is). CI's base pack job runs
-it on the pack it builds.
+Pole is; Wrangel Island at the antimeridian is) and, for the countries,
+places inside and outside known countries (Shetland, Réunion and French
+Guiana, Chukotka east of 180°, Fiji and the Aleutians across it, Lesotho
+not in South Africa), with the time to count a few big countries' tiles
+in the log. `TS_PACK_CONFIG` names another configuration, to check an
+extra pack the same way. CI's base pack job runs it on the pack it
+builds.

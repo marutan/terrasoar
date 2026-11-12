@@ -10,6 +10,8 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <vector>
 
 #include <QBuffer>
 #include <QByteArray>
@@ -21,6 +23,7 @@
 #include <QJsonDocument>
 #include <QString>
 
+#include "ts/deps/sqliteconnection.h"
 #include "ts/packs/basepack.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
@@ -34,6 +37,69 @@ namespace ts::test
  * Writes a base pack into the empty directory @p directory and returns
  * its manifest. The imagery is @p color everywhere.
  */
+/** Appends @p value to @p bytes, little-endian. */
+inline void appendUint32(QByteArray& bytes, std::uint32_t value)
+{
+  for (int i = 0; i < 4; ++i) {
+    bytes.append(
+        static_cast<char>((value >> (8U * static_cast<unsigned>(i))) & 0xffU));
+  }
+}
+
+/**
+ * A GeoPackage geometry blob (no envelope, SRS 4326) of a MULTIPOLYGON
+ * with one ring per polygon, each given as longitude/latitude pairs.
+ */
+inline QByteArray
+multiPolygonBlob(const std::vector<std::vector<double>>& rings)
+{
+  QByteArray blob("GP");
+  blob.append(static_cast<char>(0));    // version
+  blob.append(static_cast<char>(0x01)); // little-endian, no envelope
+  appendUint32(blob, 4326);
+  blob.append(static_cast<char>(1));
+  appendUint32(blob, 6); // MultiPolygon
+  appendUint32(blob, static_cast<std::uint32_t>(rings.size()));
+  for (const std::vector<double>& ring : rings) {
+    blob.append(static_cast<char>(1));
+    appendUint32(blob, 3); // Polygon
+    appendUint32(blob, 1);
+    appendUint32(blob, static_cast<std::uint32_t>(ring.size() / 2 + 1));
+    for (std::size_t i = 0; i < ring.size() + 2; ++i) {
+      const double value = ring[i % ring.size()];
+      blob.append(reinterpret_cast<const char*>(&value), sizeof value);
+    }
+  }
+  return blob;
+}
+
+/**
+ * Writes the countries table the packager writes (only what
+ * ts::CountryAreas reads): "Fixture Island" (FIX) around the fixture
+ * shoreline's island, and "Fixture Atoll" (ATL) across the antimeridian.
+ */
+inline void writeFixtureCountries(const QString& path)
+{
+  SqliteConnection connection(path,
+                              SqliteConnection::OpenMode::ReadWriteCreate);
+  connection.execute(QStringLiteral(
+      "CREATE TABLE countries (fid INTEGER PRIMARY KEY, id TEXT, name TEXT, "
+      "iso_a2 TEXT, iso_a3 TEXT, geom BLOB)"));
+  const std::function<void(const char*, const char*, const QByteArray&)>
+      insert = [&connection](const char* id, const char* name,
+                             const QByteArray& blob) {
+        connection.execute(QStringLiteral("INSERT INTO countries (id, name, "
+                                          "iso_a2, iso_a3, geom) VALUES "
+                                          "('%1', '%2', '', '', X'%3')")
+                               .arg(QLatin1String(id), QLatin1String(name),
+                                    QString::fromLatin1(blob.toHex())));
+      };
+  insert("FIX", "Fixture Island",
+         multiPolygonBlob({{9.9, 39.9, 20.1, 39.9, 20.1, 50.1, 9.9, 50.1}}));
+  insert("ATL", "Fixture Atoll",
+         multiPolygonBlob({{179, -10, 181, -10, 181, -5, 179, -5}}));
+}
+
 inline PackManifest writeFixtureBasePack(const QString& directory,
                                          const QColor& color = QColor(20, 60,
                                                                       140))
@@ -88,11 +154,13 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
     writer.putFeature(table.name, TileKey{0, 1, 0}, wkb);
     writer.finish();
   }
+  const QString countries = QStringLiteral("countries.gpkg");
+  writeFixtureCountries(dir.filePath(countries));
   const std::atomic<bool> notCancelled{false};
   PackManifest manifest;
   manifest.id = basePackId();
   manifest.version = QStringLiteral("test");
-  for (const QString& path : {file, shoreline}) {
+  for (const QString& path : {file, shoreline, countries}) {
     PackFile packFile;
     packFile.path = path;
     packFile.sizeBytes = QFileInfo(dir.filePath(path)).size();
@@ -111,6 +179,12 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
   dataset.file = shoreline;
   dataset.name = QStringLiteral("Fixture shoreline");
   dataset.attribution = QStringLiteral("Fixture shoreline");
+  manifest.datasets.push_back(dataset);
+  dataset.id = QStringLiteral("countries");
+  dataset.kind = PackDataset::Kind::Areas;
+  dataset.file = countries;
+  dataset.name = QStringLiteral("Fixture countries");
+  dataset.attribution = QStringLiteral("Fixture countries");
   manifest.datasets.push_back(dataset);
   QFile json(dir.filePath(PackManifest::fileName()));
   if (json.open(QIODevice::WriteOnly)) {

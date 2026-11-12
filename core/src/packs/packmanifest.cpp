@@ -19,7 +19,15 @@ namespace
 
 const char* kindName(PackDataset::Kind kind)
 {
-  return kind == PackDataset::Kind::Features ? "features" : "imagery";
+  switch (kind) {
+  case PackDataset::Kind::Features:
+    return "features";
+  case PackDataset::Kind::Areas:
+    return "areas";
+  case PackDataset::Kind::Imagery:
+    break;
+  }
+  return "imagery";
 }
 
 bool isSafeRelativePath(const QString& path)
@@ -124,6 +132,8 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
       dataset.kind = PackDataset::Kind::Imagery;
     } else if (kind == QLatin1String("features")) {
       dataset.kind = PackDataset::Kind::Features;
+    } else if (kind == QLatin1String("areas")) {
+      dataset.kind = PackDataset::Kind::Areas;
     } else {
       fail(errorString,
            QStringLiteral("Unknown dataset kind \"%1\" in the pack manifest")

@@ -21,6 +21,14 @@
       "sha256": "d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0",
       "name": "Blue Marble Next Generation with topography and bathymetry",
       "version": "2004-07"
+    },
+    {
+      "id": "naturalearth",
+      "file": "ne_10m_admin_0_countries-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_0_countries.geojson",
+      "sha256": "239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255",
+      "name": "Natural Earth 1:10m Cultural Vectors, Admin 0 – Countries",
+      "version": "5.1.2"
     }
   ],
   "imagery": {
@@ -46,5 +54,15 @@
       {"resolution": "i", "storageLevel": 4, "minLevel": 4, "maxLevel": 5},
       {"resolution": "h", "storageLevel": 6, "minLevel": 6, "maxLevel": -1}
     ]
+  },
+  "countries": {
+    "dataset": "countries",
+    "source": "naturalearth",
+    "name": "Countries",
+    "licence": "Public domain (Natural Earth)",
+    "attribution": "Countries: Made with Natural Earth",
+    "bufferDeg": 0.05,
+    "simplifyDeg": 0.02,
+    "exclude": ["ATA"]
   }
 }

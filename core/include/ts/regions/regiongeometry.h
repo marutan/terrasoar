@@ -6,6 +6,7 @@
 #ifndef TS_REGIONS_REGIONGEOMETRY_H
 #define TS_REGIONS_REGIONGEOMETRY_H
 
+#include <memory>
 #include <optional>
 #include <random>
 #include <vector>
@@ -28,7 +29,9 @@ struct LonLat {
 
 /**
  * The area of an offline region: a latitude/longitude rectangle or a
- * polygon, either of which may cross the antimeridian.
+ * polygon, either of which may cross the antimeridian. A polygon may have
+ * several rings (a country's islands, or holes), combined by the even–odd
+ * rule: a point is inside if it is inside an odd number of rings.
  *
  * Edges are straight lines in longitude and latitude (as the rectangle's
  * are), not geodesics. Longitudes are kept *unwrapped*: the first vertex
@@ -48,7 +51,7 @@ public:
   /** The kind of area. */
   enum class Kind {
     Rectangle, ///< A latitude/longitude rectangle.
-    Polygon,   ///< A simple polygon (even–odd rule if it crosses itself).
+    Polygon,   ///< One or more rings (even–odd rule).
   };
 
   /** Constructs an empty rectangle (isValid() is false). */
@@ -73,6 +76,17 @@ public:
   static std::optional<RegionGeometry>
   polygon(const std::vector<LonLat>& vertices, QString* errorString);
 
+  /**
+   * Returns the polygon with the rings @p rings (each as for polygon()),
+   * or nothing and @p errorString (translated) if a ring is unusable or
+   * the whole spans 360° of longitude or more. Each ring is unwrapped
+   * starting within 180° of the first ring's first vertex, so rings on
+   * either side of the antimeridian stay together; the whole is then moved
+   * so that its western edge lies in [−180°, 180°).
+   */
+  static std::optional<RegionGeometry>
+  polygons(const std::vector<std::vector<LonLat>>& rings, QString* errorString);
+
   /** Returns the kind. */
   Kind kind() const { return m_kind; }
 
@@ -80,10 +94,13 @@ public:
   bool isValid() const;
 
   /**
-   * Returns the vertices, unwrapped (see the class description); four
-   * for a rectangle, south-west first, anticlockwise.
+   * Returns the vertices of the first ring, unwrapped (see the class
+   * description); four for a rectangle, south-west first, anticlockwise.
    */
-  const std::vector<LonLat>& vertices() const { return m_vertices; }
+  const std::vector<LonLat>& vertices() const;
+
+  /** Returns all rings, unwrapped; one for a rectangle. */
+  const std::vector<std::vector<LonLat>>& rings() const { return m_rings; }
 
   /**
    * Returns the bounding rectangle in unwrapped longitudes: westDeg in
@@ -113,8 +130,9 @@ public:
 
   /**
    * Returns the object stored in region files:
-   * `{"kind": "rectangle", "west": …, "south": …, "east": …, "north": …}`
-   * or `{"kind": "polygon", "vertices": [[lon, lat], …]}`.
+   * `{"kind": "rectangle", "west": …, "south": …, "east": …, "north": …}`,
+   * `{"kind": "polygon", "vertices": [[lon, lat], …]}` for one ring, or
+   * `{"kind": "polygon", "rings": [[[lon, lat], …], …]}` for several.
    */
   QJsonObject toJson() const;
 
@@ -122,7 +140,7 @@ public:
   static std::optional<RegionGeometry> fromJson(const QJsonObject& json,
                                                 QString* errorString);
 
-  /** Equality of kind and vertices. */
+  /** Equality of kind and rings. */
   bool operator==(const RegionGeometry& other) const;
 
 private:
@@ -130,10 +148,17 @@ private:
   bool coversShifted(const GeoRect& rect) const;
   bool containsUnwrapped(double latDeg, double lonDeg) const;
   bool edgeCrossesInterior(const GeoRect& rect) const;
+  bool vertexInside(const GeoRect& rect) const;
+
+  struct EdgeIndex;
+  void buildIndex();
 
   Kind m_kind = Kind::Rectangle;
-  std::vector<LonLat> m_vertices;
+  std::vector<std::vector<LonLat>> m_rings;
+  std::vector<GeoRect> m_ringExtents;
   GeoRect m_extent;
+  /** The polygon's edges by latitude band; shared by copies. */
+  std::shared_ptr<const EdgeIndex> m_index;
 };
 
 /** Tiles of a region per level, as countRegionTiles() returns them. */
@@ -142,6 +167,11 @@ struct RegionTileCount {
   int minimumLevel = 0;
   /** Tiles at minimumLevel, minimumLevel + 1, … */
   std::vector<long long> perLevel;
+  /**
+   * False if counting stopped early, past the limit given: then the
+   * counts are only a lower bound.
+   */
+  bool complete = true;
 
   /** Returns the total over all levels. */
   long long total() const;
@@ -152,13 +182,16 @@ struct RegionTileCount {
  * share some area with @p region inside @p dataBounds, if given (where
  * the source has data; tiles outside aren't requested). Exact, and fast even
  * for millions of tiles: tiles wholly inside are counted without visiting their
- * descendants.
+ * descendants. With @p stopAbove, counting stops once the total passes it
+ * (RegionTileCount::complete is then false), which bounds the work for a
+ * big area at deep levels.
  *
  * @reentrant
  */
 RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
                                  int maximumLevel,
-                                 const std::optional<GeoRect>& dataBounds);
+                                 const std::optional<GeoRect>& dataBounds,
+                                 std::optional<long long> stopAbove = {});
 
 /**
  * Hands out the tiles of a region one by one, level by level from the
