@@ -52,7 +52,7 @@ versions ignore the field.
 | Pack id | Replaces | What | Size |
 | --- | --- | --- | --- |
 | `bluemarble-full` | `bluemarble` | The same Blue Marble image as the base pack (21600 × 10800 px), tiled to level 6 instead of 4: about 1.2 km per pixel instead of 4.9 km | 67 MB |
-| `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the full resolution added: crude to high as in the base pack, then full (10.9 million vertices) from level 8 | 241 MB |
+| `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the high and full resolutions: crude to intermediate as in the base pack, high (0.2 km) from level 6, full (10.9 million vertices) from level 8 | 241 MB |
 
 Their packager configurations are `tools/packager/packs/*.json`; `make packs`
 builds them with their release files and index entries

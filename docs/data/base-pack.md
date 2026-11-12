@@ -12,7 +12,7 @@ stored in Git.
 | File | Dataset | What | Size |
 | --- | --- | --- | --- |
 | `bluemarble.sqlite` | `bluemarble` | Blue Marble Next Generation (July 2004, topography and bathymetry) as JPEG tiles of 256 × 256 px, quadtree levels 0–4 (682 tiles; level 4 is 8192 × 4096 px for the world, about 4.9 km per pixel) | 6.1 MB |
-| `shoreline.gpkg` | `shoreline` | GSHHG 2.3.7 land polygons at four resolutions, cut to quadtree tiles | 45.6 MB |
+| `shoreline.gpkg` | `shoreline` | GSHHG 2.3.7 land polygons at three resolutions, cut to quadtree tiles | 20.1 MB |
 | `countries.gpkg` | `countries` | Natural Earth 5.1.2 admin-0 countries (257; Antarctica left out), each widened by 0.05° (about 5 km) and simplified within 0.02° | 1.4 MB |
 | `licences/gshhg/` | | GSHHG's `LICENSE.TXT`, the LGPL v3 (`COPYING.LESSERv3`) and the GPL v3 it builds on (`gpl-3.0.txt`) | 44 kB |
 | `manifest.json` | | Files with SHA-256 and size, datasets with source, licence and attribution | 3 kB |
@@ -20,19 +20,25 @@ stored in Git.
 ### Shoreline levels of detail
 
 GSHHG comes in five resolutions, each simplified by its authors with
-checked topology. The pack uses four, each cut to the tiles of one quadtree
-level and shown over a range of display levels:
+checked topology. The pack uses three, each cut to the tiles of one
+quadtree level and shown over a range of display levels; the
+intermediate resolution is stored twice, the second time cut to the
+smaller tiles of level 6 that the deep levels need (the renderer's cells
+are 1/16 of a stored tile, and the larger cells of level 4 would sag
+hundreds of metres below the surface when zoomed in):
 
 | Table | GSHHG resolution | Tolerance | Stored at level | Shown at levels | Tiles | Vertices |
 | --- | --- | --- | --- | --- | --- | --- |
 | `land_c` | crude | 25 km | 0 | 0–1 | 2 | 12 620 |
 | `land_l` | low | 5 km | 2 | 2–3 | 32 | 90 671 |
 | `land_i` | intermediate | 1 km | 4 | 4–5 | 384 | 457 123 |
-| `land_h` | high | 0.2 km | 6 | 6 and deeper | 3 955 | 1 964 004 |
+| `land_i_6` | intermediate | 1 km | 6 | 6 and deeper | 3 926 | 487 117 |
 
-The full resolution (about 10 million vertices) does not fit the budget;
-it is the downloadable pack `shoreline-full`
-([packs.md](../design/packs.md#the-first-packs)).
+The high (0.2 km) and full resolutions are the downloadable pack
+`shoreline-full` ([packs.md](../design/packs.md#the-first-packs)), which
+takes the place of this dataset when installed. The base pack had the high
+resolution until version 2 (2026-11-12); it went to make room for the
+terrain data of Phase 7 (below).
 
 Land is GSHHG's hierarchy resolved into one polygon set: land (level 1)
 and Antarctica by its ice front (level 5), minus lakes (2), plus islands in
@@ -88,24 +94,26 @@ URLs and SHA-256 sums are pinned in `tools/packager/basepack.json`.
 
 ## Size budget
 
-The pack may be at most **75 MB**, with **20 MB reserved** for the coarse
-global DEM of Phase 7, so today's contents must fit in **55 MB**
+The pack may be at most **75 MB**, with **35 MB reserved** for Phase 7's
+coarse global DEM (about 20 MB) and EGM2008 and EGM96 geoid grids (about
+13 MB), so today's contents must fit in **40 MB**
 (`sizeLimitBytes` and `reservedBytes` in `basepack.json`). The packager
 fails when the pack is over budget, and CI's base pack job runs it on
 every change.
 
 | Part | Bytes |
 | --- | --- |
-| Shoreline | 45.6 MB |
+| Shoreline | 20.1 MB |
 | Blue Marble | 6.1 MB |
 | Countries | 1.4 MB |
 | Licences, manifest | < 0.1 MB |
-| **Total** | **53.2 MB** of 55 MB |
+| **Total** | **27.7 MB** of 40 MB |
 
-Phase 7 needs more than the reserve: the DEM (about 20 MB) and the
-EGM2008 and EGM96 geoid grids (about 13 MB). Dropping the high-resolution
-shoreline (`land_h`), now that `shoreline-full` has it and more, is the
-obvious way to make room.
+Until version 2 the reserve was 20 MB and the shoreline had the high
+resolution (45.6 MB, the pack 53.2 MB of 55). Phase 7 needs about 33 MB,
+so the high resolution moved to `shoreline-full` (decided 2026-11-12).
+Without that pack, coasts are drawn from the 1 km intermediate resolution
+at every level from 4 down.
 
 ## File formats
 

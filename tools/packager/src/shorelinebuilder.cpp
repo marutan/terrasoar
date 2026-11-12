@@ -404,10 +404,10 @@ bool readLevel(const Geos& geos, const QString& path, int level,
 class TileCutter
 {
 public:
-  TileCutter(const Geos& geos, const ShorelineLod& lod,
+  TileCutter(const Geos& geos, ShorelineLod lod, QString table,
              GeoPackageFeatureWriter* writer, ShorelineLodStats* stats)
-      : m_geos(&geos), m_lod(lod), m_writer(writer), m_stats(stats),
-        m_table(QStringLiteral("land_") + lod.resolution)
+      : m_geos(&geos), m_lod(std::move(lod)), m_writer(writer), m_stats(stats),
+        m_table(std::move(table))
   {
   }
 
@@ -615,15 +615,29 @@ double rhumbRingAreaKm2(const std::vector<double>& lonLatDeg)
   return std::abs(areaM2) * 1e-6;
 }
 
+QString shorelineTableName(const std::vector<ShorelineLod>& lods,
+                           std::size_t index)
+{
+  const ShorelineLod& lod = lods.at(index);
+  QString name = QStringLiteral("land_") + lod.resolution;
+  for (std::size_t i = 0; i < index; ++i) {
+    if (lods[i].resolution == lod.resolution) {
+      return name + QStringLiteral("_%1").arg(lod.storageLevel);
+    }
+  }
+  return name;
+}
+
 bool buildShoreline(const ShorelineOptions& options,
                     GeoPackageFeatureWriter* writer,
                     std::vector<ShorelineLodStats>* stats, QString* errorString)
 {
   const std::function<void(const QString&)> progress =
       options.progress ? options.progress : [](const QString&) {};
-  for (const ShorelineLod& lod : options.lods) {
+  for (std::size_t i = 0; i < options.lods.size(); ++i) {
+    const ShorelineLod& lod = options.lods[i];
     FeatureTableSpec land;
-    land.name = QStringLiteral("land_") + lod.resolution;
+    land.name = shorelineTableName(options.lods, i);
     land.geometry = FeatureTableSpec::Geometry::Polygons;
     land.storageLevel = lod.storageLevel;
     land.minLevel = lod.minLevel;
@@ -635,7 +649,8 @@ bool buildShoreline(const ShorelineOptions& options,
   }
 
   const Geos geos;
-  for (const ShorelineLod& lod : options.lods) {
+  for (std::size_t i = 0; i < options.lods.size(); ++i) {
+    const ShorelineLod& lod = options.lods[i];
     ShorelineLodStats lodStats;
     lodStats.resolution = lod.resolution;
     std::vector<Piece> polygons;
@@ -660,7 +675,8 @@ bool buildShoreline(const ShorelineOptions& options,
     progress(QStringLiteral("Cutting resolution %1 to level %2")
                  .arg(lod.resolution)
                  .arg(lod.storageLevel));
-    TileCutter cutter(geos, lod, writer, &lodStats);
+    TileCutter cutter(geos, lod, shorelineTableName(options.lods, i), writer,
+                      &lodStats);
     for (const TileKey root : TileKey::roots()) {
       if (!cutter.cut(root, polygons)) {
         *errorString = writer->errorString();

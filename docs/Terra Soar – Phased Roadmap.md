@@ -393,6 +393,8 @@ Goal: users pre-download chosen areas for offline use and install extra data pac
 
 Goal: terrain can be switched on from local or online elevation sources, and the globe falls back to the plain ellipsoid when it is off.
 
+**Base pack room (decided 2026-11-12)**: the DEM and geoid grids below need about 33 MB, more than the 20 MB Phase 3 reserved. The base pack's high-resolution shoreline moved to the downloadable `shoreline-full` pack (Phase 6) and the reserve became 35 MB: the pack is 27.7 MB before Phase 7. See `docs/data/base-pack.md`.
+
 **Deliverables**
 
 - Elevation tiles on the same EPSG:4326 quadtree; per-tile height grids displaced in the vertex shader; skirts to hide cracks

@@ -114,7 +114,7 @@ install once and then use offline:
 | Pack | What you get | Download |
 | --- | --- | --- |
 | Blue Marble, full resolution | The same picture of the Earth, about 1.2 km per pixel instead of 4.9 km | 67 MB |
-| Shoreline, full resolution | Detailed coasts and small islands from zoom level 8 | 241 MB |
+| Shoreline, full resolution | Detailed coasts and small islands: high resolution from zoom level 6, full resolution from level 8 (the built-in shoreline stays at about 1 km) | 241 MB |
 
 Pick a pack and press **Install**. The download runs in the background
 and survives closing the window: **Pause** stops it and **Resume**
