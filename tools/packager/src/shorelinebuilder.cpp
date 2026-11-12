@@ -302,6 +302,40 @@ QString wholePolygonId(const QString& id)
              : id;
 }
 
+/**
+ * @p geometry with closeHalfAtPole() applied if it is a one-ring polygon
+ * reaching the South Pole; otherwise null, to keep @p geometry.
+ */
+OGRGeometryH closedAtPole(OGRGeometryH geometry)
+{
+  if (wkbFlatten(OGR_G_GetGeometryType(geometry)) != wkbPolygon ||
+      OGR_G_GetGeometryCount(geometry) != 1) {
+    return nullptr;
+  }
+  OGREnvelope envelope{};
+  OGR_G_GetEnvelope(geometry, &envelope);
+  if (envelope.MinY > -90.0 + 1e-9) {
+    return nullptr;
+  }
+  OGRGeometryH ring = OGR_G_GetGeometryRef(geometry, 0);
+  const int count = OGR_G_GetPointCount(ring);
+  std::vector<double> lonLat;
+  lonLat.reserve(static_cast<std::size_t>(count) * 2);
+  for (int i = 0; i < count; ++i) {
+    lonLat.push_back(OGR_G_GetX(ring, i));
+    lonLat.push_back(OGR_G_GetY(ring, i));
+  }
+  const std::vector<double> closed = closeHalfAtPole(lonLat);
+  OGRGeometryH newRing = OGR_G_CreateGeometry(wkbLinearRing);
+  for (std::size_t i = 0; i + 1 < closed.size(); i += 2) {
+    OGR_G_AddPoint_2D(newRing, closed[i], closed[i + 1]);
+  }
+  OGR_G_AddPoint_2D(newRing, closed[0], closed[1]);
+  OGRGeometryH polygon = OGR_G_CreateGeometry(wkbPolygon);
+  OGR_G_AddGeometryDirectly(polygon, newRing);
+  return polygon;
+}
+
 bool readLevel(const Geos& geos, const QString& path, int level,
                const ShorelineOptions& options, std::vector<Piece>* polygons,
                ShorelineLodStats* stats, QString* errorString)
@@ -336,9 +370,19 @@ bool readLevel(const Geos& geos, const QString& path, int level,
       OGR_F_Destroy(feature);
       continue;
     }
+    // Halves of a polygon split at the antimeridian that reach the pole
+    // (Antarctica) get their closure rebuilt; see closeHalfAtPole().
+    OGRGeometryH rebuilt =
+        wholePolygonId(id) != id ? closedAtPole(ogrGeometry) : nullptr;
+    if (rebuilt != nullptr) {
+      ogrGeometry = rebuilt;
+    }
     std::vector<unsigned char> wkb(
         static_cast<std::size_t>(OGR_G_WkbSize(ogrGeometry)));
     OGR_G_ExportToIsoWkb(ogrGeometry, wkbNDR, wkb.data());
+    if (rebuilt != nullptr) {
+      OGR_G_DestroyGeometry(rebuilt);
+    }
     OGR_F_Destroy(feature);
     GeomPtr geometry =
         geos.repair(geos.keep(geos.fromWkb(wkb)), &stats->repairedPolygons);
@@ -443,6 +487,100 @@ private:
 };
 
 } // namespace
+
+namespace
+{
+
+/** A vertex, degrees. */
+struct LonLat {
+  double lon;
+  double lat;
+};
+
+/**
+ * The boundary meridian (−180°, 0° or 180°) within 0.01° (about 380 m at
+ * the equator, 130 m at 70°S) of @p lon, or NaN.
+ */
+double boundaryMeridian(double lon)
+{
+  for (const double boundary : {-180.0, 0.0, 180.0}) {
+    if (std::abs(lon - boundary) < 0.01) {
+      return boundary;
+    }
+  }
+  return std::nan("");
+}
+
+/**
+ * The index of the one vertex of the cyclic @p points whose edge to the
+ * next goes from one boundary meridian to the other, or points.size() if
+ * there is none or more than one.
+ */
+std::size_t crossingEdge(const std::vector<LonLat>& points)
+{
+  std::size_t found = points.size();
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    const double from = boundaryMeridian(points[i].lon);
+    const double to = boundaryMeridian(points[(i + 1) % points.size()].lon);
+    if (std::isnan(from) || std::isnan(to) || from == to) {
+      continue;
+    }
+    if (found != points.size()) {
+      return points.size();
+    }
+    found = i;
+  }
+  return found;
+}
+
+} // namespace
+
+std::vector<double> closeHalfAtPole(const std::vector<double>& lonLatDeg)
+{
+  // Vertices off the pole, without the closing one and without repeats.
+  std::vector<LonLat> points;
+  bool reachesPole = false;
+  for (std::size_t i = 0; i + 1 < lonLatDeg.size(); i += 2) {
+    const LonLat point{lonLatDeg[i], lonLatDeg[i + 1]};
+    if (point.lat <= -90.0 + 1e-9) {
+      reachesPole = true;
+    } else if (points.empty() || points.back().lon != point.lon ||
+               points.back().lat != point.lat) {
+      points.push_back(point);
+    }
+  }
+  while (points.size() > 1 && points.front().lon == points.back().lon &&
+         points.front().lat == points.back().lat) {
+    points.pop_back();
+  }
+  if (!reachesPole || points.size() < 3) {
+    return lonLatDeg;
+  }
+  const std::size_t last = crossingEdge(points);
+  if (last == points.size()) {
+    return lonLatDeg;
+  }
+  // The coastline from the vertex after that edge round to the one before
+  // it, its ends on their meridians, then down, along the pole and up.
+  const std::size_t first = (last + 1) % points.size();
+  const double startLon = boundaryMeridian(points[first].lon);
+  const double endLon = boundaryMeridian(points[last].lon);
+  std::vector<double> ring;
+  ring.reserve(points.size() * 2 + 4);
+  for (std::size_t k = 0; k < points.size(); ++k) {
+    const std::size_t i = (first + k) % points.size();
+    double lon = points[i].lon;
+    if (i == first) {
+      lon = startLon;
+    } else if (i == last) {
+      lon = endLon;
+    }
+    ring.push_back(lon);
+    ring.push_back(points[i].lat);
+  }
+  ring.insert(ring.end(), {endLon, -90.0, startLon, -90.0});
+  return ring;
+}
 
 double rhumbRingAreaKm2(const std::vector<double>& lonLatDeg)
 {

@@ -1,8 +1,9 @@
 # The packager
 
 `terrasoar-packager` builds the base pack
-([docs/data/base-pack.md](../data/base-pack.md)) from downloaded sources.
-It runs at build time, never in the application.
+([docs/data/base-pack.md](../data/base-pack.md)) and the extra data packs
+([docs/design/packs.md](../design/packs.md)) from downloaded sources. It
+runs at build time, never in the application.
 
 ## Rebuilding the pack
 
@@ -39,6 +40,56 @@ limited), and plain HTTPS otherwise. A download whose checksum differs is
 deleted and the script fails: a changed upstream file never reaches the
 pack silently.
 
+## Extra packs
+
+The extra packs' configurations are `tools/packager/packs/*.json`. From a
+build directory, after `make`:
+
+```sh
+make packs
+```
+
+runs `tools/packager/build_pack.py` for each. It fetches the sources into
+the same directory as the base pack's (they are the same files), builds
+the pack into `<build>/packs/<id>`, and writes `<build>/packs/<id>-release`:
+the pack's files under flat names a GitHub release accepts
+(`licences/gshhg/LICENSE.TXT` becomes `licences.gshhg.LICENSE.TXT`), the
+manifest, and `index-entry.json`, the pack's entry for the index. Its
+URLs point at the release `<id>-<version>` of `marutan/terrasoar-packs`
+(`--base-url` changes that). One pack at a time, with the index updated:
+
+```sh
+python3 tools/packager/build_pack.py --build-dir <build> \
+    --config tools/packager/packs/shoreline-full.json \
+    --index ~/terrasoar-packs/index.json
+```
+
+`--index` puts the entry into that `index.json`, replacing the pack's
+earlier entry. Nothing is uploaded. To publish a version:
+
+1. Raise `version` in the pack's configuration (versions are compared for
+   equality only; any change is an update), and build.
+2. Create the release `<id>-<version>` in `marutan/terrasoar-packs` with
+   every file of `<build>/packs/<id>-release` except `index-entry.json`
+   attached, for example
+   `gh release create <id>-<version> --repo marutan/terrasoar-packs <files>`.
+3. Commit the updated `index.json` to that repository's main branch. The
+   application reads it from there; until then nobody sees the release.
+
+A pack's configuration has the base pack's keys, and `index` (`name`,
+`description` and `licence` for the index entry); its `imagery` and
+`shoreline` take `replaces`, the base pack dataset they replace. Either
+may be left out.
+
+| Pack | Build time | Memory | Size |
+| --- | --- | --- | --- |
+| `bluemarble-full` | 40 s | 2.3 GB | 67 MB |
+| `shoreline-full` | 2 min 15 s | 750 MB | 241 MB |
+
+The full-resolution Blue Marble is tiled to level 6, a 32768 × 16384
+mosaic: a little more than the source's 21600 pixels across, so that no
+detail of the source is lost to the tiling.
+
 ## What it does
 
 ```
@@ -52,7 +103,8 @@ basepack.json ──► check sources' SHA-256
                   │
                   ├─ shoreline ► per resolution (c, l, i, h): GDAL reads
                   │              GSHHS_<r>_L1..L5 straight from the zip
-                  │              (/vsizip/) ► GEOS: repair invalid polygons
+                  │              (/vsizip/) ► rebuild Antarctica's closure
+                  │              along the pole ► GEOS: repair invalid polygons
                   │              ► cut down the quadtree to the storage
                   │                level (each level clips its parent's
                   │                pieces, so big polygons are cut once per
@@ -64,6 +116,21 @@ basepack.json ──► check sources' SHA-256
                   ├─ manifest.json: every file with size and SHA-256
                   └─ checks: area, size budget
 ```
+
+### Antarctica at full resolution
+
+GSHHG gives Antarctica (L5 ice front, L6 grounding line) as two halves,
+`-E` and `-W`, each closed along the antimeridian, the South Pole and the
+prime meridian. In GSHHG 2.3.7's full resolution two of them are
+malformed: `GSHHS_f_L5` 4-E goes down to the pole and back up at 0°
+instead of along 180° and −90°, so its last edge cuts straight across the
+continent and most of East Antarctica would be lost; 4-W ends at −0.002°
+instead of 0°, which would leave a 70 m crack from the coast to the pole.
+For every half reaching the pole the packager therefore keeps the
+coastline (the vertices off the pole, from one boundary meridian to the
+other, snapped onto it within 0.01°) and rebuilds the closure along the
+meridians and −90° (`closeHalfAtPole()`). Well-formed halves, all of
+crude to high, come out the same.
 
 ### Checks that fail the build
 
@@ -97,8 +164,8 @@ area and GSHHG's area.
 | `id`, `version` | Copied to the manifest |
 | `sizeLimitBytes`, `reservedBytes` | Size budget (75 MB, 20 MB kept for the DEM) |
 | `sources[]` | `id`, `file` (name in the sources directory), `url`, `sha256`, `name`, `version`; `notices` (files inside the zip to ship), `localNotices` (files relative to the config to ship) |
-| `imagery` | `dataset`, `source`, `name`, `licence`, `attribution`, `maxLevel`, `tileSize`, `jpegQuality` |
-| `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |
+| `imagery` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `maxLevel` (at most 8), `tileSize`, `jpegQuality` |
+| `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |
 
 ### Changing a source
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ts/packs/packindex.h"
 
+#include <algorithm>
+
 #include <QHostAddress>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -28,13 +30,10 @@ bool isSha256(const QString& hex)
   if (hex.size() != 64) {
     return false;
   }
-  for (const QChar c : hex) {
-    if (!((c >= QLatin1Char('0') && c <= QLatin1Char('9')) ||
-          (c >= QLatin1Char('a') && c <= QLatin1Char('f')))) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(hex.cbegin(), hex.cend(), [](QChar c) {
+    return (c >= QLatin1Char('0') && c <= QLatin1Char('9')) ||
+           (c >= QLatin1Char('a') && c <= QLatin1Char('f'));
+  });
 }
 
 std::nullopt_t fail(QString* errorString, const QString& problem)
@@ -118,14 +117,11 @@ bool isValidPackId(const QString& id)
   if (id.isEmpty() || id.size() > 64 || id.startsWith(QLatin1Char('-'))) {
     return false;
   }
-  for (const QChar c : id) {
-    if (!((c >= QLatin1Char('a') && c <= QLatin1Char('z')) ||
-          (c >= QLatin1Char('0') && c <= QLatin1Char('9')) ||
-          c == QLatin1Char('-'))) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(id.cbegin(), id.cend(), [](QChar c) {
+    return (c >= QLatin1Char('a') && c <= QLatin1Char('z')) ||
+           (c >= QLatin1Char('0') && c <= QLatin1Char('9')) ||
+           c == QLatin1Char('-');
+  });
 }
 
 bool isAllowedPackUrl(const QUrl& url, bool allowLocalHttp)

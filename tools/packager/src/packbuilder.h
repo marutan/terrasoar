@@ -55,6 +55,8 @@ struct ImagerySpec {
   QString licence;
   /** Attribution. */
   QString attribution;
+  /** Base pack dataset it replaces (PackDataset::replaces), or empty. */
+  QString replaces;
   /** Tiling. */
   ImageryTilerOptions tiling;
 };
@@ -71,6 +73,8 @@ struct ShorelineSpec {
   QString licence;
   /** Attribution. */
   QString attribution;
+  /** Base pack dataset it replaces (PackDataset::replaces), or empty. */
+  QString replaces;
   /** Levels of detail. */
   std::vector<ShorelineLod> lods;
   /** Smallest polygon kept, km². */

@@ -203,9 +203,9 @@ std::vector<PendingPack> PackLibrary::pending() const
 }
 
 QString PackLibrary::prepareStaging(const PackIndexEntry& entry,
-                                    QString* errorString)
+                                    QString* errorString) const
 {
-  const QString directory = stagingDirectory(entry.id);
+  QString directory = stagingDirectory(entry.id);
   const std::optional<PendingPack> existing = readPending(directory);
   if (!existing || existing->entry.version != entry.version) {
     // Another version, or nothing usable: start afresh.
@@ -260,10 +260,10 @@ bool PackLibrary::swapIn(const QString& id, QString* errorString)
 {
   const QString target = packDirectory(id);
   const QString staging = stagingDirectory(id);
-  QString old;
+  QString aside;
   if (QFileInfo::exists(target)) {
-    old = trashSlot(id);
-    if (!QDir().rename(target, old)) {
+    aside = trashSlot(id);
+    if (!QDir().rename(target, aside)) {
       return fail(errorString,
                   QStringLiteral("Cannot move the installed pack %1 aside "
                                  "(in use?); finishing at the next start")
@@ -271,8 +271,8 @@ bool PackLibrary::swapIn(const QString& id, QString* errorString)
     }
   }
   if (!QDir().rename(staging, target)) {
-    if (!old.isEmpty()) {
-      QDir().rename(old, target);
+    if (!aside.isEmpty()) {
+      QDir().rename(aside, target);
     }
     return fail(errorString,
                 QStringLiteral("Cannot move the download of pack %1 into "
@@ -280,8 +280,8 @@ bool PackLibrary::swapIn(const QString& id, QString* errorString)
                     .arg(id));
   }
   QFile::remove(QDir(target).filePath(pendingName()));
-  if (!old.isEmpty()) {
-    QDir(old).removeRecursively();
+  if (!aside.isEmpty()) {
+    QDir(aside).removeRecursively();
   }
   return true;
 }

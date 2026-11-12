@@ -86,11 +86,13 @@ std::vector<QString> PackManager::packIds() const
 {
   std::vector<QString> ids;
   if (m_index) {
+    ids.reserve(m_index->packs.size());
     for (const PackIndexEntry& entry : m_index->packs) {
       ids.push_back(entry.id);
     }
   }
   std::vector<QString> others;
+  others.reserve(m_installed.size() + m_pending.size());
   for (const InstalledPack& pack : m_installed) {
     others.push_back(pack.manifest.id);
   }

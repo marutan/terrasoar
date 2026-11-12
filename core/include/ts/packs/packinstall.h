@@ -23,6 +23,7 @@ namespace ts
 {
 
 class NetworkClient;
+struct HttpResponse;
 
 /** Behaviour of a PackInstall. */
 struct PackInstallSettings {
@@ -131,9 +132,22 @@ public:
   bool waitUntilSettled(std::chrono::milliseconds timeout) const;
 
 private:
+  /** What one answer to a Range request gives. */
+  enum class Chunk {
+    Append,   ///< The next bytes of the file.
+    Restart,  ///< The whole file: replaces what there is.
+    Complete, ///< Nothing more (416): check what there is.
+    Stop,     ///< Stopped, or settled with an error.
+  };
+
   void work();
   bool fetchManifest();
+  /** Downloads the manifest to @p path and into @p json; checks it. */
+  bool downloadManifest(const QString& path, QByteArray* json);
   bool fetchFile(const PackFile& file);
+  /** Takes @p response to the request for @p file from byte @p have. */
+  Chunk takeChunk(const PackFile& file, const HttpResponse& response,
+                  qint64 have, QByteArray* body);
   void stop(PackInstallProgress::State state);
   void settle(PackInstallProgress::State state, const QString& error);
   void addDone(qint64 bytes);

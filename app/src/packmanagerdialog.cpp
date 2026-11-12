@@ -134,10 +134,10 @@ void PackManagerDialog::selectPack(const QString& id)
 PackManagerDialog::Row PackManagerDialog::row(const QString& id) const
 {
   const InstalledPack* installed = m_manager.installedPack(id);
+  const std::optional<PackIndex>& index = m_manager.index();
   const std::optional<PackIndexEntry> entry =
-      m_manager.index() ? m_manager.index()->pack(id) : std::nullopt;
+      index ? index->pack(id) : std::nullopt;
   const std::optional<PendingPack> pending = m_manager.pending(id);
-  const std::optional<PackInstallProgress> progress = m_manager.progress(id);
 
   Row row;
   row.name = id;
@@ -162,29 +162,11 @@ PackManagerDialog::Row PackManagerDialog::row(const QString& id) const
     row.sizeBytes = installedBytes(*installed);
     row.removal = Removal::Remove;
   }
+  if (describeDownload(&row, m_manager.progress(id), installed != nullptr)) {
+    return row;
+  }
 
-  using State = PackInstallProgress::State;
-  const int percent =
-      progress ? static_cast<int>(std::floor(progress->fraction() * 100.0)) : 0;
-  if (progress &&
-      (progress->state == State::Running || progress->state == State::Ready ||
-       progress->state == State::Verified)) {
-    row.state = progress->totalBytes > 0 ? tr("Downloading: %1 %").arg(percent)
-                                         : tr("Starting the download…");
-    row.action = Action::Pause;
-    row.removal = Removal::CancelDownload;
-  } else if (progress && progress->state == State::Paused) {
-    row.state =
-        progress->errorString.isEmpty()
-            ? tr("Paused at %1 %").arg(percent)
-            : tr("Paused at %1 %: %2").arg(percent).arg(progress->errorString);
-    row.action = Action::Resume;
-    row.removal = Removal::CancelDownload;
-  } else if (progress && progress->state == State::Failed) {
-    row.state = tr("Failed: %1").arg(progress->errorString);
-    row.action = Action::Retry;
-    row.removal = installed ? Removal::Remove : Removal::CancelDownload;
-  } else if (pending && pending->ready) {
+  if (pending && pending->ready) {
     row.state = tr("Will be installed when Terra Soar starts again");
   } else if (pending) {
     row.state = tr("Download not finished; resume to carry on");
@@ -196,7 +178,6 @@ PackManagerDialog::Row PackManagerDialog::row(const QString& id) const
   } else if (installed && entry &&
              entry->version != installed->manifest.version) {
     row.state = tr("Installed; version %1 available").arg(entry->version);
-    row.version = installed->manifest.version;
     row.action = Action::Update;
   } else if (installed) {
     row.state = tr("Installed");
@@ -205,6 +186,44 @@ PackManagerDialog::Row PackManagerDialog::row(const QString& id) const
     row.action = entry ? Action::Install : Action::None;
   }
   return row;
+}
+
+bool PackManagerDialog::describeDownload(
+    Row* row, const std::optional<PackInstallProgress>& progress,
+    bool installed)
+{
+  if (!progress) {
+    return false;
+  }
+  using State = PackInstallProgress::State;
+  const int percent =
+      static_cast<int>(std::floor(progress->fraction() * 100.0));
+  switch (progress->state) {
+  case State::Running:
+  case State::Ready:
+  case State::Verified:
+    row->state = progress->totalBytes > 0 ? tr("Downloading: %1 %").arg(percent)
+                                          : tr("Starting the download…");
+    row->action = Action::Pause;
+    row->removal = Removal::CancelDownload;
+    return true;
+  case State::Paused:
+    row->state =
+        progress->errorString.isEmpty()
+            ? tr("Paused at %1 %").arg(percent)
+            : tr("Paused at %1 %: %2").arg(percent).arg(progress->errorString);
+    row->action = Action::Resume;
+    row->removal = Removal::CancelDownload;
+    return true;
+  case State::Failed:
+    row->state = tr("Failed: %1").arg(progress->errorString);
+    row->action = Action::Retry;
+    row->removal = installed ? Removal::Remove : Removal::CancelDownload;
+    return true;
+  case State::Cancelled:
+    break;
+  }
+  return false;
 }
 
 void PackManagerDialog::fill()

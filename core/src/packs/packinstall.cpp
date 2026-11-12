@@ -90,11 +90,10 @@ void PackInstall::stop(PackInstallProgress::State state)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   m_stop.store(true);
-  if (!m_progress.isOver() &&
-      m_progress.state != PackInstallProgress::State::Paused) {
-    m_progress.state = state;
-  } else if (state == PackInstallProgress::State::Cancelled &&
-             m_progress.state == PackInstallProgress::State::Paused) {
+  // A running install takes either; a paused one can still be cancelled.
+  const bool paused = m_progress.state == PackInstallProgress::State::Paused;
+  if ((!m_progress.isOver() && !paused) ||
+      (paused && state == PackInstallProgress::State::Cancelled)) {
     m_progress.state = state;
   }
   m_changed.notify_all();
@@ -165,37 +164,9 @@ bool PackInstall::fetchManifest()
     json = staged.readAll();
     staged.close();
   }
-  if (sha256(json) != m_entry.manifestSha256) {
-    HttpRequest request;
-    request.url = m_entry.manifestUrl;
-    const HttpResponse response = m_network->fetch(request, m_stop);
-    if (response.error == NetworkError::Cancelled || m_stop.load()) {
-      return false;
-    }
-    if (!response.isSuccess() || response.status != 200) {
-      settle(PackInstallProgress::State::Paused,
-             QCoreApplication::translate(
-                 "ts::PackInstall", "Cannot download the pack's manifest: %1")
-                 .arg(describe(response)));
-      return false;
-    }
-    if (sha256(response.body) != m_entry.manifestSha256) {
-      settle(PackInstallProgress::State::Failed,
-             QCoreApplication::translate(
-                 "ts::PackInstall",
-                 "The pack's manifest is damaged (checksum mismatch)."));
-      return false;
-    }
-    json = response.body;
-    QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly) || file.write(json) < 0 ||
-        !file.commit()) {
-      settle(
-          PackInstallProgress::State::Failed,
-          QCoreApplication::translate("ts::PackInstall", "Cannot write %1: %2")
-              .arg(path, file.errorString()));
-      return false;
-    }
+  if (sha256(json) != m_entry.manifestSha256 &&
+      !downloadManifest(path, &json)) {
+    return false;
   }
   QString error;
   std::optional<PackManifest> manifest =
@@ -242,6 +213,101 @@ bool PackInstall::fetchManifest()
   return true;
 }
 
+bool PackInstall::downloadManifest(const QString& path, QByteArray* json)
+{
+  HttpRequest request;
+  request.url = m_entry.manifestUrl;
+  const HttpResponse response = m_network->fetch(request, m_stop);
+  if (response.error == NetworkError::Cancelled || m_stop.load()) {
+    return false;
+  }
+  if (!response.isSuccess() || response.status != 200) {
+    settle(PackInstallProgress::State::Paused,
+           QCoreApplication::translate(
+               "ts::PackInstall", "Cannot download the pack's manifest: %1")
+               .arg(describe(response)));
+    return false;
+  }
+  if (sha256(response.body) != m_entry.manifestSha256) {
+    settle(PackInstallProgress::State::Failed,
+           QCoreApplication::translate(
+               "ts::PackInstall",
+               "The pack's manifest is damaged (checksum mismatch)."));
+    return false;
+  }
+  *json = response.body;
+  QSaveFile file(path);
+  if (!file.open(QIODevice::WriteOnly) || file.write(*json) < 0 ||
+      !file.commit()) {
+    settle(PackInstallProgress::State::Failed,
+           QCoreApplication::translate("ts::PackInstall", "Cannot write %1: %2")
+               .arg(path, file.errorString()));
+    return false;
+  }
+  return true;
+}
+
+PackInstall::Chunk PackInstall::takeChunk(const PackFile& file,
+                                          const HttpResponse& response,
+                                          qint64 have, QByteArray* body)
+{
+  if (response.error == NetworkError::Cancelled || m_stop.load()) {
+    return Chunk::Stop;
+  }
+  const QString noResume = QCoreApplication::translate(
+      "ts::PackInstall",
+      "The server of %1 does not support resuming downloads.");
+  if (response.error == NetworkError::TooLarge) {
+    // More than a chunk came back: the server ignored the range.
+    settle(PackInstallProgress::State::Failed, noResume.arg(file.path));
+    return Chunk::Stop;
+  }
+  if (response.error != NetworkError::None) {
+    settle(
+        PackInstallProgress::State::Paused,
+        QCoreApplication::translate("ts::PackInstall", "Cannot download %1: %2")
+            .arg(file.path, describe(response)));
+    return Chunk::Stop;
+  }
+  switch (response.status) {
+  case 416:
+    return Chunk::Complete; // Nothing more to have: check what there is.
+  case 200:
+    // The whole file, from a server that ignores ranges.
+    if (response.body.size() != file.sizeBytes) {
+      settle(PackInstallProgress::State::Failed, noResume.arg(file.path));
+      return Chunk::Stop;
+    }
+    *body = response.body;
+    return Chunk::Restart;
+  case 206:
+    if (rangeStart(response.header(QByteArrayLiteral("content-range"))) !=
+            std::optional<qint64>(have) ||
+        response.body.isEmpty()) {
+      settle(PackInstallProgress::State::Failed,
+             QCoreApplication::translate(
+                 "ts::PackInstall", "The server sent the wrong part of %1.")
+                 .arg(file.path));
+      return Chunk::Stop;
+    }
+    *body = response.body;
+    body->truncate(static_cast<int>(
+        std::min<qint64>(body->size(), file.sizeBytes - have)));
+    return Chunk::Append;
+  default: {
+    // 408, 429 and 5xx were retried by the client already.
+    const bool later = response.status == 408 || response.status == 429 ||
+                       response.status >= 500;
+    settle(
+        later ? PackInstallProgress::State::Paused
+              : PackInstallProgress::State::Failed,
+        QCoreApplication::translate("ts::PackInstall", "Cannot download %1: %2")
+            .arg(file.path, describe(response)));
+    return Chunk::Stop;
+  }
+  }
+}
+
 bool PackInstall::fetchFile(const PackFile& file)
 {
   const QDir directory(m_directory);
@@ -278,65 +344,19 @@ bool PackInstall::fetchFile(const PackFile& file)
                                      QByteArray::number(have) + '-' +
                                      QByteArray::number(last));
     const HttpResponse response = m_network->fetch(request, m_stop);
-    if (response.error == NetworkError::Cancelled || m_stop.load()) {
+    QByteArray body;
+    const Chunk chunk = takeChunk(file, response, have, &body);
+    if (chunk == Chunk::Stop) {
       return false;
     }
-    if (response.error == NetworkError::TooLarge) {
-      // More than a chunk came back: the server ignored the range.
-      settle(PackInstallProgress::State::Failed,
-             QCoreApplication::translate(
-                 "ts::PackInstall",
-                 "The server of %1 does not support resuming downloads.")
-                 .arg(file.path));
-      return false;
+    if (chunk == Chunk::Complete) {
+      break;
     }
-    if (response.error != NetworkError::None) {
-      settle(PackInstallProgress::State::Paused,
-             QCoreApplication::translate("ts::PackInstall",
-                                         "Cannot download %1: %2")
-                 .arg(file.path, describe(response)));
-      return false;
-    }
-    if (response.status == 416) {
-      break; // Nothing more to have: check what there is.
-    }
-    QByteArray body = response.body;
-    if (response.status == 200) {
-      // The whole file, from a server that ignores ranges.
-      if (body.size() != file.sizeBytes) {
-        settle(PackInstallProgress::State::Failed,
-               QCoreApplication::translate(
-                   "ts::PackInstall",
-                   "The server of %1 does not support resuming downloads.")
-                   .arg(file.path));
-        return false;
-      }
+    if (chunk == Chunk::Restart) {
       addDone(-have);
       part.resize(0);
       part.seek(0);
       have = 0;
-    } else if (response.status == 206) {
-      if (rangeStart(response.header(QByteArrayLiteral("content-range"))) !=
-              std::optional<qint64>(have) ||
-          body.isEmpty()) {
-        settle(PackInstallProgress::State::Failed,
-               QCoreApplication::translate(
-                   "ts::PackInstall", "The server sent the wrong part of %1.")
-                   .arg(file.path));
-        return false;
-      }
-      body.truncate(static_cast<int>(
-          std::min<qint64>(body.size(), file.sizeBytes - have)));
-    } else {
-      // 408, 429 and 5xx were retried by the client already.
-      const bool later = response.status == 408 || response.status == 429 ||
-                         response.status >= 500;
-      settle(later ? PackInstallProgress::State::Paused
-                   : PackInstallProgress::State::Failed,
-             QCoreApplication::translate("ts::PackInstall",
-                                         "Cannot download %1: %2")
-                 .arg(file.path, describe(response)));
-      return false;
     }
     if (part.write(body) != body.size() || !part.flush()) {
       settle(

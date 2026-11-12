@@ -92,7 +92,8 @@ public:
    * emptied first), and records the entry in its `pending.json`. Returns
    * the directory, or an empty string and @p errorString (English).
    */
-  QString prepareStaging(const PackIndexEntry& entry, QString* errorString);
+  QString prepareStaging(const PackIndexEntry& entry,
+                         QString* errorString) const;
 
   /** Deletes the staging directory of pack @p id (a cancelled download). */
   void discardStaging(const QString& id);

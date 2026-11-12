@@ -9,6 +9,8 @@
 #include <QDialog>
 #include <QString>
 
+#include "ts/packs/packinstall.h"
+
 class QLabel;
 class QPushButton;
 class QTreeWidget;
@@ -90,6 +92,15 @@ public:
 
   /** Returns how pack @p id is shown. */
   Row row(const QString& id) const;
+
+  /**
+   * Fills the state, action and removal of @p row from a download's
+   * @p progress if it runs, is paused or failed; false otherwise.
+   * @p installed: an earlier version is installed.
+   */
+  static bool
+  describeDownload(Row* row, const std::optional<PackInstallProgress>& progress,
+                   bool installed);
 
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */

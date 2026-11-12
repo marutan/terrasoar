@@ -51,10 +51,12 @@ versions ignore the field.
 
 | Pack id | Replaces | What | Size |
 | --- | --- | --- | --- |
-| `bluemarble-full` | `bluemarble` | The same Blue Marble image as the base pack (21600 × 10800 px), tiled to level 6 instead of 4: about 1.2 km per pixel instead of 4.9 km | about 100 MB |
-| `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the full resolution added: crude to high as in the base pack, then full (about 10 million vertices) from level 8 | about 250 MB |
+| `bluemarble-full` | `bluemarble` | The same Blue Marble image as the base pack (21600 × 10800 px), tiled to level 6 instead of 4: about 1.2 km per pixel instead of 4.9 km | 67 MB |
+| `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the full resolution added: crude to high as in the base pack, then full (10.9 million vertices) from level 8 | 241 MB |
 
-Their packager configurations are `tools/packager/packs/*.json`.
+Their packager configurations are `tools/packager/packs/*.json`; `make packs`
+builds them with their release files and index entries
+([docs/tools/packager.md](../tools/packager.md#extra-packs)).
 
 ## The index
 
@@ -132,8 +134,8 @@ resume later.
 ## Installing, updating and removing
 
 `ts::PackLibrary` owns `<AppLocalDataLocation>/packs/` (on Linux
-`~/.local/share/terrasoar/packs`; the environment variable `TS_PACKS_DIR`
-replaces it, for tests and portable installs):
+`~/.local/share/Terra Soar/terrasoar/packs`; the environment variable
+`TS_PACKS_DIR` replaces it, for tests and portable installs):
 
 - **Activate** (all files good): the manifest is written into the
   staging directory last, then the installed `<id>/` (if any, an update)
@@ -149,7 +151,7 @@ replaces it, for tests and portable installs):
   list either way, and no file of it is left once the trash is emptied.
 - **On start-up**: empty `.trash/`, finish `ready` swaps, then read each
   `<id>/manifest.json` and check every file's size (not its SHA-256: that
-  was checked on install, and reading 350 MB at every start would be
+  was checked on install, and reading 300 MB at every start would be
   slow). A pack with a missing or wrongly sized file is listed as
   "Damaged" and not used; Install fetches it again.
 
