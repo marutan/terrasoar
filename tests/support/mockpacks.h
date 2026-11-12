@@ -52,8 +52,10 @@ inline MockHttpResponse serve(const Served& content,
   if (first >= size) {
     return mockResponse(416, QByteArray());
   }
+  // Test files are small: int fits, and is what Qt 5's mid() takes.
   MockHttpResponse response =
-      mockResponse(206, data.mid(first, last - first + 1));
+      mockResponse(206, data.mid(static_cast<int>(first),
+                                 static_cast<int>(last - first + 1)));
   response.headers.emplace_back(
       QByteArrayLiteral("Content-Range"),
       QStringLiteral("bytes %1-%2/%3").arg(first).arg(last).arg(size).toUtf8());

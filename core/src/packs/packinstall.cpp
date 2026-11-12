@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
+#include <QList>
 #include <QSaveFile>
 
 #include "ts/network/networkclient.h"
@@ -28,11 +29,12 @@ std::optional<qint64> rangeStart(const QByteArray& contentRange)
   if (!contentRange.startsWith(prefix)) {
     return std::nullopt;
   }
-  const qsizetype dash = contentRange.indexOf('-');
+  // "bytes <first>-<last>/<size>". Split, not indexOf(): its type differs
+  // between Qt 5 (int) and Qt 6 (qsizetype).
+  const QList<QByteArray> parts = contentRange.mid(prefix.size()).split('-');
   bool ok = false;
-  const qint64 first =
-      contentRange.mid(prefix.size(), dash - prefix.size()).toLongLong(&ok);
-  return ok && dash > 0 ? std::optional<qint64>(first) : std::nullopt;
+  const qint64 first = parts.size() > 1 ? parts.front().toLongLong(&ok) : 0;
+  return ok ? std::optional<qint64>(first) : std::nullopt;
 }
 
 QString sha256(const QByteArray& data)
