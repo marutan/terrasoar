@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <functional>
+
 #include <QAction>
 #include <QApplication>
 #include <QComboBox>
 #include <QDir>
+#include <QDirIterator>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFontMetrics>
@@ -31,10 +34,13 @@
 #include "globeview.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
+#include "mockpacks.h"
 #include "mockwms.h"
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
 #include "offlineregionsdialog.h"
+#include "packmanager.h"
+#include "packmanagerdialog.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
@@ -1175,6 +1181,120 @@ private slots:
     QVERIFY(regions.regions().empty());
     QCOMPARE(provider->diskCache()->regionUsage(id).tiles, 0LL);
     QCOMPARE(list->list()->topLevelItemCount(), 0);
+  }
+
+  void dataPacksEndToEnd()
+  {
+    // A pack replacing Blue Marble, listed from the index, installed (the
+    // globe credits it), updated and removed (the base pack's is back).
+    const QTemporaryDir packsDirectory;
+    qputenv("TS_PACKS_DIR", packsDirectory.path().toUtf8());
+    const QTemporaryDir full;
+    ts::test::writeFixtureBasePack(full.path(), QColor(200, 100, 50));
+    QFile tilesFile(
+        QDir(full.path()).filePath(QStringLiteral("bluemarble.sqlite")));
+    QVERIFY(tilesFile.open(QIODevice::ReadOnly));
+    const QByteArray tiles = tilesFile.readAll();
+    const QString id = QStringLiteral("bluemarble-full");
+    ts::test::MockHttpServer server;
+    const ts::test::RemotePack v1 =
+        ts::test::remotePack(server, id, QStringLiteral("1"), tiles);
+    const ts::test::RemotePack v2 =
+        ts::test::remotePack(server, id, QStringLiteral("2"), tiles);
+    ts::test::Served files = v1.files;
+    files.insert(v2.files.cbegin(), v2.files.cend());
+    const std::function<void(const ts::PackIndexEntry&)> serveIndexOf =
+        [&server, &files](const ts::PackIndexEntry& entry) {
+          files[QStringLiteral("/index.json")] =
+              QJsonDocument(QJsonObject{{QStringLiteral("format"), 1},
+                                        {QStringLiteral("packs"),
+                                         QJsonArray{entry.toJson()}}})
+                  .toJson();
+          server.setHandler(
+              [served = files](const ts::test::MockHttpRequest& request) {
+                return ts::test::serve(served, request, true);
+              });
+        };
+    serveIndexOf(v1.entry);
+
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    window.registry().setWmsNetwork(
+        std::make_shared<ts::NetworkClient>(settings),
+        ts::WmsProviderSettings());
+    ts::PackManager& packs = window.packs();
+    packs.setIndexUrl(server.url(QStringLiteral("/index.json")));
+    packs.setAllowLocalHttp(true);
+    QVERIFY(packs.installed().empty());
+
+    ts::PackManagerDialog* dialog = window.showDataPacks();
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return dialog->list()->topLevelItemCount() == 1; }, 10000));
+    dialog->selectPack(id);
+    QCOMPARE(dialog->row(id).state, QStringLiteral("Not installed"));
+    QCOMPARE(dialog->list()->topLevelItem(0)->text(0),
+             QStringLiteral("Test pack"));
+    QPushButton* action =
+        dialog->findChild<QPushButton*>(QStringLiteral("packActionButton"));
+    QPushButton* remove =
+        dialog->findChild<QPushButton*>(QStringLiteral("packRemoveButton"));
+    QCOMPARE(withoutMnemonic(action->text()), QStringLiteral("Install"));
+    QVERIFY(!remove->isEnabled());
+
+    action->click();
+    QVERIFY(QTest::qWaitFor([&]() { return packs.installed().size() == 1; },
+                            20000));
+    QCOMPARE(dialog->row(id).state, QStringLiteral("Installed"));
+    QVERIFY(remove->isEnabled());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QVERIFY(
+          globe->attributions().contains(QStringLiteral("Full attribution")));
+    }
+
+    // The index lists version 2: an update.
+    serveIndexOf(v2.entry);
+    dialog->findChild<QPushButton*>(QStringLiteral("packRefreshButton"))
+        ->click();
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return dialog->row(id).action ==
+                 ts::PackManagerDialog::Action::Update;
+        },
+        10000));
+    QCOMPARE(withoutMnemonic(action->text()), QStringLiteral("Update"));
+    action->click();
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return !packs.installed().empty() &&
+                 packs.installed().front().manifest.version ==
+                     QStringLiteral("2");
+        },
+        20000));
+
+    // Removing it (after the question) brings the base pack's back.
+    QTimer::singleShot(0, &window, [&]() {
+      for (QWidget* widget : QApplication::topLevelWidgets()) {
+        if (QMessageBox* box = qobject_cast<QMessageBox*>(widget)) {
+          box->button(QMessageBox::Yes)->click();
+        }
+      }
+    });
+    remove->click();
+    QVERIFY(packs.installed().empty());
+    QCOMPARE(dialog->row(id).state, QStringLiteral("Not installed"));
+    QDirIterator left(packsDirectory.path(), QDir::Files | QDir::Hidden,
+                      QDirIterator::Subdirectories);
+    QVERIFY2(!left.hasNext(),
+             qPrintable(left.hasNext() ? left.next() : QString()));
+    if (globe != nullptr) {
+      QVERIFY(
+          globe->attributions().contains(QStringLiteral("Fixture imagery")));
+    }
+    qunsetenv("TS_PACKS_DIR");
   }
 
   void drawRegionOnTheGlobe()

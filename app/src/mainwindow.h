@@ -39,6 +39,8 @@ class LayerTreeModel;
 class NewRegionDialog;
 class OfflineRegionManager;
 class OfflineRegionsDialog;
+class PackManager;
+class PackManagerDialog;
 class ProviderRegistry;
 struct LayerStack;
 
@@ -103,6 +105,12 @@ public:
 
   /** Returns the offline regions. */
   OfflineRegionManager& offlineRegions() const { return *m_offlineRegions; }
+
+  /** Shows the Data Packs window (not modal) and returns it. */
+  PackManagerDialog* showDataPacks();
+
+  /** Returns the extra data packs. */
+  PackManager& packs() const { return *m_packs; }
 
   /** Returns the globe view, or null without OpenGL (tests). */
   GlobeView* globeView() const { return m_globeView; }
@@ -199,6 +207,10 @@ private:
   std::unique_ptr<OfflineRegionManager> m_offlineRegions;
   QPointer<OfflineRegionsDialog> m_offlineRegionsDialog;
   QPointer<NewRegionDialog> m_newRegionDialog;
+  QAction* m_dataPacksAction = nullptr;
+  /** Destroyed before the registry. */
+  std::unique_ptr<PackManager> m_packs;
+  QPointer<PackManagerDialog> m_packsDialog;
   QLabel* m_downloadLabel = nullptr;
   /** The imagery layers' providers, by node id, for their status. */
   std::vector<std::pair<QString, std::shared_ptr<ImageryProvider>>>

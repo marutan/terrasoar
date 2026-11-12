@@ -2,6 +2,7 @@
 #include "mainwindow.h"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <optional>
 
@@ -32,6 +33,8 @@
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
 #include "offlineregionsdialog.h"
+#include "packmanager.h"
+#include "packmanagerdialog.h"
 #include "ts/base/buildinfo.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/layerstackdraws.h"
@@ -63,6 +66,18 @@ MainWindow::MainWindow(QWidget* parent)
   m_offlineRegions = std::make_unique<OfflineRegionManager>(
       *m_registry,
       QDir(wms.cacheDirectory).filePath(QStringLiteral("regions.json")));
+  // Extra packs are data, not cache: they live with the application's
+  // data, or in TS_PACKS_DIR (tests, portable installs).
+  QString packsDirectory = qEnvironmentVariable("TS_PACKS_DIR");
+  if (packsDirectory.isEmpty()) {
+    packsDirectory = QDir(QStandardPaths::writableLocation(
+                              QStandardPaths::AppLocalDataLocation))
+                         .filePath(QStringLiteral("packs"));
+  }
+  m_packs = std::make_unique<PackManager>(*m_registry, packsDirectory);
+  // Directly: an update closes the old version's files before replacing it.
+  connect(m_packs.get(), &PackManager::layersChanged, this,
+          &MainWindow::refreshLayers, Qt::DirectConnection);
   m_layers->setStatusIcons(
       style()->standardIcon(QStyle::SP_MessageBoxWarning),
       style()->standardIcon(QStyle::SP_MessageBoxCritical));
@@ -143,12 +158,16 @@ MainWindow::MainWindow(QWidget* parent)
   m_downloadLabel = new QLabel(this);
   m_downloadLabel->setObjectName(QStringLiteral("downloadLabel"));
   statusBar()->addPermanentWidget(m_downloadLabel);
+  const std::function<void()> showDownloads = [this]() {
+    QStringList parts{m_offlineRegions->statusText(), m_packs->statusText()};
+    parts.removeAll(QString());
+    const QString text = parts.join(QStringLiteral(" · "));
+    m_downloadLabel->setText(text);
+    m_downloadLabel->setVisible(!text.isEmpty());
+  };
   connect(m_offlineRegions.get(), &OfflineRegionManager::progressChanged, this,
-          [this]() {
-            const QString text = m_offlineRegions->statusText();
-            m_downloadLabel->setText(text);
-            m_downloadLabel->setVisible(!text.isEmpty());
-          });
+          showDownloads);
+  connect(m_packs.get(), &PackManager::progressChanged, this, showDownloads);
   m_downloadLabel->hide();
 
   createActions();
@@ -163,7 +182,9 @@ MainWindow::~MainWindow()
   // Dialogs first: they refer to the regions, which go before the registry.
   delete m_newRegionDialog;
   delete m_offlineRegionsDialog;
+  delete m_packsDialog;
   m_offlineRegions.reset();
+  m_packs.reset();
   for (const std::pair<QString, std::shared_ptr<ImageryProvider>>& layer :
        m_layerProviders) {
     layer.second->setStatusCallback({});
@@ -389,6 +410,11 @@ void MainWindow::createActions()
   connect(m_offlineRegionsAction, &QAction::triggered, this,
           [this]() { showOfflineRegions(); });
 
+  m_dataPacksAction = new QAction(this);
+  m_dataPacksAction->setObjectName(QStringLiteral("dataPacksAction"));
+  connect(m_dataPacksAction, &QAction::triggered, this,
+          [this]() { showDataPacks(); });
+
   m_openAction = new QAction(this);
   m_openAction->setObjectName(QStringLiteral("openProjectAction"));
   m_openAction->setShortcut(QKeySequence::Open);
@@ -426,6 +452,7 @@ void MainWindow::createMenus()
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
+  m_fileMenu->addAction(m_dataPacksAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_quitAction);
 
@@ -483,6 +510,9 @@ void MainWindow::retranslateUi()
   m_offlineRegionsAction->setStatusTip(
       tr("Keep areas of WMS layers on this computer for use without a "
          "network"));
+  m_dataPacksAction->setText(tr("&Data Packs…"));
+  m_dataPacksAction->setStatusTip(
+      tr("Install more detailed imagery and shorelines, or remove them"));
   m_openAction->setText(tr("&Open Project…"));
   m_openAction->setStatusTip(
       tr("Replace the layers and view with a saved project"));
@@ -661,6 +691,18 @@ OfflineRegionsDialog* MainWindow::showOfflineRegions()
   m_offlineRegionsDialog->raise();
   m_offlineRegionsDialog->activateWindow();
   return m_offlineRegionsDialog;
+}
+
+PackManagerDialog* MainWindow::showDataPacks()
+{
+  if (!m_packsDialog) {
+    m_packsDialog = new PackManagerDialog(*m_packs, this);
+    m_packsDialog->setAttribute(Qt::WA_DeleteOnClose);
+  }
+  m_packsDialog->show();
+  m_packsDialog->raise();
+  m_packsDialog->activateWindow();
+  return m_packsDialog;
 }
 
 NewRegionDialog* MainWindow::newOfflineRegion()

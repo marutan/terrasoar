@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 
 #include "ts/network/networkclient.h"
+#include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
@@ -76,6 +77,12 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
                                        QString* errorString) const
 {
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const std::unordered_map<QString, Replacement>::const_iterator replacement =
+      m_replacements.find(dataset);
+  if (replacement != m_replacements.end() &&
+      replacement->second.features == features) {
+    return replacement->second.path;
+  }
   const std::unordered_map<QString, QString>& files =
       features ? m_basePackFeatures : m_basePackImagery;
   const std::unordered_map<QString, QString>::const_iterator file =
@@ -174,6 +181,29 @@ void ProviderRegistry::setBasePack(const QString& directory,
   }
 }
 
+void ProviderRegistry::setInstalledPacks(
+    const std::vector<InstalledPack>& packs)
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  m_replacements.clear();
+  for (const InstalledPack& pack : packs) {
+    if (pack.damaged) {
+      continue;
+    }
+    for (const PackDataset& dataset : pack.manifest.datasets) {
+      if (dataset.replaces.isEmpty() ||
+          m_replacements.count(dataset.replaces) != 0) {
+        continue;
+      }
+      Replacement replacement;
+      replacement.path = QDir(pack.directory).filePath(dataset.file);
+      replacement.features = dataset.kind == PackDataset::Kind::Features;
+      replacement.attribution = dataset.attribution;
+      m_replacements[dataset.replaces] = replacement;
+    }
+  }
+}
+
 std::shared_ptr<FeatureProvider>
 ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 {
@@ -187,7 +217,8 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
     }
     return nullptr;
   }
-  const QString key = canonical(source) + m_basePackDirectory;
+  // A pack source depends on which file it resolves to.
+  const QString key = canonical(source) + basePackFile(source, true, nullptr);
   const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
       it = m_features.find(key);
   if (it != m_features.end()) {
@@ -223,12 +254,20 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
     return source.value(QStringLiteral("attribution")).toString();
   }
   const std::lock_guard<std::mutex> lock(m_mutex);
-  if (!isBasePackSource(source) || m_basePackDirectory.isEmpty()) {
+  if (!isBasePackSource(source)) {
+    return QString();
+  }
+  const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const std::unordered_map<QString, Replacement>::const_iterator replacement =
+      m_replacements.find(dataset);
+  if (replacement != m_replacements.end()) {
+    return replacement->second.attribution;
+  }
+  if (m_basePackDirectory.isEmpty()) {
     return QString();
   }
   const std::unordered_map<QString, QString>::const_iterator found =
-      m_basePackAttribution.find(
-          source.value(QStringLiteral("dataset")).toString());
+      m_basePackAttribution.find(dataset);
   return found == m_basePackAttribution.end() ? QString() : found->second;
 }
 
@@ -242,10 +281,11 @@ std::shared_ptr<ImageryProvider>
 ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  // A pack source depends on which pack is installed.
-  const QString key = isBasePackSource(source)
-                          ? canonical(source) + m_basePackDirectory
-                          : canonical(source);
+  // A pack source depends on which file it resolves to.
+  const QString key =
+      isBasePackSource(source)
+          ? canonical(source) + basePackFile(source, false, nullptr)
+          : canonical(source);
   const std::unordered_map<QString, std::weak_ptr<ImageryProvider>>::iterator
       it = m_imagery.find(key);
   if (it != m_imagery.end()) {

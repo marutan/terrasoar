@@ -16,6 +16,8 @@ HEADERS += \
     $$PWD/src/mainwindow.h \
     $$PWD/src/newregiondialog.h \
     $$PWD/src/offlineregionmanager.h \
+    $$PWD/src/packmanager.h \
+    $$PWD/src/packmanagerdialog.h \
     $$PWD/src/offlineregionsdialog.h \
     $$PWD/src/startupmeasurement.h \
     $$PWD/src/wmscataloguefile.h
@@ -27,6 +29,8 @@ SOURCES += \
     $$PWD/src/mainwindow.cpp \
     $$PWD/src/newregiondialog.cpp \
     $$PWD/src/offlineregionmanager.cpp \
+    $$PWD/src/packmanager.cpp \
+    $$PWD/src/packmanagerdialog.cpp \
     $$PWD/src/offlineregionsdialog.cpp \
     $$PWD/src/startupmeasurement.cpp \
     $$PWD/src/wmscataloguefile.cpp
