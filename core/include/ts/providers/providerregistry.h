@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <vector>
 
 #include <QJsonObject>
 #include <QString>
@@ -20,6 +21,7 @@ class FeatureProvider;
 class ImageryProvider;
 class NetworkClient;
 class PackManifest;
+struct InstalledPack;
 struct WmsProviderSettings;
 
 /**
@@ -80,6 +82,16 @@ public:
   QString basePackDirectory() const;
 
   /**
+   * Makes the datasets of @p packs that replace a base pack dataset
+   * (PackDataset::replaces) take its place for sources `{"kind":
+   * "basepack", "dataset": "<id>"}`, with their own attribution. Damaged
+   * packs are left out; if two packs replace one dataset, the first in
+   * @p packs wins. Replaces the previous set; affects providers handed out
+   * afterwards (refresh the layers). See docs/design/packs.md.
+   */
+  void setInstalledPacks(const std::vector<InstalledPack>& packs);
+
+  /**
    * Sets the network client and settings for WMS sources (`{"kind":
    * "wms", …}`, see WmsSource). A null @p network is created with default
    * settings when the first WMS source needs it (so that a program without
@@ -122,6 +134,14 @@ private:
   /** Dataset id → attribution. */
   std::unordered_map<QString, QString> m_basePackAttribution;
   std::unordered_map<QString, std::weak_ptr<FeatureProvider>> m_features;
+  /** A dataset of an installed pack in place of a base pack one. */
+  struct Replacement {
+    QString path;
+    bool features = false;
+    QString attribution;
+  };
+  /** Base pack dataset id → what replaces it. */
+  std::unordered_map<QString, Replacement> m_replacements;
   std::shared_ptr<NetworkClient> m_network;
   std::unique_ptr<WmsProviderSettings> m_wmsSettings;
 };

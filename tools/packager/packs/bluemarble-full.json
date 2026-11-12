@@ -1,0 +1,32 @@
+{
+  "id": "bluemarble-full",
+  "version": "2004-07.1",
+  "index": {
+    "name": "Blue Marble, full resolution",
+    "description": "NASA's Blue Marble image of the Earth at its full resolution, about 1.2 km per pixel instead of the base pack's 4.9 km. Replaces the base pack's Blue Marble while installed.",
+    "licence": "Public domain (NASA)"
+  },
+  "sizeLimitBytes": 100000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "bmng",
+      "file": "world.topo.bathy.200407.3x21600x10800.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg",
+      "sha256": "d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0",
+      "name": "Blue Marble Next Generation with topography and bathymetry",
+      "version": "2004-07"
+    }
+  ],
+  "imagery": {
+    "dataset": "bluemarble",
+    "replaces": "bluemarble",
+    "source": "bmng",
+    "name": "Blue Marble, full resolution",
+    "licence": "Public domain (NASA)",
+    "attribution": "Blue Marble: NASA Earth Observatory",
+    "maxLevel": 6,
+    "tileSize": 256,
+    "jpegQuality": 85
+  }
+}

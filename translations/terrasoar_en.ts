@@ -596,6 +596,14 @@
             <source>Only layers from WMS servers can be kept for offline use. Add a WMS layer first (File → Add WMS Layer…).</source>
             <translation>Only layers from WMS servers can be kept for offline use. Add a WMS layer first (File → Add WMS Layer…).</translation>
         </message>
+        <message>
+            <source>&amp;Data Packs…</source>
+            <translation>&amp;Data Packs…</translation>
+        </message>
+        <message>
+            <source>Install more detailed imagery and shorelines, or remove them</source>
+            <translation>Install more detailed imagery and shorelines, or remove them</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -837,6 +845,207 @@
         <message>
             <source>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</source>
             <translation>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::PackInstall</name>
+        <message>
+            <source>Cannot download the pack's manifest: %1</source>
+            <translation>Cannot download the pack's manifest: %1</translation>
+        </message>
+        <message>
+            <source>The pack's manifest is damaged (checksum mismatch).</source>
+            <translation>The pack's manifest is damaged (checksum mismatch).</translation>
+        </message>
+        <message>
+            <source>Cannot write %1: %2</source>
+            <translation>Cannot write %1: %2</translation>
+        </message>
+        <message>
+            <source>The pack's manifest can't be used: %1</source>
+            <translation>The pack's manifest can't be used: %1</translation>
+        </message>
+        <message>
+            <source>The server of %1 does not support resuming downloads.</source>
+            <translation>The server of %1 does not support resuming downloads.</translation>
+        </message>
+        <message>
+            <source>Cannot download %1: %2</source>
+            <translation>Cannot download %1: %2</translation>
+        </message>
+        <message>
+            <source>The server sent the wrong part of %1.</source>
+            <translation>The server sent the wrong part of %1.</translation>
+        </message>
+        <message>
+            <source>%1 is damaged (checksum mismatch).</source>
+            <translation>%1 is damaged (checksum mismatch).</translation>
+        </message>
+        <message>
+            <source>Cannot write %1.</source>
+            <translation>Cannot write %1.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::PackManager</name>
+        <message>
+            <source>The address of the list of packs is not secure: %1</source>
+            <translation>The address of the list of packs is not secure: %1</translation>
+        </message>
+        <message>
+            <source>Cannot load the list of packs: %1</source>
+            <translation>Cannot load the list of packs: %1</translation>
+        </message>
+        <message>
+            <source>HTTP status %1</source>
+            <translation>HTTP status %1</translation>
+        </message>
+        <message>
+            <source>Cannot read the list of packs: %1</source>
+            <translation>Cannot read the list of packs: %1</translation>
+        </message>
+        <message>
+            <source>The pack %1 is not in the list of packs.</source>
+            <translation>The pack %1 is not in the list of packs.</translation>
+        </message>
+        <message>
+            <source>Cannot prepare the download: %1</source>
+            <translation>Cannot prepare the download: %1</translation>
+        </message>
+        <message>
+            <source>Pack %1: %2 %</source>
+            <translation>Pack %1: %2 %</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::PackManagerDialog</name>
+        <message>
+            <source>Data Packs</source>
+            <translation>Data Packs</translation>
+        </message>
+        <message>
+            <source>Name</source>
+            <translation>Name</translation>
+        </message>
+        <message>
+            <source>Version</source>
+            <translation>Version</translation>
+        </message>
+        <message>
+            <source>Size</source>
+            <translation>Size</translation>
+        </message>
+        <message>
+            <source>State</source>
+            <translation>State</translation>
+        </message>
+        <message>
+            <source>Re&amp;fresh List</source>
+            <translation>Re&amp;fresh List</translation>
+        </message>
+        <message>
+            <source>Read the list of packs again</source>
+            <translation>Read the list of packs again</translation>
+        </message>
+        <message>
+            <source>Close</source>
+            <translation>Close</translation>
+        </message>
+        <message>
+            <source>%1 Licence: %2.</source>
+            <translation>%1 Licence: %2.</translation>
+        </message>
+        <message>
+            <source>Downloading: %1 %</source>
+            <translation>Downloading: %1 %</translation>
+        </message>
+        <message>
+            <source>Starting the download…</source>
+            <translation>Starting the download…</translation>
+        </message>
+        <message>
+            <source>Paused at %1 %</source>
+            <translation>Paused at %1 %</translation>
+        </message>
+        <message>
+            <source>Paused at %1 %: %2</source>
+            <translation>Paused at %1 %: %2</translation>
+        </message>
+        <message>
+            <source>Failed: %1</source>
+            <translation>Failed: %1</translation>
+        </message>
+        <message>
+            <source>Will be installed when Terra Soar starts again</source>
+            <translation>Will be installed when Terra Soar starts again</translation>
+        </message>
+        <message>
+            <source>Download not finished; resume to carry on</source>
+            <translation>Download not finished; resume to carry on</translation>
+        </message>
+        <message>
+            <source>Damaged; not used</source>
+            <translation>Damaged; not used</translation>
+        </message>
+        <message>
+            <source>Installed; version %1 available</source>
+            <translation>Installed; version %1 available</translation>
+        </message>
+        <message>
+            <source>Installed</source>
+            <translation>Installed</translation>
+        </message>
+        <message>
+            <source>Not installed</source>
+            <translation>Not installed</translation>
+        </message>
+        <message>
+            <source>No data packs are available.</source>
+            <translation>No data packs are available.</translation>
+        </message>
+        <message>
+            <source>Reading the list of packs…</source>
+            <translation>Reading the list of packs…</translation>
+        </message>
+        <message>
+            <source>&amp;Install</source>
+            <translation>&amp;Install</translation>
+        </message>
+        <message>
+            <source>&amp;Update</source>
+            <translation>&amp;Update</translation>
+        </message>
+        <message>
+            <source>Re&amp;install</source>
+            <translation>Re&amp;install</translation>
+        </message>
+        <message>
+            <source>&amp;Resume</source>
+            <translation>&amp;Resume</translation>
+        </message>
+        <message>
+            <source>&amp;Try Again</source>
+            <translation>&amp;Try Again</translation>
+        </message>
+        <message>
+            <source>&amp;Pause</source>
+            <translation>&amp;Pause</translation>
+        </message>
+        <message>
+            <source>&amp;Cancel Download</source>
+            <translation>&amp;Cancel Download</translation>
+        </message>
+        <message>
+            <source>Re&amp;move</source>
+            <translation>Re&amp;move</translation>
+        </message>
+        <message>
+            <source>Remove Pack</source>
+            <translation>Remove Pack</translation>
+        </message>
+        <message>
+            <source>Remove “%1” from this computer? Where it replaced data of the base pack, the base pack's is used again.</source>
+            <translation>Remove “%1” from this computer? Where it replaced data of the base pack, the base pack's is used again.</translation>
         </message>
     </context>
     <context>

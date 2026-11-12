@@ -103,6 +103,23 @@ bool buildShoreline(const ShorelineOptions& options,
  */
 double rhumbRingAreaKm2(const std::vector<double>& lonLatDeg);
 
+/**
+ * Returns the ring @p lonLatDeg (longitude, latitude pairs, degrees; closed
+ * or not) of one half of a polygon split at the antimeridian that reaches
+ * the South Pole, with its closure rebuilt: the coastline from one boundary
+ * meridian (0° or ±180°) to the other, then down that meridian, along −90°
+ * and up the first. Returns an open ring.
+ *
+ * GSHHG 2.3.7's full resolution needs this for Antarctica: its eastern half
+ * has a spike down to the pole at 0° where the edges along 180° and −90°
+ * should be, so the ring cuts across the continent; its western half ends
+ * at −0.002° instead of 0°. A well-formed half comes back as the same ring,
+ * maybe starting at another vertex. A ring without pole vertices, or
+ * without exactly one edge from one boundary meridian to the other, comes
+ * back unchanged.
+ */
+std::vector<double> closeHalfAtPole(const std::vector<double>& lonLatDeg);
+
 } // namespace ts::packager
 
 #endif // TS_PACKAGER_SHORELINEBUILDER_H

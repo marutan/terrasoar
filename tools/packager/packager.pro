@@ -18,5 +18,7 @@ SOURCES += $$PWD/src/main.cpp
 OTHER_FILES += \
     basepack.json \
     build_basepack.py \
+    build_pack.py \
     fetch_sources.py \
-    notices/*
+    notices/* \
+    packs/*.json

@@ -97,10 +97,35 @@ says, until you delete it. Regions are kept in your cache folder (on Linux
 `%LOCALAPPDATA%\Terra Soar\terrasoar\cache\wms`); deleting that folder
 deletes your regions too.
 
+## Extra data packs
+
+The built-in Blue Marble and shoreline are kept small so Terra Soar
+downloads quickly. **File > Data Packs…** lists larger versions you can
+install once and then use offline:
+
+| Pack | What you get | Download |
+| --- | --- | --- |
+| Blue Marble, full resolution | The same picture of the Earth, about 1.2 km per pixel instead of 4.9 km | 67 MB |
+| Shoreline, full resolution | Detailed coasts and small islands from zoom level 8 | 241 MB |
+
+Pick a pack and press **Install**. The download runs in the background
+and survives closing the window: **Pause** stops it and **Resume**
+carries on from where it stopped, also after quitting Terra Soar or
+losing the connection. Every file is checked before the pack is used, so
+a damaged download is never shown.
+
+An installed pack takes the place of the built-in data it improves: the
+Blue Marble and Shoreline layers of every project show the pack's data,
+with no change to the project. **Remove** deletes the pack and brings the
+built-in data back. When a newer version is listed, **Update** replaces
+the installed one.
+
+Packs are kept in `~/.local/share/Terra Soar/terrasoar/packs` on Linux
+and `%LOCALAPPDATA%\Terra Soar\terrasoar\packs` on Windows.
+
 ## Limits
 
 - Only WMS layers can be kept this way. The built-in layers need no
-  download; larger built-in data (full-resolution Blue Marble and
-  shoreline) will come as installable packs.
+  download; for more detail in them, install a data pack (below).
 - Picking a country by name isn't available yet; draw its outline as a
   polygon instead.

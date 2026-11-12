@@ -72,6 +72,11 @@ struct PackDataset {
   QString attribution;
   /** Where it comes from. */
   PackSource source;
+  /**
+   * The base pack dataset this one takes the place of while its pack is
+   * installed, or empty. See docs/design/packs.md.
+   */
+  QString replaces;
 };
 
 /** The result of checking a pack's files against its manifest. */
@@ -96,7 +101,8 @@ struct PackVerification {
  *   "datasets": [ {"id": "...", "kind": "imagery|features", "file": "...",
  *                  "name": "...", "licence": "...", "attribution": "...",
  *                  "source": {"name": "...", "version": "...",
- *                             "url": "...", "sha256": "..."}} ],
+ *                             "url": "...", "sha256": "..."},
+ *                  "replaces": "..."} ],
  *   "notices": ["licences/..."]
  * }
  * ```

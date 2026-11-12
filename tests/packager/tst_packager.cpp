@@ -426,6 +426,39 @@ private slots:
     QVERIFY2(cap > 15.2e6 && cap < 15.6e6, qPrintable(QString::number(cap)));
   }
 
+  void poleClosure()
+  {
+    using ts::packager::closeHalfAtPole;
+    // Antarctica's eastern half as GSHHG gives it at high resolution:
+    // coast from 0° to 180°, closed along 180°, −90° and 0°.
+    const std::vector<double> good = {180, -78, 180, -90, 0,   -90, 0,
+                                      -70, 90,  -66, 179, -78, 180, -78};
+    const double area = areaOf(good);
+    QVERIFY(area > 5e6);
+    QCOMPARE(areaOf(closeHalfAtPole(good)), area);
+    // ... and at full resolution: a spike at 0° where the closure should
+    // be, so the last edge cuts back from 180° to 0°.
+    const std::vector<double> broken = {0,  -70, 0,   -90, 0,   -90, 0, -70,
+                                        90, -66, 179, -78, 180, -78, 0, -70};
+    QVERIFY(areaOf(broken) < area / 2);
+    QCOMPARE(areaOf(closeHalfAtPole(broken)), area);
+    // The western half ending 0.002° short of 0°: snapped onto it.
+    const std::vector<double> west = {-0.002, -70, -0.002, -90, -180,   -90,
+                                      -180,   -78, -90,    -66, -0.002, -70};
+    const std::vector<double> closed = closeHalfAtPole(west);
+    QCOMPARE(areaOf(closed),
+             areaOf({0, -70, 0, -90, -180, -90, -180, -78, -90, -66}));
+    for (std::size_t i = 0; i < closed.size(); i += 2) {
+      QVERIFY(closed[i] == 0.0 || closed[i] <= -90.0);
+    }
+    // Rings not reaching the pole, or without one edge across the half,
+    // are kept.
+    const std::vector<double> island = box(10, 10, 20, 20);
+    QCOMPARE(closeHalfAtPole(island), island);
+    const std::vector<double> sliver = {0, -70, 0, -90, 0, -71};
+    QCOMPARE(closeHalfAtPole(sliver), sliver);
+  }
+
   void shoreline()
   {
     const QTemporaryDir dir;
@@ -604,7 +637,7 @@ private slots:
         "\"name\": \"Fixture world\", \"version\": \"1\"}"
         "],"
         "\"imagery\": {\"dataset\": \"bluemarble\", \"source\": \"world\", "
-        "\"name\": \"World\","
+        "\"name\": \"World\", \"replaces\": \"bluemarble\","
         "\"licence\": \"CC0-1.0\", \"attribution\": \"Fixture\","
         "\"maxLevel\": 1, \"tileSize\": 64},"
         "\"shoreline\": {\"dataset\": \"shoreline\", \"source\": \"gshhg\", "
@@ -645,6 +678,12 @@ private slots:
     QVERIFY(manifest.value().verify(options.outputDirectory, notCancelled).ok);
     QCOMPARE(manifest.value().datasets.size(), std::size_t{2});
     QCOMPARE(manifest.value().notices.size(), std::size_t{2});
+    // "replaces" reaches the manifest where it is set, and only there.
+    for (const ts::PackDataset& dataset : manifest.value().datasets) {
+      QCOMPARE(dataset.replaces, dataset.kind == ts::PackDataset::Kind::Imagery
+                                     ? QStringLiteral("bluemarble")
+                                     : QString());
+    }
     qint64 listed = 0;
     for (const ts::PackFile& file : manifest.value().files) {
       listed += file.sizeBytes;
@@ -700,18 +739,31 @@ private slots:
   void basePack()
   {
     // The real base pack, when TS_BASEPACK_DIR names one (CI's base pack
-    // job; locally after `make basepack`).
+    // job; locally after `make basepack`). An extra pack is checked the
+    // same way with TS_PACK_CONFIG naming its configuration
+    // (tools/packager/packs/*.json).
     const QString directory = qEnvironmentVariable("TS_BASEPACK_DIR");
     if (directory.isEmpty()) {
       QSKIP("TS_BASEPACK_DIR is not set.");
     }
+    QString configPath = qEnvironmentVariable("TS_PACK_CONFIG");
+    if (configPath.isEmpty()) {
+      configPath = QStringLiteral(TS_TEST_DATA_DIR
+                                  "/../../tools/packager/basepack.json");
+    }
     QString error;
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::read(configPath, &error);
+    if (!config) {
+      QFAIL(qPrintable(error));
+    }
     const std::optional<ts::PackManifest> manifest =
         ts::PackManifest::read(directory, &error);
     if (!manifest) {
       QFAIL(qPrintable(error));
     }
-    QCOMPARE(manifest.value().id, QStringLiteral("terrasoar-base"));
+    QCOMPARE(manifest.value().id, config.value().id);
+    QCOMPARE(manifest.value().version, config.value().version);
     const ts::PackVerification verification =
         manifest.value().verify(directory, notCancelled);
     QVERIFY2(verification.ok, verification.problems.empty()
@@ -719,14 +771,6 @@ private slots:
                                   : qPrintable(verification.problems[0]));
 
     // Within the configured budget (limit minus reserve).
-    const std::optional<ts::packager::PackConfig> config =
-        ts::packager::PackConfig::read(
-            QStringLiteral(TS_TEST_DATA_DIR
-                           "/../../tools/packager/basepack.json"),
-            &error);
-    if (!config || !config->imagery || !config->shoreline) {
-      QFAIL(qPrintable(error));
-    }
     qint64 total =
         QFileInfo(QDir(directory).filePath(ts::PackManifest::fileName()))
             .size();
@@ -737,13 +781,33 @@ private slots:
                  config.value().sizeLimitBytes - config.value().reservedBytes,
              qPrintable(QString::number(total)));
 
+    // Each dataset replaces what its configuration says (nothing in the
+    // base pack).
+    QCOMPARE(manifest.value().datasets.size(),
+             std::size_t{config->imagery ? 1U : 0U} +
+                 std::size_t{config->shoreline ? 1U : 0U});
+    const QString imageryReplaces =
+        config->imagery ? config->imagery->replaces : QString();
+    const QString shorelineReplaces =
+        config->shoreline ? config->shoreline->replaces : QString();
+    for (const ts::PackDataset& dataset : manifest.value().datasets) {
+      QCOMPARE(dataset.replaces, dataset.kind == ts::PackDataset::Kind::Imagery
+                                     ? imageryReplaces
+                                     : shorelineReplaces);
+    }
+
     const QDir pack(directory);
-    ts::SqliteTileImageryProvider imagery(
-        pack.filePath(QStringLiteral("bluemarble.sqlite")));
-    QVERIFY(imagery.isValid());
-    QCOMPARE(imagery.maximumLevel(),
-             config.value().imagery.value().tiling.maxLevel);
-    QVERIFY(checkPyramid(imagery, imagery.maximumLevel()));
+    if (config->imagery) {
+      ts::SqliteTileImageryProvider imagery(
+          pack.filePath(QStringLiteral("bluemarble.sqlite")));
+      QVERIFY(imagery.isValid());
+      QCOMPARE(imagery.maximumLevel(),
+               config.value().imagery.value().tiling.maxLevel);
+      QVERIFY(checkPyramid(imagery, imagery.maximumLevel()));
+    }
+    if (!config->shoreline) {
+      return;
+    }
 
     const QString shoreline = pack.filePath(QStringLiteral("shoreline.gpkg"));
     ts::GeoPackageFeatureProvider features(shoreline);
@@ -757,7 +821,7 @@ private slots:
     // Spot checks at every level: London is land, the North Sea and the
     // middle of the Pacific are not, the Caspian Sea is a lake, the South
     // Pole is land (ice), Wrangel Island sits on the antimeridian.
-    for (int level = 0; level <= 8; ++level) {
+    for (int level = 0; level <= 10; ++level) {
       QVERIFY(isLand(features, level, -0.1, 51.5));
       QVERIFY(!isLand(features, level, 3.0, 56.0));
       QVERIFY(!isLand(features, level, -150.0, 0.0));

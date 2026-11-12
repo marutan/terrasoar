@@ -55,6 +55,20 @@ NetworkError classify(QNetworkReply::NetworkError error)
   }
 }
 
+/**
+ * True if @p reply carries the server's answer, whatever its status. A
+ * redirect not followed to its end is not: the connection closed on the
+ * way (a connection failure, retried), or it led somewhere less safe.
+ */
+bool isAnswer(const QNetworkReply& reply)
+{
+  const int status =
+      reply.attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+  const bool cutShort =
+      status >= 300 && status < 400 && reply.error() != QNetworkReply::NoError;
+  return status > 0 && !cutShort;
+}
+
 bool isRetryable(const HttpResponse& response)
 {
   if (response.error == NetworkError::Timeout ||
@@ -258,6 +272,12 @@ void NetworkDispatcher::startAttempt(
                               QNetworkRequest::AlwaysNetwork);
   networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                               QNetworkRequest::NoLessSafeRedirectPolicy);
+  // HTTP/1.1 only. With Qt 6.4, a server closing an HTTP/2 connection
+  // while a redirect is followed (GitHub's release downloads) left the
+  // next request on it hanging past its transfer timeout. Qt opens up to
+  // six connections per host, as many as we keep in flight, so HTTP/2's
+  // multiplexing would gain little.
+  networkRequest.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
   QNetworkReply* reply = m_manager.get(networkRequest);
   m_core.attemptsSent.fetch_add(1);
   m_active[reply] = Active{ticket, attempt, false, false};
@@ -308,7 +328,7 @@ void NetworkDispatcher::onFinished(QNetworkReply* reply)
     response.error = NetworkError::TooLarge;
     response.errorString = QStringLiteral("response larger than %1 bytes")
                                .arg(m_core.settings.maximumResponseBytes);
-  } else if (status.isValid() && status.toInt() > 0) {
+  } else if (isAnswer(*reply)) {
     // A response, whatever its status.
     response.error = NetworkError::None;
     response.status = status.toInt();

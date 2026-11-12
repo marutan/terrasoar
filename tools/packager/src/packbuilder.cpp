@@ -155,6 +155,7 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     spec.name = text(imagery, "name");
     spec.licence = text(imagery, "licence");
     spec.attribution = text(imagery, "attribution");
+    spec.replaces = text(imagery, "replaces");
     spec.tiling.maxLevel = integer(imagery, "maxLevel", 4);
     spec.tiling.tileSizePx = integer(imagery, "tileSize", 256);
     spec.tiling.jpegQuality = integer(imagery, "jpegQuality", 85);
@@ -176,6 +177,7 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     spec.name = text(shoreline, "name");
     spec.licence = text(shoreline, "licence");
     spec.attribution = text(shoreline, "attribution");
+    spec.replaces = text(shoreline, "replaces");
     spec.minimumAreaKm2 =
         shoreline.value(QStringLiteral("minimumAreaKm2")).toDouble(0.0);
     const QJsonArray lods = shoreline.value(QStringLiteral("lods")).toArray();
@@ -369,6 +371,7 @@ private:
     dataset.name = spec.name;
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
+    dataset.replaces = spec.replaces;
     return true;
   }
 
@@ -412,6 +415,7 @@ private:
     dataset.name = spec.name;
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
+    dataset.replaces = spec.replaces;
     return true;
   }
 

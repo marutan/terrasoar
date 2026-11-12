@@ -42,6 +42,18 @@ basepack.commands = python3 $$shell_path($$PWD/tools/packager/build_basepack.py)
 basepack.depends = sub-tools
 QMAKE_EXTRA_TARGETS += basepack
 
+# `make packs` builds the extra data packs (tools/packager/packs/*.json) into
+# packs/ here, with their release files and index entries. Nothing is
+# uploaded. See docs/tools/packager.md.
+packs.commands = python3 $$shell_path($$PWD/tools/packager/build_pack.py) \
+    --build-dir $$shell_path($$OUT_PWD) \
+    --config $$shell_path($$PWD/tools/packager/packs/bluemarble-full.json) && \
+    python3 $$shell_path($$PWD/tools/packager/build_pack.py) \
+    --build-dir $$shell_path($$OUT_PWD) \
+    --config $$shell_path($$PWD/tools/packager/packs/shoreline-full.json)
+packs.depends = sub-tools
+QMAKE_EXTRA_TARGETS += packs
+
 # `make docs` builds the Doxygen API documentation into build/docs/api.
 docs.commands = cd $$shell_path($$PWD) && doxygen Doxyfile
 QMAKE_EXTRA_TARGETS += docs

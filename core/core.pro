@@ -50,6 +50,9 @@ HEADERS += \
     include/ts/network/networkclient.h \
     include/ts/network/tilediskcache.h \
     include/ts/packs/basepack.h \
+    include/ts/packs/packindex.h \
+    include/ts/packs/packinstall.h \
+    include/ts/packs/packlibrary.h \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
     include/ts/projection/cylindricalprojection.h \
@@ -110,6 +113,9 @@ SOURCES += \
     src/network/networkclient.cpp \
     src/network/tilediskcache.cpp \
     src/packs/basepack.cpp \
+    src/packs/packindex.cpp \
+    src/packs/packinstall.cpp \
+    src/packs/packlibrary.cpp \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
     src/projection/cylindricalprojection.cpp \
