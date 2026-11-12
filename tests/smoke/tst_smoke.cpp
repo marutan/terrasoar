@@ -120,7 +120,8 @@ bool writeWmsProject(const QString& path, const QUrl& url, const QString& name)
 void verifyCleanExit(const Run& run)
 {
   QVERIFY2(run.finished, run.err.constData());
-  QCOMPARE(run.status, QProcess::NormalExit);
+  // A crash: show what it printed (a sanitizer report, a Qt fatal).
+  QVERIFY2(run.status == QProcess::NormalExit, run.err.constData());
   QVERIFY2(run.exitCode == 0, run.err.constData());
   const QStringList warnings = qtWarnings(run.err);
   QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join(QLatin1Char('\n'))));
@@ -219,7 +220,8 @@ private slots:
     }
     const Run run = runApp({QStringLiteral("--smoke-test")}, false);
     QVERIFY2(run.finished, run.err.constData());
-    QCOMPARE(run.status, QProcess::NormalExit);
+    // A crash: show what it printed (a sanitizer report, a Qt fatal).
+    QVERIFY2(run.status == QProcess::NormalExit, run.err.constData());
     QCOMPARE(run.exitCode, 0);
     const QStringList warnings = qtWarnings(run.err);
     QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join(QLatin1Char('\n'))));
@@ -312,7 +314,8 @@ private slots:
     const Run run = runApp({QStringLiteral("--smoke-test"),
                             QStringLiteral("no-such-file.terrasoar")});
     QVERIFY(run.finished);
-    QCOMPARE(run.status, QProcess::NormalExit);
+    // A crash: show what it printed (a sanitizer report, a Qt fatal).
+    QVERIFY2(run.status == QProcess::NormalExit, run.err.constData());
     QCOMPARE(run.exitCode, 1);
     QVERIFY2(run.err.contains("no-such-file.terrasoar"), run.err.constData());
   }

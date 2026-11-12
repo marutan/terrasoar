@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QComboBox>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QFontMetrics>
 #include <QJsonArray>
@@ -890,10 +891,10 @@ private slots:
   {
     // A WMS layer that can't be opened is marked at once; one whose server
     // can't be reached is marked offline once tiles were asked for.
+    QTemporaryDir cache; // before the window, which keeps the cache open
     ts::MainWindow window;
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
-    QTemporaryDir cache;
     ts::NetworkSettings settings;
     settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
     settings.attempts = 1;
@@ -959,10 +960,12 @@ private slots:
     std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
         std::make_shared<ts::test::MockWmsBehaviour>();
     ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    // Before the window: its providers keep the disk cache open until it
+    // goes, and Windows can't delete open files.
+    QTemporaryDir cache;
     ts::MainWindow window;
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
-    QTemporaryDir cache;
     ts::NetworkSettings settings;
     settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
     ts::WmsProviderSettings wms;
@@ -1022,8 +1025,22 @@ private slots:
         QTest::qWaitFor([&]() { return globe->framesRendered() > 0; }, 5000));
     // The checkerboard imagery loads first; frames keep coming until then.
     QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
-    QTest::qWait(200);
-    const int frames = globe->framesRendered();
+    // The frame for the last tile may still be on its way (slow software
+    // rendering): wait until no frame has come for 300 ms. A view that keeps
+    // drawing never gets there.
+    int frames = globe->framesRendered();
+    QElapsedTimer quiet;
+    quiet.start();
+    QVERIFY2(QTest::qWaitFor(
+                 [&]() {
+                   if (globe->framesRendered() != frames) {
+                     frames = globe->framesRendered();
+                     quiet.restart();
+                   }
+                   return quiet.elapsed() >= 300;
+                 },
+                 10000),
+             "the view kept drawing");
     QTest::qWait(500);
     QCOMPARE(globe->framesRendered(), frames);
   }

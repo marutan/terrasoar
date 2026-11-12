@@ -155,8 +155,10 @@ public:
   }
 
 private:
-  /** Runs the QTcpServer; every socket lives on this thread. */
-  class Thread : public QThread
+  /** Runs the QTcpServer; every socket lives on this thread. Only run() is
+   * overridden (no signals, slots or properties), and Q_OBJECT here would
+   * need moc in every test project that includes this header. */
+  class Thread : public QThread // clazy:exclude=missing-qobject-macro
   {
   public:
     explicit Thread(MockHttpServer& owner) : m_owner(owner) {}

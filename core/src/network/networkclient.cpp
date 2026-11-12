@@ -380,8 +380,11 @@ void NetworkDispatcher::complete(const std::shared_ptr<NetworkTicket>& ticket,
 /** Runs the QNetworkAccessManager and dispatcher, created on it. */
 class NetworkClient::Thread : public QThread
 {
+  Q_OBJECT
+
 public:
-  explicit Thread(std::shared_ptr<NetworkCore> core) : m_core(std::move(core))
+  explicit Thread(std::shared_ptr<NetworkCore> core, QObject* parent = nullptr)
+      : QThread(parent), m_core(std::move(core))
   {
     setObjectName(QStringLiteral("Terra Soar network"));
   }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -385,7 +387,21 @@ private slots:
     const ts::GeoRect rect = ts::TileKey{3, 6, 4}.bounds();
     QCOMPARE(rect.westDeg, -45.0);
     QCOMPARE(rect.southDeg, -22.5);
-    QCOMPARE(ts::bboxParameter(version, crs, rect), bbox);
+    const QString actual = ts::bboxParameter(version, crs, rect);
+    // Number by number: Web Mercator northings come from log() and tan(),
+    // whose last bit differs between C libraries (MSVC's and glibc's).
+    const QStringList got = actual.split(QLatin1Char(','));
+    const QStringList want = bbox.split(QLatin1Char(','));
+    QCOMPARE(got.size(), want.size());
+    for (int i = 0; i < got.size(); ++i) {
+      bool okGot = false;
+      bool okWant = false;
+      const double g = got.at(i).toDouble(&okGot);
+      const double w = want.at(i).toDouble(&okWant);
+      QVERIFY2(okGot == okWant, qPrintable(actual));
+      QVERIFY2(std::abs(g - w) <= 1e-12 * std::max(1.0, std::abs(w)),
+               qPrintable(actual + QStringLiteral(" vs ") + bbox));
+    }
   }
 
   void webMercatorEdges()
