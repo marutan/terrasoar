@@ -44,6 +44,7 @@
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/regions/countryareas.h"
 #include "ts/wms/wmsimageryprovider.h"
 
 namespace ts
@@ -210,6 +211,7 @@ void MainWindow::findBasePack()
     return;
   }
   m_registry->setBasePack(m_basePackDirectory, *manifest);
+  m_countriesFile = CountryAreas::fileInPack(*manifest, m_basePackDirectory);
   m_basePackState = BasePackState::Checking;
   // Reading every byte takes a moment, so the check runs on its own
   // thread; tiles load meanwhile, and a damaged file only means missing
@@ -736,8 +738,14 @@ NewRegionDialog* MainWindow::newOfflineRegion()
            "WMS layer first (File → Add WMS Layer…)."));
     return nullptr;
   }
+  if (!m_countries && !m_countriesFile.isEmpty()) {
+    m_countries = std::make_shared<const CountryAreas>(m_countriesFile);
+    if (!m_countries->isValid()) {
+      qWarning("Countries: %s", qUtf8Printable(m_countries->errorString()));
+    }
+  }
   m_newRegionDialog = new NewRegionDialog(*m_offlineRegions, std::move(layers),
-                                          m_globeView, this);
+                                          m_globeView, m_countries, this);
   m_newRegionDialog->setAttribute(Qt::WA_DeleteOnClose);
   connect(m_newRegionDialog, &QDialog::accepted, this, [this]() {
     QString error;

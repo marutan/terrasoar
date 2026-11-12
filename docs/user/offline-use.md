@@ -18,6 +18,12 @@ in the field.
      the globe or map.
    - **Draw Polygon**: click each corner of the area, then double-click
      (or press Enter) to finish. Backspace takes the last corner back.
+   - **Or country**: type part of a country's name ("king" finds the
+     United Kingdom) and pick it from the list. The area is the whole
+     country with its islands and about 5 km around its coasts and
+     borders, so nothing at the edge is missed. The region takes the
+     country's name, unless you have typed one. Antarctica isn't in the
+     list: use a rectangle that reaches the South Pole instead.
 
    While drawing, the right mouse button and the wheel still move the
    view, and Esc gives up. Areas may cross the 180° meridian (Fiji, the
@@ -31,7 +37,9 @@ in the field.
    from a few tiles fetched as samples, so it is "about" (usually within
    a third). Regions are limited to a million tiles: each extra level
    quadruples the count, so choose a smaller area or fewer levels if the
-   dialog says it is too many.
+   dialog says it is too many. For a whole country the limit comes
+   early: the United Kingdom, France or Japan fit to level 14, Norway to
+   13, the United States to 12, Canada and Russia only to 11.
 7. Press **Download**.
 
 The download runs in the background, two tiles at a time, while you carry
@@ -127,5 +135,3 @@ and `%LOCALAPPDATA%\Terra Soar\terrasoar\packs` on Windows.
 
 - Only WMS layers can be kept this way. The built-in layers need no
   download; for more detail in them, install a data pack (below).
-- Picking a country by name isn't available yet; draw its outline as a
-  polygon instead.

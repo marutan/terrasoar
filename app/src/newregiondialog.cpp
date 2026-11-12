@@ -6,6 +6,7 @@
 #include <utility>
 
 #include <QComboBox>
+#include <QCompleter>
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QGridLayout>
@@ -21,6 +22,7 @@
 #include "globeview.h"
 #include "offlineregionmanager.h"
 #include "ts/geo/geoformat.h"
+#include "ts/regions/countryareas.h"
 #include "ts/wms/wmscatalogue.h"
 #include "ts/wms/wmsimageryprovider.h"
 
@@ -50,14 +52,18 @@ double metresPerPixel(int level, int tileSizePx)
 
 NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
                                  std::vector<RegionLayerChoice> layers,
-                                 GlobeView* view, QWidget* parent)
+                                 GlobeView* view,
+                                 std::shared_ptr<const CountryAreas> countries,
+                                 QWidget* parent)
     : QDialog(parent), m_manager(manager), m_layers(std::move(layers)),
-      m_view(view), m_nameLabel(new QLabel(this)),
-      m_nameEdit(new QLineEdit(this)), m_layerLabel(new QLabel(this)),
-      m_layerBox(new QComboBox(this)), m_areaTitle(new QLabel(this)),
-      m_areaLabel(new QLabel(this)), m_viewButton(new QPushButton(this)),
+      m_view(view), m_countries(std::move(countries)),
+      m_nameLabel(new QLabel(this)), m_nameEdit(new QLineEdit(this)),
+      m_layerLabel(new QLabel(this)), m_layerBox(new QComboBox(this)),
+      m_areaTitle(new QLabel(this)), m_areaLabel(new QLabel(this)),
+      m_viewButton(new QPushButton(this)),
       m_rectangleButton(new QPushButton(this)),
-      m_polygonButton(new QPushButton(this)), m_levelsLabel(new QLabel(this)),
+      m_polygonButton(new QPushButton(this)), m_countryLabel(new QLabel(this)),
+      m_countryBox(new QComboBox(this)), m_levelsLabel(new QLabel(this)),
       m_minimumBox(new QSpinBox(this)), m_toLabel(new QLabel(this)),
       m_maximumBox(new QSpinBox(this)), m_detailLabel(new QLabel(this)),
       m_sizeLabel(new QLabel(this)), m_termsLabel(new QLabel(this)),
@@ -71,6 +77,7 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
   m_viewButton->setObjectName(QStringLiteral("regionViewButton"));
   m_rectangleButton->setObjectName(QStringLiteral("regionRectangleButton"));
   m_polygonButton->setObjectName(QStringLiteral("regionPolygonButton"));
+  m_countryBox->setObjectName(QStringLiteral("regionCountryBox"));
   m_minimumBox->setObjectName(QStringLiteral("regionMinimumLevelBox"));
   m_maximumBox->setObjectName(QStringLiteral("regionMaximumLevelBox"));
   m_detailLabel->setObjectName(QStringLiteral("regionDetailLabel"));
@@ -78,6 +85,22 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
   m_termsLabel->setObjectName(QStringLiteral("regionTermsLabel"));
   m_nameLabel->setBuddy(m_nameEdit);
   m_layerLabel->setBuddy(m_layerBox);
+  m_countryLabel->setBuddy(m_countryBox);
+  // Type part of a name to find a country.
+  m_countryBox->setEditable(true);
+  m_countryBox->setInsertPolicy(QComboBox::NoInsert);
+  m_countryBox->completer()->setFilterMode(Qt::MatchContains);
+  m_countryBox->completer()->setCaseSensitivity(Qt::CaseInsensitive);
+  m_countryBox->completer()->setCompletionMode(QCompleter::PopupCompletion);
+  if (m_countries && m_countries->isValid()) {
+    for (const CountryArea& country : m_countries->countries()) {
+      m_countryBox->addItem(country.name, country.id);
+    }
+  } else {
+    m_countryLabel->hide();
+    m_countryBox->hide();
+  }
+  m_countryBox->setCurrentIndex(-1);
   m_levelsLabel->setBuddy(m_minimumBox);
   m_areaLabel->setWordWrap(true);
   m_termsLabel->setWordWrap(true);
@@ -105,6 +128,10 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
   areaButtons->addWidget(m_polygonButton);
   areaButtons->addStretch();
   areaColumn->addLayout(areaButtons);
+  QHBoxLayout* countryRow = new QHBoxLayout;
+  countryRow->addWidget(m_countryLabel);
+  countryRow->addWidget(m_countryBox, 1);
+  areaColumn->addLayout(countryRow);
   grid->addLayout(areaColumn, 2, 1);
   grid->addWidget(m_levelsLabel, 3, 0);
   QHBoxLayout* levels = new QHBoxLayout;
@@ -137,6 +164,8 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
           [this]() { draw(false); });
   connect(m_polygonButton, &QPushButton::clicked, this,
           [this]() { draw(true); });
+  connect(m_countryBox, QOverload<int>::of(&QComboBox::activated), this,
+          &NewRegionDialog::countryActivated);
   m_estimateDelay->setSingleShot(true);
   m_estimateDelay->setInterval(estimateDelayMs);
   connect(m_estimateDelay, &QTimer::timeout, this,
@@ -155,8 +184,9 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
   }
 
   retranslateUi();
-  m_nameEdit->setText(
-      tr("Region %1").arg(static_cast<int>(m_manager.regions().size()) + 1));
+  m_automaticName =
+      tr("Region %1").arg(static_cast<int>(m_manager.regions().size()) + 1);
+  m_nameEdit->setText(m_automaticName);
   layerChanged();
   if (m_view) {
     useCurrentView();
@@ -205,6 +235,10 @@ void NewRegionDialog::retranslateUi()
   m_polygonButton->setText(tr("Draw &Polygon"));
   m_polygonButton->setToolTip(tr("Click the corners of the area on the "
                                  "globe; double-click to finish"));
+  m_countryLabel->setText(tr("Or c&ountry:"));
+  m_countryBox->lineEdit()->setPlaceholderText(tr("Type a country's name"));
+  m_countryBox->setToolTip(tr("The whole country with its islands, and "
+                              "about 5 km around its coasts and borders"));
   m_levelsLabel->setText(tr("L&evels:"));
   m_toLabel->setText(tr("to"));
   m_downloadButton->setText(tr("&Download"));
@@ -232,8 +266,43 @@ OfflineRegion NewRegionDialog::region() const
 void NewRegionDialog::setArea(const RegionGeometry& area)
 {
   m_area = area;
+  m_areaCountry.clear();
+  m_countryBox->setCurrentIndex(-1);
   showOutline();
   refresh();
+}
+
+bool NewRegionDialog::chooseCountry(const QString& id)
+{
+  if (!m_countries) {
+    return false;
+  }
+  const std::optional<CountryArea> country = m_countries->country(id);
+  if (!country) {
+    return false;
+  }
+  QString error;
+  const std::optional<RegionGeometry> area = m_countries->area(id, &error);
+  if (!area) {
+    return false;
+  }
+  setArea(*area);
+  m_areaCountry = country->name;
+  m_countryBox->setCurrentIndex(m_countryBox->findData(id));
+  // A name the user hasn't changed follows the country.
+  if (m_nameEdit->text() == m_automaticName) {
+    m_automaticName = country->name;
+    m_nameEdit->setText(m_automaticName);
+  }
+  refresh();
+  return true;
+}
+
+void NewRegionDialog::countryActivated(int index)
+{
+  if (index >= 0) {
+    chooseCountry(m_countryBox->itemData(index).toString());
+  }
 }
 
 void NewRegionDialog::setLevels(int minimumLevel, int maximumLevel)
@@ -303,8 +372,12 @@ void NewRegionDialog::refresh()
   const QLocale locale;
   // The area in words.
   if (!m_area) {
-    m_areaLabel->setText(tr("None yet: use the current view or draw one on "
-                            "the globe."));
+    m_areaLabel->setText(tr("None yet: use the current view, draw one on "
+                            "the globe or choose a country."));
+  } else if (!m_areaCountry.isEmpty()) {
+    m_areaLabel->setText(
+        tr("%1 with about 5 km around its coasts and borders (%2 km²)")
+            .arg(m_areaCountry, locale.toString(m_area->areaKm2(), 'f', 0)));
   } else {
     const GeoRect& extent = m_area->extent();
     const QString area = locale.toString(m_area->areaKm2(), 'f', 0);
@@ -316,6 +389,10 @@ void NewRegionDialog::refresh()
                                     formatLongitude(extent.westDeg, locale),
                                     formatLongitude(extent.eastDeg, locale),
                                     area));
+    } else if (m_area->rings().size() > 1) {
+      m_areaLabel->setText(tr("Polygon in %n part(s) (%1 km²)", "",
+                              static_cast<int>(m_area->rings().size()))
+                               .arg(area));
     } else {
       m_areaLabel->setText(tr("Polygon with %n corner(s) (%1 km²)", "",
                               static_cast<int>(m_area->vertices().size()))
@@ -334,9 +411,12 @@ void NewRegionDialog::refresh()
                               locale)));
   m_tiles = 0;
   if (m_area && m_provider) {
-    m_tiles = countRegionTiles(*m_area, m_minimumBox->value(),
-                               m_maximumBox->value(), m_provider->dataBounds())
-                  .total();
+    // Past the limit the exact number doesn't matter, and counting a
+    // country to deep levels would take a while.
+    const RegionTileCount counts =
+        countRegionTiles(*m_area, m_minimumBox->value(), m_maximumBox->value(),
+                         m_provider->dataBounds(), maximumTiles);
+    m_tiles = counts.total();
   }
   m_refused = false;
   QString terms;
@@ -381,9 +461,9 @@ void NewRegionDialog::refresh()
     m_sizeLabel->clear();
   } else if (m_tiles > maximumTiles) {
     m_sizeLabel->setText(
-        tr("<b>%1 tiles: too many.</b> Choose fewer levels or a smaller "
-           "area (at most %2 tiles).")
-            .arg(locale.toString(m_tiles), locale.toString(maximumTiles)));
+        tr("<b>More than %1 tiles: too many.</b> Choose fewer levels or a "
+           "smaller area.")
+            .arg(locale.toString(maximumTiles)));
   } else if (m_provider && !m_refused) {
     m_sizeLabel->setText(
         tr("%1 tiles; estimating the size…").arg(locale.toString(m_tiles)));

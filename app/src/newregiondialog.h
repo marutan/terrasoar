@@ -33,6 +33,7 @@ class QTimer;
 namespace ts
 {
 
+class CountryAreas;
 class GlobeView;
 class OfflineRegionManager;
 class WmsImageryProvider;
@@ -72,10 +73,13 @@ public:
    * @param manager The regions the new one joins.
    * @param layers The layers to choose from (at least one).
    * @param view Where the area is drawn and shown; may be null.
+   * @param countries Country outlines to choose an area from; may be null
+   *        (no choice of country).
    * @param parent Usual QWidget parent.
    */
   NewRegionDialog(OfflineRegionManager& manager,
                   std::vector<RegionLayerChoice> layers, GlobeView* view,
+                  std::shared_ptr<const CountryAreas> countries,
                   QWidget* parent = nullptr);
 
   /** Stops the size estimate. */
@@ -86,6 +90,15 @@ public:
 
   /** Sets the area. */
   void setArea(const RegionGeometry& area);
+
+  /**
+   * Sets the area to the country with id @p id (CountryArea::id). Returns
+   * false if there is no such country or its outline can't be read.
+   */
+  bool chooseCountry(const QString& id);
+
+  /** Returns the name of the country the area is, or an empty string. */
+  const QString& areaCountry() const { return m_areaCountry; }
 
   /** Returns the area, if one is set. */
   const std::optional<RegionGeometry>& area() const { return m_area; }
@@ -123,12 +136,18 @@ private:
   void stopEstimate();
   void pollEstimate();
   void showOutline();
+  void countryActivated(int index);
 
   OfflineRegionManager& m_manager;
   const std::vector<RegionLayerChoice> m_layers;
   QPointer<GlobeView> m_view;
   std::shared_ptr<WmsImageryProvider> m_provider;
   std::optional<RegionGeometry> m_area;
+  std::shared_ptr<const CountryAreas> m_countries;
+  /** The country the area is, if chosen by country. */
+  QString m_areaCountry;
+  /** The name the dialog gave the region, until the user changes it. */
+  QString m_automaticName;
   long long m_tiles = 0;
   bool m_refused = false;
 
@@ -141,6 +160,8 @@ private:
   QPushButton* m_viewButton = nullptr;
   QPushButton* m_rectangleButton = nullptr;
   QPushButton* m_polygonButton = nullptr;
+  QLabel* m_countryLabel = nullptr;
+  QComboBox* m_countryBox = nullptr;
   QLabel* m_levelsLabel = nullptr;
   QSpinBox* m_minimumBox = nullptr;
   QLabel* m_toLabel = nullptr;

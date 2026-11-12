@@ -104,6 +104,39 @@ PackSource packSource(const SourceSpec& source)
   return result;
 }
 
+/** Reads the optional "countries" entry into @p config. */
+bool readCountries(const QJsonObject& json, PackConfig* config,
+                   QString* errorString)
+{
+  const QJsonObject countries =
+      json.value(QStringLiteral("countries")).toObject();
+  if (countries.isEmpty()) {
+    return true;
+  }
+  CountriesSpec spec;
+  spec.dataset = text(countries, "dataset");
+  spec.source = text(countries, "source");
+  spec.name = text(countries, "name");
+  spec.licence = text(countries, "licence");
+  spec.attribution = text(countries, "attribution");
+  spec.bufferDeg =
+      countries.value(QStringLiteral("bufferDeg")).toDouble(spec.bufferDeg);
+  spec.simplifyDeg =
+      countries.value(QStringLiteral("simplifyDeg")).toDouble(spec.simplifyDeg);
+  const QJsonArray exclude =
+      countries.value(QStringLiteral("exclude")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int i = 0; i < exclude.size(); ++i) {
+    spec.exclude.push_back(exclude.at(i).toString());
+  }
+  if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty() ||
+      !(spec.bufferDeg > spec.simplifyDeg) || spec.simplifyDeg < 0.0) {
+    return fail(errorString, QStringLiteral("Bad countries entry"));
+  }
+  config->countries = spec;
+  return true;
+}
+
 } // namespace
 
 std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
@@ -205,6 +238,9 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     }
     config.shoreline = spec;
   }
+  if (!readCountries(json, &config, errorString)) {
+    return std::nullopt;
+  }
   if (config.id.isEmpty() || config.sizeLimitBytes <= 0) {
     fail(errorString, QStringLiteral("The pack has no id or size limit"));
     return std::nullopt;
@@ -254,6 +290,16 @@ QJsonObject BuildReport::toJson() const
   json.insert(QStringLiteral("totalBytes"), static_cast<double>(totalBytes));
   json.insert(QStringLiteral("imagery"), imageryJson);
   json.insert(QStringLiteral("shoreline"), lods);
+  QJsonObject countriesJson;
+  countriesJson.insert(QStringLiteral("countries"), countries.countries);
+  countriesJson.insert(QStringLiteral("excluded"), countries.excluded);
+  countriesJson.insert(QStringLiteral("sourceVertices"),
+                       static_cast<double>(countries.sourceVertices));
+  countriesJson.insert(QStringLiteral("rings"),
+                       static_cast<double>(countries.rings));
+  countriesJson.insert(QStringLiteral("vertices"),
+                       static_cast<double>(countries.vertices));
+  json.insert(QStringLiteral("countries"), countriesJson);
   return json;
 }
 
@@ -278,8 +324,8 @@ public:
   bool run()
   {
     return checkSources() && prepareOutput() && buildImagery() &&
-           buildShoreline() && copyNotices() && writeManifest() &&
-           checkBudget();
+           buildShoreline() && buildCountries() && copyNotices() &&
+           writeManifest() && checkBudget();
   }
 
 private:
@@ -416,6 +462,32 @@ private:
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
     dataset.replaces = spec.replaces;
+    return true;
+  }
+
+  bool buildCountries()
+  {
+    if (!m_config->countries) {
+      return true;
+    }
+    const CountriesSpec& spec = *m_config->countries;
+    const SourceSpec& source = *findSource(*m_config, spec.source);
+    const QString file = spec.dataset + QStringLiteral(".gpkg");
+    CountryOptions options;
+    options.sourcePath = gdalPath(m_sources.filePath(source.file));
+    options.outputPath = m_output.filePath(file);
+    options.bufferDeg = spec.bufferDeg;
+    options.simplifyDeg = spec.simplifyDeg;
+    options.exclude = spec.exclude;
+    options.progress = m_progress;
+    if (!ts::packager::buildCountries(options, &m_report->countries, m_error)) {
+      return false;
+    }
+    addDataset(spec.dataset, PackDataset::Kind::Areas, file, source);
+    PackDataset& dataset = m_manifest.datasets.back();
+    dataset.name = spec.name;
+    dataset.licence = spec.licence;
+    dataset.attribution = spec.attribution;
     return true;
   }
 

@@ -9,6 +9,7 @@
 
 #include <QColor>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QJsonArray>
@@ -29,6 +30,7 @@
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
+#include "ts/regions/countryareas.h"
 #include "ts/tiling/tilekey.h"
 
 namespace
@@ -406,6 +408,79 @@ bool checkPyramid(ts::SqliteTileImageryProvider& provider, int maxLevel)
 
 } // namespace
 
+namespace
+{
+
+/**
+ * Checks the real country outlines in @p path: places inside and outside
+ * known countries, and that counting a big country's tiles stays quick.
+ */
+void checkCountries(const QString& path)
+{
+  const ts::CountryAreas areas(path);
+  QVERIFY2(areas.isValid(), qPrintable(areas.errorString()));
+  QVERIFY(areas.countries().size() > 200);
+  struct Place {
+    const char* country;
+    double latDeg;
+    double lonDeg;
+    bool inside;
+  };
+  const std::array<Place, 14> places{{
+      {"GBR", 51.5, -0.1, true},     // London
+      {"GBR", 54.6, -5.93, true},    // Belfast
+      {"GBR", 60.15, -1.15, true},   // Lerwick, Shetland
+      {"GBR", 48.86, 2.35, false},   // Paris
+      {"FRA", 48.86, 2.35, true},    //
+      {"FRA", -21.1, 55.5, true},    // Réunion
+      {"FRA", 4.9, -52.3, true},     // Cayenne, French Guiana
+      {"RUS", 55.75, 37.6, true},    // Moscow
+      {"RUS", 66.0, -175.0, true},   // Chukotka, east of 180°
+      {"FJI", -18.14, 178.44, true}, // Suva
+      {"FJI", -16.8, -179.9, true},  // Taveuni's east, across 180°
+      {"ZAF", -29.6, 28.2, false},   // Lesotho, inside South Africa
+      {"USA", 21.3, -157.85, true},  // Honolulu
+      {"USA", 52.0, 177.5, true},    // Aleutians, west of 180°
+  }};
+  for (const Place& place : places) {
+    QString error;
+    const std::optional<ts::RegionGeometry> area =
+        areas.area(QString::fromLatin1(place.country), &error);
+    if (!area) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY2(area->contains(place.latDeg, place.lonDeg) == place.inside,
+             qPrintable(QStringLiteral("%1 at %2, %3")
+                            .arg(QLatin1String(place.country))
+                            .arg(place.latDeg)
+                            .arg(place.lonDeg)));
+  }
+  for (const char* id : {"GBR", "CAN", "RUS", "IDN"}) {
+    QString error;
+    const std::optional<ts::RegionGeometry> area =
+        areas.area(QString::fromLatin1(id), &error);
+    if (!area) {
+      QFAIL(qPrintable(error));
+    }
+    // For the log (timings would make the test flaky): the whole count to
+    // level 12, and to level 16 stopped past a million tiles, as the New
+    // Region dialog counts.
+    QElapsedTimer timer;
+    timer.start();
+    const long long tiles =
+        ts::countRegionTiles(*area, 0, 12, std::nullopt).total();
+    const qint64 fullMs = timer.restart();
+    const ts::RegionTileCount capped =
+        ts::countRegionTiles(*area, 0, 16, std::nullopt, 1000000);
+    qInfo("%s: %zu rings; levels 0-12: %lld tiles in %lld ms; 0-16 up to a "
+          "million: %lld tiles%s in %lld ms",
+          id, area->rings().size(), tiles, fullMs, capped.total(),
+          capped.complete ? "" : " (stopped)", timer.elapsed());
+  }
+}
+
+} // namespace
+
 /** Unit tests for the base-pack packager, and checks of a built pack. */
 class TestPackager : public QObject
 {
@@ -712,6 +787,87 @@ private slots:
     QVERIFY(error.contains(QLatin1String("budget")));
   }
 
+  void countries()
+  {
+    // Natural Earth's fields; a country with a lake, one split at the
+    // antimeridian, one without ISO codes, and Antarctica (left out).
+    const QTemporaryDir dir;
+    const QString source = dir.filePath(QStringLiteral("countries.geojson"));
+    QFile file(source);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(R"({"type": "FeatureCollection", "features": [
+      {"type": "Feature", "properties": {"ADM0_A3": "ISL", "ADMIN": "Islandia",
+        "ISO_A2_EH": "IS", "ISO_A3_EH": "ISL"},
+       "geometry": {"type": "Polygon", "coordinates": [
+         [[10, 40], [20, 40], [20, 50], [10, 50], [10, 40]],
+         [[13, 43], [13, 47], [17, 47], [17, 43], [13, 43]]]}},
+      {"type": "Feature", "properties": {"ADM0_A3": "SPL", "ADMIN": "Splitland",
+        "ISO_A2_EH": "SP", "ISO_A3_EH": "SPL"},
+       "geometry": {"type": "MultiPolygon", "coordinates": [
+         [[[175, 60], [180, 60], [180, 65], [175, 65], [175, 60]]],
+         [[[-180, 60], [-175, 60], [-175, 66], [-180, 66], [-180, 60]]]]}},
+      {"type": "Feature", "properties": {"ADM0_A3": "ANO", "ADMIN": "Anonymia",
+        "ISO_A2_EH": "-99", "ISO_A3_EH": "-99"},
+       "geometry": {"type": "Polygon", "coordinates": [
+         [[-60, -10], [-50, -10], [-50, 0], [-60, 0], [-60, -10]]]}},
+      {"type": "Feature", "properties": {"ADM0_A3": "ATA", "ADMIN": "Antarctica",
+        "ISO_A2_EH": "AQ", "ISO_A3_EH": "ATA"},
+       "geometry": {"type": "Polygon", "coordinates": [
+         [[-180, -90], [180, -90], [180, -70], [-180, -70], [-180, -90]]]}}
+    ]})");
+    file.close();
+    ts::packager::CountryOptions options;
+    options.sourcePath = source;
+    options.outputPath = dir.filePath(QStringLiteral("countries.gpkg"));
+    options.exclude = {QStringLiteral("ATA")};
+    ts::packager::CountryStats stats;
+    QString error;
+    QVERIFY2(ts::packager::buildCountries(options, &stats, &error),
+             qPrintable(error));
+    QCOMPARE(stats.countries, 3);
+    QCOMPARE(stats.excluded, 1);
+    QCOMPARE(stats.rings, 4LL); // Splitland's halves joined; the lake
+
+    const ts::CountryAreas areas(options.outputPath);
+    QVERIFY2(areas.isValid(), qPrintable(areas.errorString()));
+    QCOMPARE(areas.countries().size(), std::size_t{3});
+    QCOMPARE(areas.countries().front().name, QStringLiteral("Anonymia"));
+    QVERIFY(areas.countries().front().isoA2.isEmpty());
+    QCOMPARE(
+        areas.country(QStringLiteral("ISL")).value_or(ts::CountryArea{}).isoA3,
+        QStringLiteral("ISL"));
+    QVERIFY(!areas.country(QStringLiteral("ATA")));
+    QVERIFY(!areas.area(QStringLiteral("ATA"), &error));
+
+    // Widened by 0.05° and simplified within 0.02°: the whole country,
+    // a little more, and the lake still a hole.
+    const std::optional<ts::RegionGeometry> islandia =
+        areas.area(QStringLiteral("ISL"), &error);
+    if (!islandia) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(islandia->contains(41.0, 11.0));
+    QVERIFY(islandia->contains(40.0, 10.0));  // a corner
+    QVERIFY(islandia->contains(39.98, 15.0)); // just off the coast
+    QVERIFY(!islandia->contains(39.9, 15.0));
+    QVERIFY(!islandia->contains(45.0, 15.0)); // the lake
+    const std::optional<ts::RegionGeometry> splitland =
+        areas.area(QStringLiteral("SPL"), &error);
+    if (!splitland) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(splitland->rings().size(), std::size_t{1});
+    QVERIFY(splitland->contains(62.0, 179.99));
+    QVERIFY(splitland->contains(62.0, -179.99));
+    QVERIFY(splitland->contains(65.5, -176.0));
+    QVERIFY(!splitland->contains(65.5, 176.0));
+
+    // The buffer must exceed the simplification.
+    options.outputPath = dir.filePath(QStringLiteral("bad.gpkg"));
+    options.bufferDeg = 0.01;
+    QVERIFY(!ts::packager::buildCountries(options, &stats, &error));
+  }
+
   void configErrors()
   {
     QString error;
@@ -785,15 +941,24 @@ private slots:
     // base pack).
     QCOMPARE(manifest.value().datasets.size(),
              std::size_t{config->imagery ? 1U : 0U} +
-                 std::size_t{config->shoreline ? 1U : 0U});
+                 std::size_t{config->shoreline ? 1U : 0U} +
+                 std::size_t{config->countries ? 1U : 0U});
     const QString imageryReplaces =
         config->imagery ? config->imagery->replaces : QString();
     const QString shorelineReplaces =
         config->shoreline ? config->shoreline->replaces : QString();
     for (const ts::PackDataset& dataset : manifest.value().datasets) {
-      QCOMPARE(dataset.replaces, dataset.kind == ts::PackDataset::Kind::Imagery
-                                     ? imageryReplaces
-                                     : shorelineReplaces);
+      switch (dataset.kind) {
+      case ts::PackDataset::Kind::Imagery:
+        QCOMPARE(dataset.replaces, imageryReplaces);
+        break;
+      case ts::PackDataset::Kind::Features:
+        QCOMPARE(dataset.replaces, shorelineReplaces);
+        break;
+      case ts::PackDataset::Kind::Areas:
+        QVERIFY(dataset.replaces.isEmpty());
+        break;
+      }
     }
 
     const QDir pack(directory);
@@ -804,6 +969,10 @@ private slots:
       QCOMPARE(imagery.maximumLevel(),
                config.value().imagery.value().tiling.maxLevel);
       QVERIFY(checkPyramid(imagery, imagery.maximumLevel()));
+    }
+    if (config->countries) {
+      checkCountries(
+          pack.filePath(config->countries->dataset + QStringLiteral(".gpkg")));
     }
     if (!config->shoreline) {
       return;

@@ -13,6 +13,7 @@
 #include <QJsonObject>
 #include <QString>
 
+#include "countrybuilder.h"
 #include "imagerytiler.h"
 #include "shorelinebuilder.h"
 
@@ -81,6 +82,26 @@ struct ShorelineSpec {
   double minimumAreaKm2 = 0.0;
 };
 
+/** The country outlines of the pack. */
+struct CountriesSpec {
+  /** Dataset id in the manifest. */
+  QString dataset;
+  /** Source id (Natural Earth admin-0 countries). */
+  QString source;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+  /** See CountryOptions. */
+  double bufferDeg = 0.05;
+  /** See CountryOptions. */
+  double simplifyDeg = 0.02;
+  /** See CountryOptions. */
+  std::vector<QString> exclude;
+};
+
 /** The whole pack configuration (tools/packager/basepack.json). */
 struct PackConfig {
   /** Pack id. */
@@ -97,6 +118,8 @@ struct PackConfig {
   std::optional<ImagerySpec> imagery;
   /** Shoreline dataset, if any. */
   std::optional<ShorelineSpec> shoreline;
+  /** Country outlines, if any. */
+  std::optional<CountriesSpec> countries;
 
   /** Parses the configuration; nothing and @p errorString on failure. */
   static std::optional<PackConfig> fromJson(const QJsonObject& json,
@@ -128,6 +151,8 @@ struct BuildReport {
   ImageryTilerStats imagery;
   /** Shoreline results per level of detail. */
   std::vector<ShorelineLodStats> shoreline;
+  /** Country outline results. */
+  CountryStats countries;
   /** The report as JSON, for CI and tests. */
   QJsonObject toJson() const;
 };

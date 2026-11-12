@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <memory>
 #include <unordered_set>
 #include <utility>
 
@@ -157,6 +159,66 @@ long long pow4(int exponent)
 
 } // namespace
 
+/**
+ * The edges of a polygon sorted into latitude bands, so that a point or a
+ * tile is only tested against the edges near its latitude: a country's
+ * outline has tens of thousands of edges, but a line of latitude crosses
+ * only a few hundred of them.
+ */
+struct RegionGeometry::EdgeIndex {
+  /** One edge, from a to b, with its bounding box. */
+  struct Edge {
+    LonLat a;
+    LonLat b;
+    double westDeg;
+    double southDeg;
+    double eastDeg;
+    double northDeg;
+  };
+  std::vector<Edge> edges;
+  double southDeg = 0.0;
+  double bandHeightDeg = 1.0;
+  /** Indices into edges, per band, south to north. */
+  std::vector<std::vector<std::uint32_t>> bands;
+
+  std::size_t bandOf(double latDeg) const
+  {
+    const double position = std::floor((latDeg - southDeg) / bandHeightDeg);
+    return static_cast<std::size_t>(
+        std::clamp(position, 0.0, static_cast<double>(bands.size() - 1)));
+  }
+};
+
+void RegionGeometry::buildIndex()
+{
+  std::shared_ptr<EdgeIndex> index = std::make_shared<EdgeIndex>();
+  for (const std::vector<LonLat>& ring : m_rings) {
+    const std::size_t n = ring.size();
+    for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
+      const LonLat& a = ring[j];
+      const LonLat& b = ring[i];
+      index->edges.push_back(EdgeIndex::Edge{
+          a, b, std::min(a.lonDeg, b.lonDeg), std::min(a.latDeg, b.latDeg),
+          std::max(a.lonDeg, b.lonDeg), std::max(a.latDeg, b.latDeg)});
+    }
+  }
+  // About eight edges per band, at most 4096 bands.
+  const std::size_t bandCount =
+      std::clamp<std::size_t>(index->edges.size() / 8, 1, 4096);
+  index->southDeg = m_extent.southDeg;
+  index->bandHeightDeg =
+      std::max(m_extent.heightDeg(), 1e-9) / static_cast<double>(bandCount);
+  index->bands.resize(bandCount);
+  for (std::size_t e = 0; e < index->edges.size(); ++e) {
+    const EdgeIndex::Edge& edge = index->edges[e];
+    for (std::size_t band = index->bandOf(edge.southDeg);
+         band <= index->bandOf(edge.northDeg); ++band) {
+      index->bands[band].push_back(static_cast<std::uint32_t>(e));
+    }
+  }
+  m_index = std::move(index);
+}
+
 // The edges in GeoRect's order (west, south, east, north), as declared.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 RegionGeometry RegionGeometry::rectangle(double westDeg, double southDeg,
@@ -181,17 +243,25 @@ RegionGeometry RegionGeometry::rectangle(double westDeg, double southDeg,
   const double east = west + span;
   RegionGeometry geometry;
   geometry.m_kind = Kind::Rectangle;
-  geometry.m_vertices = {LonLat{west, south}, LonLat{east, south},
-                         LonLat{east, north}, LonLat{west, north}};
+  geometry.m_rings = {{LonLat{west, south}, LonLat{east, south},
+                       LonLat{east, north}, LonLat{west, north}}};
   geometry.m_extent = GeoRect{west, south, east, north};
+  geometry.m_ringExtents = {geometry.m_extent};
   return geometry;
 }
 
-std::optional<RegionGeometry>
-RegionGeometry::polygon(const std::vector<LonLat>& vertices,
-                        QString* errorString)
+namespace
 {
-  // Drop repeated vertices, including a closing copy of the first.
+
+/**
+ * @p vertices without repeats (nor a closing copy of the first), unwrapped
+ * from a first vertex within 180° of @p referenceLonDeg; nothing and
+ * @p errorString if they can't make a ring.
+ */
+std::optional<std::vector<LonLat>>
+unwrappedRing(const std::vector<LonLat>& vertices, double referenceLonDeg,
+              QString* errorString)
+{
   std::vector<LonLat> ring;
   for (const LonLat& vertex : vertices) {
     if (!std::isfinite(vertex.lonDeg) || !std::isfinite(vertex.latDeg) ||
@@ -218,7 +288,8 @@ RegionGeometry::polygon(const std::vector<LonLat>& vertices,
     return std::nullopt;
   }
   // Unwrap: each vertex within 180° of the one before.
-  ring.front().lonDeg = wrapLon(ring.front().lonDeg);
+  ring.front().lonDeg =
+      referenceLonDeg + wrapDelta(ring.front().lonDeg - referenceLonDeg);
   for (std::size_t i = 1; i < ring.size(); ++i) {
     ring[i].lonDeg =
         ring[i - 1].lonDeg + wrapDelta(ring[i].lonDeg - ring[i - 1].lonDeg);
@@ -230,26 +301,158 @@ RegionGeometry::polygon(const std::vector<LonLat>& vertices,
                                  "rectangle that reaches the pole instead."));
     return std::nullopt;
   }
-  // Move the whole ring so that its western edge lies in [−180°, 180°).
-  const double west = extentOf(ring).westDeg;
-  const double shift = wrapLon(west) - west;
-  for (LonLat& vertex : ring) {
-    vertex.lonDeg += shift;
+  return ring;
+}
+
+/** Even–odd crossings of @p ring by a ray east from the point; true if odd. */
+// Latitude first, as GeoRect::contains().
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool insideRing(const std::vector<LonLat>& ring, double latDeg, double lonDeg)
+{
+  bool inside = false;
+  const std::size_t n = ring.size();
+  for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
+    const LonLat& a = ring[i];
+    const LonLat& b = ring[j];
+    if ((a.latDeg > latDeg) != (b.latDeg > latDeg)) {
+      const double crossLon = a.lonDeg + (latDeg - a.latDeg) *
+                                             (b.lonDeg - a.lonDeg) /
+                                             (b.latDeg - a.latDeg);
+      if (lonDeg < crossLon) {
+        inside = !inside;
+      }
+    }
+  }
+  return inside;
+}
+
+/** Area of @p ring on the authalic sphere, km², always positive. */
+double ringAreaKm2(const std::vector<LonLat>& ring)
+{
+  // Green's theorem: area = −∮ sin φ dλ, each edge straight in (λ, φ).
+  const double radians = pi / 180.0;
+  double sum = 0.0;
+  const std::size_t n = ring.size();
+  for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
+    const double lon1 = ring[j].lonDeg * radians;
+    const double lat1 = ring[j].latDeg * radians;
+    const double lon2 = ring[i].lonDeg * radians;
+    const double lat2 = ring[i].latDeg * radians;
+    const double meanSin =
+        std::abs(lat2 - lat1) < 1e-12
+            ? std::sin(lat1)
+            : (std::cos(lat1) - std::cos(lat2)) / (lat2 - lat1);
+    sum += (lon2 - lon1) * meanSin;
+  }
+  return std::abs(sum) * authalicRadiusKm * authalicRadiusKm;
+}
+
+std::optional<std::vector<LonLat>> ringFromJson(const QJsonArray& array,
+                                                QString* errorString)
+{
+  std::vector<LonLat> vertices;
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int i = 0; i < array.size(); ++i) {
+    const QJsonArray pair = array.at(i).toArray();
+    if (pair.size() != 2 || !pair.at(0).isDouble() || !pair.at(1).isDouble()) {
+      fail(errorString, translated("A point of the region is not a pair "
+                                   "of numbers."));
+      return std::nullopt;
+    }
+    vertices.push_back(LonLat{pair.at(0).toDouble(), pair.at(1).toDouble()});
+  }
+  return vertices;
+}
+
+QJsonArray ringToJson(const std::vector<LonLat>& ring)
+{
+  QJsonArray vertices;
+  for (const LonLat& vertex : ring) {
+    vertices.append(QJsonArray{vertex.lonDeg, vertex.latDeg});
+  }
+  return vertices;
+}
+
+} // namespace
+
+std::optional<RegionGeometry>
+RegionGeometry::polygon(const std::vector<LonLat>& vertices,
+                        QString* errorString)
+{
+  return polygons({vertices}, errorString);
+}
+
+std::optional<RegionGeometry>
+RegionGeometry::polygons(const std::vector<std::vector<LonLat>>& rings,
+                         QString* errorString)
+{
+  if (rings.empty()) {
+    fail(errorString,
+         translated("An area needs at least three different points."));
+    return std::nullopt;
   }
   RegionGeometry geometry;
   geometry.m_kind = Kind::Polygon;
-  geometry.m_vertices = std::move(ring);
-  geometry.m_extent = extentOf(geometry.m_vertices);
+  double reference = 0.0;
+  for (const std::vector<LonLat>& vertices : rings) {
+    if (!vertices.empty() && geometry.m_rings.empty()) {
+      reference = wrapLon(vertices.front().lonDeg);
+    }
+    std::optional<std::vector<LonLat>> ring =
+        unwrappedRing(vertices, reference, errorString);
+    if (!ring) {
+      return std::nullopt;
+    }
+    geometry.m_rings.push_back(std::move(*ring));
+  }
+  // Move the whole so that its western edge lies in [−180°, 180°).
+  GeoRect extent = extentOf(geometry.m_rings.front());
+  for (const std::vector<LonLat>& ring : geometry.m_rings) {
+    const GeoRect ringExtent = extentOf(ring);
+    extent.westDeg = std::min(extent.westDeg, ringExtent.westDeg);
+    extent.eastDeg = std::max(extent.eastDeg, ringExtent.eastDeg);
+  }
+  if (extent.eastDeg - extent.westDeg >= 360.0) {
+    fail(errorString,
+         translated("The area goes the whole way round the Earth; use a "
+                    "rectangle instead."));
+    return std::nullopt;
+  }
+  const double shift = wrapLon(extent.westDeg) - extent.westDeg;
+  for (std::vector<LonLat>& ring : geometry.m_rings) {
+    for (LonLat& vertex : ring) {
+      vertex.lonDeg += shift;
+    }
+    geometry.m_ringExtents.push_back(extentOf(ring));
+  }
+  geometry.m_extent = geometry.m_ringExtents.front();
+  for (const GeoRect& ringExtent : geometry.m_ringExtents) {
+    geometry.m_extent.westDeg =
+        std::min(geometry.m_extent.westDeg, ringExtent.westDeg);
+    geometry.m_extent.southDeg =
+        std::min(geometry.m_extent.southDeg, ringExtent.southDeg);
+    geometry.m_extent.eastDeg =
+        std::max(geometry.m_extent.eastDeg, ringExtent.eastDeg);
+    geometry.m_extent.northDeg =
+        std::max(geometry.m_extent.northDeg, ringExtent.northDeg);
+  }
   if (geometry.areaKm2() <= 0.0) {
     fail(errorString, translated("The area has no size."));
     return std::nullopt;
   }
+  geometry.buildIndex();
   return geometry;
+}
+
+const std::vector<LonLat>& RegionGeometry::vertices() const
+{
+  static const std::vector<LonLat> none;
+  return m_rings.empty() ? none : m_rings.front();
 }
 
 bool RegionGeometry::isValid() const
 {
-  return !m_vertices.empty() && m_extent.widthDeg() > 0.0 &&
+  return !m_rings.empty() && m_extent.widthDeg() > 0.0 &&
          m_extent.heightDeg() > 0.0;
 }
 
@@ -261,16 +464,17 @@ bool RegionGeometry::containsUnwrapped(double latDeg, double lonDeg) const
   if (m_kind == Kind::Rectangle) {
     return true;
   }
-  // Even–odd rule, a ray towards the east.
+  // Even–odd over all rings, a ray towards the east: only edges in the
+  // point's latitude band can cross it.
   bool inside = false;
-  const std::size_t n = m_vertices.size();
-  for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
-    const LonLat& a = m_vertices[i];
-    const LonLat& b = m_vertices[j];
-    if ((a.latDeg > latDeg) != (b.latDeg > latDeg)) {
-      const double crossLon = a.lonDeg + (latDeg - a.latDeg) *
-                                             (b.lonDeg - a.lonDeg) /
-                                             (b.latDeg - a.latDeg);
+  for (const std::uint32_t e : m_index->bands[m_index->bandOf(latDeg)]) {
+    const EdgeIndex::Edge& edge = m_index->edges[e];
+    if ((edge.a.latDeg > latDeg) != (edge.b.latDeg > latDeg) &&
+        lonDeg < edge.eastDeg) {
+      const double crossLon =
+          edge.a.lonDeg + (latDeg - edge.a.latDeg) *
+                              (edge.b.lonDeg - edge.a.lonDeg) /
+                              (edge.b.latDeg - edge.a.latDeg);
       if (lonDeg < crossLon) {
         inside = !inside;
       }
@@ -296,16 +500,39 @@ bool RegionGeometry::contains(double latDeg, double lonDeg) const
 
 bool RegionGeometry::edgeCrossesInterior(const GeoRect& rect) const
 {
-  const std::size_t n = m_vertices.size();
-  for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
-    const LonLat& a = m_vertices[j];
-    const LonLat& b = m_vertices[i];
-    double t0 = 0.0;
-    double t1 = 0.0;
-    if (clipSegment(a, b, rect, t0, t1)) {
-      const double t = 0.5 * (t0 + t1);
-      if (strictlyInside(rect, a.lonDeg + t * (b.lonDeg - a.lonDeg),
-                         a.latDeg + t * (b.latDeg - a.latDeg))) {
+  const std::size_t last = m_index->bandOf(rect.northDeg);
+  for (std::size_t band = m_index->bandOf(rect.southDeg); band <= last;
+       ++band) {
+    for (const std::uint32_t e : m_index->bands[band]) {
+      const EdgeIndex::Edge& edge = m_index->edges[e];
+      if (edge.eastDeg < rect.westDeg || edge.westDeg > rect.eastDeg ||
+          edge.northDeg < rect.southDeg || edge.southDeg > rect.northDeg) {
+        continue;
+      }
+      double t0 = 0.0;
+      double t1 = 0.0;
+      if (clipSegment(edge.a, edge.b, rect, t0, t1)) {
+        const double t = 0.5 * (t0 + t1);
+        if (strictlyInside(
+                rect, edge.a.lonDeg + t * (edge.b.lonDeg - edge.a.lonDeg),
+                edge.a.latDeg + t * (edge.b.latDeg - edge.a.latDeg))) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+bool RegionGeometry::vertexInside(const GeoRect& rect) const
+{
+  // Every vertex starts one edge, which is in the vertex's band.
+  const std::size_t last = m_index->bandOf(rect.northDeg);
+  for (std::size_t band = m_index->bandOf(rect.southDeg); band <= last;
+       ++band) {
+    for (const std::uint32_t e : m_index->bands[band]) {
+      const LonLat& vertex = m_index->edges[e].a;
+      if (strictlyInside(rect, vertex.lonDeg, vertex.latDeg)) {
         return true;
       }
     }
@@ -321,15 +548,8 @@ bool RegionGeometry::intersectsShifted(const GeoRect& rect) const
   if (m_kind == Kind::Rectangle) {
     return true;
   }
-  if (containsUnwrapped(rect.centreLatDeg(), rect.centreLonDeg())) {
-    return true;
-  }
-  for (const LonLat& vertex : m_vertices) {
-    if (strictlyInside(rect, vertex.lonDeg, vertex.latDeg)) {
-      return true;
-    }
-  }
-  return edgeCrossesInterior(rect);
+  return containsUnwrapped(rect.centreLatDeg(), rect.centreLonDeg()) ||
+         vertexInside(rect) || edgeCrossesInterior(rect);
 }
 
 bool RegionGeometry::coversShifted(const GeoRect& rect) const
@@ -340,15 +560,8 @@ bool RegionGeometry::coversShifted(const GeoRect& rect) const
   if (m_kind == Kind::Rectangle) {
     return true;
   }
-  if (!containsUnwrapped(rect.centreLatDeg(), rect.centreLonDeg())) {
-    return false;
-  }
-  for (const LonLat& vertex : m_vertices) {
-    if (strictlyInside(rect, vertex.lonDeg, vertex.latDeg)) {
-      return false;
-    }
-  }
-  return !edgeCrossesInterior(rect);
+  return containsUnwrapped(rect.centreLatDeg(), rect.centreLonDeg()) &&
+         !vertexInside(rect) && !edgeCrossesInterior(rect);
 }
 
 bool RegionGeometry::intersects(const GeoRect& rect) const
@@ -367,25 +580,26 @@ bool RegionGeometry::covers(const GeoRect& rect) const
 
 double RegionGeometry::areaKm2() const
 {
-  if (m_vertices.size() < 3) {
-    return 0.0;
+  // Even–odd: a ring inside an odd number of others is a hole.
+  double area = 0.0;
+  for (std::size_t r = 0; r < m_rings.size(); ++r) {
+    const std::vector<LonLat>& ring = m_rings[r];
+    if (ring.size() < 3) {
+      continue;
+    }
+    bool hole = false;
+    for (std::size_t other = 0; other < m_rings.size(); ++other) {
+      if (other != r &&
+          m_ringExtents[other].contains(ring.front().latDeg,
+                                        ring.front().lonDeg) &&
+          insideRing(m_rings[other], ring.front().latDeg,
+                     ring.front().lonDeg)) {
+        hole = !hole;
+      }
+    }
+    area += hole ? -ringAreaKm2(ring) : ringAreaKm2(ring);
   }
-  // Green's theorem: area = −∮ sin φ dλ, each edge straight in (λ, φ).
-  const double radians = pi / 180.0;
-  double sum = 0.0;
-  const std::size_t n = m_vertices.size();
-  for (std::size_t i = 0, j = n - 1; i < n; j = i++) {
-    const double lon1 = m_vertices[j].lonDeg * radians;
-    const double lat1 = m_vertices[j].latDeg * radians;
-    const double lon2 = m_vertices[i].lonDeg * radians;
-    const double lat2 = m_vertices[i].latDeg * radians;
-    const double meanSin =
-        std::abs(lat2 - lat1) < 1e-12
-            ? std::sin(lat1)
-            : (std::cos(lat1) - std::cos(lat2)) / (lat2 - lat1);
-    sum += (lon2 - lon1) * meanSin;
-  }
-  return std::abs(sum) * authalicRadiusKm * authalicRadiusKm;
+  return std::max(area, 0.0);
 }
 
 QJsonObject RegionGeometry::toJson() const
@@ -399,12 +613,16 @@ QJsonObject RegionGeometry::toJson() const
     json.insert(QStringLiteral("north"), m_extent.northDeg);
     return json;
   }
-  QJsonArray vertices;
-  for (const LonLat& vertex : m_vertices) {
-    vertices.append(QJsonArray{vertex.lonDeg, vertex.latDeg});
-  }
   json.insert(QStringLiteral("kind"), QStringLiteral("polygon"));
-  json.insert(QStringLiteral("vertices"), vertices);
+  if (m_rings.size() == 1) {
+    json.insert(QStringLiteral("vertices"), ringToJson(m_rings.front()));
+    return json;
+  }
+  QJsonArray rings;
+  for (const std::vector<LonLat>& ring : m_rings) {
+    rings.append(ringToJson(ring));
+  }
+  json.insert(QStringLiteral("rings"), rings);
   return json;
 }
 
@@ -433,20 +651,27 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
     return geometry;
   }
   if (kind == QLatin1String("polygon")) {
-    std::vector<LonLat> vertices;
-    const QJsonArray array = json.value(QStringLiteral("vertices")).toArray();
-    // NOLINTNEXTLINE(modernize-loop-convert)
-    for (int i = 0; i < array.size(); ++i) {
-      const QJsonArray pair = array.at(i).toArray();
-      if (pair.size() != 2 || !pair.at(0).isDouble() ||
-          !pair.at(1).isDouble()) {
-        fail(errorString, translated("A point of the region is not a pair "
-                                     "of numbers."));
+    std::vector<std::vector<LonLat>> rings;
+    if (json.contains(QStringLiteral("rings"))) {
+      const QJsonArray array = json.value(QStringLiteral("rings")).toArray();
+      // NOLINTNEXTLINE(modernize-loop-convert)
+      for (int i = 0; i < array.size(); ++i) {
+        std::optional<std::vector<LonLat>> ring =
+            ringFromJson(array.at(i).toArray(), errorString);
+        if (!ring) {
+          return std::nullopt;
+        }
+        rings.push_back(std::move(*ring));
+      }
+    } else {
+      std::optional<std::vector<LonLat>> ring = ringFromJson(
+          json.value(QStringLiteral("vertices")).toArray(), errorString);
+      if (!ring) {
         return std::nullopt;
       }
-      vertices.push_back(LonLat{pair.at(0).toDouble(), pair.at(1).toDouble()});
+      rings.push_back(std::move(*ring));
     }
-    return polygon(vertices, errorString);
+    return polygons(rings, errorString);
   }
   fail(errorString, translated("The region's area is of an unknown kind."));
   return std::nullopt;
@@ -454,13 +679,19 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
 
 bool RegionGeometry::operator==(const RegionGeometry& other) const
 {
-  if (m_kind != other.m_kind || m_vertices.size() != other.m_vertices.size()) {
+  if (m_kind != other.m_kind || m_rings.size() != other.m_rings.size()) {
     return false;
   }
-  for (std::size_t i = 0; i < m_vertices.size(); ++i) {
-    if (m_vertices[i].lonDeg != other.m_vertices[i].lonDeg ||
-        m_vertices[i].latDeg != other.m_vertices[i].latDeg) {
+  for (std::size_t r = 0; r < m_rings.size(); ++r) {
+    const std::vector<LonLat>& a = m_rings[r];
+    const std::vector<LonLat>& b = other.m_rings[r];
+    if (a.size() != b.size()) {
       return false;
+    }
+    for (std::size_t i = 0; i < a.size(); ++i) {
+      if (a[i].lonDeg != b[i].lonDeg || a[i].latDeg != b[i].latDeg) {
+        return false;
+      }
     }
   }
   return true;
@@ -479,7 +710,8 @@ long long RegionTileCount::total() const
 
 RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
                                  int maximumLevel,
-                                 const std::optional<GeoRect>& dataBounds)
+                                 const std::optional<GeoRect>& dataBounds,
+                                 std::optional<long long> stopAbove)
 {
   RegionTileCount counts;
   const int first = std::clamp(minimumLevel, 0, TileKey::maximumLevel);
@@ -493,7 +725,12 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
   for (const TileKey root : TileKey::roots()) {
     stack.push_back(root);
   }
+  long long total = 0;
   while (!stack.empty()) {
+    if (stopAbove && total > *stopAbove) {
+      counts.complete = false;
+      break;
+    }
     const TileKey key = stack.back();
     stack.pop_back();
     const GeoRect rect = key.bounds();
@@ -505,11 +742,13 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
       for (int level = std::max(key.level, first); level <= last; ++level) {
         counts.perLevel[static_cast<std::size_t>(level - first)] +=
             pow4(level - key.level);
+        total += pow4(level - key.level);
       }
       continue;
     }
     if (key.level >= first) {
       ++counts.perLevel[static_cast<std::size_t>(key.level - first)];
+      ++total;
     }
     if (key.level < last) {
       for (int child = 0; child < 4; ++child) {

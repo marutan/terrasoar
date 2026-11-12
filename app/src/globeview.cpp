@@ -761,8 +761,10 @@ void GlobeView::drawRegions()
   painter.setRenderHint(QPainter::Antialiasing, true);
   painter.setPen(QPen(QColor(255, 200, 40), 2.0));
   for (const RegionGeometry& region : m_outlines) {
-    for (const QPolygonF& piece : outlineOnScreen(region.vertices(), true)) {
-      painter.drawPolyline(piece);
+    for (const std::vector<LonLat>& ring : region.rings()) {
+      for (const QPolygonF& piece : outlineOnScreen(ring, true)) {
+        painter.drawPolyline(piece);
+      }
     }
   }
   if (m_drawing != RegionDrawing::None) {
