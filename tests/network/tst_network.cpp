@@ -277,6 +277,32 @@ private slots:
     QCOMPARE(response.finalUrl.path(), QStringLiteral("/new"));
   }
 
+  void retriesARedirectCutShort()
+  {
+    // The connection closes while the redirect is being followed (GitHub's
+    // release downloads over HTTP/2 did this): that is a connection
+    // failure, retried, not a 302 answer.
+    std::atomic<int> targetRequests{0};
+    MockHttpServer server([&targetRequests](const MockHttpRequest& request) {
+      if (request.url.path() == QLatin1String("/old")) {
+        MockHttpResponse response = mockResponse(302, QByteArray());
+        response.headers.emplace_back("Location", "/new");
+        return response;
+      }
+      MockHttpResponse response = mockResponse(200, "moved");
+      // Twice: Qt itself resends once on a closed HTTP/1.1 connection.
+      response.hangUp = targetRequests.fetch_add(1) < 2;
+      return response;
+    });
+    ts::NetworkClient client(testSettings());
+    const ts::HttpResponse response =
+        get(client, server.url(QStringLiteral("/old")));
+    QCOMPARE(response.error, ts::NetworkError::None);
+    QCOMPARE(response.status, 200);
+    QCOMPARE(response.body, QByteArray("moved"));
+    QCOMPARE(response.attempts, 2);
+  }
+
   void cancellationDropsTheConnection()
   {
     // A slow answer; the caller gives up after 100 ms. fetch() returns at

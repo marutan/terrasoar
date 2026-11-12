@@ -46,9 +46,14 @@ reported (see `tests/tsan.supp`).
    budget, and what servers expect from one client.
 2. **On the wire.** User-Agent `TerraSoar/<version>`; no HTTP cache in
    Qt (the disk cache does that); redirects followed unless from https to
-   http.
+   http. HTTP/1.1 only: with Qt 6.4, a server closing an HTTP/2
+   connection while a redirect was followed (GitHub's release downloads
+   do) left the next request on it hanging past its timeout, and Qt's six
+   connections per host already match the in-flight limit.
 3. **Answered.** Any HTTP status is a response (`NetworkError::None`); the
-   caller decides what a 404 means. A body over `maximumResponseBytes`
+   caller decides what a 404 means. Except a redirect cut short: a 3xx
+   that comes with a transport error (the connection closed while
+   following it) is that error, and retried. A body over `maximumResponseBytes`
    (16 MB) aborts the transfer (`TooLarge`).
 4. **Retried** when worth it: a timeout, a connection failure, HTTP 408,
    429 or 5xx. Up to three attempts, 0.5 s then 1 s apart (doubling),
@@ -157,7 +162,8 @@ listed and Update fetches them again.
 test may block in a request to it; it can delay, stall, hang up, send too
 much, redirect or act as a proxy):
 
-- Responses, request headers, HTTP errors as answers, redirects.
+- Responses, request headers, HTTP errors as answers, redirects, a
+  redirect whose target hangs up (retried, not taken as the answer).
 - Retries: doubling pauses, Retry-After honoured and capped, giving up;
   connection refused and hang-ups; timeouts; oversized bodies.
 - Cancellation drops the connection (the server sees the client go) and
