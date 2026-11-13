@@ -44,8 +44,8 @@ QPlainTextEdit* textPage(QWidget* parent, const QString& text)
 
 } // namespace
 
-AboutDialog::AboutDialog(QWidget* parent, std::vector<AboutDataRow> data)
-    : QDialog(parent), m_data(std::move(data)), m_tabs(new QTabWidget(this)),
+AboutDialog::AboutDialog(QWidget* parent, std::vector<AboutDataRow> rows)
+    : QDialog(parent), m_data(std::move(rows)), m_tabs(new QTabWidget(this)),
       m_aboutLabel(new QLabel(this)), m_dataTree(new QTreeWidget(this))
 {
   setObjectName(QStringLiteral("aboutDialog"));

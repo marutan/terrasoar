@@ -48,8 +48,8 @@ class AboutDialog : public QDialog
   Q_DISABLE_COPY_MOVE(AboutDialog)
 
 public:
-  /** Creates the window listing @p data. */
-  AboutDialog(QWidget* parent, std::vector<AboutDataRow> data);
+  /** Creates the window listing @p rows. */
+  AboutDialog(QWidget* parent, std::vector<AboutDataRow> rows);
   ~AboutDialog() override;
 
   /** Returns THIRD_PARTY_NOTICES, as built into the program. */
