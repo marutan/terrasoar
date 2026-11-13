@@ -53,6 +53,9 @@ win32 {
     # analysis cover only our own code, as for Qt's headers in common.pri.
     TS_DEPS_INCLUDES = $$system(pkg-config --cflags-only-I gdal proj geos sqlite3 geographiclib)
     for (flag, TS_DEPS_INCLUDES) {
-        QMAKE_CXXFLAGS += -isystem $$shell_quote($$replace(flag, ^-I, ))
+        TS_DEPS_DIR = $$replace(flag, ^-I, )
+        # Not the compiler's own directories (see common.pri).
+        !contains(TS_SYSTEM_INCLUDE_DIRS, $$TS_DEPS_DIR): \
+            QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_DEPS_DIR)
     }
 }

@@ -61,10 +61,14 @@ clang: QMAKE_CXXFLAGS_WARN_ON += -Wnull-dereference
 # warning flags; Clang's -Wpedantic then rejects Qt 6.8's [[nodiscard("…")]]
 # under C++17. Marking Qt's include directories as system headers keeps
 # warnings for our own code only (for a directory given both ways, -isystem
-# wins).
+# wins). Not for the compiler's own system directories (where a distribution
+# or SDK may put Qt, as the Flatpak SDK does): passing /usr/include again
+# reorders it before the C++ library's headers and breaks #include_next.
+TS_SYSTEM_INCLUDE_DIRS = /usr/include /usr/local/include
 gcc|clang {
     TS_QT_HEADERS = $$[QT_INSTALL_HEADERS]
-    QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_QT_HEADERS)
+    !contains(TS_SYSTEM_INCLUDE_DIRS, $$TS_QT_HEADERS): \
+        QMAKE_CXXFLAGS += -isystem $$shell_quote($$TS_QT_HEADERS)
     for (module, $$list(QtCore QtGui QtNetwork QtWidgets QtOpenGL \
                         QtOpenGLWidgets QtTest QtDBus)) {
         exists($$TS_QT_HEADERS/$$module): \
