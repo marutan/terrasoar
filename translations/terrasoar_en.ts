@@ -1138,6 +1138,10 @@
             <source>Unknown or invalid feature source: %1</source>
             <translation>Unknown or invalid feature source: %1</translation>
         </message>
+        <message>
+            <source>Unknown or invalid elevation source: %1</source>
+            <translation>Unknown or invalid elevation source: %1</translation>
+        </message>
     </context>
     <context>
         <name>ts::RegionDownload</name>

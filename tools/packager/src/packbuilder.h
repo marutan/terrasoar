@@ -14,6 +14,7 @@
 #include <QString>
 
 #include "countrybuilder.h"
+#include "elevationbuilder.h"
 #include "imagerytiler.h"
 #include "shorelinebuilder.h"
 
@@ -82,6 +83,42 @@ struct ShorelineSpec {
   double minimumAreaKm2 = 0.0;
 };
 
+/** The global DEM of the pack. */
+struct ElevationSpec {
+  /** Dataset id in the manifest. */
+  QString dataset;
+  /** Source id (a global DEM such as ETOPO 2022). */
+  QString source;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+  /** Deepest level stored. */
+  int maxLevel = 6;
+  /** Samples along a tile's side. */
+  int samples = 65;
+  /** The heights' vertical datum: a geoid dataset of the pack, or empty. */
+  QString verticalDatum;
+};
+
+/** A geoid grid of the pack. */
+struct GeoidSpec {
+  /** Dataset id in the manifest (e.g. "egm2008"). */
+  QString dataset;
+  /** Source id (a PROJ GeoTIFF grid). */
+  QString source;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+  /** Keep every step-th sample. */
+  int step = 1;
+};
+
 /** The country outlines of the pack. */
 struct CountriesSpec {
   /** Dataset id in the manifest. */
@@ -120,6 +157,10 @@ struct PackConfig {
   std::optional<ShorelineSpec> shoreline;
   /** Country outlines, if any. */
   std::optional<CountriesSpec> countries;
+  /** Global DEM, if any. */
+  std::optional<ElevationSpec> elevation;
+  /** Geoid grids. */
+  std::vector<GeoidSpec> geoids;
 
   /** Parses the configuration; nothing and @p errorString on failure. */
   static std::optional<PackConfig> fromJson(const QJsonObject& json,
@@ -153,6 +194,8 @@ struct BuildReport {
   std::vector<ShorelineLodStats> shoreline;
   /** Country outline results. */
   CountryStats countries;
+  /** DEM results. */
+  ElevationStats elevation;
   /** The report as JSON, for CI and tests. */
   QJsonObject toJson() const;
 };

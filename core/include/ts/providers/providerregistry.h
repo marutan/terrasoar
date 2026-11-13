@@ -17,7 +17,9 @@
 namespace ts
 {
 
+class ElevationProvider;
 class FeatureProvider;
+class GeoidModel;
 class ImageryProvider;
 class NetworkClient;
 class PackManifest;
@@ -64,6 +66,22 @@ public:
    */
   std::shared_ptr<FeatureProvider> features(const QJsonObject& source,
                                             QString* errorString);
+
+  /**
+   * Returns the elevation provider for @p source (`{"kind": "basepack",
+   * "dataset": "<id>"}` for an elevation dataset of the base pack), with
+   * the geoid model of its vertical datum, shared like imagery(), or null
+   * and @p errorString.
+   */
+  std::shared_ptr<ElevationProvider> elevation(const QJsonObject& source,
+                                               QString* errorString);
+
+  /**
+   * Returns the geoid model of the base pack's geoid dataset @p dataset
+   * (e.g. "egm2008"), shared, or null and @p errorString.
+   */
+  std::shared_ptr<const GeoidModel> geoid(const QString& dataset,
+                                          QString* errorString);
 
   /**
    * Returns the attribution to show while a layer with @p source is on
@@ -123,6 +141,8 @@ private:
   std::shared_ptr<ImageryProvider> createWmsImagery(const QJsonObject& source,
                                                     QString* errorString);
   std::shared_ptr<NetworkClient> networkLocked();
+  std::shared_ptr<const GeoidModel> geoidLocked(const QString& dataset,
+                                                QString* errorString);
 
   mutable std::mutex m_mutex;
   std::unordered_map<QString, std::weak_ptr<ImageryProvider>> m_imagery;
@@ -131,6 +151,13 @@ private:
   std::unordered_map<QString, QString> m_basePackImagery;
   /** Dataset id → file name, of the base pack's features datasets. */
   std::unordered_map<QString, QString> m_basePackFeatures;
+  /** Dataset id → file name, of the base pack's elevation datasets. */
+  std::unordered_map<QString, QString> m_basePackElevation;
+  /** Dataset id → file name, of the base pack's geoid grids. */
+  std::unordered_map<QString, QString> m_basePackGeoids;
+  std::unordered_map<QString, std::weak_ptr<ElevationProvider>> m_elevation;
+  /** Geoid models stay loaded once read (a few MB each). */
+  std::unordered_map<QString, std::shared_ptr<const GeoidModel>> m_geoids;
   /** Dataset id → attribution. */
   std::unordered_map<QString, QString> m_basePackAttribution;
   std::unordered_map<QString, std::weak_ptr<FeatureProvider>> m_features;

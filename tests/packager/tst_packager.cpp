@@ -27,6 +27,9 @@
 #include "shorelinebuilder.h"
 #include "ts/deps/dependencies.h"
 #include "ts/deps/geoscontext.h"
+#include "ts/elevation/geoidmodel.h"
+#include "ts/elevation/heightgrid.h"
+#include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
@@ -479,6 +482,140 @@ void checkCountries(const QString& path)
   }
 }
 
+/** NGA's test points for EGM96 (latitude, longitude, undulation in m). */
+constexpr std::array<std::array<double, 3>, 6> egm96TestPoints{{
+    {38.6281550, -90.2208450, -31.628},
+    {-14.6212170, -54.9788860, -2.969},
+    {46.8743190, 102.4487290, -43.575},
+    {-23.6174460, 133.8747120, 15.871},
+    {38.6254730, -0.0005000, 50.066},
+    {-0.4667440, 0.0023000, 17.329},
+}};
+
+/**
+ * EGM2008 undulations from PROJ's full 2.5′ grid (us_nga_egm08_25.tif),
+ * bilinearly interpolated: what the base pack's 5′ grid approximates.
+ */
+constexpr std::array<std::array<double, 3>, 9> egm2008ReferencePoints{{
+    {51.5, -0.1, 46.043},       // London
+    {56.7969, -5.0036, 55.387}, // Ben Nevis
+    {27.9881, 86.925, -28.427}, // Everest
+    {31.5, 35.5, 17.915},       // the Dead Sea
+    {4.7, 78.8, -106.898},      // the geoid's low, south of India
+    {-8.4, 147.4, 85.761},      // its high, New Guinea
+    {0.0, -150.0, 12.914},      // the Pacific
+    {-90.0, 0.0, -30.150},      // the South Pole
+    {52.0, 179.99, 3.707},      // by the antimeridian
+}};
+
+/**
+ * Checks the real DEM and geoid grids: every tile decodes, neighbours
+ * share their edges, heights at known places are plausible for a 5 km
+ * grid, the geoids match published values.
+ */
+void checkElevation(const QString& directory,
+                    const ts::packager::ElevationSpec& spec)
+{
+  // Geoids: NGA's EGM96 test values within 0.1 m (bilinear interpolation
+  // of the 15′ grid); EGM2008 within 0.4 m of the 2.5′ grid (the 5′ grid
+  // loses most in high mountains).
+  const ts::GeoidModel egm96(directory, QStringLiteral("egm96.tif"));
+  const ts::GeoidModel egm2008(directory, QStringLiteral("egm2008.tif"));
+  QVERIFY2(egm96.isValid() && egm2008.isValid(),
+           qPrintable(egm96.errorString() + egm2008.errorString()));
+  for (const std::array<double, 3>& point : egm96TestPoints) {
+    QVERIFY2(
+        std::abs(egm96.undulationM(point[0], point[1]) - point[2]) < 0.1,
+        qPrintable(QString::number(egm96.undulationM(point[0], point[1]))));
+  }
+  for (const std::array<double, 3>& point : egm2008ReferencePoints) {
+    QVERIFY2(
+        std::abs(egm2008.undulationM(point[0], point[1]) - point[2]) < 0.4,
+        qPrintable(QString::number(egm2008.undulationM(point[0], point[1]))));
+  }
+
+  ts::SqliteElevationProvider provider(
+      QDir(directory).filePath(spec.dataset + QStringLiteral(".sqlite")),
+      std::make_shared<const ts::GeoidModel>(
+          directory, spec.verticalDatum + QStringLiteral(".tif")));
+  QVERIFY2(provider.isValid(), qPrintable(provider.errorString()));
+  QCOMPARE(provider.maximumLevel(), spec.maxLevel);
+  QCOMPARE(provider.samples(), spec.samples);
+  const int n = spec.samples;
+  for (int level = 0; level <= spec.maxLevel; ++level) {
+    for (int y = 0; y < static_cast<int>(ts::TileKey::rows(level)); ++y) {
+      for (int x = 0; x < static_cast<int>(ts::TileKey::columns(level)); ++x) {
+        const std::optional<ts::HeightTile> tile =
+            provider.loadStoredHeights(ts::TileKey{level, x, y});
+        if (!tile) {
+          QFAIL(qPrintable(QStringLiteral("No heights for %1/%2/%3")
+                               .arg(level)
+                               .arg(x)
+                               .arg(y)));
+        }
+        // The eastern neighbour (across the antimeridian too) has the
+        // same samples along the shared edge.
+        const int east =
+            (x + 1) % static_cast<int>(ts::TileKey::columns(level));
+        const std::optional<ts::HeightTile> next =
+            provider.loadStoredHeights(ts::TileKey{level, east, y});
+        if (!next) {
+          QFAIL("No eastern neighbour");
+        }
+        const std::vector<float> west =
+            tile.value_or(ts::HeightTile{}).heightsM;
+        const std::vector<float> eastern =
+            next.value_or(ts::HeightTile{}).heightsM;
+        for (std::size_t row = 0; row < static_cast<std::size_t>(n); ++row) {
+          const std::size_t width = static_cast<std::size_t>(n);
+          QCOMPARE(west.at(row * width + width - 1), eastern.at(row * width));
+        }
+      }
+    }
+  }
+  // Heights above sea level, from the deepest level: a 5 km grid smooths
+  // peaks and trenches, so the ranges are generous.
+  struct Place {
+    const char* name;
+    double latDeg;
+    double lonDeg;
+    double lowestM;
+    double highestM;
+  };
+  const std::array<Place, 8> places{{
+      {"London", 51.5, -0.1, -5.0, 80.0},
+      {"Ben Nevis", 56.7969, -5.0036, 400.0, 1345.0},
+      {"Everest", 27.9881, 86.925, 5500.0, 8849.0},
+      {"the Dead Sea", 31.5, 35.5, -440.0, -300.0},
+      {"the Challenger Deep", 11.3733, 142.5917, -11000.0, -8000.0},
+      {"the central Pacific", 0.0, -150.0, -6000.0, -3500.0},
+      {"the South Pole", -90.0, 0.0, 2600.0, 3000.0},
+      {"Wrangel Island, across 180°", 71.3, 179.99, -100.0, 1000.0},
+  }};
+  for (const Place& place : places) {
+    const ts::TileKey key = ts::TileKey::containing(
+        spec.maxLevel, ts::Geodetic{place.latDeg, place.lonDeg, 0.0});
+    const std::optional<ts::HeightTile> tile = provider.loadStoredHeights(key);
+    const std::optional<double> height =
+        tile ? ts::sampleHeightM(*tile, place.latDeg, place.lonDeg)
+             : std::nullopt;
+    QVERIFY2(height && *height >= place.lowestM && *height <= place.highestM,
+             qPrintable(QStringLiteral("%1: %2 m")
+                            .arg(QLatin1String(place.name))
+                            .arg(height.value_or(std::nan("")))));
+    // Above the ellipsoid: plus the undulation.
+    const std::optional<ts::HeightTile> ellipsoidal =
+        provider.loadHeights(key, notCancelled);
+    const std::optional<double> above =
+        ellipsoidal
+            ? ts::sampleHeightM(*ellipsoidal, place.latDeg, place.lonDeg)
+            : std::nullopt;
+    QVERIFY(std::abs(above.value_or(std::nan("")) -
+                     height.value_or(std::nan("")) -
+                     egm2008.undulationM(place.latDeg, place.lonDeg)) < 0.5);
+  }
+}
+
 } // namespace
 
 /** Unit tests for the base-pack packager, and checks of a built pack. */
@@ -906,6 +1043,28 @@ private slots:
                "}")
                .object();
     QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+    // An elevation dataset above a geoid the pack doesn't have.
+    json =
+        QJsonDocument::fromJson(
+            "{"
+            "\"id\": \"p\", \"sizeLimitBytes\": 10,"
+            "\"sources\": [{\"id\": \"dem\", \"file\": \"dem.tif\", "
+            "\"sha256\": "
+            "\"0000000000000000000000000000000000000000000000000000000000000000"
+            "\"}],"
+            "\"elevation\": {\"dataset\": \"elevation\", \"source\": "
+            "\"dem\", \"verticalDatum\": \"egm2008\"}"
+            "}")
+            .object();
+    QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+    json.insert(QStringLiteral("geoids"),
+                QJsonArray{QJsonObject{
+                    {QStringLiteral("dataset"), QStringLiteral("egm2008")},
+                    {QStringLiteral("source"), QStringLiteral("dem")}}});
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::fromJson(json, &error);
+    QVERIFY2(config && config->elevation && config->geoids.size() == 1,
+             qPrintable(error));
   }
 
   void basePack()
@@ -958,7 +1117,9 @@ private slots:
     QCOMPARE(manifest.value().datasets.size(),
              std::size_t{config->imagery ? 1U : 0U} +
                  std::size_t{config->shoreline ? 1U : 0U} +
-                 std::size_t{config->countries ? 1U : 0U});
+                 std::size_t{config->countries ? 1U : 0U} +
+                 std::size_t{config->elevation ? 1U : 0U} +
+                 config->geoids.size());
     const QString imageryReplaces =
         config->imagery ? config->imagery->replaces : QString();
     const QString shorelineReplaces =
@@ -972,6 +1133,8 @@ private slots:
         QCOMPARE(dataset.replaces, shorelineReplaces);
         break;
       case ts::PackDataset::Kind::Areas:
+      case ts::PackDataset::Kind::Elevation:
+      case ts::PackDataset::Kind::Geoid:
         QVERIFY(dataset.replaces.isEmpty());
         break;
       }
@@ -985,6 +1148,9 @@ private slots:
       QCOMPARE(imagery.maximumLevel(),
                config.value().imagery.value().tiling.maxLevel);
       QVERIFY(checkPyramid(imagery, imagery.maximumLevel()));
+    }
+    if (config->elevation) {
+      checkElevation(directory, *config->elevation);
     }
     if (config->countries) {
       checkCountries(

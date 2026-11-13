@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QJsonDocument>
 
+#include "ts/elevation/geoidmodel.h"
+#include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/network/networkclient.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
@@ -170,12 +172,26 @@ void ProviderRegistry::setBasePack(const QString& directory,
   m_basePackDirectory = directory;
   m_basePackImagery.clear();
   m_basePackFeatures.clear();
+  m_basePackElevation.clear();
+  m_basePackGeoids.clear();
   m_basePackAttribution.clear();
+  m_geoids.clear();
   for (const PackDataset& dataset : manifest.datasets) {
-    if (dataset.kind == PackDataset::Kind::Imagery) {
+    switch (dataset.kind) {
+    case PackDataset::Kind::Imagery:
       m_basePackImagery[dataset.id] = dataset.file;
-    } else {
+      break;
+    case PackDataset::Kind::Features:
       m_basePackFeatures[dataset.id] = dataset.file;
+      break;
+    case PackDataset::Kind::Elevation:
+      m_basePackElevation[dataset.id] = dataset.file;
+      break;
+    case PackDataset::Kind::Geoid:
+      m_basePackGeoids[dataset.id] = dataset.file;
+      break;
+    case PackDataset::Kind::Areas:
+      break;
     }
     m_basePackAttribution[dataset.id] = dataset.attribution;
   }
@@ -245,6 +261,98 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
     return nullptr;
   }
   m_features[key] = provider;
+  return provider;
+}
+
+std::shared_ptr<const GeoidModel>
+ProviderRegistry::geoid(const QString& dataset, QString* errorString)
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  return geoidLocked(dataset, errorString);
+}
+
+std::shared_ptr<const GeoidModel>
+ProviderRegistry::geoidLocked(const QString& dataset, QString* errorString)
+{
+  const std::unordered_map<
+      QString, std::shared_ptr<const GeoidModel>>::const_iterator loaded =
+      m_geoids.find(dataset);
+  if (loaded != m_geoids.end()) {
+    return loaded->second;
+  }
+  const std::unordered_map<QString, QString>::const_iterator file =
+      m_basePackGeoids.find(dataset);
+  if (m_basePackDirectory.isEmpty() || file == m_basePackGeoids.end()) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+                         "ts::ProviderRegistry",
+                         "The base pack, which holds \"%1\", is not installed.")
+                         .arg(dataset);
+    }
+    return nullptr;
+  }
+  std::shared_ptr<const GeoidModel> model =
+      std::make_shared<const GeoidModel>(m_basePackDirectory, file->second);
+  if (!model->isValid()) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+                         "ts::ProviderRegistry",
+                         "Cannot read \"%1\" from the base pack: %2")
+                         .arg(dataset, model->errorString());
+    }
+    return nullptr;
+  }
+  m_geoids[dataset] = model;
+  return model;
+}
+
+std::shared_ptr<ElevationProvider>
+ProviderRegistry::elevation(const QJsonObject& source, QString* errorString)
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const std::unordered_map<QString, QString>::const_iterator file =
+      m_basePackElevation.find(dataset);
+  if (!isBasePackSource(source) || m_basePackDirectory.isEmpty() ||
+      file == m_basePackElevation.end()) {
+    if (errorString) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Unknown or invalid elevation source: %1")
+              .arg(canonical(source));
+    }
+    return nullptr;
+  }
+  const QString path = QDir(m_basePackDirectory).filePath(file->second);
+  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
+      it = m_elevation.find(path);
+  if (it != m_elevation.end()) {
+    std::shared_ptr<ElevationProvider> live = it->second.lock();
+    if (live) {
+      return live;
+    }
+  }
+  // The store names its vertical datum: a geoid dataset of the pack.
+  const QString datum = SqliteTileImageryProvider(path).info().verticalDatum;
+  std::shared_ptr<const GeoidModel> geoid;
+  if (!datum.isEmpty()) {
+    geoid = geoidLocked(datum, errorString);
+    if (!geoid) {
+      return nullptr;
+    }
+  }
+  std::shared_ptr<SqliteElevationProvider> provider =
+      std::make_shared<SqliteElevationProvider>(path, geoid);
+  if (!provider->isValid()) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+                         "ts::ProviderRegistry",
+                         "Cannot read \"%1\" from the base pack: %2")
+                         .arg(dataset, provider->errorString());
+    }
+    return nullptr;
+  }
+  m_elevation[path] = provider;
   return provider;
 }
 

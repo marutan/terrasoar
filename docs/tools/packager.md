@@ -17,13 +17,13 @@ This runs `tools/packager/build_basepack.py`, which
 
 1. downloads the sources listed in `tools/packager/basepack.json` into
    `$TS_BASEPACK_SOURCES` (default `<build>/basepack-sources`), about
-   189 MB, and checks each against its pinned SHA-256; files already there
+   740 MB (466 MB of it the ETOPO 2022 GeoTIFF), and checks each against its pinned SHA-256; files already there
    with the right checksum are kept;
 2. runs the packager into `<build>/basepack.new`;
 3. replaces `<build>/basepack` with it if the packager succeeded.
 
 The application in `<build>/app` finds `<build>/basepack` by itself. The
-build takes about 30 s and 400 MB of memory on one core.
+build takes about 50 s and 900 MB of memory on one core.
 
 Run the steps separately to use other directories:
 
@@ -117,6 +117,17 @@ basepack.json ──► check sources' SHA-256
                   │              widen by 0.05°, simplify within 0.02°,
                   │              check it covers the country ► countries.gpkg
                   │
+                  ├─ geoids ───► PROJ's EGM2008 2.5′ and EGM96 15′ grids:
+                  │              every step-th sample as int16 cm with a
+                  │              scale of 0.01 ► egm2008.tif, egm96.tif
+                  │
+                  ├─ elevation ► ETOPO 2022 60″ GeoTIFF, row by row: each
+                  │              level-6 sample the area-weighted mean of
+                  │              the cells within half a spacing ► coarser
+                  │              levels by [1 2 1] filter and every other
+                  │              sample ► 65 × 65 tiles, quantized and
+                  │              encoded ► elevation.sqlite
+                  │
                   ├─ licence notices from the zip and tools/packager/notices
                   ├─ manifest.json: every file with size and SHA-256
                   └─ checks: area, coverage, size budget
@@ -171,11 +182,13 @@ area and GSHHG's area.
 | Key | Meaning |
 | --- | --- |
 | `id`, `version` | Copied to the manifest |
-| `sizeLimitBytes`, `reservedBytes` | Size budget (75 MB, 35 MB kept for Phase 7's DEM and geoid grids) |
+| `sizeLimitBytes`, `reservedBytes` | Size budget (75 MB, nothing reserved) |
 | `sources[]` | `id`, `file` (name in the sources directory), `url`, `sha256`, `name`, `version`; `notices` (files inside the zip to ship), `localNotices` (files relative to the config to ship) |
 | `imagery` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `maxLevel` (at most 8), `tileSize`, `jpegQuality` |
 | `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |
 | `countries` | `dataset`, `source` (Natural Earth admin-0 countries, with `ADM0_A3`, `ADMIN`, `ISO_A2_EH`, `ISO_A3_EH`), `name`, `licence`, `attribution`, `bufferDeg` (0.05), `simplifyDeg` (0.02; must be smaller), `exclude` (`ADM0_A3` codes left out: `ATA`) |
+| `geoids[]` | `dataset`, `source` (a PROJ GeoTIFF geoid grid), `name`, `licence`, `attribution`, `step` (keep every step-th sample) |
+| `elevation` | `dataset`, `source` (a global geographic DEM), `name`, `licence`, `attribution`, `maxLevel` (6), `samples` (65 per tile side), `verticalDatum` (a geoid dataset of `geoids`, written to the store) |
 
 ### Changing a source
 

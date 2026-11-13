@@ -56,6 +56,8 @@ bool readInfo(const SqliteConnection& connection, SqliteTileStoreInfo* info,
       found += ok ? 1 : 0;
     } else if (name == QLatin1String("name")) {
       info->name = value;
+    } else if (name == QLatin1String("vertical_datum")) {
+      info->verticalDatum = value;
     }
   }
   sqlite3_finalize(statement);
@@ -101,7 +103,7 @@ SqliteTileStoreWriter::SqliteTileStoreWriter(const QString& path,
   name.replace(QLatin1Char('\''), QStringLiteral("''"));
   const QString schema =
       QStringLiteral(
-          "PRAGMA page_size = 8192;"
+          "PRAGMA page_size = 65536;"
           "BEGIN;"
           "CREATE TABLE metadata (name TEXT PRIMARY KEY, value TEXT);"
           "CREATE TABLE tiles (level INTEGER NOT NULL, x INTEGER NOT NULL, "
@@ -115,6 +117,17 @@ SqliteTileStoreWriter::SqliteTileStoreWriter(const QString& path,
   if (!m_connection.isOpen() || !m_connection.execute(schema)) {
     m_error = m_connection.errorString();
     return;
+  }
+  if (!info.verticalDatum.isEmpty()) {
+    QString datum = info.verticalDatum;
+    datum.replace(QLatin1Char('\''), QStringLiteral("''"));
+    if (!m_connection.execute(
+            QStringLiteral("INSERT INTO metadata VALUES ('vertical_datum', "
+                           "'%1');")
+                .arg(datum))) {
+      m_error = m_connection.errorString();
+      return;
+    }
   }
   if (sqlite3_prepare_v2(m_connection.get(),
                          "INSERT INTO tiles VALUES (?, ?, ?, ?)", -1,

@@ -70,6 +70,20 @@ Geography Database), resolutions c, l and i, cut to tiles
   The program that turns it into the pack's form is tools/packager in
   this source tree.
 
+ETOPO 2022 Global Relief Model, 60 arc-second surface elevation, version 1,
+resampled to a 2.64′ grid
+  NOAA National Centers for Environmental Information (2022): ETOPO 2022
+  15 Arc-Second Global Relief Model. https://doi.org/10.25921/fd45-gt74
+  Licence: public domain (US government work); credit requested
+  Attribution: "Elevation: ETOPO 2022, NOAA NCEI"
+
+EGM2008 and EGM96 geoid models (Earth Gravitational Models), as the
+grids us_nga_egm08_25.tif and us_nga_egm96_15.tif distributed by PROJ
+(cdn.proj.org), EGM2008 reduced to a 5′ grid
+  US National Geospatial-Intelligence Agency
+  Licence: public domain
+  Attribution: "Geoid: EGM2008, NGA", "Geoid: EGM96, NGA"
+
 Natural Earth 1:10m Cultural Vectors, Admin 0 – Countries, version 5.1.2,
 widened by about 5 km and simplified
   Natural Earth (naturalearthdata.com)

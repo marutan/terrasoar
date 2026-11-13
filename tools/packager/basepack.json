@@ -1,8 +1,8 @@
 {
   "id": "terrasoar-base",
-  "version": "2",
+  "version": "3",
   "sizeLimitBytes": 75000000,
-  "reservedBytes": 35000000,
+  "reservedBytes": 0,
   "sources": [
     {
       "id": "gshhg",
@@ -29,6 +29,30 @@
       "sha256": "239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255",
       "name": "Natural Earth 1:10m Cultural Vectors, Admin 0 – Countries",
       "version": "5.1.2"
+    },
+    {
+      "id": "etopo",
+      "file": "ETOPO_2022_v1_60s_N90W180_surface.tif",
+      "url": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif",
+      "sha256": "9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e",
+      "name": "ETOPO 2022 Global Relief Model, 60 arc-second, surface elevation",
+      "version": "2022 v1"
+    },
+    {
+      "id": "egm2008",
+      "file": "us_nga_egm08_25.tif",
+      "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+      "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
+      "name": "EGM2008 geoid undulation grid, 2.5 arc-minute (PROJ data)",
+      "version": "2008"
+    },
+    {
+      "id": "egm96",
+      "file": "us_nga_egm96_15.tif",
+      "url": "https://cdn.proj.org/us_nga_egm96_15.tif",
+      "sha256": "db493027562c9b004d7220fa881f5603adada4e1c5029b933fa7de4547b0e78d",
+      "name": "EGM96 geoid undulation grid, 15 arc-minute (PROJ data)",
+      "version": "1996"
     }
   ],
   "imagery": {
@@ -64,5 +88,33 @@
     "bufferDeg": 0.05,
     "simplifyDeg": 0.02,
     "exclude": ["ATA"]
+  },
+  "geoids": [
+    {
+      "dataset": "egm2008",
+      "source": "egm2008",
+      "name": "EGM2008 geoid (5′)",
+      "licence": "Public domain (NGA)",
+      "attribution": "Geoid: EGM2008, NGA",
+      "step": 2
+    },
+    {
+      "dataset": "egm96",
+      "source": "egm96",
+      "name": "EGM96 geoid (15′)",
+      "licence": "Public domain (NGA)",
+      "attribution": "Geoid: EGM96, NGA",
+      "step": 1
+    }
+  ],
+  "elevation": {
+    "dataset": "elevation",
+    "source": "etopo",
+    "name": "Elevation",
+    "licence": "Public domain (NOAA)",
+    "attribution": "Elevation: ETOPO 2022, NOAA NCEI",
+    "maxLevel": 6,
+    "samples": 65,
+    "verticalDatum": "egm2008"
   }
 }

@@ -62,6 +62,13 @@ struct PackDataset {
      * choosing an offline region (ts::CountryAreas).
      */
     Areas,
+    /**
+     * Height grids in a SQLite tile store (format "heights"), read by
+     * ts::SqliteElevationProvider.
+     */
+    Elevation,
+    /** A geoid grid in PROJ's GeoTIFF format, read by ts::GeoidModel. */
+    Geoid,
   };
   /** Identifier within the pack, e.g. "bluemarble". */
   QString id;
