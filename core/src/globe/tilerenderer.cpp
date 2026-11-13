@@ -693,11 +693,28 @@ void TileRenderer::requestHeights(const TileSelection& selection)
       wanted.push_back(key);
     }
   };
+  std::unordered_set<TileKey, TileKeyHash> selected;
   for (const TileKey& key : selection.render) {
     want(key);
+    selected.insert(key);
   }
   for (const TileLoadRequest& request : selection.load) {
     want(request.key);
+    selected.insert(request.key);
+  }
+  // Incomplete heights no longer wanted are dropped rather than kept as
+  // they are: picking and the readout use the finest heights there are,
+  // and the complete ancestors are better than them. If they are wanted
+  // again, they are loaded again.
+  for (std::unordered_map<TileKey, std::chrono::steady_clock::time_point,
+                          TileKeyHash>::iterator it = m_heightsRetry.begin();
+       it != m_heightsRetry.end();) {
+    if (selected.count(it->first) == 0) {
+      m_heights.remove(it->first);
+      it = m_heightsRetry.erase(it);
+    } else {
+      ++it;
+    }
   }
   m_heightLoader->setRequests(wanted);
 }

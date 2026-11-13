@@ -1515,10 +1515,20 @@ private slots:
           return !renderer.isBusy() && complete();
         },
         60000);
+    const std::optional<ts::GroundHeight> ground =
+        renderer.groundHeight(46.0, 8.0);
+    const QString state =
+        QStringLiteral("busy %1, retries %2, ground %3 m at level %4")
+            .arg(renderer.isBusy())
+            .arg(flaky->retries())
+            .arg(ground ? ground->ellipsoidalM : -1.0)
+            .arg(ground ? ground->level : -1);
     m_gl->makeCurrent();
     renderer.setElevationProvider(nullptr);
     renderer.setImageryProvider(nullptr);
-    QVERIFY2(settled, "the full heights never arrived");
+    QVERIFY2(settled, qPrintable(QStringLiteral("the full heights never "
+                                                "arrived: ") +
+                                 state));
     QVERIFY(flaky->retries() > 0);
   }
 
