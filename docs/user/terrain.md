@@ -121,5 +121,18 @@ the full detail of the data.
   from (and will be shown as) heights above sea level; see
   [the design notes](../design/vertical-datums.md) if that matters to you.
 
-Finer geoid models (EGM2008 at 2.5′ and 1′, and OSGM15 for Britain) come
-later as downloadable packs (roadmap Phase 7d).
+## More exact sea level
+
+Heights above sea level depend on a model of where sea level is (the
+geoid). Two data packs (**File → Data Packs…**) make them more exact:
+
+- **EGM2008 geoid, 2.5′** (13 MB) replaces the built-in 5′ grid: heights
+  above sea level within a centimetre or two of the full model, where the
+  built-in grid can be half a metre off in high mountains.
+- **OSGM15 geoid (Great Britain)** (1.5 MB) adds Ordnance Datum Newlyn,
+  the datum of British maps and of OS and Environment Agency elevation
+  data, to what elevation files can be measured from. Without it, choose
+  EGM2008 for such files: within about half a metre.
+
+The terrain and the height readout use them as soon as they are
+installed.

@@ -37,8 +37,12 @@ London would be drawn 46 m under the sea.
 | --- | --- | --- | --- | --- |
 | EGM2008 | 5′ | base pack, `egm2008.tif` | 5.4 MB | within 0.4 m of the 2.5′ grid at the reference points; up to about 0.5 m in high mountains |
 | EGM96 | 15′ | base pack, `egm96.tif` | 0.9 MB | within 6 cm of NGA's published test values |
-| EGM2008 | 2.5′, 1′ | downloadable packs (Phase 7d) | | |
-| OSGM15 | | downloadable pack (Phase 7d): Ordnance Datum Newlyn, Great Britain | | |
+| EGM2008 | 2.5′ | pack `geoid-egm2008-fine`, replaces the base pack's | 13.4 MB | within 1 cm of PROJ's 2.5′ grid at the reference points (whole centimetres) |
+| OSGM15 | 1 km | pack `geoid-osgm15`: Ordnance Datum Newlyn, Great Britain onshore (datum `osgm15`) | 1.5 MB | as published (PROJ adds at most 2 mm reprojecting it) |
+
+EGM2008's 1′ grid isn't among PROJ's grids; NGA's own is about 1 GB, and
+differs from the 2.5′ grid by centimetres except in high mountains, so
+there is no pack of it.
 
 The grids are PROJ's GeoTIFF grids (`us_nga_egm08_25.tif`,
 `us_nga_egm96_15.tif` from cdn.proj.org, pinned in
@@ -69,12 +73,20 @@ for. Two details:
   sample as it loads a tile, so `ts::HeightTile` is always ellipsoidal,
   as the renderer and picking need. `ProviderRegistry::elevation()` finds
   the geoid dataset the store names.
-- **DEM files** (`ts::GdalElevationProvider`) name their datum in the
-  layer's source: `egm2008` or `egm96` (N added from the base pack's
-  grid) or `ellipsoid` (left as they are). Add Elevation File takes it
-  from the file's compound CRS where there is one, else asks. Files on a
-  national datum (e.g. Ordnance Datum Newlyn) are within a metre or so of
-  EGM2008; the OSGM15 pack (Phase 7d) will convert them exactly.
+- **DEM files** (`ts::GdalElevationProvider`) and **web terrain** name
+  their datum in the layer's source: `egm2008` or `egm96` (N added from
+  the base pack's grid, or a pack's finer one), a geoid pack's own datum
+  such as `osgm15`, or `ellipsoid` (left as they are). The datums on offer
+  are `ProviderRegistry::verticalDatums()`. Add Elevation File takes the
+  datum from the file's compound CRS where there is one (EPSG:3855,
+  EPSG:5773, EPSG:5701 "ODN height"), else asks; a file on ODN without the
+  OSGM15 pack installed is pointed at it (EGM2008 is about half a metre
+  off there).
+- **Regional geoids** (OSGM15) have no values outside their area; there
+  the global EGM2008 stands in (`applyVerticalDatum()`), so a DEM reaching
+  past the grid's edge doesn't drop by tens of metres. Sea level
+  (`HeightTile::seaLevelM`) is the datum's geoid where it has values, else
+  EGM2008.
 - **What the user sees**: the pointer readout gives heights above sea
   level (the tile's height minus its sea level, N), or above the
   ellipsoid with View → Heights Above the Ellipsoid. `ProviderRegistry::geoid()`

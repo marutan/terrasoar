@@ -50,7 +50,13 @@ packs.commands = python3 $$shell_path($$PWD/tools/packager/build_pack.py) \
     --config $$shell_path($$PWD/tools/packager/packs/bluemarble-full.json) && \
     python3 $$shell_path($$PWD/tools/packager/build_pack.py) \
     --build-dir $$shell_path($$OUT_PWD) \
-    --config $$shell_path($$PWD/tools/packager/packs/shoreline-full.json)
+    --config $$shell_path($$PWD/tools/packager/packs/shoreline-full.json) && \
+    python3 $$shell_path($$PWD/tools/packager/build_pack.py) \
+    --build-dir $$shell_path($$OUT_PWD) \
+    --config $$shell_path($$PWD/tools/packager/packs/geoid-egm2008-fine.json) && \
+    python3 $$shell_path($$PWD/tools/packager/build_pack.py) \
+    --build-dir $$shell_path($$OUT_PWD) \
+    --config $$shell_path($$PWD/tools/packager/packs/geoid-osgm15.json)
 packs.depends = sub-tools
 QMAKE_EXTRA_TARGETS += packs
 

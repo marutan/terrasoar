@@ -1,0 +1,31 @@
+{
+  "id": "geoid-egm2008-fine",
+  "version": "2008.1",
+  "index": {
+    "name": "EGM2008 geoid, 2.5′",
+    "description": "The EGM2008 geoid at its published 2.5′ grid instead of the base pack's 5′: heights above sea level within a few centimetres of the full model in high mountains, where the base pack's grid can be half a metre off. Replaces the base pack's EGM2008 grid while installed.",
+    "licence": "Public domain (NGA)"
+  },
+  "sizeLimitBytes": 40000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "egm08",
+      "file": "us_nga_egm08_25.tif",
+      "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+      "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
+      "name": "EGM2008 geoid undulations, 2.5′ grid (NGA, as distributed by PROJ)",
+      "version": "2008"
+    }
+  ],
+  "geoids": [
+    {
+      "dataset": "egm2008",
+      "replaces": "egm2008",
+      "source": "egm08",
+      "name": "EGM2008 geoid, 2.5′",
+      "licence": "Public domain (NGA)",
+      "step": 1
+    }
+  ]
+}

@@ -31,7 +31,9 @@ SqliteElevationProvider::~SqliteElevationProvider() = default;
 
 QString SqliteElevationProvider::id() const
 {
-  return QStringLiteral("sqliteheights:") + m_store.id(); // ts-notr: identifier
+  // ts-notr: identifier
+  return QStringLiteral("sqliteheights:") + m_store.id() +
+         (m_geoid ? QStringLiteral("|") + m_geoid->id() : QString());
 }
 
 std::optional<HeightTile>

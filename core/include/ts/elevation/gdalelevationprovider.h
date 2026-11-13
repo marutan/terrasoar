@@ -34,6 +34,11 @@ enum class DemVerticalDatum {
   Egm2008,
   /** Heights above EGM96 (e.g. EPSG:5773). */
   Egm96,
+  /**
+   * Heights above Ordnance Datum Newlyn (EPSG:5701, Great Britain), which
+   * the OSGM15 geoid pack converts.
+   */
+  Odn,
 };
 
 /**
@@ -42,7 +47,10 @@ enum class DemVerticalDatum {
  */
 DemVerticalDatum detectDemVerticalDatum(const QString& path);
 
-/** Returns the dataset id of @p datum ("egm2008", "egm96", "ellipsoid"). */
+/**
+ * Returns the dataset id of @p datum ("egm2008", "egm96", "osgm15",
+ * "ellipsoid"; empty for Unknown).
+ */
 QString demVerticalDatumId(DemVerticalDatum datum);
 
 /**
@@ -68,8 +76,10 @@ public:
   /**
    * Opens the raster at @p path. @p datumGeoid is the geoid the heights
    * are measured from (null for heights above the ellipsoid);
-   * @p seaLevelGeoid gives HeightTile::seaLevelM where @p datumGeoid is
-   * null (may be null too: sea level is then the ellipsoid).
+   * @p seaLevelGeoid, the global one, gives HeightTile::seaLevelM where
+   * @p datumGeoid is null, and stands in where a regional @p datumGeoid
+   * has no value (may be null too: sea level is then the ellipsoid). See
+   * applyVerticalDatum().
    * @p datumId names the datum for id(). Check isValid().
    */
   // The file, then its datum's name.

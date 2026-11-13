@@ -77,14 +77,16 @@ earlier entry. Nothing is uploaded. To publish a version:
    application reads it from there; until then nobody sees the release.
 
 A pack's configuration has the base pack's keys, and `index` (`name`,
-`description` and `licence` for the index entry); its `imagery` and
-`shoreline` take `replaces`, the base pack dataset they replace. Either
-may be left out.
+`description` and `licence` for the index entry); its `imagery`,
+`shoreline` and `geoids` take `replaces`, the base pack dataset they
+replace. Each may be left out.
 
 | Pack | Build time | Memory | Size |
 | --- | --- | --- | --- |
 | `bluemarble-full` | 40 s | 2.3 GB | 67 MB |
 | `shoreline-full` | 2 min 15 s | 750 MB | 241 MB |
+| `geoid-egm2008-fine` | 25 s | 450 MB | 13.4 MB |
+| `geoid-osgm15` | < 1 s | — | 1.5 MB |
 
 The full-resolution Blue Marble is tiled to level 6, a 32768 × 16384
 mosaic: a little more than the source's 21600 pixels across, so that no
@@ -187,7 +189,7 @@ area and GSHHG's area.
 | `imagery` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `maxLevel` (at most 8), `tileSize`, `jpegQuality` |
 | `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |
 | `countries` | `dataset`, `source` (Natural Earth admin-0 countries, with `ADM0_A3`, `ADMIN`, `ISO_A2_EH`, `ISO_A3_EH`), `name`, `licence`, `attribution`, `bufferDeg` (0.05), `simplifyDeg` (0.02; must be smaller), `exclude` (`ADM0_A3` codes left out: `ATA`) |
-| `geoids[]` | `dataset`, `source` (a PROJ GeoTIFF geoid grid), `name`, `licence`, `attribution`, `step` (keep every step-th sample) |
+| `geoids[]` | `dataset`, `source` (a PROJ GeoTIFF geoid grid), `name`, `licence`, `attribution`, `step` (keep every step-th sample), `replaces` (extra packs: the base pack geoid it is a finer grid of), `copy` (true: ship the grid as it is, for small regional grids with no-data cells; otherwise it is written as 16-bit centimetres) |
 | `elevation` | `dataset`, `source` (a global geographic DEM), `name`, `licence`, `attribution`, `maxLevel` (6), `samples` (65 per tile side), `verticalDatum` (a geoid dataset of `geoids`, written to the store) |
 
 ### Changing a source

@@ -97,8 +97,9 @@ class WebTerrainProvider : public ElevationProvider
 public:
   /**
    * Fetches @p source's tiles through @p network. @p datumGeoid is the
-   * geoid of the source's datum (null for the ellipsoid); @p seaLevelGeoid
-   * gives sea level where it is null.
+   * geoid of the source's datum (null for the ellipsoid); @p seaLevelGeoid,
+   * the global one, gives sea level where it is null or has no value (see
+   * applyVerticalDatum()).
    */
   WebTerrainProvider(WebTerrainSource source,
                      std::shared_ptr<NetworkClient> network,

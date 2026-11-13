@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <initializer_list>
+#include <utility>
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -52,7 +53,8 @@ constexpr int presetCount = static_cast<int>(presets.size());
 
 } // namespace
 
-AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent)
+AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent,
+                                         std::vector<VerticalDatum> datums)
     : QDialog(parent), m_presetBox(new QComboBox(this)),
       m_kindBox(new QComboBox(this)), m_addressEdit(new QLineEdit(this)),
       m_zoomBox(new QSpinBox(this)), m_tileSizeBox(new QComboBox(this)),
@@ -84,8 +86,14 @@ AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent)
   m_zoomBox->setValue(15);
   m_tileSizeBox->addItem(QStringLiteral("256"), 256);
   m_tileSizeBox->addItem(QStringLiteral("512"), 512);
-  for (const char* datum : {"egm2008", "egm96", "ellipsoid"}) {
-    m_datumBox->addItem(QString(), QString::fromLatin1(datum));
+  m_datums = std::move(datums);
+  if (m_datums.empty()) {
+    for (const char* datum : {"egm2008", "egm96", "ellipsoid"}) {
+      m_datums.push_back(VerticalDatum{QString::fromLatin1(datum), QString()});
+    }
+  }
+  for (const VerticalDatum& datum : m_datums) {
+    m_datumBox->addItem(QString(), datum.id);
   }
   m_noteLabel->setWordWrap(true);
   m_errorLabel->setWordWrap(true);
@@ -123,6 +131,20 @@ AddWebTerrainDialog::~AddWebTerrainDialog()
   // The kind box says its index changed as it is destroyed, after the
   // controls updateControls() touches.
   disconnect(m_kindBox, nullptr, this, nullptr);
+}
+
+QString AddWebTerrainDialog::datumLabel(const VerticalDatum& datum)
+{
+  if (datum.id == QLatin1String("egm2008")) {
+    return tr("Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)");
+  }
+  if (datum.id == QLatin1String("egm96")) {
+    return tr("Sea level, EGM96 (e.g. SRTM)");
+  }
+  if (datum.id == QLatin1String("ellipsoid")) {
+    return tr("WGS 84 ellipsoid (GNSS heights)");
+  }
+  return tr("Sea level, %1").arg(datum.name.isEmpty() ? datum.id : datum.name);
 }
 
 bool AddWebTerrainDialog::canReadRemoteFiles()
@@ -274,9 +296,9 @@ void AddWebTerrainDialog::retranslateUi()
                          tr("Terrain tiles, Terrain-RGB encoding"));
   m_kindBox->setItemText(static_cast<int>(Kind::CloudGeoTiff),
                          tr("Cloud Optimized GeoTIFF"));
-  m_datumBox->setItemText(0, tr("Sea level, EGM2008"));
-  m_datumBox->setItemText(1, tr("Sea level, EGM96"));
-  m_datumBox->setItemText(2, tr("WGS 84 ellipsoid"));
+  for (std::size_t i = 0; i < m_datums.size(); ++i) {
+    m_datumBox->setItemText(static_cast<int>(i), datumLabel(m_datums[i]));
+  }
   const QStringList labels = {tr("&Source:"),    tr("&Kind:"),
                               tr("&Address:"),   tr("Deepest &zoom:"),
                               tr("&Tile size:"), tr("&Heights above:"),

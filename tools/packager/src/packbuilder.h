@@ -117,6 +117,13 @@ struct GeoidSpec {
   QString attribution;
   /** Keep every step-th sample. */
   int step = 1;
+  /** The base pack dataset it takes the place of, or empty. */
+  QString replaces;
+  /**
+   * True to ship the source grid as it is (small regional grids, which
+   * may have no-data cells), false to write it as 16-bit centimetres.
+   */
+  bool copy = false;
 };
 
 /** The country outlines of the pack. */

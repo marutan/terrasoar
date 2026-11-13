@@ -113,18 +113,6 @@
             <translation>Cloud Optimized GeoTIFF</translation>
         </message>
         <message>
-            <source>Sea level, EGM2008</source>
-            <translation>Sea level, EGM2008</translation>
-        </message>
-        <message>
-            <source>Sea level, EGM96</source>
-            <translation>Sea level, EGM96</translation>
-        </message>
-        <message>
-            <source>WGS 84 ellipsoid</source>
-            <translation>WGS 84 ellipsoid</translation>
-        </message>
-        <message>
             <source>&amp;Source:</source>
             <translation>&amp;Source:</translation>
         </message>
@@ -167,6 +155,22 @@
         <message>
             <source>Add</source>
             <translation>Add</translation>
+        </message>
+        <message>
+            <source>Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)</source>
+            <translation>Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)</translation>
+        </message>
+        <message>
+            <source>Sea level, EGM96 (e.g. SRTM)</source>
+            <translation>Sea level, EGM96 (e.g. SRTM)</translation>
+        </message>
+        <message>
+            <source>WGS 84 ellipsoid (GNSS heights)</source>
+            <translation>WGS 84 ellipsoid (GNSS heights)</translation>
+        </message>
+        <message>
+            <source>Sea level, %1</source>
+            <translation>Sea level, %1</translation>
         </message>
     </context>
     <context>
@@ -851,18 +855,6 @@
             <translation>Cannot use "%1" as an elevation model: %2</translation>
         </message>
         <message>
-            <source>Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)</source>
-            <translation>Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)</translation>
-        </message>
-        <message>
-            <source>Sea level, EGM96 (e.g. SRTM)</source>
-            <translation>Sea level, EGM96 (e.g. SRTM)</translation>
-        </message>
-        <message>
-            <source>WGS 84 ellipsoid (GNSS heights)</source>
-            <translation>WGS 84 ellipsoid (GNSS heights)</translation>
-        </message>
-        <message>
             <source>The file doesn't say what its heights are measured from. Heights of "%1" are above:</source>
             <translation>The file doesn't say what its heights are measured from. Heights of "%1" are above:</translation>
         </message>
@@ -925,6 +917,10 @@
         <message>
             <source>There are no heights along the line.</source>
             <translation>There are no heights along the line.</translation>
+        </message>
+        <message>
+            <source>Heights of "%1" are above Ordnance Datum Newlyn. Install the OSGM15 geoid pack (File → Data Packs) to convert them exactly; until then EGM2008 is within about a metre:</source>
+            <translation>Heights of "%1" are above Ordnance Datum Newlyn. Install the OSGM15 geoid pack (File → Data Packs) to convert them exactly; until then EGM2008 is within about a metre:</translation>
         </message>
     </context>
     <context>
@@ -1460,6 +1456,10 @@
         <message>
             <source>Cannot read "%1": %2</source>
             <translation>Cannot read "%1": %2</translation>
+        </message>
+        <message>
+            <source>Cannot read the geoid "%1": %2</source>
+            <translation>Cannot read the geoid "%1": %2</translation>
         </message>
     </context>
     <context>

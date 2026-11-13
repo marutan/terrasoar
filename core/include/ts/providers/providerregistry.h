@@ -37,6 +37,15 @@ struct WebTileSettings;
 std::shared_ptr<ImageryProvider>
 createImageryProvider(const QJsonObject& source, QString* errorString);
 
+/** A vertical datum elevation sources can be measured from. */
+struct VerticalDatum {
+  /** Its id in layer sources ("egm2008", "egm96", "osgm15", "ellipsoid"). */
+  QString id;
+  /** A name for the user from the pack that brings it; empty for the
+   *  built-in ones (the application names those). */
+  QString name;
+};
+
 /**
  * Hands out one provider per source: layers whose sources are equal get
  * the same provider object, so they also share its loader and caches.
@@ -98,6 +107,14 @@ public:
    */
   std::shared_ptr<const GeoidModel> geoid(const QString& dataset,
                                           QString* errorString);
+
+  /**
+   * Returns the vertical datums elevation sources can be measured from
+   * now: "egm2008" and "egm96" (the base pack's, or a pack's finer
+   * grids), the datums of installed geoid packs (e.g. "osgm15", with the
+   * pack's name for it), then "ellipsoid".
+   */
+  std::vector<VerticalDatum> verticalDatums() const;
 
   /**
    * Returns the attribution to show while a layer with @p source is on
@@ -198,6 +215,15 @@ private:
     bool features = false;
     QString attribution;
   };
+  /** A geoid grid of an installed pack. */
+  struct PackGeoid {
+    QString directory;
+    QString file;
+    QString name;
+    QString attribution;
+  };
+  /** Datum id → an installed pack's grid for it. */
+  std::unordered_map<QString, PackGeoid> m_packGeoids;
   /** Base pack dataset id → what replaces it. */
   std::unordered_map<QString, Replacement> m_replacements;
   std::shared_ptr<NetworkClient> m_network;

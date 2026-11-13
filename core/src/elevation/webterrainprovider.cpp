@@ -210,7 +210,9 @@ WebTerrainProvider::~WebTerrainProvider() = default;
 
 QString WebTerrainProvider::id() const
 {
-  return m_source.id();
+  // The tiles' id, and which grid turns them into ellipsoidal heights.
+  return m_source.id() + QLatin1Char('|') +
+         (m_datumGeoid ? m_datumGeoid->id() : QString());
 }
 
 QString WebTerrainProvider::name() const
