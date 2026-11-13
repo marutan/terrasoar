@@ -220,6 +220,7 @@ private:
   QAction* m_mapViewAction = nullptr;
   QAction* m_scaleBarAction = nullptr;
   QAction* m_ellipsoidalHeightsAction = nullptr;
+  QAction* m_hillshadeAction = nullptr;
   QAction* m_addElevationAction = nullptr;
   QAction* m_addWebTerrainAction = nullptr;
   QMenu* m_projectionMenu = nullptr;

@@ -231,6 +231,7 @@ void GlobeView::setElevationDraw(const ElevationDraw& draw)
     makeCurrent();
     m_globe->setElevationProvider(m_elevationDraw.provider);
     m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
+    m_globe->setHillshade(m_elevationDraw.hillshade ? 1.0 : 0.0);
     doneCurrent();
   }
   updateSurfaceHeight();
@@ -378,6 +379,7 @@ void GlobeView::initializeGL()
   m_globe->setVectorLayers(m_vectorDraws);
   m_globe->setElevationProvider(m_elevationDraw.provider);
   m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
+  m_globe->setHillshade(m_elevationDraw.hillshade ? 1.0 : 0.0);
   updateSurfaceHeight();
 }
 

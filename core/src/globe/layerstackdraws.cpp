@@ -99,6 +99,11 @@ double terrainExaggeration(const LayerDefinition& definition)
   return std::isfinite(value) ? std::clamp(value, 0.1, 20.0) : 1.0;
 }
 
+bool terrainHillshade(const LayerDefinition& definition)
+{
+  return definition.style.value(QStringLiteral("hillshade")).toBool(true);
+}
+
 ElevationDraw elevationDrawForStack(const LayerStack& stack,
                                     ProviderRegistry& registry,
                                     QStringList* errors)
@@ -134,6 +139,7 @@ ElevationDraw elevationDrawForStack(const LayerStack& stack,
   draw.provider = registry.elevationComposite(std::move(sources));
   draw.visible = visible;
   draw.exaggeration = terrainExaggeration(chosen.front()->definition);
+  draw.hillshade = terrainHillshade(chosen.front()->definition);
   return draw;
 }
 

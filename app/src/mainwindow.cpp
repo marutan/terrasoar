@@ -443,6 +443,15 @@ void MainWindow::createActions()
                                     action->data().toDouble());
             m_layers->setLayerDefinition(index, definition);
           });
+  m_hillshadeAction = new QAction(this);
+  m_hillshadeAction->setObjectName(QStringLiteral("hillshadeAction"));
+  m_hillshadeAction->setCheckable(true);
+  connect(m_hillshadeAction, &QAction::triggered, this, [this](bool checked) {
+    const QModelIndex index = topmostElevationLayer();
+    LayerDefinition definition = m_layers->layerDefinition(index);
+    definition.style.insert(QStringLiteral("hillshade"), checked);
+    m_layers->setLayerDefinition(index, definition);
+  });
   connect(m_layers, &LayerTreeModel::layerStackChanged, this,
           &MainWindow::syncTerrainActions);
 
@@ -628,6 +637,9 @@ void MainWindow::syncTerrainActions()
   for (QAction* action : m_exaggerationGroup->actions()) {
     action->setChecked(std::abs(action->data().toDouble() - current) < 1e-9);
   }
+  m_hillshadeAction->setEnabled(index.isValid());
+  m_hillshadeAction->setChecked(
+      !index.isValid() || terrainHillshade(m_layers->layerDefinition(index)));
 }
 
 void MainWindow::createMenus()
@@ -658,6 +670,7 @@ void MainWindow::createMenus()
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
+  m_viewMenu->addAction(m_hillshadeAction);
   syncTerrainActions();
   m_viewMenu->addAction(m_ellipsoidalHeightsAction);
   m_viewMenu->addSeparator();
@@ -695,6 +708,10 @@ void MainWindow::retranslateUi()
                                .arg(projection->displayName()));
     }
   }
+  m_hillshadeAction->setText(tr("&Hillshade on the Map"));
+  m_hillshadeAction->setStatusTip(
+      tr("Shade the terrain's slopes on the flat map, as if lit from the "
+         "north-west"));
   m_exaggerationMenu->setTitle(tr("Terrain &Exaggeration"));
   for (QAction* action : m_exaggerationGroup->actions()) {
     const QString factor = QLocale().toString(action->data().toDouble());

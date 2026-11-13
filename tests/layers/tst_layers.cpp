@@ -747,6 +747,11 @@ private slots:
     QCOMPARE(ts::terrainExaggeration(steep), 20.0);
     steep.style.insert(QStringLiteral("exaggeration"), QStringLiteral("x"));
     QCOMPARE(ts::terrainExaggeration(steep), 1.0);
+
+    // The map's hillshade: on unless the style says not.
+    QVERIFY(ts::terrainHillshade(steep));
+    steep.style.insert(QStringLiteral("hillshade"), false);
+    QVERIFY(!ts::terrainHillshade(steep));
   }
 
   void elevationSourcesInPriority()
@@ -787,6 +792,7 @@ private slots:
     QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char(' '))));
     QVERIFY(draw.visible);
     QCOMPARE(draw.exaggeration, 2.0);
+    QVERIFY(draw.hillshade);
     const ts::CompositeElevationProvider* composite =
         dynamic_cast<const ts::CompositeElevationProvider*>(
             draw.provider.get());

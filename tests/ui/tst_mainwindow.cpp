@@ -627,11 +627,23 @@ private slots:
     triple->trigger();
     QCOMPARE(ts::terrainExaggeration(model->layerDefinition(terrain)), 3.0);
     QVERIFY(triple->isChecked() && !single->isChecked());
+    // The map's hillshade, on by default, is kept in the style too.
+    QAction* hillshade =
+        window.findChild<QAction*>(QStringLiteral("hillshadeAction"));
+    if (hillshade == nullptr) {
+      QFAIL("hillshade action missing");
+    }
+    QVERIFY(hillshade->isEnabled() && hillshade->isChecked());
+    hillshade->trigger();
+    QVERIFY(!ts::terrainHillshade(model->layerDefinition(terrain)));
+    QVERIFY(!hillshade->isChecked());
+    hillshade->trigger();
+    QVERIFY(ts::terrainHillshade(model->layerDefinition(terrain)));
     // Without an elevation layer the menu is off.
     const int rows = model->rowCount();
     QVERIFY(model->removeNode(terrain));
     QCOMPARE(model->rowCount(), rows - 1);
-    QVERIFY(!triple->isEnabled());
+    QVERIFY(!triple->isEnabled() && !hillshade->isEnabled());
     if (globe != nullptr) {
       QVERIFY(!globe->terrainShown());
     }

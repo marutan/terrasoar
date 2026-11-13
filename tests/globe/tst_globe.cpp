@@ -1282,6 +1282,11 @@ private slots:
     // Half-way to the map the terrain is half flattened.
     QTest::newRow("base-terrain-morph-half")
         << 46.0 << 8.0 << 3.0e5 << 45.0 << mercator << 0.5 << 3.0;
+    // On the map the terrain is flat and hillshaded.
+    QTest::newRow("base-terrain-alps-map")
+        << 46.0 << 8.0 << 4.0e5 << 0.0 << mercator << 1.0 << 1.0;
+    QTest::newRow("base-terrain-everest-map")
+        << 28.0 << 86.9 << 6.0e5 << 0.0 << mercator << 1.0 << 1.0;
     // Loaded but switched off: the same picture as without terrain (its
     // golden image is base-uk-close's).
     QTest::newRow("base-uk-close-terrain-off")
@@ -1469,6 +1474,58 @@ private slots:
     QCOMPARE(differing, 0);
     // And switched on, it does change the picture.
     QVERIFY(changed > plain.width() * plain.height() / 10);
+  }
+
+  void hillshadeShadesTheMap()
+  {
+    // On the flat map the terrain is flat and hillshaded: slopes facing
+    // the north-west sun lighter, the others darker. Without terrain, or
+    // with the hillshade off, the map is as before.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(128, 128, 128),
+                                                        64));
+    ts::Camera camera = makeCamera(ts::CameraPose{20.0, 30.0, 2.0e6, 0.0, 0.0});
+    camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+    camera.setMorph(1.0);
+    const QImage plain = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setElevationProvider(std::make_shared<SineElevation>());
+    m_renderer->setTerrain(true, 1.0);
+    m_renderer->setHillshade(0.0);
+    const QImage off = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setHillshade(1.0);
+    const QImage on = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setTerrain(false, 1.0);
+    const QImage hidden = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setElevationProvider(nullptr);
+    m_renderer->setImageryProvider(nullptr);
+    QVERIFY(!plain.isNull() && !off.isNull() && !on.isNull() &&
+            !hidden.isNull());
+    int darker = 0;
+    int lighter = 0;
+    int unchanged = 0;
+    for (int y = 0; y < plain.height(); ++y) {
+      for (int x = 0; x < plain.width(); ++x) {
+        const int base = qGray(plain.pixel(x, y));
+        QVERIFY(std::abs(qGray(off.pixel(x, y)) - base) <= 2);
+        QVERIFY(std::abs(qGray(hidden.pixel(x, y)) - base) <= 2);
+        const int shaded = qGray(on.pixel(x, y));
+        darker += shaded < base - 8 ? 1 : 0;
+        lighter += shaded > base + 8 ? 1 : 0;
+        unchanged += std::abs(shaded - base) <= 8 ? 1 : 0;
+      }
+    }
+    const int pixels = plain.width() * plain.height();
+    QVERIFY2(darker > pixels / 20 && lighter > pixels / 20,
+             qPrintable(QStringLiteral("%1 darker, %2 lighter of %3")
+                            .arg(darker)
+                            .arg(lighter)
+                            .arg(pixels)));
   }
 
   void incompleteHeightsAreAskedForAgain()

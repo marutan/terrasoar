@@ -61,6 +61,8 @@ struct ElevationDraw {
   bool visible = false;
   /** Vertical exaggeration. */
   double exaggeration = 1.0;
+  /** True if the terrain is hillshaded on the flat map. */
+  bool hillshade = true;
 };
 
 /**
@@ -70,12 +72,18 @@ struct ElevationDraw {
 double terrainExaggeration(const LayerDefinition& definition);
 
 /**
+ * Returns whether an elevation layer's style asks for the flat map to be
+ * hillshaded (`{"hillshade": false}` to not), true if it doesn't say.
+ */
+bool terrainHillshade(const LayerDefinition& definition);
+
+/**
  * Returns the terrain of @p stack: its visible elevation layers as one
  * source, each over those below it (ProviderRegistry::elevationComposite()),
- * with the topmost one's exaggeration; or, if none is visible, the topmost
- * hidden one with visible false (its heights stay loaded, so switching it
- * on is immediate). Visible layers whose source can't be opened add their
- * errors to @p errors and are left out.
+ * with the topmost one's exaggeration and hillshade; or, if none is visible,
+ * the topmost hidden one with visible false (its heights stay loaded, so
+ * switching it on is immediate). Visible layers whose source can't be opened
+ * add their errors to @p errors and are left out.
  *
  * @guithread
  */
