@@ -1469,6 +1469,14 @@ private slots:
         QTest::qWaitFor([&]() { return globe->framesRendered() > 0; }, 5000));
     // The checkerboard imagery loads first; frames keep coming until then.
     QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    // The base pack check ends in a status bar change, which may redraw the
+    // view once more (slow on Windows runners); wait for it first.
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return window.basePackState() !=
+                 ts::MainWindow::BasePackState::Checking;
+        },
+        20000));
     QVERIFY2(waitUntilQuiet(globe), "the view kept drawing");
     const int frames = globe->framesRendered();
     QTest::qWait(500);
