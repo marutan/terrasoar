@@ -1480,6 +1480,8 @@ private slots:
     ts::TileRendererSettings settings;
     settings.heightsRetryDelay = std::chrono::milliseconds(0);
     ts::GlobeRenderer renderer(m_gl->device(), settings);
+    QString error;
+    QVERIFY2(renderer.initialise(&error), qPrintable(error));
     std::shared_ptr<FlakyElevation> flaky = std::make_shared<FlakyElevation>();
     renderer.setImageryProvider(
         std::make_shared<ts::CheckerboardImageryProvider>(256));
