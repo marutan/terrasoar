@@ -193,7 +193,11 @@ struct HeightTile {
   TileKey key;
   /** Samples along each side (at least 2). */
   int samples = 0;
-  /** samples² heights above the WGS 84 ellipsoid, metres, row by row. */
+  /**
+   * samples² heights above the WGS 84 ellipsoid, metres, row by row; NaN
+   * where the source has no data (CompositeElevationProvider fills those
+   * before the renderer sees them).
+   */
   std::vector<float> heightsM;
   /**
    * samples² heights of sea level (the geoid) above the ellipsoid at the
@@ -204,8 +208,8 @@ struct HeightTile {
 };
 
 /**
- * A source of elevation tiles. Used from Phase 6 (terrain); the interface
- * is fixed now so that the loader, cache and renderer are built for it.
+ * A source of elevation tiles (Phase 7): the base pack's DEM, DEM files,
+ * or several of them combined.
  *
  * @threadsafe
  */

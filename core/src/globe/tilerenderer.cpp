@@ -608,6 +608,33 @@ std::optional<double> TileRenderer::terrainHeightM(double latDeg, double lonDeg)
   return std::nullopt;
 }
 
+std::optional<GroundHeight> TileRenderer::groundHeight(double latDeg,
+                                                       double lonDeg)
+{
+  if (!m_elevation) {
+    return std::nullopt;
+  }
+  const Geodetic point{latDeg, lonDeg, 0.0};
+  for (int level = m_deepestHeights; level >= 0; --level) {
+    std::optional<std::shared_ptr<const HeightTile>> found =
+        m_heights.find(TileKey::containing(level, point));
+    if (!found || !*found) {
+      continue;
+    }
+    const HeightTile& tile = **found;
+    const std::optional<double> height = sampleHeightM(tile, latDeg, lonDeg);
+    if (!height) {
+      continue;
+    }
+    GroundHeight ground;
+    ground.ellipsoidalM = *height;
+    ground.seaLevelM = sampleSeaLevelM(tile, latDeg, lonDeg).value_or(0.0);
+    ground.level = level;
+    return ground;
+  }
+  return std::nullopt;
+}
+
 void TileRenderer::takeHeights()
 {
   if (!m_heightLoader) {

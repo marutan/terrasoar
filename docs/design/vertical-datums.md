@@ -69,9 +69,16 @@ for. Two details:
   sample as it loads a tile, so `ts::HeightTile` is always ellipsoidal,
   as the renderer and picking need. `ProviderRegistry::elevation()` finds
   the geoid dataset the store names.
-- **What the user sees**: heights above sea level by default, ellipsoidal
-  as an option (Phase 7d readout and profile). `ProviderRegistry::geoid()`
-  gives the model to subtract N again.
+- **DEM files** (`ts::GdalElevationProvider`) name their datum in the
+  layer's source: `egm2008` or `egm96` (N added from the base pack's
+  grid) or `ellipsoid` (left as they are). Add Elevation File takes it
+  from the file's compound CRS where there is one, else asks. Files on a
+  national datum (e.g. Ordnance Datum Newlyn) are within a metre or so of
+  EGM2008; the OSGM15 pack (Phase 7d) will convert them exactly.
+- **What the user sees**: the pointer readout gives heights above sea
+  level (the tile's height minus its sea level, N), or above the
+  ellipsoid with View → Heights Above the Ellipsoid. `ProviderRegistry::geoid()`
+  gives the model to subtract N where a tile doesn't carry it.
 
 ## Tests
 

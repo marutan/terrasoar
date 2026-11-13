@@ -199,6 +199,29 @@
         </message>
     </context>
     <context>
+        <name>ts::GdalElevationProvider</name>
+        <message>
+            <source>The file has no raster band.</source>
+            <translation>The file has no raster band.</translation>
+        </message>
+        <message>
+            <source>The file has no georeferencing (coordinate reference system and position).</source>
+            <translation>The file has no georeferencing (coordinate reference system and position).</translation>
+        </message>
+        <message>
+            <source>The file's coordinate reference system can't be converted to latitude and longitude.</source>
+            <translation>The file's coordinate reference system can't be converted to latitude and longitude.</translation>
+        </message>
+        <message>
+            <source>The file can't be read.</source>
+            <translation>The file can't be read.</translation>
+        </message>
+        <message>
+            <source>The file's extent can't be turned into latitude and longitude.</source>
+            <translation>The file's extent can't be turned into latitude and longitude.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::GeoFormat</name>
         <message>
             <source>%1° S</source>
@@ -413,6 +436,10 @@
             <source>WMS Layer…</source>
             <translation>WMS Layer…</translation>
         </message>
+        <message>
+            <source>Elevation File…</source>
+            <translation>Elevation File…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -626,6 +653,62 @@
         <message>
             <source>Draw the terrain %1 times as high as it is</source>
             <translation>Draw the terrain %1 times as high as it is</translation>
+        </message>
+        <message>
+            <source>Add Elevation File</source>
+            <translation>Add Elevation File</translation>
+        </message>
+        <message>
+            <source>Elevation models (*.tif *.tiff *.vrt *.hgt *.dem *.asc *.img *.bil *.nc);;All files (*)</source>
+            <translation>Elevation models (*.tif *.tiff *.vrt *.hgt *.dem *.asc *.img *.bil *.nc);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Cannot use "%1" as an elevation model: %2</source>
+            <translation>Cannot use "%1" as an elevation model: %2</translation>
+        </message>
+        <message>
+            <source>Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)</source>
+            <translation>Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)</translation>
+        </message>
+        <message>
+            <source>Sea level, EGM96 (e.g. SRTM)</source>
+            <translation>Sea level, EGM96 (e.g. SRTM)</translation>
+        </message>
+        <message>
+            <source>WGS 84 ellipsoid (GNSS heights)</source>
+            <translation>WGS 84 ellipsoid (GNSS heights)</translation>
+        </message>
+        <message>
+            <source>The file doesn't say what its heights are measured from. Heights of "%1" are above:</source>
+            <translation>The file doesn't say what its heights are measured from. Heights of "%1" are above:</translation>
+        </message>
+        <message>
+            <source>Heights of "%1" are above (as the file says):</source>
+            <translation>Heights of "%1" are above (as the file says):</translation>
+        </message>
+        <message>
+            <source>Add &amp;Elevation File…</source>
+            <translation>Add &amp;Elevation File…</translation>
+        </message>
+        <message>
+            <source>Add a digital elevation model (GeoTIFF or another raster) as terrain</source>
+            <translation>Add a digital elevation model (GeoTIFF or another raster) as terrain</translation>
+        </message>
+        <message>
+            <source>Heights Above the &amp;Ellipsoid</source>
+            <translation>Heights Above the &amp;Ellipsoid</translation>
+        </message>
+        <message>
+            <source>Show heights above the WGS 84 ellipsoid (as GNSS gives them) instead of above sea level</source>
+            <translation>Show heights above the WGS 84 ellipsoid (as GNSS gives them) instead of above sea level</translation>
+        </message>
+        <message>
+            <source>%1  %2 m ellipsoidal</source>
+            <translation>%1  %2 m ellipsoidal</translation>
+        </message>
+        <message>
+            <source>%1  %2 m</source>
+            <translation>%1  %2 m</translation>
         </message>
     </context>
     <context>
@@ -1157,6 +1240,10 @@
         <message>
             <source>Unknown or invalid elevation source: %1</source>
             <translation>Unknown or invalid elevation source: %1</translation>
+        </message>
+        <message>
+            <source>Cannot read "%1": %2</source>
+            <translation>Cannot read "%1": %2</translation>
         </message>
     </context>
     <context>

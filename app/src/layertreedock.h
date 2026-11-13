@@ -68,6 +68,9 @@ signals:
   /** The user asked to add a WMS layer (the window opens the dialog). */
   void addWmsLayerRequested();
 
+  /** The user asked to add an elevation file (the window asks for it). */
+  void addElevationFileRequested();
+
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;

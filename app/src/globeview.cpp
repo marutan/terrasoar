@@ -656,6 +656,7 @@ void GlobeView::focusOutEvent(QFocusEvent* event)
 void GlobeView::leaveEvent(QEvent* event)
 {
   m_pointerInside = false;
+  m_pointerGround.reset();
   emit pointerPositionChanged(false, 0.0, 0.0);
   QOpenGLWidget::leaveEvent(event);
 }
@@ -869,6 +870,9 @@ void GlobeView::updatePointerReadout()
   }
   const std::optional<Geodetic> hit =
       m_controller.camera().pickGeodetic(m_pointerPx.x(), m_pointerPx.y());
+  m_pointerGround = hit && m_globe
+                        ? m_globe->groundHeight(hit->latDeg, hit->lonDeg)
+                        : std::nullopt;
   emit pointerPositionChanged(hit.has_value(), hit ? hit->latDeg : 0.0,
                               hit ? hit->lonDeg : 0.0);
 }

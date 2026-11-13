@@ -15,6 +15,8 @@
 #include <QDir>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QInputDialog>
 #include <QJsonArray>
 #include <QKeySequence>
 #include <QLabel>
@@ -27,6 +29,7 @@
 #include <QStyle>
 #include <QThread>
 #include <QTimer>
+#include <QUuid>
 #include <QWidget>
 
 #include "addwmsdialog.h"
@@ -38,6 +41,7 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "ts/base/buildinfo.h"
+#include "ts/elevation/gdalelevationprovider.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/layers/layertreemodel.h"
@@ -156,6 +160,8 @@ MainWindow::MainWindow(QWidget* parent)
   addDockWidget(Qt::LeftDockWidgetArea, m_layerDock);
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
+          [this]() { addElevationFile(); });
   connect(m_layers, &LayerTreeModel::layerStackChanged, this,
           &MainWindow::refreshLayers);
   if (m_globeView) {
@@ -442,6 +448,19 @@ void MainWindow::createActions()
   connect(m_addWmsAction, &QAction::triggered, this,
           [this]() { addWmsLayer(); });
 
+  m_addElevationAction = new QAction(this);
+  m_addElevationAction->setObjectName(QStringLiteral("addElevationAction"));
+  connect(m_addElevationAction, &QAction::triggered, this,
+          [this]() { addElevationFile(); });
+
+  m_ellipsoidalHeightsAction = new QAction(this);
+  m_ellipsoidalHeightsAction->setObjectName(
+      QStringLiteral("ellipsoidalHeightsAction"));
+  m_ellipsoidalHeightsAction->setCheckable(true);
+  connect(m_ellipsoidalHeightsAction, &QAction::toggled, this, [this]() {
+    showPointerPosition(m_pointerOnGlobe, m_pointerLatDeg, m_pointerLonDeg);
+  });
+
   m_offlineRegionsAction = new QAction(this);
   m_offlineRegionsAction->setObjectName(QStringLiteral("offlineRegionsAction"));
   connect(m_offlineRegionsAction, &QAction::triggered, this,
@@ -477,6 +496,81 @@ void MainWindow::createActions()
   m_aboutQtAction->setObjectName(QStringLiteral("aboutQtAction"));
   m_aboutQtAction->setMenuRole(QAction::AboutQtRole);
   connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
+}
+
+void MainWindow::addElevationFile()
+{
+  const QString path = QFileDialog::getOpenFileName(
+      this, tr("Add Elevation File"), QString(),
+      tr("Elevation models (*.tif *.tiff *.vrt *.hgt *.dem *.asc *.img "
+         "*.bil *.nc);;All files (*)"));
+  if (path.isEmpty()) {
+    return;
+  }
+  // Opened once now, so that an unreadable file is said at once.
+  const GdalElevationProvider probe(path, QStringLiteral("ellipsoid"), nullptr,
+                                    nullptr);
+  if (!probe.isValid()) {
+    QMessageBox::warning(
+        this, tr("Add Elevation File"),
+        tr("Cannot use \"%1\" as an elevation model: %2")
+            .arg(QDir::toNativeSeparators(path), probe.errorString()));
+    return;
+  }
+  const DemVerticalDatum detected = detectDemVerticalDatum(path);
+  const QStringList ids = {QStringLiteral("egm2008"), QStringLiteral("egm96"),
+                           QStringLiteral("ellipsoid")};
+  const QStringList choices = {
+      tr("Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)"),
+      tr("Sea level, EGM96 (e.g. SRTM)"),
+      tr("WGS 84 ellipsoid (GNSS heights)")};
+  int current = static_cast<int>(ids.indexOf(demVerticalDatumId(detected)));
+  const QString label =
+      detected == DemVerticalDatum::Unknown
+          ? tr("The file doesn't say what its heights are measured from. "
+               "Heights of \"%1\" are above:")
+                .arg(QFileInfo(path).fileName())
+          : tr("Heights of \"%1\" are above (as the file says):")
+                .arg(QFileInfo(path).fileName());
+  bool ok = false;
+  const QString chosen =
+      QInputDialog::getItem(this, tr("Add Elevation File"), label, choices,
+                            std::max(current, 0), false, &ok);
+  if (!ok) {
+    return;
+  }
+  addElevationLayer(path, ids.value(static_cast<int>(choices.indexOf(chosen))));
+}
+
+// The file, then its datum.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void MainWindow::addElevationLayer(const QString& path, const QString& datum)
+{
+  LayerDefinition definition;
+  definition.id = QStringLiteral("user:elevation-") +
+                  QUuid::createUuid().toString(QUuid::WithoutBraces);
+  definition.origin = LayerOrigin::User;
+  definition.type = LayerType::Elevation;
+  definition.name = QFileInfo(path).completeBaseName();
+  QJsonObject source;
+  source.insert(QStringLiteral("kind"), QStringLiteral("file"));
+  source.insert(QStringLiteral("path"), QDir::cleanPath(path));
+  source.insert(QStringLiteral("verticalDatum"), datum);
+  definition.source = source;
+  // The terrain keeps its exaggeration.
+  const QModelIndex topmost = topmostElevationLayer();
+  const double exaggeration =
+      topmost.isValid()
+          ? terrainExaggeration(m_layers->layerDefinition(topmost))
+          : 1.0;
+  QJsonObject style;
+  style.insert(QStringLiteral("exaggeration"), exaggeration);
+  definition.style = style;
+  // Above the other elevation layers, so it takes priority over them.
+  const QModelIndex added = m_layers->addLayer(
+      definition, topmost.isValid() ? topmost.parent() : QModelIndex(),
+      topmost.isValid() ? topmost.row() : 0);
+  m_layers->setData(added, Qt::Checked, Qt::CheckStateRole);
 }
 
 QModelIndex MainWindow::topmostElevationLayer() const
@@ -521,6 +615,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_saveAsAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
+  m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
   m_fileMenu->addAction(m_dataPacksAction);
   m_fileMenu->addSeparator();
@@ -539,6 +634,7 @@ void MainWindow::createMenus()
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
   syncTerrainActions();
+  m_viewMenu->addAction(m_ellipsoidalHeightsAction);
   m_viewMenu->addSeparator();
   QAction* layers = m_layerDock->toggleViewAction();
   layers->setObjectName(QStringLiteral("layersDockAction"));
@@ -584,6 +680,14 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_addElevationAction->setText(tr("Add &Elevation File…"));
+  m_addElevationAction->setStatusTip(
+      tr("Add a digital elevation model (GeoTIFF or another raster) as "
+         "terrain"));
+  m_ellipsoidalHeightsAction->setText(tr("Heights Above the &Ellipsoid"));
+  m_ellipsoidalHeightsAction->setStatusTip(
+      tr("Show heights above the WGS 84 ellipsoid (as GNSS gives them) "
+         "instead of above sea level"));
   m_addWmsAction->setText(tr("Add &WMS Layer…"));
   m_addWmsAction->setStatusTip(
       tr("Add a layer from a web map server (WMS) to the layer tree"));
@@ -658,8 +762,18 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
   m_pointerLonDeg = lonDeg;
   const QLocale locale;
   if (onGlobe) {
-    m_pointerLabel->setText(tr("%1  %2").arg(formatLatitude(latDeg, locale),
-                                             formatLongitude(lonDeg, locale)));
+    QString text = tr("%1  %2").arg(formatLatitude(latDeg, locale),
+                                    formatLongitude(lonDeg, locale));
+    const std::optional<GroundHeight> ground =
+        m_globeView != nullptr ? m_globeView->pointerGround() : std::nullopt;
+    if (ground) {
+      const bool ellipsoidal = m_ellipsoidalHeightsAction->isChecked();
+      const QString metres = locale.toString(std::lround(
+          ellipsoidal ? ground->ellipsoidalM : ground->aboveSeaLevelM()));
+      text = ellipsoidal ? tr("%1  %2 m ellipsoidal").arg(text, metres)
+                         : tr("%1  %2 m").arg(text, metres);
+    }
+    m_pointerLabel->setText(text);
   } else if (m_globeView != nullptr &&
              m_globeView->viewMode() == ViewMode::Map) {
     m_pointerLabel->setText(tr("Pointer not on the map"));

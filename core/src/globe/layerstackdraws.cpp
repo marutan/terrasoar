@@ -104,28 +104,36 @@ ElevationDraw elevationDrawForStack(const LayerStack& stack,
                                     QStringList* errors)
 {
   ElevationDraw draw;
-  if (stack.elevation.empty()) {
-    return draw;
-  }
-  // The topmost visible layer, or the topmost of all (its heights stay
-  // loaded for when it is switched on).
-  const ElevationStackEntry* chosen = &stack.elevation.back();
+  // The visible layers, topmost first: each has priority over those below
+  // it. If none is visible, the topmost of all (its heights stay loaded
+  // for when it is switched on).
+  std::vector<const ElevationStackEntry*> chosen;
   for (std::size_t i = stack.elevation.size(); i-- > 0;) {
     if (stack.elevation[i].visible) {
-      chosen = &stack.elevation[i];
-      break;
+      chosen.push_back(&stack.elevation[i]);
     }
   }
-  QString error;
-  draw.provider = registry.elevation(chosen->definition.source, &error);
-  if (!draw.provider) {
-    if (errors != nullptr && chosen->visible) {
+  const bool visible = !chosen.empty();
+  if (!visible && !stack.elevation.empty()) {
+    chosen.push_back(&stack.elevation.back());
+  }
+  std::vector<std::shared_ptr<ElevationProvider>> sources;
+  for (const ElevationStackEntry* entry : chosen) {
+    QString error;
+    std::shared_ptr<ElevationProvider> provider =
+        registry.elevation(entry->definition.source, &error);
+    if (provider) {
+      sources.push_back(std::move(provider));
+    } else if (errors != nullptr && entry->visible) {
       errors->append(error);
     }
+  }
+  if (sources.empty()) {
     return draw;
   }
-  draw.visible = chosen->visible;
-  draw.exaggeration = terrainExaggeration(chosen->definition);
+  draw.provider = registry.elevationComposite(std::move(sources));
+  draw.visible = visible;
+  draw.exaggeration = terrainExaggeration(chosen.front()->definition);
   return draw;
 }
 

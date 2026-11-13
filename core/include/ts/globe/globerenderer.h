@@ -15,6 +15,7 @@
 
 #include <QString>
 
+#include "ts/globe/tilerenderer.h"
 #include "ts/globe/vectorrenderer.h"
 #include "ts/maths/vec3.h"
 #include "ts/render/renderdevice.h"
@@ -182,6 +183,9 @@ public:
 
   /** See TileRenderer::terrainHeightM(). */
   std::optional<double> terrainHeightM(double latDeg, double lonDeg);
+
+  /** See TileRenderer::groundHeight(). */
+  std::optional<GroundHeight> groundHeight(double latDeg, double lonDeg);
 
   /**
    * Draws a frame as seen by @p camera into @p pass (whose clear colour is

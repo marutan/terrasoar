@@ -610,6 +610,13 @@ std::optional<double> GlobeRenderer::terrainHeightM(double latDeg,
   return m_tiles->terrainHeightM(latDeg, lonDeg);
 }
 
+std::optional<GroundHeight> GlobeRenderer::groundHeight(double latDeg,
+                                                        double lonDeg)
+{
+  return m_tiles ? m_tiles->groundHeight(latDeg, lonDeg)
+                 : std::optional<GroundHeight>();
+}
+
 void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
                            double devicePixelRatio)
 {

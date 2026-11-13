@@ -11,6 +11,7 @@
 #include <QFontMetrics>
 #include <QJsonArray>
 #include <QLabel>
+#include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -632,6 +633,67 @@ private slots:
     if (globe != nullptr) {
       QVERIFY(!globe->terrainShown());
     }
+  }
+
+  void elevationFileLayer()
+  {
+    // A DEM file becomes a visible elevation layer above the terrain, and
+    // the status bar reads the height under the pointer.
+    const QTemporaryDir directory;
+    const QString dem = directory.filePath(QStringLiteral("hills.tif"));
+    QVERIFY(ts::test::writeFixtureDem(dem, 1500.0F));
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY(window.findChild<QAction*>(QStringLiteral("addElevationAction")));
+    QVERIFY(
+        window.findChild<QAction*>(QStringLiteral("addElevationFileAction")));
+    QAction* ellipsoidal =
+        window.findChild<QAction*>(QStringLiteral("ellipsoidalHeightsAction"));
+    if (ellipsoidal == nullptr) {
+      QFAIL("ellipsoidal heights action missing");
+    }
+    QVERIFY(!ellipsoidal->isChecked());
+
+    ts::LayerTreeModel* model = window.layerModel();
+    const int rows = model->rowCount();
+    window.addElevationLayer(dem, QStringLiteral("ellipsoid"));
+    QCOMPARE(model->rowCount(), rows + 1);
+    // Above the terrain (at the bottom), so it takes priority.
+    const QModelIndex added = model->index(rows - 1, 0);
+    const ts::LayerDefinition definition = model->layerDefinition(added);
+    QCOMPARE(definition.type, ts::LayerType::Elevation);
+    QCOMPARE(definition.name, QStringLiteral("hills"));
+    QCOMPARE(definition.source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("file"));
+    QCOMPARE(model->data(added, Qt::CheckStateRole).toInt(),
+             static_cast<int>(Qt::Checked));
+    QCOMPARE(model->layerDefinition(model->index(rows, 0)).id,
+             QStringLiteral("builtin:terrain"));
+
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      return;
+    }
+    QVERIFY(globe->terrainShown());
+    QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
+    QVERIFY(pointer != nullptr);
+    // The start view's centre, 20° N 10° E, is on the DEM: 1500 m (the
+    // fixture pack has no geoid, so sea level is the ellipsoid).
+    const QString metres = QLocale().toString(1500) + QStringLiteral(" m");
+    const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
+    QVERIFY2(QTest::qWaitFor(
+                 [&]() {
+                   sendMouse(globe, QEvent::MouseMove, centre, Qt::NoButton,
+                             Qt::NoButton);
+                   return pointer->text().contains(metres);
+                 },
+                 20000),
+             qPrintable(pointer->text()));
+    QVERIFY(globe->pointerGround().has_value());
+    ellipsoidal->trigger();
+    QVERIFY2(pointer->text().contains(metres + QStringLiteral(" ellipsoidal")),
+             qPrintable(pointer->text()));
   }
 
   void projectSaveAndOpen()
