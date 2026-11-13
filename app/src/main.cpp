@@ -12,6 +12,7 @@
 #include <QCommandLineParser>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QIcon>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLocale>
@@ -117,6 +118,15 @@ int main(int argc, char* argv[])
   QCoreApplication::setOrganizationName(QStringLiteral("Terra Soar"));
   QCoreApplication::setApplicationName(QStringLiteral("terrasoar"));
   QCoreApplication::setApplicationVersion(ts::buildInfo().version);
+  // The window icon, and the desktop entry it belongs to (Wayland and
+  // desktops match windows to their launcher by it).
+  QIcon icon;
+  for (const int size : {16, 24, 32, 48, 64, 128, 256}) {
+    icon.addFile(QStringLiteral(":/icons/terrasoar-%1.png").arg(size));
+  }
+  QApplication::setWindowIcon(icon);
+  QGuiApplication::setDesktopFileName(
+      QStringLiteral("io.github.marutan.TerraSoar"));
 
   // Translators go in before any user-visible text is created.
   const char* localeArgument = findArgument(argc, argv, "--locale", true);

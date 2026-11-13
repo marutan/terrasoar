@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Terra Soar
+GenericName=Globe and Map Viewer
+Comment=View the Earth as a 3D globe or a 2D map, online and offline
+Exec=terrasoar %F
+Icon=io.github.marutan.TerraSoar
+Terminal=false
+Categories=Science;Geography;Geoscience;
+Keywords=globe;map;GIS;WMS;terrain;elevation;earth;
+MimeType=application/x-terrasoar-project;
+StartupWMClass=terrasoar

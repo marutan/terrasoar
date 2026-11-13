@@ -41,6 +41,19 @@ GeographicLib
   Licence: MIT/X style
   https://geographiclib.sourceforge.io/
 
+Libraries bundled in Linux packages
+-----------------------------------
+
+The AppImage bundles Qt and the libraries above together with the
+libraries they use (libtiff, libcurl, OpenSSL, zlib and others). It lists
+each one, and the distribution package it comes from, in
+usr/share/doc/terrasoar/bundled-libraries.txt, with each package's
+copyright and licence file in usr/share/doc/<package>/copyright and the
+LGPL v3 and GPL v3 texts in usr/share/doc/terrasoar/licences/. The
+Flatpak builds GEOS, PROJ, GeographicLib and GDAL from their sources and
+uses the KDE runtime (Qt and common libraries), which carries its own
+notices.
+
 Runtime components bundled in Windows packages
 ----------------------------------------------
 

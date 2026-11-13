@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!-- Terra Soar project files, for the desktop to open with Terra Soar. -->
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-terrasoar-project">
+    <sub-class-of type="application/json"/>
+    <comment>Terra Soar project</comment>
+    <glob pattern="*.terrasoar"/>
+    <icon name="io.github.marutan.TerraSoar"/>
+  </mime-type>
+</mime-info>

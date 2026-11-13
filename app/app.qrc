@@ -5,6 +5,16 @@
     <qresource prefix="/data">
         <file alias="wms-catalogue.json">../data/wms-catalogue.json</file>
     </qresource>
+    <!-- The window icon, rendered from packaging/icons/terrasoar.svg. -->
+    <qresource prefix="/icons">
+        <file alias="terrasoar-16.png">../packaging/icons/png/terrasoar-16.png</file>
+        <file alias="terrasoar-24.png">../packaging/icons/png/terrasoar-24.png</file>
+        <file alias="terrasoar-32.png">../packaging/icons/png/terrasoar-32.png</file>
+        <file alias="terrasoar-48.png">../packaging/icons/png/terrasoar-48.png</file>
+        <file alias="terrasoar-64.png">../packaging/icons/png/terrasoar-64.png</file>
+        <file alias="terrasoar-128.png">../packaging/icons/png/terrasoar-128.png</file>
+        <file alias="terrasoar-256.png">../packaging/icons/png/terrasoar-256.png</file>
+    </qresource>
     <!-- Shown in Help > About (see AboutDialog). -->
     <qresource prefix="/notices">
         <file alias="THIRD_PARTY_NOTICES">../THIRD_PARTY_NOTICES</file>

@@ -104,7 +104,9 @@ private slots:
     const MockHttpRequest sent = server.requests().front();
     QCOMPARE(sent.method, QByteArray("GET"));
     QVERIFY(sent.header("user-agent").startsWith("TerraSoar/"));
-    QCOMPARE(client.inFlight(), 0);
+    // The worker thread lets go of the request just after it hands over
+    // the response.
+    QVERIFY(QTest::qWaitFor([&]() { return client.inFlight() == 0; }, 3000));
   }
 
   void sendsRequestHeaders()

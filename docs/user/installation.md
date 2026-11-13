@@ -40,7 +40,11 @@ Three ways, all with the base pack:
 
 - **AppImage**: download `TerraSoar-0.0.1-x86_64.AppImage`, make it
   executable (`chmod +x TerraSoar-0.0.1-x86_64.AppImage`) and run it. No
-  installation; delete the file to remove it.
+  installation; delete the file to remove it. It needs a Linux at least as
+  new as Ubuntu 24.04, Fedora 40 or Debian 13 (glibc 2.39); on older
+  systems use the Flatpak. If it says FUSE is missing, install `libfuse2`
+  (`libfuse2t64` on Ubuntu 24.04) or run it with
+  `--appimage-extract-and-run`.
 - **Flatpak**: download `TerraSoar-0.0.1.flatpak` and install it with
   `flatpak install --user TerraSoar-0.0.1.flatpak` (it needs the KDE
   runtime from Flathub, which Flatpak offers to install). Start it from

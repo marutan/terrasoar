@@ -8,11 +8,16 @@
 
 TEMPLATE = subdirs
 
-SUBDIRS = core app tools tests
-
+# CONFIG+=ts_app_only builds the program alone, without the packager and
+# the tests (the Flatpak build).
+ts_app_only {
+    SUBDIRS = core app
+} else {
+    SUBDIRS = core app tools tests
+    tools.depends = core
+    tests.depends = core app
+}
 app.depends = core
-tools.depends = core
-tests.depends = core app
 
 OTHER_FILES += \
     common.pri \
