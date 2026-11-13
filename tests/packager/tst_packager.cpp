@@ -509,6 +509,46 @@ constexpr std::array<std::array<double, 3>, 9> egm2008ReferencePoints{{
 }};
 
 /**
+ * Checks a geoid pack's grids: the finer EGM2008 matches PROJ's 2.5′ grid
+ * at the reference points to the centimetre (it is that grid in whole
+ * centimetres); OSGM15 is about half a metre below EGM2008 in Great
+ * Britain (Ordnance Datum Newlyn against the global geoid) and has nothing
+ * outside it.
+ */
+void checkGeoidPack(const QString& directory,
+                    const ts::packager::PackConfig& config)
+{
+  for (const ts::packager::GeoidSpec& spec : config.geoids) {
+    const ts::GeoidModel model(directory,
+                               spec.dataset + QStringLiteral(".tif"));
+    QVERIFY2(model.isValid(), qPrintable(model.errorString()));
+    if (spec.dataset == QLatin1String("egm2008")) {
+      for (const std::array<double, 3>& point : egm2008ReferencePoints) {
+        const double n = model.undulationM(point[0], point[1]);
+        QVERIFY2(std::abs(n - point[2]) < 0.01,
+                 qPrintable(QStringLiteral("%1, %2: %3")
+                                .arg(point[0])
+                                .arg(point[1])
+                                .arg(n)));
+      }
+    } else if (spec.dataset == QLatin1String("osgm15")) {
+      for (const std::array<double, 3>& point :
+           {egm2008ReferencePoints[0], egm2008ReferencePoints[1]}) {
+        // ODN is about half a metre below EGM2008 in Great Britain.
+        const double offset = point[2] - model.undulationM(point[0], point[1]);
+        QVERIFY2(offset > 0.3 && offset < 0.8,
+                 qPrintable(QString::number(offset)));
+      }
+      // Paris is outside it.
+      QVERIFY(!std::isfinite(model.undulationM(48.85, 2.35)));
+    } else {
+      QFAIL(qPrintable(
+          QStringLiteral("No check for the geoid %1").arg(spec.dataset)));
+    }
+  }
+}
+
+/**
  * Checks the real DEM and geoid grids: every tile decodes, neighbours
  * share their edges, heights at known places are plausible for a 5 km
  * grid, the geoids match published values.
@@ -1132,9 +1172,18 @@ private slots:
       case ts::PackDataset::Kind::Features:
         QCOMPARE(dataset.replaces, shorelineReplaces);
         break;
+      case ts::PackDataset::Kind::Geoid: {
+        QString replaces;
+        for (const ts::packager::GeoidSpec& geoid : config->geoids) {
+          if (geoid.dataset == dataset.id) {
+            replaces = geoid.replaces;
+          }
+        }
+        QCOMPARE(dataset.replaces, replaces);
+        break;
+      }
       case ts::PackDataset::Kind::Areas:
       case ts::PackDataset::Kind::Elevation:
-      case ts::PackDataset::Kind::Geoid:
         QVERIFY(dataset.replaces.isEmpty());
         break;
       }
@@ -1151,6 +1200,8 @@ private slots:
     }
     if (config->elevation) {
       checkElevation(directory, *config->elevation);
+    } else {
+      checkGeoidPack(directory, *config);
     }
     if (config->countries) {
       checkCountries(

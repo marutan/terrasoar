@@ -1,0 +1,32 @@
+{
+  "id": "geoid-osgm15",
+  "version": "2015.1",
+  "index": {
+    "name": "OSGM15 geoid (Great Britain)",
+    "description": "Ordnance Survey's OSGM15 model of Ordnance Datum Newlyn, the height datum of Great Britain's maps and DEMs (OS Terrain 50, Environment Agency lidar). Adds it to the vertical datums elevation files can be measured from.",
+    "licence": "BSD-2-Clause (Ordnance Survey, via PROJ)"
+  },
+  "sizeLimitBytes": 10000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "osgm15",
+      "file": "uk_os_OSGM15_GB.tif",
+      "url": "https://cdn.proj.org/uk_os_OSGM15_GB.tif",
+      "sha256": "bf0ac81f1c0c33332693d7d606f335b793c3c2995b8e69eeb1350bd94adcde3b",
+      "name": "OSGM15 geoid model, ODN height (Ordnance Survey, as distributed by PROJ)",
+      "version": "2015",
+      "localNotices": ["../notices/uk_os_README.txt", "../notices/bsd-2-clause.txt"]
+    }
+  ],
+  "geoids": [
+    {
+      "dataset": "osgm15",
+      "source": "osgm15",
+      "name": "OSGM15 (Ordnance Datum Newlyn)",
+      "licence": "BSD-2-Clause (Ordnance Survey)",
+      "attribution": "OSGM15: Ordnance Survey",
+      "copy": true
+    }
+  ]
+}

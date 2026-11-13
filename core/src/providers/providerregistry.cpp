@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ts/providers/providerregistry.h"
 
+#include <algorithm>
+
 #include <QColor>
 #include <QCoreApplication>
 #include <QDir>
@@ -206,11 +208,24 @@ void ProviderRegistry::setInstalledPacks(
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   m_replacements.clear();
+  m_packGeoids.clear();
+  // Providers created from now on use the packs' geoids.
+  m_geoids.clear();
   for (const InstalledPack& pack : packs) {
     if (pack.damaged) {
       continue;
     }
     for (const PackDataset& dataset : pack.manifest.datasets) {
+      if (dataset.kind == PackDataset::Kind::Geoid) {
+        // A finer grid of a base pack datum, or a datum of its own.
+        const QString id =
+            dataset.replaces.isEmpty() ? dataset.id : dataset.replaces;
+        // The first pack with a grid for it wins.
+        m_packGeoids.try_emplace(id,
+                                 PackGeoid{pack.directory, dataset.file,
+                                           dataset.name, dataset.attribution});
+        continue;
+      }
       if (dataset.replaces.isEmpty() ||
           m_replacements.count(dataset.replaces) != 0) {
         continue;
@@ -284,6 +299,25 @@ ProviderRegistry::geoidLocked(const QString& dataset, QString* errorString)
   if (loaded != m_geoids.end()) {
     return loaded->second;
   }
+  // An installed pack's grid first (finer, or a datum of its own).
+  const std::unordered_map<QString, PackGeoid>::const_iterator packed =
+      m_packGeoids.find(dataset);
+  if (packed != m_packGeoids.end()) {
+    std::shared_ptr<const GeoidModel> model =
+        std::make_shared<const GeoidModel>(packed->second.directory,
+                                           packed->second.file);
+    if (!model->isValid()) {
+      if (errorString) {
+        *errorString =
+            QCoreApplication::translate("ts::ProviderRegistry",
+                                        "Cannot read the geoid \"%1\": %2")
+                .arg(dataset, model->errorString());
+      }
+      return nullptr;
+    }
+    m_geoids[dataset] = model;
+    return model;
+  }
   const std::unordered_map<QString, QString>::const_iterator file =
       m_basePackGeoids.find(dataset);
   if (m_basePackDirectory.isEmpty() || file == m_basePackGeoids.end()) {
@@ -333,7 +367,12 @@ ProviderRegistry::webElevationLocked(const QJsonObject& source,
   if (!web) {
     return nullptr;
   }
-  const QString key = web->id();
+  std::shared_ptr<const GeoidModel> datumGeoid;
+  if (!datumGeoidLocked(web->verticalDatum, &datumGeoid, source, errorString)) {
+    return nullptr;
+  }
+  const QString key = web->id() + QLatin1Char('|') +
+                      (datumGeoid ? datumGeoid->id() : QString());
   const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
       it = m_elevation.find(key);
   if (it != m_elevation.end()) {
@@ -342,14 +381,9 @@ ProviderRegistry::webElevationLocked(const QJsonObject& source,
       return live;
     }
   }
-  std::shared_ptr<const GeoidModel> datumGeoid;
-  if (!datumGeoidLocked(web->verticalDatum, &datumGeoid, source, errorString)) {
-    return nullptr;
-  }
   QString ignored;
   std::shared_ptr<const GeoidModel> seaLevel =
-      datumGeoid ? datumGeoid
-                 : geoidLocked(QStringLiteral("egm2008"), &ignored);
+      geoidLocked(QStringLiteral("egm2008"), &ignored);
   std::shared_ptr<ElevationProvider> provider =
       std::make_shared<WebTerrainProvider>(
           *web, networkLocked(), *m_wmsSettings, datumGeoid, seaLevel);
@@ -365,7 +399,8 @@ bool ProviderRegistry::datumGeoidLocked(
     geoid->reset();
     return true;
   }
-  if (datum != QLatin1String("egm2008") && datum != QLatin1String("egm96")) {
+  if (datum.isEmpty() ||
+      (m_basePackGeoids.count(datum) == 0 && m_packGeoids.count(datum) == 0)) {
     if (errorString) {
       *errorString =
           QCoreApplication::translate("ts::ProviderRegistry",
@@ -385,10 +420,10 @@ ProviderRegistry::fileElevationLocked(const QJsonObject& source,
   const QString path = source.value(QStringLiteral("path")).toString();
   const QString datum =
       source.value(QStringLiteral("verticalDatum")).toString();
+  std::shared_ptr<const GeoidModel> datumGeoid;
   if (path.isEmpty() ||
-      (datum != QLatin1String("ellipsoid") &&
-       datum != QLatin1String("egm2008") && datum != QLatin1String("egm96"))) {
-    if (errorString) {
+      !datumGeoidLocked(datum, &datumGeoid, source, errorString)) {
+    if (path.isEmpty() && errorString) {
       *errorString =
           QCoreApplication::translate("ts::ProviderRegistry",
                                       "Unknown or invalid elevation source: %1")
@@ -396,7 +431,9 @@ ProviderRegistry::fileElevationLocked(const QJsonObject& source,
     }
     return nullptr;
   }
-  const QString key = path + QLatin1Char('|') + datum;
+  // Shared while the same grid converts its heights.
+  const QString key = path + QLatin1Char('|') + datum + QLatin1Char('|') +
+                      (datumGeoid ? datumGeoid->id() : QString());
   const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
       it = m_elevation.find(key);
   if (it != m_elevation.end()) {
@@ -405,19 +442,11 @@ ProviderRegistry::fileElevationLocked(const QJsonObject& source,
       return live;
     }
   }
-  std::shared_ptr<const GeoidModel> datumGeoid;
-  if (datum != QLatin1String("ellipsoid")) {
-    datumGeoid = geoidLocked(datum, errorString);
-    if (!datumGeoid) {
-      return nullptr;
-    }
-  }
   // Sea level for heights above the ellipsoid; without the base pack the
   // ellipsoid stands in for it.
   QString ignored;
   std::shared_ptr<const GeoidModel> seaLevel =
-      datumGeoid ? datumGeoid
-                 : geoidLocked(QStringLiteral("egm2008"), &ignored);
+      geoidLocked(QStringLiteral("egm2008"), &ignored);
   std::shared_ptr<GdalElevationProvider> provider =
       std::make_shared<GdalElevationProvider>(path, datum, datumGeoid,
                                               seaLevel);
@@ -475,21 +504,25 @@ ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
     return nullptr;
   }
   const QString path = QDir(m_basePackDirectory).filePath(file->second);
-  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
-      it = m_elevation.find(path);
-  if (it != m_elevation.end()) {
-    std::shared_ptr<ElevationProvider> live = it->second.lock();
-    if (live) {
-      return live;
-    }
-  }
-  // The store names its vertical datum: a geoid dataset of the pack.
+  // The store names its vertical datum: a geoid dataset of the pack (or a
+  // finer one from an installed pack).
   const QString datum = SqliteTileImageryProvider(path).info().verticalDatum;
   std::shared_ptr<const GeoidModel> geoid;
   if (!datum.isEmpty()) {
     geoid = geoidLocked(datum, errorString);
     if (!geoid) {
       return nullptr;
+    }
+  }
+  // Shared while the same grid converts its heights.
+  const QString key =
+      path + QLatin1Char('|') + (geoid ? geoid->id() : QString());
+  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
+      it = m_elevation.find(key);
+  if (it != m_elevation.end()) {
+    std::shared_ptr<ElevationProvider> live = it->second.lock();
+    if (live) {
+      return live;
     }
   }
   std::shared_ptr<SqliteElevationProvider> provider =
@@ -503,8 +536,33 @@ ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
     }
     return nullptr;
   }
-  m_elevation[path] = provider;
+  m_elevation[key] = provider;
   return provider;
+}
+
+std::vector<VerticalDatum> ProviderRegistry::verticalDatums() const
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  std::vector<VerticalDatum> datums;
+  for (const QString& id :
+       {QStringLiteral("egm2008"), QStringLiteral("egm96")}) {
+    if (m_basePackGeoids.count(id) != 0 || m_packGeoids.count(id) != 0) {
+      datums.push_back(VerticalDatum{id, QString()});
+    }
+  }
+  for (const std::pair<const QString, PackGeoid>& geoid : m_packGeoids) {
+    if (geoid.first != QLatin1String("egm2008") &&
+        geoid.first != QLatin1String("egm96")) {
+      datums.push_back(VerticalDatum{geoid.first, geoid.second.name});
+    }
+  }
+  std::sort(datums.begin() + std::min<std::ptrdiff_t>(
+                                 static_cast<std::ptrdiff_t>(datums.size()), 2),
+            datums.end(), [](const VerticalDatum& a, const VerticalDatum& b) {
+              return a.id < b.id;
+            });
+  datums.push_back(VerticalDatum{QStringLiteral("ellipsoid"), QString()});
+  return datums;
 }
 
 QString ProviderRegistry::attribution(const QJsonObject& source) const

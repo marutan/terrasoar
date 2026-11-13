@@ -147,6 +147,8 @@ bool readElevation(const QJsonObject& json, PackConfig* config,
     spec.licence = text(entry, "licence");
     spec.attribution = text(entry, "attribution");
     spec.step = integer(entry, "step", 1);
+    spec.replaces = text(entry, "replaces");
+    spec.copy = entry.value(QStringLiteral("copy")).toBool(false);
     if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty() ||
         spec.step < 1) {
       return fail(errorString, QStringLiteral("Bad geoid entry %1").arg(i));
@@ -539,19 +541,29 @@ private:
       const SourceSpec& source = *findSource(*m_config, spec.source);
       const QString file = spec.dataset + QStringLiteral(".tif");
       m_progress(QStringLiteral("Writing the geoid grid %1").arg(file));
-      GeoidGridOptions options;
-      options.sourcePath = m_sources.filePath(source.file);
-      options.outputPath = m_output.filePath(file);
-      options.step = spec.step;
-      GeoidGridStats stats;
-      if (!buildGeoidGrid(options, &stats, m_error)) {
-        return false;
+      if (spec.copy) {
+        if (!QFile::copy(m_sources.filePath(source.file),
+                         m_output.filePath(file))) {
+          return fail(
+              m_error,
+              QStringLiteral("Cannot copy %1 into the pack").arg(source.file));
+        }
+      } else {
+        GeoidGridOptions options;
+        options.sourcePath = m_sources.filePath(source.file);
+        options.outputPath = m_output.filePath(file);
+        options.step = spec.step;
+        GeoidGridStats stats;
+        if (!buildGeoidGrid(options, &stats, m_error)) {
+          return false;
+        }
       }
       addDataset(spec.dataset, PackDataset::Kind::Geoid, file, source);
       PackDataset& dataset = m_manifest.datasets.back();
       dataset.name = spec.name;
       dataset.licence = spec.licence;
       dataset.attribution = spec.attribution;
+      dataset.replaces = spec.replaces;
     }
     return true;
   }

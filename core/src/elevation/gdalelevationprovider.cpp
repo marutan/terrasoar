@@ -135,6 +135,8 @@ QString demVerticalDatumId(DemVerticalDatum datum)
     return QStringLiteral("egm2008");
   case DemVerticalDatum::Egm96:
     return QStringLiteral("egm96");
+  case DemVerticalDatum::Odn:
+    return QStringLiteral("osgm15");
   case DemVerticalDatum::Unknown:
     break;
   }
@@ -163,6 +165,9 @@ DemVerticalDatum detectDemVerticalDatum(const QString& path)
         datum = DemVerticalDatum::Egm2008;
       } else if (text.contains(QLatin1String("EGM96"))) {
         datum = DemVerticalDatum::Egm96;
+      } else if (text.contains(QLatin1String("ODN HEIGHT")) ||
+                 text.contains(QLatin1String("NEWLYN"))) {
+        datum = DemVerticalDatum::Odn;
       } else if (OSRGetAxesCount(srs) == 3 && OSRIsGeographic(srs) != 0 &&
                  OSRIsCompound(srs) == 0) {
         // A 3D geographic CRS such as EPSG:4979: ellipsoidal heights.
@@ -532,7 +537,8 @@ std::optional<GeoRect> GdalElevationProvider::extentOf(const Reader& reader)
 QString GdalElevationProvider::id() const
 {
   // ts-notr: identifier
-  return QStringLiteral("gdalheights:%1|%2").arg(m_path, m_datumId);
+  return QStringLiteral("gdalheights:%1|%2|%3")
+      .arg(m_path, m_datumId, m_datumGeoid ? m_datumGeoid->id() : QString());
 }
 
 QString GdalElevationProvider::name() const

@@ -50,6 +50,13 @@ public:
   const QString& gridFile() const { return m_gridFile; }
 
   /**
+   * Identifies the grid: its path. Two models with the same id give the
+   * same undulations (a pack's finer grid has the same file name as the
+   * base pack's, in another directory).
+   */
+  const QString& id() const { return m_id; }
+
+  /**
    * Returns the undulation N at (@p latDeg, @p lonDeg), metres (positive
    * where the geoid is above the ellipsoid), or NaN if it can't be had.
    */
@@ -59,9 +66,13 @@ public:
   std::vector<double> undulationsM(const std::vector<GeoPoint>& points) const;
 
 private:
+  /** The undulation at the middle of the grid file @p path (NaN if none). */
+  double undulationAtCentre(const QString& path) const;
+
   struct Private;
   std::unique_ptr<Private> d;
   QString m_gridFile;
+  QString m_id;
 };
 
 /**
@@ -69,7 +80,9 @@ private:
  * heights above the ellipsoid: adds the undulation of @p datum, the geoid
  * they are measured from (null for heights already above the ellipsoid),
  * and sets HeightTile::seaLevelM from @p datum, or @p seaLevel where
- * @p datum is null (both null: no sea level). NaN heights stay NaN.
+ * @p datum is null (both null: no sea level). Where @p datum has no value
+ * (outside a regional grid), @p seaLevel's stands in. NaN heights stay
+ * NaN.
  */
 void applyVerticalDatum(HeightTile& tile, const std::vector<GeoPoint>& points,
                         const GeoidModel* datum, const GeoidModel* seaLevel);

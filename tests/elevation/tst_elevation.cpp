@@ -29,6 +29,7 @@
 #include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/elevation/webterrainprovider.h"
 #include "ts/network/networkclient.h"
+#include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
@@ -48,7 +49,7 @@ double fixtureUndulation(double latDeg, double lonDeg)
  * Writes a global 1° geoid grid of fixtureUndulation() in PROJ's GeoTIFF
  * form (points on whole degrees, as PROJ's own grids).
  */
-bool writeFixtureGeoid(const QString& path)
+bool writeFixtureGeoid(const QString& path, double offsetM = 0.0)
 {
   ts::initialiseGdal();
   const int width = 360;
@@ -78,7 +79,47 @@ bool writeFixtureGeoid(const QString& path)
     for (int column = 0; column < width; ++column) {
       values[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) +
              static_cast<std::size_t>(column)] =
-          static_cast<float>(fixtureUndulation(90.0 - row, -180.0 + column));
+          static_cast<float>(fixtureUndulation(90.0 - row, -180.0 + column) +
+                             offsetM);
+    }
+  }
+  const bool ok =
+      GDALRasterIO(GDALGetRasterBand(dataset, 1), GF_Write, 0, 0, width, height,
+                   values.data(), width, height, GDT_Float32, 0, 0) == CE_None;
+  GDALClose(dataset);
+  return ok;
+}
+
+/**
+ * Writes a regional 0.1° geoid grid over 45°–47° N, 7°–9° E (like
+ * OSGM15's over Great Britain): fixtureUndulation() − 20 m.
+ */
+bool writeRegionalGeoid(const QString& path)
+{
+  ts::initialiseGdal();
+  const int width = 21;
+  const int height = 21;
+  const QByteArray encoded = path.toUtf8();
+  GDALDatasetH dataset =
+      GDALCreate(GDALGetDriverByName("GTiff"), encoded.constData(), width,
+                 height, 1, GDT_Float32, nullptr);
+  if (dataset == nullptr) {
+    return false;
+  }
+  std::array<double, 6> transform{6.95, 0.1, 0.0, 47.05, 0.0, -0.1};
+  GDALSetGeoTransform(dataset, transform.data());
+  OGRSpatialReferenceH srs = OSRNewSpatialReference(nullptr);
+  OSRSetWellKnownGeogCS(srs, "WGS84");
+  GDALSetSpatialRef(dataset, srs);
+  OSRRelease(srs);
+  GDALSetMetadataItem(dataset, "AREA_OR_POINT", "Point", nullptr);
+  GDALSetMetadataItem(dataset, "TYPE", "VERTICAL_OFFSET_GEOGRAPHIC_TO_VERTICAL",
+                      nullptr);
+  std::vector<float> values;
+  for (int row = 0; row < height; ++row) {
+    for (int column = 0; column < width; ++column) {
+      values.push_back(static_cast<float>(
+          fixtureUndulation(47.0 - 0.1 * row, 7.0 + 0.1 * column) - 20.0));
     }
   }
   const bool ok =
@@ -759,11 +800,12 @@ private slots:
       const char* crs;
       ts::DemVerticalDatum expected;
     };
-    const std::array<Case, 4> cases = {
+    const std::array<Case, 5> cases = {
         {{"EPSG:4326", ts::DemVerticalDatum::Unknown},
          {"EPSG:4326+3855", ts::DemVerticalDatum::Egm2008},
          {"EPSG:4326+5773", ts::DemVerticalDatum::Egm96},
-         {"EPSG:4979", ts::DemVerticalDatum::Ellipsoid}}};
+         {"EPSG:4979", ts::DemVerticalDatum::Ellipsoid},
+         {"EPSG:4326+5701", ts::DemVerticalDatum::Odn}}};
     int index = 0;
     for (const Case& c : cases) {
       const QString path =
@@ -774,6 +816,8 @@ private slots:
     }
     QCOMPARE(ts::demVerticalDatumId(ts::DemVerticalDatum::Egm96),
              QStringLiteral("egm96"));
+    QCOMPARE(ts::demVerticalDatumId(ts::DemVerticalDatum::Odn),
+             QStringLiteral("osgm15"));
     QVERIFY(ts::demVerticalDatumId(ts::DemVerticalDatum::Unknown).isEmpty());
   }
 
@@ -1266,6 +1310,159 @@ private slots:
     QVERIFY(!ts::computeElevationProfile(
         provider, {ts::GeoPoint{45.5, 7.5}, ts::GeoPoint{46.5, 8.5}}, 11,
         cancelled));
+  }
+
+  void geoidPacks()
+  {
+    // A base pack with EGM2008 and a DEM on it; packs with a finer EGM2008
+    // (here: the fixture plus 10 m) and a datum of their own.
+    const QTemporaryDir dir;
+    const QString base = dir.filePath(QStringLiteral("base"));
+    const QString fine = dir.filePath(QStringLiteral("fine"));
+    const QString odn = dir.filePath(QStringLiteral("odn"));
+    for (const QString& path : {base, fine, odn}) {
+      QVERIFY(QDir().mkpath(path));
+    }
+    QVERIFY(
+        writeFixtureGeoid(QDir(base).filePath(QStringLiteral("egm2008.tif"))));
+    QVERIFY(
+        writeFixtureHeights(QDir(base).filePath(QStringLiteral("dem.sqlite")),
+                            QStringLiteral("egm2008")));
+    QVERIFY(writeFixtureGeoid(
+        QDir(fine).filePath(QStringLiteral("egm2008.tif")), 10.0));
+    QVERIFY(writeFixtureGeoid(QDir(odn).filePath(QStringLiteral("osgm15.tif")),
+                              -20.0));
+    ts::PackManifest manifest;
+    manifest.id = QStringLiteral("terrasoar-base");
+    ts::PackDataset dataset;
+    dataset.id = QStringLiteral("elevation");
+    dataset.kind = ts::PackDataset::Kind::Elevation;
+    dataset.file = QStringLiteral("dem.sqlite");
+    manifest.datasets.push_back(dataset);
+    dataset.id = QStringLiteral("egm2008");
+    dataset.kind = ts::PackDataset::Kind::Geoid;
+    dataset.file = QStringLiteral("egm2008.tif");
+    manifest.datasets.push_back(dataset);
+    ts::ProviderRegistry registry;
+    registry.setBasePack(base, manifest);
+
+    const QJsonObject terrain{
+        {QStringLiteral("kind"), QStringLiteral("basepack")},
+        {QStringLiteral("dataset"), QStringLiteral("elevation")}};
+    QString error;
+    std::shared_ptr<ts::ElevationProvider> before =
+        registry.elevation(terrain, &error);
+    QVERIFY2(before, qPrintable(error));
+    std::vector<ts::VerticalDatum> datums = registry.verticalDatums();
+    QCOMPARE(datums.size(), std::size_t{2});
+    QCOMPARE(datums.front().id, QStringLiteral("egm2008"));
+    QCOMPARE(datums.back().id, QStringLiteral("ellipsoid"));
+
+    ts::InstalledPack finer;
+    finer.directory = fine;
+    finer.manifest.id = QStringLiteral("geoid-egm2008-fine");
+    dataset.replaces = QStringLiteral("egm2008");
+    finer.manifest.datasets = {dataset};
+    ts::InstalledPack newlyn;
+    newlyn.directory = odn;
+    newlyn.manifest.id = QStringLiteral("geoid-osgm15");
+    dataset.id = QStringLiteral("osgm15");
+    dataset.file = QStringLiteral("osgm15.tif");
+    dataset.replaces.clear();
+    dataset.name = QStringLiteral("OSGM15 (Ordnance Datum Newlyn)");
+    newlyn.manifest.datasets = {dataset};
+    registry.setInstalledPacks({finer, newlyn});
+
+    // The finer grid is used, by a new provider (the old one keeps its
+    // grid while still in use).
+    std::shared_ptr<const ts::GeoidModel> geoid =
+        registry.geoid(QStringLiteral("egm2008"), &error);
+    QVERIFY2(geoid, qPrintable(error));
+    QVERIFY(std::abs(geoid->undulationM(30.0, 60.0) -
+                     fixtureUndulation(30.0, 60.0) - 10.0) < 1e-3);
+    std::shared_ptr<ts::ElevationProvider> after =
+        registry.elevation(terrain, &error);
+    QVERIFY2(after, qPrintable(error));
+    QVERIFY(after != before && after->id() != before->id());
+    const ts::TileKey key{2, 5, 1};
+    const std::optional<ts::HeightTile> old =
+        before->loadHeights(key, notCancelled);
+    const std::optional<ts::HeightTile> now =
+        after->loadHeights(key, notCancelled);
+    if (!old) {
+      QFAIL("no heights before");
+    }
+    if (!now) {
+      QFAIL("no heights after");
+    }
+    const ts::HeightTile& oldHeights = *old;
+    const ts::HeightTile& newHeights = *now;
+    QVERIFY(std::abs(static_cast<double>(newHeights.heightsM[40] -
+                                         oldHeights.heightsM[40]) -
+                     10.0) < 1e-3);
+
+    // The pack's own datum is offered and usable.
+    datums = registry.verticalDatums();
+    QCOMPARE(datums.size(), std::size_t{3});
+    QCOMPARE(datums[1].id, QStringLiteral("osgm15"));
+    QCOMPARE(datums[1].name, QStringLiteral("OSGM15 (Ordnance Datum Newlyn)"));
+    const QString demPath = dir.filePath(QStringLiteral("dem.tif"));
+    QVERIFY(writeGeographicDem(demPath));
+    const QJsonObject file{
+        {QStringLiteral("kind"), QStringLiteral("file")},
+        {QStringLiteral("path"), demPath},
+        {QStringLiteral("verticalDatum"), QStringLiteral("osgm15")}};
+    std::shared_ptr<ts::ElevationProvider> local =
+        registry.elevation(file, &error);
+    QVERIFY2(local, qPrintable(error));
+    const ts::TileKey alps =
+        ts::TileKey::containing(9, ts::Geodetic{46.0, 8.0, 0.0});
+    const std::optional<ts::HeightTile> heights =
+        local->loadHeights(alps, notCancelled);
+    if (!heights) {
+      QFAIL("no heights");
+    }
+    const ts::GeoPoint point = ts::heightSamplePoint(alps, 65, 32, 32);
+    QVERIFY(std::abs(heightAt(*heights, 32, 32) -
+                     demHeight(point.latDeg, point.lonDeg) -
+                     (fixtureUndulation(point.latDeg, point.lonDeg) - 20.0)) <
+            0.01);
+
+    // Uninstalled: the base pack's grid again, and no OSGM15.
+    registry.setInstalledPacks({});
+    geoid = registry.geoid(QStringLiteral("egm2008"), &error);
+    QVERIFY(geoid && std::abs(geoid->undulationM(30.0, 60.0) -
+                              fixtureUndulation(30.0, 60.0)) < 1e-3);
+    QCOMPARE(registry.verticalDatums().size(), std::size_t{2});
+    QVERIFY(!registry.elevation(file, &error));
+  }
+
+  void regionalDatum()
+  {
+    // A regional geoid (as OSGM15) converts heights where it has values;
+    // outside it the global one stands in rather than nothing.
+    const QTemporaryDir dir;
+    QVERIFY(writeFixtureGeoid(dir.filePath(QStringLiteral("global.tif"))));
+    QVERIFY(writeRegionalGeoid(dir.filePath(QStringLiteral("regional.tif"))));
+    const ts::GeoidModel global(dir.path(), QStringLiteral("global.tif"));
+    const ts::GeoidModel regional(dir.path(), QStringLiteral("regional.tif"));
+    QVERIFY2(regional.isValid(), qPrintable(regional.errorString()));
+    QVERIFY(std::abs(regional.undulationM(46.0, 8.0) -
+                     (fixtureUndulation(46.0, 8.0) - 20.0)) < 1e-3);
+    QVERIFY(!std::isfinite(regional.undulationM(30.0, 60.0)));
+    ts::HeightTile tile;
+    tile.samples = 2;
+    tile.heightsM = {100.0F, 100.0F, 100.0F, 100.0F};
+    const std::vector<ts::GeoPoint> points = {
+        ts::GeoPoint{46.0, 8.0}, ts::GeoPoint{46.5, 7.5},
+        ts::GeoPoint{30.0, 60.0}, ts::GeoPoint{50.0, 9.5}};
+    ts::applyVerticalDatum(tile, points, &regional, &global);
+    QVERIFY(std::abs(static_cast<double>(tile.heightsM[0]) - 100.0 -
+                     (fixtureUndulation(46.0, 8.0) - 20.0)) < 1e-3);
+    QVERIFY(std::abs(static_cast<double>(tile.heightsM[2]) - 100.0 -
+                     fixtureUndulation(30.0, 60.0)) < 1e-3);
+    QVERIFY(std::abs(static_cast<double>(tile.seaLevelM[3]) -
+                     fixtureUndulation(50.0, 9.5)) < 1e-3);
   }
 };
 

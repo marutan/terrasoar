@@ -13,6 +13,7 @@
 #include <QDialog>
 
 #include "ts/layers/layerdefinition.h"
+#include "ts/providers/providerregistry.h"
 
 class QComboBox;
 class QDialogButtonBox;
@@ -48,8 +49,13 @@ public:
     CloudGeoTiff,
   };
 
-  /** Creates the dialog. */
-  explicit AddWebTerrainDialog(QWidget* parent);
+  /**
+   * Creates the dialog, offering @p datums (ProviderRegistry::
+   * verticalDatums(); empty for the built-in EGM2008, EGM96 and
+   * ellipsoid).
+   */
+  explicit AddWebTerrainDialog(QWidget* parent,
+                               std::vector<VerticalDatum> datums = {});
   ~AddWebTerrainDialog() override;
 
   /** Returns the layer to add, once Add was pressed. */
@@ -74,6 +80,12 @@ public:
    * the dialog (what Add does before closing).
    */
   std::optional<LayerDefinition> buildDefinition();
+
+  /**
+   * Returns what to call @p datum in a list of what heights are measured
+   * from (translated; a pack's datum by the pack's name for it).
+   */
+  static QString datumLabel(const VerticalDatum& datum);
 
   /** Returns true if GDAL can read files over HTTP (/vsicurl/). */
   static bool canReadRemoteFiles();
@@ -103,6 +115,8 @@ private:
   std::vector<QLabel*> m_labels;
   QDialogButtonBox* m_buttons = nullptr;
   std::optional<LayerDefinition> m_definition;
+  /** The datums offered, in the datum box's order. */
+  std::vector<VerticalDatum> m_datums;
 };
 
 } // namespace ts

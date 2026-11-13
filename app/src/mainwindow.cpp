@@ -549,20 +549,28 @@ void MainWindow::addElevationFile()
     return;
   }
   const DemVerticalDatum detected = detectDemVerticalDatum(path);
-  const QStringList ids = {QStringLiteral("egm2008"), QStringLiteral("egm96"),
-                           QStringLiteral("ellipsoid")};
-  const QStringList choices = {
-      tr("Sea level, EGM2008 (most recent DEMs, e.g. Copernicus)"),
-      tr("Sea level, EGM96 (e.g. SRTM)"),
-      tr("WGS 84 ellipsoid (GNSS heights)")};
+  // The datums there are now: the base pack's, installed geoid packs'.
+  QStringList ids;
+  QStringList choices;
+  for (const VerticalDatum& datum : m_registry->verticalDatums()) {
+    ids << datum.id;
+    choices << AddWebTerrainDialog::datumLabel(datum);
+  }
   int current = static_cast<int>(ids.indexOf(demVerticalDatumId(detected)));
-  const QString label =
-      detected == DemVerticalDatum::Unknown
-          ? tr("The file doesn't say what its heights are measured from. "
+  const QString file = QFileInfo(path).fileName();
+  QString label;
+  if (detected == DemVerticalDatum::Unknown) {
+    label = tr("The file doesn't say what its heights are measured from. "
                "Heights of \"%1\" are above:")
-                .arg(QFileInfo(path).fileName())
-          : tr("Heights of \"%1\" are above (as the file says):")
-                .arg(QFileInfo(path).fileName());
+                .arg(file);
+  } else if (current < 0 && detected == DemVerticalDatum::Odn) {
+    label = tr("Heights of \"%1\" are above Ordnance Datum Newlyn. Install "
+               "the OSGM15 geoid pack (File → Data Packs) to convert them "
+               "exactly; until then EGM2008 is within about a metre:")
+                .arg(file);
+  } else {
+    label = tr("Heights of \"%1\" are above (as the file says):").arg(file);
+  }
   bool ok = false;
   const QString chosen =
       QInputDialog::getItem(this, tr("Add Elevation File"), label, choices,
@@ -593,7 +601,7 @@ void MainWindow::addElevationLayer(const QString& path, const QString& datum)
 
 void MainWindow::addWebTerrain()
 {
-  AddWebTerrainDialog dialog(this);
+  AddWebTerrainDialog dialog(this, m_registry->verticalDatums());
   if (dialog.exec() != QDialog::Accepted) {
     return;
   }

@@ -53,6 +53,15 @@ versions ignore the field.
 | --- | --- | --- | --- |
 | `bluemarble-full` | `bluemarble` | The same Blue Marble image as the base pack (21600 × 10800 px), tiled to level 6 instead of 4: about 1.2 km per pixel instead of 4.9 km | 67 MB |
 | `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the high and full resolutions: crude to intermediate as in the base pack, high (0.2 km) from level 6, full (10.9 million vertices) from level 8 | 241 MB |
+| `geoid-egm2008-fine` | `egm2008` | EGM2008 at its published 2.5′ grid (PROJ's `us_nga_egm08_25.tif`) instead of the base pack's 5′, as 16-bit centimetres: within 1 cm of PROJ's grid instead of 0.4 m | 13.4 MB |
+| `geoid-osgm15` | (a datum of its own, `osgm15`) | Ordnance Survey's OSGM15 for Ordnance Datum Newlyn (PROJ's `uk_os_OSGM15_GB.tif`, shipped as it is, BSD-2-Clause) | 1.5 MB |
+
+A geoid pack replacing a base pack geoid makes every elevation source on
+that datum use the finer grid (the registry keys providers by the grid in
+use, so the terrain is reloaded when the pack is installed or removed).
+One that brings a datum of its own adds it to the datums elevation files
+and web terrain can be measured from (`ProviderRegistry::verticalDatums()`,
+see [vertical-datums.md](vertical-datums.md)).
 
 Their packager configurations are `tools/packager/packs/*.json`; `make packs`
 builds them with their release files and index entries

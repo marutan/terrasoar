@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ts/elevation/geoidmodel.h"
 
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <mutex>
@@ -9,8 +11,10 @@
 #include <QDir>
 #include <QStringList>
 
+#include <gdal.h>
 #include <proj.h>
 
+#include "ts/deps/dependencies.h"
 #include "ts/deps/projcontext.h"
 
 namespace ts
@@ -37,7 +41,8 @@ struct GeoidModel::Private {
 };
 
 GeoidModel::GeoidModel(const QString& directory, const QString& gridFile)
-    : d(std::make_unique<Private>()), m_gridFile(gridFile)
+    : d(std::make_unique<Private>()), m_gridFile(gridFile),
+      m_id(QDir::cleanPath(QDir(directory).filePath(gridFile)))
 {
   if (!d->context.isValid()) {
     d->error = QStringLiteral("Cannot create a PROJ context");
@@ -79,8 +84,10 @@ GeoidModel::GeoidModel(const QString& directory, const QString& gridFile)
                    .arg(gridFile, d->context.lastErrorString());
     return;
   }
-  // PROJ opens the grid on first use: try it.
-  if (!std::isfinite(undulationM(0.0, 0.0))) {
+  // PROJ opens the grid on first use: try it, at 0° N 0° E for a global
+  // grid, else at the middle of a regional one (such as OSGM15).
+  if (!std::isfinite(undulationM(0.0, 0.0)) &&
+      !std::isfinite(undulationAtCentre(QDir(directory).filePath(gridFile)))) {
     d->error = QStringLiteral("Cannot read the geoid grid %1 in %2")
                    .arg(gridFile, directory);
     proj_destroy(d->transform);
@@ -89,6 +96,27 @@ GeoidModel::GeoidModel(const QString& directory, const QString& gridFile)
 }
 
 GeoidModel::~GeoidModel() = default;
+
+double GeoidModel::undulationAtCentre(const QString& path) const
+{
+  initialiseGdal();
+  const QByteArray encoded = path.toUtf8();
+  GDALDatasetH grid =
+      GDALOpenEx(encoded.constData(), GDAL_OF_READONLY | GDAL_OF_RASTER,
+                 nullptr, nullptr, nullptr);
+  if (grid == nullptr) {
+    return std::numeric_limits<double>::quiet_NaN();
+  }
+  std::array<double, 6> transform{};
+  const bool placed = GDALGetGeoTransform(grid, transform.data()) == CE_None;
+  const double lon =
+      transform[0] + transform[1] * GDALGetRasterXSize(grid) / 2.0;
+  const double lat =
+      transform[3] + transform[5] * GDALGetRasterYSize(grid) / 2.0;
+  GDALClose(grid);
+  return placed ? undulationM(lat, lon)
+                : std::numeric_limits<double>::quiet_NaN();
+}
 
 bool GeoidModel::isValid() const
 {
@@ -142,7 +170,20 @@ void applyVerticalDatum(HeightTile& tile, const std::vector<GeoPoint>& points,
   if (geoid == nullptr) {
     return;
   }
-  const std::vector<double> undulations = geoid->undulationsM(points);
+  std::vector<double> undulations = geoid->undulationsM(points);
+  // A regional datum (OSGM15) has nothing outside its area: there the
+  // global geoid stands in, which is near it (better than nothing, a
+  // cliff of tens of metres at the grid's edge).
+  if (seaLevel != nullptr && seaLevel != geoid &&
+      std::any_of(undulations.begin(), undulations.end(),
+                  [](double n) { return !std::isfinite(n); })) {
+    const std::vector<double> global = seaLevel->undulationsM(points);
+    for (std::size_t i = 0; i < undulations.size(); ++i) {
+      if (!std::isfinite(undulations[i])) {
+        undulations[i] = global[i];
+      }
+    }
+  }
   tile.seaLevelM.assign(points.size(), 0.0F);
   for (std::size_t i = 0; i < points.size() && i < tile.heightsM.size(); ++i) {
     const double n = std::isfinite(undulations[i]) ? undulations[i] : 0.0;
