@@ -26,10 +26,12 @@ class SqliteStatementPool;
  * A tile store has two tables:
  *
  * - `metadata(name TEXT PRIMARY KEY, value TEXT)` with the rows
- *   `scheme` (= "ts-epsg4326"), `format` ("jpeg" or "png"), `tile_size`,
- *   `min_level`, `max_level` and `name`;
+ *   `scheme` (= "ts-epsg4326"), `format` ("jpeg" or "png"; "heights" for
+ *   height grids, see ts::encodeHeightGrid(), with `tile_size` the samples
+ *   per side), `tile_size`, `min_level`, `max_level`, `name` and, for
+ *   heights, optionally `vertical_datum`;
  * - `tiles(level, x, y, data)` keyed by ts::TileKey (rows from the north),
- *   `data` the encoded image.
+ *   `data` the encoded image or height grid.
  *
  * See docs/data/base-pack.md.
  *
@@ -46,6 +48,12 @@ struct SqliteTileStoreInfo {
   int maxLevel = 0;
   /** Name of the imagery (English). */
   QString name;
+  /**
+   * For height grids (format "heights"): the vertical datum of the
+   * heights, the id of a geoid dataset of the same pack (e.g. "egm2008"),
+   * or empty for heights above the ellipsoid.
+   */
+  QString verticalDatum;
 };
 
 /**

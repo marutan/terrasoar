@@ -24,6 +24,10 @@ const char* kindName(PackDataset::Kind kind)
     return "features";
   case PackDataset::Kind::Areas:
     return "areas";
+  case PackDataset::Kind::Elevation:
+    return "elevation";
+  case PackDataset::Kind::Geoid:
+    return "geoid";
   case PackDataset::Kind::Imagery:
     break;
   }
@@ -134,6 +138,10 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
       dataset.kind = PackDataset::Kind::Features;
     } else if (kind == QLatin1String("areas")) {
       dataset.kind = PackDataset::Kind::Areas;
+    } else if (kind == QLatin1String("elevation")) {
+      dataset.kind = PackDataset::Kind::Elevation;
+    } else if (kind == QLatin1String("geoid")) {
+      dataset.kind = PackDataset::Kind::Geoid;
     } else {
       fail(errorString,
            QStringLiteral("Unknown dataset kind \"%1\" in the pack manifest")

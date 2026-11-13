@@ -24,6 +24,9 @@ HEADERS += \
     include/ts/deps/geoscontext.h \
     include/ts/deps/projcontext.h \
     include/ts/deps/sqliteconnection.h \
+    include/ts/elevation/geoidmodel.h \
+    include/ts/elevation/heightgrid.h \
+    include/ts/elevation/sqliteelevationprovider.h \
     include/ts/geo/ellipsoid.h \
     include/ts/geo/geodesic.h \
     include/ts/geo/geodetic.h \
@@ -94,6 +97,9 @@ SOURCES += \
     src/deps/geoscontext.cpp \
     src/deps/projcontext.cpp \
     src/deps/sqliteconnection.cpp \
+    src/elevation/geoidmodel.cpp \
+    src/elevation/heightgrid.cpp \
+    src/elevation/sqliteelevationprovider.cpp \
     src/geo/ellipsoid.cpp \
     src/geo/geodesic.cpp \
     src/geo/geodetic.cpp \

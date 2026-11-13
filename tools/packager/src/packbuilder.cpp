@@ -104,6 +104,84 @@ PackSource packSource(const SourceSpec& source)
   return result;
 }
 
+/** One entry of "sources", or nothing if it is unusable. */
+std::optional<SourceSpec> readSource(const QJsonObject& entry)
+{
+  SourceSpec source;
+  source.id = text(entry, "id");
+  source.file = text(entry, "file");
+  source.url = text(entry, "url");
+  source.sha256 = text(entry, "sha256").toLower();
+  source.name = text(entry, "name");
+  source.version = text(entry, "version");
+  const QJsonArray notices = entry.value(QStringLiteral("notices")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int j = 0; j < notices.size(); ++j) {
+    source.notices.push_back(notices.at(j).toString());
+  }
+  const QJsonArray local =
+      entry.value(QStringLiteral("localNotices")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int j = 0; j < local.size(); ++j) {
+    source.localNotices.push_back(local.at(j).toString());
+  }
+  if (source.id.isEmpty() || source.file.isEmpty() ||
+      source.file.contains(QLatin1Char('/')) || source.sha256.size() != 64) {
+    return std::nullopt;
+  }
+  return source;
+}
+
+/** Reads the optional "geoids" and "elevation" entries into @p config. */
+bool readElevation(const QJsonObject& json, PackConfig* config,
+                   QString* errorString)
+{
+  const QJsonArray geoids = json.value(QStringLiteral("geoids")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int i = 0; i < geoids.size(); ++i) {
+    const QJsonObject entry = geoids.at(i).toObject();
+    GeoidSpec spec;
+    spec.dataset = text(entry, "dataset");
+    spec.source = text(entry, "source");
+    spec.name = text(entry, "name");
+    spec.licence = text(entry, "licence");
+    spec.attribution = text(entry, "attribution");
+    spec.step = integer(entry, "step", 1);
+    if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty() ||
+        spec.step < 1) {
+      return fail(errorString, QStringLiteral("Bad geoid entry %1").arg(i));
+    }
+    config->geoids.push_back(spec);
+  }
+  const QJsonObject elevation =
+      json.value(QStringLiteral("elevation")).toObject();
+  if (elevation.isEmpty()) {
+    return true;
+  }
+  ElevationSpec spec;
+  spec.dataset = text(elevation, "dataset");
+  spec.source = text(elevation, "source");
+  spec.name = text(elevation, "name");
+  spec.licence = text(elevation, "licence");
+  spec.attribution = text(elevation, "attribution");
+  spec.maxLevel = integer(elevation, "maxLevel", 6);
+  spec.samples = integer(elevation, "samples", 65);
+  spec.verticalDatum = text(elevation, "verticalDatum");
+  const bool datumKnown =
+      spec.verticalDatum.isEmpty() ||
+      std::any_of(config->geoids.begin(), config->geoids.end(),
+                  [&spec](const GeoidSpec& geoid) {
+                    return geoid.dataset == spec.verticalDatum;
+                  });
+  if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty() ||
+      spec.maxLevel < 0 || spec.maxLevel > 10 || spec.samples < 3 ||
+      !datumKnown) {
+    return fail(errorString, QStringLiteral("Bad elevation entry"));
+  }
+  config->elevation = spec;
+  return true;
+}
+
 /** Reads the optional "countries" entry into @p config. */
 bool readCountries(const QJsonObject& json, PackConfig* config,
                    QString* errorString)
@@ -153,31 +231,12 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
   // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
   // NOLINTNEXTLINE(modernize-loop-convert)
   for (int i = 0; i < sources.size(); ++i) {
-    const QJsonObject entry = sources.at(i).toObject();
-    SourceSpec source;
-    source.id = text(entry, "id");
-    source.file = text(entry, "file");
-    source.url = text(entry, "url");
-    source.sha256 = text(entry, "sha256").toLower();
-    source.name = text(entry, "name");
-    source.version = text(entry, "version");
-    const QJsonArray notices = entry.value(QStringLiteral("notices")).toArray();
-    // NOLINTNEXTLINE(modernize-loop-convert)
-    for (int j = 0; j < notices.size(); ++j) {
-      source.notices.push_back(notices.at(j).toString());
-    }
-    const QJsonArray local =
-        entry.value(QStringLiteral("localNotices")).toArray();
-    // NOLINTNEXTLINE(modernize-loop-convert)
-    for (int j = 0; j < local.size(); ++j) {
-      source.localNotices.push_back(local.at(j).toString());
-    }
-    if (source.id.isEmpty() || source.file.isEmpty() ||
-        source.file.contains(QLatin1Char('/')) || source.sha256.size() != 64) {
+    std::optional<SourceSpec> source = readSource(sources.at(i).toObject());
+    if (!source) {
       fail(errorString, QStringLiteral("Bad source entry %1").arg(i));
       return std::nullopt;
     }
-    config.sources.push_back(source);
+    config.sources.push_back(std::move(*source));
   }
 
   const QJsonObject imagery = json.value(QStringLiteral("imagery")).toObject();
@@ -238,7 +297,8 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     }
     config.shoreline = spec;
   }
-  if (!readCountries(json, &config, errorString)) {
+  if (!readCountries(json, &config, errorString) ||
+      !readElevation(json, &config, errorString)) {
     return std::nullopt;
   }
   if (config.id.isEmpty() || config.sizeLimitBytes <= 0) {
@@ -300,6 +360,13 @@ QJsonObject BuildReport::toJson() const
   countriesJson.insert(QStringLiteral("vertices"),
                        static_cast<double>(countries.vertices));
   json.insert(QStringLiteral("countries"), countriesJson);
+  QJsonObject elevationJson;
+  elevationJson.insert(QStringLiteral("tiles"), elevation.tiles);
+  elevationJson.insert(QStringLiteral("minHeightM"), elevation.minHeightM);
+  elevationJson.insert(QStringLiteral("maxHeightM"), elevation.maxHeightM);
+  elevationJson.insert(QStringLiteral("maxQuantizationErrorM"),
+                       elevation.maxQuantizationErrorM);
+  json.insert(QStringLiteral("elevation"), elevationJson);
   return json;
 }
 
@@ -324,8 +391,9 @@ public:
   bool run()
   {
     return checkSources() && prepareOutput() && buildImagery() &&
-           buildShoreline() && buildCountries() && copyNotices() &&
-           writeManifest() && checkBudget();
+           buildShoreline() && buildCountries() && buildGeoids() &&
+           buildElevation() && copyNotices() && writeManifest() &&
+           checkBudget();
   }
 
 private:
@@ -462,6 +530,56 @@ private:
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
     dataset.replaces = spec.replaces;
+    return true;
+  }
+
+  bool buildGeoids()
+  {
+    for (const GeoidSpec& spec : m_config->geoids) {
+      const SourceSpec& source = *findSource(*m_config, spec.source);
+      const QString file = spec.dataset + QStringLiteral(".tif");
+      m_progress(QStringLiteral("Writing the geoid grid %1").arg(file));
+      GeoidGridOptions options;
+      options.sourcePath = m_sources.filePath(source.file);
+      options.outputPath = m_output.filePath(file);
+      options.step = spec.step;
+      GeoidGridStats stats;
+      if (!buildGeoidGrid(options, &stats, m_error)) {
+        return false;
+      }
+      addDataset(spec.dataset, PackDataset::Kind::Geoid, file, source);
+      PackDataset& dataset = m_manifest.datasets.back();
+      dataset.name = spec.name;
+      dataset.licence = spec.licence;
+      dataset.attribution = spec.attribution;
+    }
+    return true;
+  }
+
+  bool buildElevation()
+  {
+    if (!m_config->elevation) {
+      return true;
+    }
+    const ElevationSpec& spec = *m_config->elevation;
+    const SourceSpec& source = *findSource(*m_config, spec.source);
+    const QString file = spec.dataset + QStringLiteral(".sqlite");
+    ElevationOptions options;
+    options.sourcePath = m_sources.filePath(source.file);
+    options.outputPath = m_output.filePath(file);
+    options.maxLevel = spec.maxLevel;
+    options.samples = spec.samples;
+    options.verticalDatum = spec.verticalDatum;
+    options.name = spec.name;
+    options.progress = m_progress;
+    if (!ts::packager::buildElevation(options, &m_report->elevation, m_error)) {
+      return false;
+    }
+    addDataset(spec.dataset, PackDataset::Kind::Elevation, file, source);
+    PackDataset& dataset = m_manifest.datasets.back();
+    dataset.name = spec.name;
+    dataset.licence = spec.licence;
+    dataset.attribution = spec.attribution;
     return true;
   }
 

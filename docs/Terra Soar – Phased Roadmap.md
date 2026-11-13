@@ -393,7 +393,7 @@ Goal: users pre-download chosen areas for offline use and install extra data pac
 
 Goal: terrain can be switched on from local or online elevation sources, and the globe falls back to the plain ellipsoid when it is off.
 
-**Base pack room (decided 2026-11-12)**: the DEM and geoid grids below need about 33 MB, more than the 20 MB Phase 3 reserved. The base pack's high-resolution shoreline moved to the downloadable `shoreline-full` pack (Phase 6) and the reserve became 35 MB: the pack is 27.7 MB before Phase 7. See `docs/data/base-pack.md`.
+**Base pack room (decided 2026-11-12)**: the DEM and geoid grids below need about 33 MB, more than the 20 MB Phase 3 reserved. The base pack's high-resolution shoreline moved to the downloadable `shoreline-full` pack (Phase 6) and the reserve became 35 MB: the pack is 27.7 MB before Phase 7. See `docs/data/base-pack.md`. Phase 7b (data) delivered the DEM from ETOPO 2022 (60″ resampled to 2.64′, 4.9 km; 29.3 MB, more than planned because the grid keeps real detail), EGM2008 at 5′ (5.4 MB, reduced from PROJ's 2.5′ grid) and EGM96 at 15′ (0.9 MB): the pack is 63.0 MB of 75. Rendering follows in 7c, further sources and tools in 7d.
 
 **Deliverables**
 
