@@ -1180,9 +1180,13 @@ private slots:
     QVERIFY(QTest::qWaitFor(
         [&]() { return !globeOf(window)->isLoadingTiles(); }, 20000));
     QVERIFY2(waitUntilQuiet(globeOf(window)), "the view kept drawing");
+    // As in idleViewStopsDrawing: a late repaint or two from the window
+    // system is not drawing continuously.
     const int frames = globeOf(window)->framesRendered();
-    QTest::qWait(500);
-    QCOMPARE(globeOf(window)->framesRendered(), frames);
+    QTest::qWait(1000);
+    QVERIFY2(globeOf(window)->framesRendered() <= frames + 2,
+             qPrintable(QStringLiteral("%1 frames drawn while idle")
+                            .arg(globeOf(window)->framesRendered() - frames)));
     // Removing the layer forgets its status.
     model->removeNode(offline);
   }

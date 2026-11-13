@@ -1521,7 +1521,8 @@ private slots:
         renderer.groundHeight(46.0, 8.0);
     const QString state =
         QStringLiteral("busy %1, retries %2, ground %3 m at level %4")
-            .arg(renderer.isBusy())
+            .arg(renderer.isBusy() ? QStringLiteral("yes")
+                                   : QStringLiteral("no"))
             .arg(flaky->retries())
             .arg(ground ? ground->ellipsoidalM : -1.0)
             .arg(ground ? ground->level : -1);
