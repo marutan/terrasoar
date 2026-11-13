@@ -1494,14 +1494,25 @@ private slots:
       pass.viewportPx = QRect(0, 0, imageWidthPx, imageHeightPx);
       renderer.render(camera, pass, 1.0);
     };
-    const double expected = SineElevation::heightM(46.0, 8.0);
+    // Settled with the full heights: the finest heights at the target are
+    // the source's own tile there (not the flat incomplete stand-in).
+    const std::function<bool()> complete = [&]() {
+      const std::optional<ts::GroundHeight> ground =
+          renderer.groundHeight(46.0, 8.0);
+      if (!ground) {
+        return false;
+      }
+      const std::optional<ts::HeightTile> own = SineElevation().loadHeights(
+          ts::TileKey::containing(ground->level, ts::Geodetic{46.0, 8.0, 0.0}),
+          std::atomic<bool>{false});
+      const std::optional<double> expected =
+          own ? ts::sampleHeightM(*own, 46.0, 8.0) : std::nullopt;
+      return expected && std::abs(ground->ellipsoidalM - *expected) < 0.5;
+    };
     const bool settled = QTest::qWaitFor(
         [&]() {
           frame();
-          const std::optional<double> height =
-              renderer.terrainHeightM(46.0, 8.0);
-          return !renderer.isBusy() && height &&
-                 std::abs(*height - expected) < 50.0;
+          return !renderer.isBusy() && complete();
         },
         60000);
     m_gl->makeCurrent();
