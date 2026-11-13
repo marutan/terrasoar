@@ -315,7 +315,7 @@ jobs:
             /DVERSION=${{ steps.version.outputs.version }} ^
             /DSTAGE=%CD%\stage /DUNINSTALL_LIST=%CD%\uninstall.nsh ^
             /DOUTFILE=%CD%\dist\TerraSoar-${{ steps.version.outputs.version }}-setup.exe ^
-            packaging\windows\terrasoar.nsi
+            %CD%\packaging\windows\terrasoar.nsi
 
       - name: Sign the installer
         if: env.WINDOWS_SIGNING_CERTIFICATE != ''
