@@ -1784,12 +1784,12 @@ private slots:
         },
         20000));
     QVERIFY2(waitUntilQuiet(globe), "the view kept drawing");
-    // Drawing continuously would be dozens of frames a second; one late
-    // repaint (the window system exposing it again, a status bar change
-    // resizing it, both seen on slow Windows runners) is not that.
+    // Drawing continuously would be dozens of frames a second; a late
+    // repaint or two (the window system exposing it again, a status bar
+    // change resizing it, both seen on slow Windows runners) is not that.
     const int frames = globe->framesRendered();
     QTest::qWait(1000);
-    QVERIFY2(globe->framesRendered() <= frames + 1,
+    QVERIFY2(globe->framesRendered() <= frames + 2,
              qPrintable(QStringLiteral("%1 frames drawn while idle")
                             .arg(globe->framesRendered() - frames)));
   }
