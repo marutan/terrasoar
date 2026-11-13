@@ -290,6 +290,8 @@ struct TileRenderer::GpuMesh {
   std::uint64_t lastUsedFrame = 0;
   /** Level of the heights it was built with; −1 for none. */
   int heightsLevel = -1;
+  /** The heights it was built with (kept, to tell a replacement). */
+  std::shared_ptr<const HeightTile> heights;
 };
 
 struct TileRenderer::GpuImage {
@@ -549,13 +551,16 @@ void TileRenderer::setElevationProvider(
   m_elevation = std::move(provider);
   m_heights.clear();
   m_noHeights.clear();
+  m_heightsRetry.clear();
   m_deepestHeights = 0;
   m_meshes.clear();
   m_meshBytes = 0;
   m_drawTiles.clear();
   if (m_elevation) {
+    // Network sources want more requests in flight.
     m_heightLoader = std::make_unique<HeightTileLoader>(
-        m_elevation, m_settings.heightThreads);
+        m_elevation, std::max(m_settings.heightThreads,
+                              m_elevation->preferredLoaderThreads()));
     m_heightLoader->setTilesReadyCallback(m_callback);
   }
   applySelectionSettings();
@@ -649,6 +654,13 @@ void TileRenderer::takeHeights()
         (loaded.heights->heightsM.size() + loaded.heights->seaLevelM.size()) *
             sizeof(float) +
         sizeof(HeightTile);
+    if (loaded.heights->incomplete) {
+      // Shown as it is; asked for again later (see requestHeights()).
+      m_heightsRetry[loaded.key] =
+          std::chrono::steady_clock::now() + m_settings.heightsRetryDelay;
+    } else {
+      m_heightsRetry.erase(loaded.key);
+    }
     m_deepestHeights = std::max(m_deepestHeights, loaded.key.level);
     m_heights.insert(
         loaded.key,
@@ -663,8 +675,21 @@ void TileRenderer::requestHeights(const TileSelection& selection)
   }
   // Drawn tiles first, then the ones about to be: the selection's order.
   std::vector<TileKey> wanted;
-  const std::function<void(TileKey)> want = [this, &wanted](TileKey key) {
-    if (m_noHeights.count(key) == 0 && !heightsFor(key, true)) {
+  const std::chrono::steady_clock::time_point now =
+      std::chrono::steady_clock::now();
+  const std::function<void(TileKey)> want = [&](TileKey key) {
+    if (m_noHeights.count(key) != 0) {
+      return;
+    }
+    if (!heightsFor(key, true)) {
+      wanted.push_back(key);
+      return;
+    }
+    // Incomplete heights, due to be asked for again.
+    const std::unordered_map<TileKey, std::chrono::steady_clock::time_point,
+                             TileKeyHash>::const_iterator retry =
+        m_heightsRetry.find(key);
+    if (retry != m_heightsRetry.end() && retry->second <= now) {
       wanted.push_back(key);
     }
   };
@@ -790,6 +815,7 @@ void TileRenderer::uploadMesh(TileKey key)
         buildTileMesh(key, m_settings.loader.meshSegments, heights.get());
     std::unique_ptr<GpuMesh> gpu = std::make_unique<GpuMesh>();
     gpu->heightsLevel = heights ? heights->key.level : -1;
+    gpu->heights = heights;
     gpu->bytes = mesh.vertices.size() * sizeof(TileVertex);
     gpu->vertices =
         m_device.createBuffer(BufferType::Vertex, BufferUsage::Static,
@@ -1026,8 +1052,9 @@ void TileRenderer::prepare(const Camera& camera)
   std::vector<TileKey> rebuild;
   if (m_elevation) {
     for (const DrawTile& tile : m_drawTiles) {
-      if (tile.mesh->heightsLevel < tile.key.level &&
-          heightsFor(tile.key, true) &&
+      const std::shared_ptr<const HeightTile> own = heightsFor(tile.key, true);
+      // Its own heights have arrived, or replaced incomplete ones.
+      if (own && own != tile.mesh->heights &&
           std::find(rebuild.begin(), rebuild.end(), tile.key) ==
               rebuild.end()) {
         rebuild.push_back(tile.key);

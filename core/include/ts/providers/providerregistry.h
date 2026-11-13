@@ -74,7 +74,12 @@ public:
    *   the base pack;
    * - `{"kind": "file", "path": "<raster>", "verticalDatum": "<datum>"}`:
    *   a DEM file GDAL reads (GdalElevationProvider), its heights above
-   *   `"egm2008"`, `"egm96"` (the base pack's geoids) or `"ellipsoid"`.
+   *   `"egm2008"`, `"egm96"` (the base pack's geoids) or `"ellipsoid"`;
+   *   a path of `/vsicurl/<url>` reads a Cloud Optimized GeoTIFF over
+   *   HTTP;
+   * - `{"kind": "web", "url": …, "encoding": …}`: web terrain tiles
+   *   (WebTerrainSource), through the WMS network and disk cache settings
+   *   (setWmsNetwork()).
    */
   std::shared_ptr<ElevationProvider> elevation(const QJsonObject& source,
                                                QString* errorString);
@@ -158,6 +163,15 @@ private:
   basePackElevationLocked(const QJsonObject& source, QString* errorString);
   std::shared_ptr<ElevationProvider>
   fileElevationLocked(const QJsonObject& source, QString* errorString);
+  std::shared_ptr<ElevationProvider>
+  webElevationLocked(const QJsonObject& source, QString* errorString);
+  /**
+   * Sets @p geoid to the model of @p datum (null for "ellipsoid"); false
+   * and @p errorString for an unknown datum or a missing grid.
+   */
+  bool datumGeoidLocked(const QString& datum,
+                        std::shared_ptr<const GeoidModel>* geoid,
+                        const QJsonObject& source, QString* errorString);
 
   mutable std::mutex m_mutex;
   std::unordered_map<QString, std::weak_ptr<ImageryProvider>> m_imagery;

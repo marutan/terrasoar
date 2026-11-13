@@ -32,6 +32,7 @@
 #include <QUuid>
 #include <QWidget>
 
+#include "addwebterraindialog.h"
 #include "addwmsdialog.h"
 #include "globeview.h"
 #include "layertreedock.h"
@@ -162,6 +163,8 @@ MainWindow::MainWindow(QWidget* parent)
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
           [this]() { addElevationFile(); });
+  connect(m_layerDock, &LayerTreeDock::addWebTerrainRequested, this,
+          [this]() { addWebTerrain(); });
   connect(m_layers, &LayerTreeModel::layerStackChanged, this,
           &MainWindow::refreshLayers);
   if (m_globeView) {
@@ -448,6 +451,11 @@ void MainWindow::createActions()
   connect(m_addWmsAction, &QAction::triggered, this,
           [this]() { addWmsLayer(); });
 
+  m_addWebTerrainAction = new QAction(this);
+  m_addWebTerrainAction->setObjectName(QStringLiteral("addWebTerrainAction"));
+  connect(m_addWebTerrainAction, &QAction::triggered, this,
+          [this]() { addWebTerrain(); });
+
   m_addElevationAction = new QAction(this);
   m_addElevationAction->setObjectName(QStringLiteral("addElevationAction"));
   connect(m_addElevationAction, &QAction::triggered, this,
@@ -557,15 +565,31 @@ void MainWindow::addElevationLayer(const QString& path, const QString& datum)
   source.insert(QStringLiteral("path"), QDir::cleanPath(path));
   source.insert(QStringLiteral("verticalDatum"), datum);
   definition.source = source;
+  addElevationDefinition(definition);
+}
+
+void MainWindow::addWebTerrain()
+{
+  AddWebTerrainDialog dialog(this);
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& chosen = dialog.layerDefinition();
+  if (chosen.has_value()) {
+    addElevationDefinition(chosen.value());
+  }
+}
+
+void MainWindow::addElevationDefinition(const LayerDefinition& layer)
+{
+  LayerDefinition definition = layer;
   // The terrain keeps its exaggeration.
   const QModelIndex topmost = topmostElevationLayer();
   const double exaggeration =
       topmost.isValid()
           ? terrainExaggeration(m_layers->layerDefinition(topmost))
           : 1.0;
-  QJsonObject style;
-  style.insert(QStringLiteral("exaggeration"), exaggeration);
-  definition.style = style;
+  definition.style.insert(QStringLiteral("exaggeration"), exaggeration);
   // Above the other elevation layers, so it takes priority over them.
   const QModelIndex added = m_layers->addLayer(
       definition, topmost.isValid() ? topmost.parent() : QModelIndex(),
@@ -616,6 +640,7 @@ void MainWindow::createMenus()
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addElevationAction);
+  m_fileMenu->addAction(m_addWebTerrainAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
   m_fileMenu->addAction(m_dataPacksAction);
   m_fileMenu->addSeparator();
@@ -680,6 +705,10 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_addWebTerrainAction->setText(tr("Add Web &Terrain…"));
+  m_addWebTerrainAction->setStatusTip(
+      tr("Add elevation from a web terrain tile service or a Cloud "
+         "Optimized GeoTIFF on a server"));
   m_addElevationAction->setText(tr("Add &Elevation File…"));
   m_addElevationAction->setStatusTip(
       tr("Add a digital elevation model (GeoTIFF or another raster) as "

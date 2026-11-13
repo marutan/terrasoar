@@ -19,6 +19,7 @@
 #include <QPointer>
 #include <QString>
 
+#include "ts/layers/layerdefinition.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/tileprovider.h"
 
@@ -107,6 +108,18 @@ public:
   // The file, then its datum.
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   void addElevationLayer(const QString& path, const QString& datum);
+
+  /**
+   * Opens the Add Web Terrain dialog and adds what the user chooses.
+   */
+  void addWebTerrain();
+
+  /**
+   * Adds the elevation layer @p layer, visible, above the other
+   * elevation layers (so it takes priority over them), with the terrain's
+   * current exaggeration.
+   */
+  void addElevationDefinition(const LayerDefinition& layer);
 
   /**
    * Shows the Offline Regions window (not modal) and returns it.
@@ -208,6 +221,7 @@ private:
   QAction* m_scaleBarAction = nullptr;
   QAction* m_ellipsoidalHeightsAction = nullptr;
   QAction* m_addElevationAction = nullptr;
+  QAction* m_addWebTerrainAction = nullptr;
   QMenu* m_projectionMenu = nullptr;
   QActionGroup* m_projectionGroup = nullptr;
   QMenu* m_exaggerationMenu = nullptr;

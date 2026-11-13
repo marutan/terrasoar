@@ -71,6 +71,105 @@
         </message>
     </context>
     <context>
+        <name>ts::AddWebTerrainDialog</name>
+        <message>
+            <source>The address has {z}, {x} and {y} where the zoom, column and row go, e.g. https://example.org/terrain/{z}/{x}/{y}.png. Tiles are kept on this computer like WMS tiles.</source>
+            <translation>The address has {z}, {x} and {y} where the zoom, column and row go, e.g. https://example.org/terrain/{z}/{x}/{y}.png. Tiles are kept on this computer like WMS tiles.</translation>
+        </message>
+        <message>
+            <source>The address of one GeoTIFF with overviews, read in parts as needed (Cloud Optimized GeoTIFF).</source>
+            <translation>The address of one GeoTIFF with overviews, read in parts as needed (Cloud Optimized GeoTIFF).</translation>
+        </message>
+        <message>
+            <source>This build of Terra Soar can't read files over the network; download the file and use Add Elevation File instead.</source>
+            <translation>This build of Terra Soar can't read files over the network; download the file and use Add Elevation File instead.</translation>
+        </message>
+        <message>
+            <source>Enter an http or https address of a GeoTIFF.</source>
+            <translation>Enter an http or https address of a GeoTIFF.</translation>
+        </message>
+        <message>
+            <source>This build of Terra Soar can't read files over the network.</source>
+            <translation>This build of Terra Soar can't read files over the network.</translation>
+        </message>
+        <message>
+            <source>Add Web Terrain</source>
+            <translation>Add Web Terrain</translation>
+        </message>
+        <message>
+            <source>Custom</source>
+            <translation>Custom</translation>
+        </message>
+        <message>
+            <source>Terrain tiles, Terrarium encoding</source>
+            <translation>Terrain tiles, Terrarium encoding</translation>
+        </message>
+        <message>
+            <source>Terrain tiles, Terrain-RGB encoding</source>
+            <translation>Terrain tiles, Terrain-RGB encoding</translation>
+        </message>
+        <message>
+            <source>Cloud Optimized GeoTIFF</source>
+            <translation>Cloud Optimized GeoTIFF</translation>
+        </message>
+        <message>
+            <source>Sea level, EGM2008</source>
+            <translation>Sea level, EGM2008</translation>
+        </message>
+        <message>
+            <source>Sea level, EGM96</source>
+            <translation>Sea level, EGM96</translation>
+        </message>
+        <message>
+            <source>WGS 84 ellipsoid</source>
+            <translation>WGS 84 ellipsoid</translation>
+        </message>
+        <message>
+            <source>&amp;Source:</source>
+            <translation>&amp;Source:</translation>
+        </message>
+        <message>
+            <source>&amp;Kind:</source>
+            <translation>&amp;Kind:</translation>
+        </message>
+        <message>
+            <source>&amp;Address:</source>
+            <translation>&amp;Address:</translation>
+        </message>
+        <message>
+            <source>Deepest &amp;zoom:</source>
+            <translation>Deepest &amp;zoom:</translation>
+        </message>
+        <message>
+            <source>&amp;Tile size:</source>
+            <translation>&amp;Tile size:</translation>
+        </message>
+        <message>
+            <source>&amp;Heights above:</source>
+            <translation>&amp;Heights above:</translation>
+        </message>
+        <message>
+            <source>&amp;Name:</source>
+            <translation>&amp;Name:</translation>
+        </message>
+        <message>
+            <source>Attri&amp;bution:</source>
+            <translation>Attri&amp;bution:</translation>
+        </message>
+        <message>
+            <source>The server's name</source>
+            <translation>The server's name</translation>
+        </message>
+        <message>
+            <source>What the provider asks to be credited with</source>
+            <translation>What the provider asks to be credited with</translation>
+        </message>
+        <message>
+            <source>Add</source>
+            <translation>Add</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::AddWmsDialog</name>
         <message>
             <source>Add WMS Layer</source>
@@ -189,6 +288,17 @@
         <message>
             <source>Terrain</source>
             <translation>Terrain</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::CachedTileFetcher</name>
+        <message>
+            <source>Can't reach %1 (%2). Saved tiles are shown where there are some.</source>
+            <translation>Can't reach %1 (%2). Saved tiles are shown where there are some.</translation>
+        </message>
+        <message>
+            <source>The server sent a tile that is far too large.</source>
+            <translation>The server sent a tile that is far too large.</translation>
         </message>
     </context>
     <context>
@@ -439,6 +549,10 @@
         <message>
             <source>Elevation File…</source>
             <translation>Elevation File…</translation>
+        </message>
+        <message>
+            <source>Web Terrain…</source>
+            <translation>Web Terrain…</translation>
         </message>
     </context>
     <context>
@@ -709,6 +823,14 @@
         <message>
             <source>%1  %2 m</source>
             <translation>%1  %2 m</translation>
+        </message>
+        <message>
+            <source>Add Web &amp;Terrain…</source>
+            <translation>Add Web &amp;Terrain…</translation>
+        </message>
+        <message>
+            <source>Add elevation from a web terrain tile service or a Cloud Optimized GeoTIFF on a server</source>
+            <translation>Add elevation from a web terrain tile service or a Cloud Optimized GeoTIFF on a server</translation>
         </message>
     </context>
     <context>
@@ -1265,6 +1387,29 @@
         </message>
     </context>
     <context>
+        <name>ts::WebTerrainProvider</name>
+        <message>
+            <source>The terrain server answered %1.</source>
+            <translation>The terrain server answered %1.</translation>
+        </message>
+        <message>
+            <source>The terrain server sent something that isn't a terrain tile (%1).</source>
+            <translation>The terrain server sent something that isn't a terrain tile (%1).</translation>
+        </message>
+        <message>
+            <source>A terrain tile address must be an http or https address with {z}, {x} and {y} in it.</source>
+            <translation>A terrain tile address must be an http or https address with {z}, {x} and {y} in it.</translation>
+        </message>
+        <message>
+            <source>Unknown terrain encoding "%1".</source>
+            <translation>Unknown terrain encoding "%1".</translation>
+        </message>
+        <message>
+            <source>The terrain tiles' zoom must be 0–22 and their size 256 or 512.</source>
+            <translation>The terrain tiles' zoom must be 0–22 and their size 256 or 512.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::WmsCapabilities</name>
         <message>
             <source>The capabilities document is empty.</source>
@@ -1308,10 +1453,6 @@
     </context>
     <context>
         <name>ts::WmsImageryProvider</name>
-        <message>
-            <source>Can't reach %1 (%2). Saved tiles are shown where there are some.</source>
-            <translation>Can't reach %1 (%2). Saved tiles are shown where there are some.</translation>
-        </message>
         <message>
             <source>The server sent a tile that is far too large.</source>
             <translation>The server sent a tile that is far too large.</translation>

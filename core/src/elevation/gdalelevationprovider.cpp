@@ -623,28 +623,9 @@ GdalElevationProvider::read(const Reader& reader, TileKey key,
   if (!found) {
     return std::nullopt;
   }
-  addGeoid(tile, pixels.points);
+  applyVerticalDatum(tile, pixels.points, m_datumGeoid.get(),
+                     m_seaLevelGeoid.get());
   return tile;
-}
-
-void GdalElevationProvider::addGeoid(HeightTile& tile,
-                                     const std::vector<GeoPoint>& points) const
-{
-  // Heights above the ellipsoid; sea level from the geoid.
-  const std::shared_ptr<const GeoidModel>& seaLevel =
-      m_datumGeoid ? m_datumGeoid : m_seaLevelGeoid;
-  if (!seaLevel) {
-    return;
-  }
-  const std::vector<double> undulations = seaLevel->undulationsM(points);
-  tile.seaLevelM.assign(points.size(), 0.0F);
-  for (std::size_t i = 0; i < points.size(); ++i) {
-    const double n = std::isfinite(undulations[i]) ? undulations[i] : 0.0;
-    tile.seaLevelM[i] = static_cast<float>(n);
-    if (m_datumGeoid) {
-      tile.heightsM[i] += static_cast<float>(n);
-    }
-  }
 }
 
 } // namespace ts

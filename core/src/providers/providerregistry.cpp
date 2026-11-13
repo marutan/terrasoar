@@ -11,6 +11,7 @@
 #include "ts/elevation/gdalelevationprovider.h"
 #include "ts/elevation/geoidmodel.h"
 #include "ts/elevation/sqliteelevationprovider.h"
+#include "ts/elevation/webterrainprovider.h"
 #include "ts/network/networkclient.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
@@ -313,11 +314,68 @@ std::shared_ptr<ElevationProvider>
 ProviderRegistry::elevation(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  if (source.value(QStringLiteral("kind")).toString() ==
-      QLatin1String("file")) {
+  const QString kind = source.value(QStringLiteral("kind")).toString();
+  if (kind == QLatin1String("file")) {
     return fileElevationLocked(source, errorString);
   }
+  if (kind == QLatin1String("web")) {
+    return webElevationLocked(source, errorString);
+  }
   return basePackElevationLocked(source, errorString);
+}
+
+std::shared_ptr<ElevationProvider>
+ProviderRegistry::webElevationLocked(const QJsonObject& source,
+                                     QString* errorString)
+{
+  const std::optional<WebTerrainSource> web =
+      WebTerrainSource::fromJson(source, errorString);
+  if (!web) {
+    return nullptr;
+  }
+  const QString key = web->id();
+  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
+      it = m_elevation.find(key);
+  if (it != m_elevation.end()) {
+    std::shared_ptr<ElevationProvider> live = it->second.lock();
+    if (live) {
+      return live;
+    }
+  }
+  std::shared_ptr<const GeoidModel> datumGeoid;
+  if (!datumGeoidLocked(web->verticalDatum, &datumGeoid, source, errorString)) {
+    return nullptr;
+  }
+  QString ignored;
+  std::shared_ptr<const GeoidModel> seaLevel =
+      datumGeoid ? datumGeoid
+                 : geoidLocked(QStringLiteral("egm2008"), &ignored);
+  std::shared_ptr<ElevationProvider> provider =
+      std::make_shared<WebTerrainProvider>(
+          *web, networkLocked(), *m_wmsSettings, datumGeoid, seaLevel);
+  m_elevation[key] = provider;
+  return provider;
+}
+
+bool ProviderRegistry::datumGeoidLocked(
+    const QString& datum, std::shared_ptr<const GeoidModel>* geoid,
+    const QJsonObject& source, QString* errorString)
+{
+  if (datum == QLatin1String("ellipsoid")) {
+    geoid->reset();
+    return true;
+  }
+  if (datum != QLatin1String("egm2008") && datum != QLatin1String("egm96")) {
+    if (errorString) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Unknown or invalid elevation source: %1")
+              .arg(canonical(source));
+    }
+    return false;
+  }
+  *geoid = geoidLocked(datum, errorString);
+  return *geoid != nullptr;
 }
 
 std::shared_ptr<ElevationProvider>
@@ -451,7 +509,9 @@ ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
 
 QString ProviderRegistry::attribution(const QJsonObject& source) const
 {
-  if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wms")) {
+  const QString kind = source.value(QStringLiteral("kind")).toString();
+  if (kind == QLatin1String("wms") || kind == QLatin1String("web") ||
+      kind == QLatin1String("file")) {
     return source.value(QStringLiteral("attribution")).toString();
   }
   const std::lock_guard<std::mutex> lock(m_mutex);

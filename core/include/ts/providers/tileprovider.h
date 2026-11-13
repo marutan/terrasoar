@@ -205,6 +205,12 @@ struct HeightTile {
    * sea level is taken as the ellipsoid).
    */
   std::vector<float> seaLevelM;
+  /**
+   * True if part of it couldn't be had for now (a web source that failed
+   * to answer): the samples are what there is, and the renderer asks for
+   * the tile again later.
+   */
+  bool incomplete = false;
 };
 
 /**

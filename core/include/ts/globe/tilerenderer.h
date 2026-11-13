@@ -6,6 +6,7 @@
 #ifndef TS_GLOBE_TILERENDERER_H
 #define TS_GLOBE_TILERENDERER_H
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -44,6 +45,11 @@ struct TileRendererSettings {
   std::size_t heightCacheBytes = std::size_t{64} * 1024 * 1024;
   /** Threads loading height tiles. */
   int heightThreads = 2;
+  /**
+   * After a web elevation source failed to deliver (part of) a tile, it is
+   * asked for again when still wanted this long after.
+   */
+  std::chrono::milliseconds heightsRetryDelay{30000};
   /** Budget of tile textures and meshes on the GPU (common use: 96 MB). */
   std::size_t gpuBytes = std::size_t{96} * 1024 * 1024;
   /** Most imagery tiles uploaded to the GPU per frame, all sources. */
@@ -336,6 +342,10 @@ private:
   std::shared_ptr<ElevationProvider> m_elevation;
   std::unique_ptr<HeightTileLoader> m_heightLoader;
   LruCache<TileKey, std::shared_ptr<const HeightTile>, TileKeyHash> m_heights;
+  /** Incomplete heights → when to ask for them again. */
+  std::unordered_map<TileKey, std::chrono::steady_clock::time_point,
+                     TileKeyHash>
+      m_heightsRetry;
   /** Keys the source has no heights for. */
   std::unordered_set<TileKey, TileKeyHash> m_noHeights;
   bool m_terrainVisible = false;

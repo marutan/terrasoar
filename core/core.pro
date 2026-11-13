@@ -30,6 +30,7 @@ HEADERS += \
     include/ts/elevation/heightgrid.h \
     include/ts/elevation/heighttileloader.h \
     include/ts/elevation/sqliteelevationprovider.h \
+    include/ts/elevation/webterrainprovider.h \
     include/ts/geo/ellipsoid.h \
     include/ts/geo/geodesic.h \
     include/ts/geo/geodetic.h \
@@ -107,6 +108,7 @@ SOURCES += \
     src/elevation/heightgrid.cpp \
     src/elevation/heighttileloader.cpp \
     src/elevation/sqliteelevationprovider.cpp \
+    src/elevation/webterrainprovider.cpp \
     src/geo/ellipsoid.cpp \
     src/geo/geodesic.cpp \
     src/geo/geodetic.cpp \

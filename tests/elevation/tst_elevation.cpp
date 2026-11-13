@@ -6,8 +6,11 @@
 #include <memory>
 #include <vector>
 
+#include <QBuffer>
 #include <QDir>
+#include <QImage>
 #include <QJsonObject>
+#include <QNetworkProxy>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -16,12 +19,15 @@
 #include <ogr_srs_api.h>
 
 #include "concurrency.h"
+#include "mockhttpserver.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/compositeelevationprovider.h"
 #include "ts/elevation/gdalelevationprovider.h"
 #include "ts/elevation/geoidmodel.h"
 #include "ts/elevation/heightgrid.h"
 #include "ts/elevation/sqliteelevationprovider.h"
+#include "ts/elevation/webterrainprovider.h"
+#include "ts/network/networkclient.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
@@ -194,6 +200,83 @@ double heightAt(const ts::HeightTile& tile, int row, int column)
       tile.heightsM[static_cast<std::size_t>(row) *
                         static_cast<std::size_t>(tile.samples) +
                     static_cast<std::size_t>(column)]);
+}
+
+/** The web fixture's heights: linear in the zoom's global pixels. */
+double webHeight(double globalX, double globalY)
+{
+  return 0.01 * globalX + 0.02 * globalY;
+}
+
+/** Terrarium PNG of web tile (@p zoom, @p x, @p y) of webHeight(). */
+QByteArray terrariumTile(int x, int y)
+{
+  QImage image(256, 256, QImage::Format_ARGB32);
+  for (int row = 0; row < 256; ++row) {
+    for (int column = 0; column < 256; ++column) {
+      const double height =
+          webHeight(x * 256 + column + 0.5, y * 256 + row + 0.5) + 32768.0;
+      const int whole = static_cast<int>(std::floor(height));
+      const int fraction =
+          static_cast<int>(std::lround((height - whole) * 256.0));
+      image.setPixel(column, row,
+                     qRgb(whole / 256, whole % 256, std::min(fraction, 255)));
+    }
+  }
+  QByteArray png;
+  QBuffer buffer(&png);
+  buffer.open(QIODevice::WriteOnly);
+  image.save(&buffer, "PNG");
+  return png;
+}
+
+/** Network settings for the mock server: no proxy, quick retries. */
+ts::NetworkSettings testNetwork()
+{
+  ts::NetworkSettings settings;
+  settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+  settings.retryDelay = std::chrono::milliseconds(20);
+  settings.attempts = 2;
+  settings.timeout = std::chrono::milliseconds(5000);
+  return settings;
+}
+
+/**
+ * Answers /z/x/y.png with terrariumTile(); 404 for x = 3 at zoom 2, 500
+ * while @p failing is set.
+ */
+ts::test::MockHttpServer::Handler
+terrariumHandler(const std::shared_ptr<std::atomic<bool>>& failing)
+{
+  return [failing](const ts::test::MockHttpRequest& request) {
+    const QStringList parts =
+        request.url.path().split(QLatin1Char('/'), Qt::SkipEmptyParts);
+    if (failing->load()) {
+      return ts::test::mockResponse(500, "broken");
+    }
+    if (parts.size() != 3) {
+      return ts::test::mockResponse(404, "no");
+    }
+    const int zoom = parts[0].toInt();
+    const int x = parts[1].toInt();
+    const int y = QString(parts[2]).remove(QStringLiteral(".png")).toInt();
+    if (zoom == 2 && x == 3) {
+      return ts::test::mockResponse(404, "none here");
+    }
+    return ts::test::mockResponse(200, terrariumTile(x, y), "image/png");
+  };
+}
+
+/** The global pixel coordinates of (@p latDeg, @p lonDeg) at @p zoom. */
+// Latitude then longitude, as everywhere.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::pair<double, double> webPixel(double latDeg, double lonDeg, int zoom)
+{
+  const double world = 256.0 * (1 << zoom);
+  const double lat = latDeg * 3.14159265358979323846 / 180.0;
+  return {(lonDeg + 180.0) / 360.0 * world,
+          (1.0 - std::asinh(std::tan(lat)) / 3.14159265358979323846) / 2.0 *
+              world};
 }
 
 } // namespace
@@ -864,6 +947,243 @@ private slots:
         registry.elevationComposite({ellipsoidal, provider});
     QCOMPARE(registry.elevationComposite({ellipsoidal, provider}), composite);
     QVERIFY(registry.elevationComposite({provider, ellipsoidal}) != composite);
+  }
+
+  void terrainEncodings()
+  {
+    QCOMPARE(
+        ts::decodeTerrainPixel(qRgb(128, 0, 0), ts::TerrainEncoding::Terrarium),
+        0.0);
+    QCOMPARE(ts::decodeTerrainPixel(qRgb(130, 10, 128),
+                                    ts::TerrainEncoding::Terrarium),
+             522.5);
+    QVERIFY(std::abs(ts::decodeTerrainPixel(
+                qRgb(1, 134, 160), ts::TerrainEncoding::TerrainRgb)) < 1e-9);
+    QVERIFY(std::abs(ts::decodeTerrainPixel(qRgb(1, 140, 124),
+                                            ts::TerrainEncoding::TerrainRgb) -
+                     150.0) < 1e-6);
+    QVERIFY(std::isnan(ts::decodeTerrainPixel(qRgba(1, 2, 3, 0),
+                                              ts::TerrainEncoding::Terrarium)));
+
+    // The layer source form.
+    QString error;
+    const QJsonObject json{
+        {QStringLiteral("kind"), QStringLiteral("web")},
+        {QStringLiteral("url"),
+         QStringLiteral("https://tiles.example/{z}/{x}/{y}.png")},
+        {QStringLiteral("encoding"), QStringLiteral("terrain-rgb")},
+        {QStringLiteral("maximumZoom"), 12},
+        {QStringLiteral("tileSize"), 512},
+        {QStringLiteral("verticalDatum"), QStringLiteral("egm2008")},
+        {QStringLiteral("attribution"), QStringLiteral("Example")}};
+    const std::optional<ts::WebTerrainSource> source =
+        ts::WebTerrainSource::fromJson(json, &error);
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
+    const ts::WebTerrainSource& parsed = *source;
+    QCOMPARE(parsed.encoding, ts::TerrainEncoding::TerrainRgb);
+    QCOMPARE(parsed.maximumZoom, 12);
+    QCOMPARE(parsed.tileSizePx, 512);
+    QCOMPARE(parsed.toJson(), json);
+    QCOMPARE(parsed.tileUrl(5, 17, 11).toString(),
+             QStringLiteral("https://tiles.example/5/17/11.png"));
+    for (const std::pair<const char*, QJsonValue>& bad :
+         {std::pair<const char*, QJsonValue>{
+              "url", QStringLiteral("ftp://x/{z}/{x}/{y}")},
+          {"url", QStringLiteral("https://x/{z}/{x}.png")},
+          {"encoding", QStringLiteral("lerc")},
+          {"tileSize", 300},
+          {"maximumZoom", 30}}) {
+      QJsonObject broken = json;
+      broken.insert(QString::fromLatin1(bad.first), bad.second);
+      error.clear();
+      QVERIFY(!ts::WebTerrainSource::fromJson(broken, &error));
+      QVERIFY(!error.isEmpty());
+    }
+  }
+
+  void webTerrain()
+  {
+    std::shared_ptr<std::atomic<bool>> failing =
+        std::make_shared<std::atomic<bool>>(false);
+    ts::test::MockHttpServer server(terrariumHandler(failing));
+    ts::WebTerrainSource source;
+    source.urlTemplate =
+        server.url().toString() + QStringLiteral("{z}/{x}/{y}.png");
+    source.maximumZoom = 4;
+    source.verticalDatum = QStringLiteral("ellipsoid");
+    ts::WebTileSettings settings;
+    settings.failuresBeforeOffline = 100;
+    ts::WebTerrainProvider provider(
+        source, std::make_shared<ts::NetworkClient>(testNetwork()), settings,
+        nullptr, nullptr);
+    QCOMPARE(provider.zoomForLevel(3), 2);
+    QCOMPARE(provider.zoomForLevel(0), 0);
+    QCOMPARE(provider.zoomForLevel(9), 4);
+    QCOMPARE(provider.maximumLevel(), 5);
+    QCOMPARE(provider.name(), QStringLiteral("127.0.0.1"));
+
+    // Level 3 reads zoom 2: the plane exactly, edges shared.
+    const ts::TileKey key =
+        ts::TileKey::containing(3, ts::Geodetic{30.0, -50.0, 0.0});
+    const std::optional<ts::HeightTile> tile =
+        provider.loadHeights(key, notCancelled);
+    if (!tile) {
+      QFAIL("no heights");
+    }
+    const ts::HeightTile& heights = *tile;
+    QVERIFY(!heights.incomplete);
+    for (int row = 0; row < 65; row += 8) {
+      for (int column = 0; column < 65; column += 8) {
+        const ts::GeoPoint point = ts::heightSamplePoint(key, 65, row, column);
+        const std::pair<double, double> pixel =
+            webPixel(point.latDeg, point.lonDeg, 2);
+        // Within the tiles' first and last half pixel the nearest pixel
+        // stands in; elsewhere it is the plane.
+        QVERIFY2(std::abs(heightAt(heights, row, column) -
+                          webHeight(pixel.first, pixel.second)) < 0.02,
+                 qPrintable(QString::number(heightAt(heights, row, column))));
+      }
+    }
+    const ts::TileKey east{key.level, key.x + 1, key.y};
+    const std::optional<ts::HeightTile> next =
+        provider.loadHeights(east, notCancelled);
+    if (!next) {
+      QFAIL("no heights east");
+    }
+    const ts::HeightTile& eastHeights = *next;
+    for (int row = 0; row < 65; ++row) {
+      QCOMPARE(heightAt(heights, row, 64), heightAt(eastHeights, row, 0));
+    }
+    // Web tiles shared by neighbours are fetched once.
+    const int requests = provider.statistics().requests;
+    QVERIFY(provider.loadHeights(key, notCancelled).has_value());
+    QCOMPARE(provider.statistics().requests, requests);
+
+    // Beyond the Mercator limit: no data.
+    const ts::TileKey polar{3, 3, 0};
+    const std::optional<ts::HeightTile> top =
+        provider.loadHeights(polar, notCancelled);
+    if (!top) {
+      QFAIL("no heights near the pole");
+    }
+    QVERIFY(std::isnan(heightAt(*top, 0, 32)));
+    QVERIFY(!std::isnan(heightAt(*top, 64, 32)));
+
+    // Where the server has no tiles (404): nothing, and not a failure.
+    const ts::TileKey missing =
+        ts::TileKey::containing(3, ts::Geodetic{10.0, 150.0, 0.0});
+    QVERIFY(!provider.loadHeights(missing, notCancelled));
+    QCOMPARE(provider.status().state, ts::ProviderStatus::State::Ok);
+
+    // A failing server: an incomplete tile of no data, asked for again.
+    failing->store(true);
+    const ts::TileKey elsewhere =
+        ts::TileKey::containing(3, ts::Geodetic{-30.0, 20.0, 0.0});
+    const std::optional<ts::HeightTile> failed =
+        provider.loadHeights(elsewhere, notCancelled);
+    if (!failed) {
+      QFAIL("no incomplete tile");
+    }
+    QVERIFY(failed->incomplete);
+    QVERIFY(std::isnan(heightAt(*failed, 32, 32)));
+    QCOMPARE(provider.status().state, ts::ProviderStatus::State::Error);
+    failing->store(false);
+    const std::optional<ts::HeightTile> again =
+        provider.loadHeights(elsewhere, notCancelled);
+    if (!again) {
+      QFAIL("no heights after the server recovered");
+    }
+    QVERIFY(!again->incomplete);
+    QVERIFY(!std::isnan(heightAt(*again, 32, 32)));
+    QCOMPARE(provider.status().state, ts::ProviderStatus::State::Ok);
+
+    // Composed over other heights, a failure leaves them and is passed on.
+    failing->store(true);
+    std::shared_ptr<ts::ElevationProvider> web =
+        std::make_shared<ts::WebTerrainProvider>(
+            source, std::make_shared<ts::NetworkClient>(testNetwork()),
+            settings, nullptr, nullptr);
+    const QTemporaryDir dir;
+    QVERIFY(writeGeographicDem(dir.filePath(QStringLiteral("dem.tif"))));
+    std::shared_ptr<ts::ElevationProvider> local =
+        std::make_shared<ts::GdalElevationProvider>(
+            dir.filePath(QStringLiteral("dem.tif")),
+            QStringLiteral("ellipsoid"), nullptr, nullptr);
+    ts::CompositeElevationProvider composite({web, local});
+    const ts::TileKey alps =
+        ts::TileKey::containing(9, ts::Geodetic{46.0, 8.0, 0.0});
+    const std::optional<ts::HeightTile> combined =
+        composite.loadHeights(alps, notCancelled);
+    if (!combined) {
+      QFAIL("no combined heights");
+    }
+    QVERIFY(combined->incomplete);
+    const ts::GeoPoint middle = ts::heightSamplePoint(alps, 65, 32, 32);
+    QVERIFY(std::abs(heightAt(*combined, 32, 32) -
+                     demHeight(middle.latDeg, middle.lonDeg)) < 0.01);
+  }
+
+  void webTerrainDatumAndRegistry()
+  {
+    std::shared_ptr<std::atomic<bool>> failing =
+        std::make_shared<std::atomic<bool>>(false);
+    ts::test::MockHttpServer server(terrariumHandler(failing));
+    const QTemporaryDir dir;
+    QVERIFY(writeFixtureGeoid(dir.filePath(QStringLiteral("egm96.tif"))));
+    ts::PackManifest manifest;
+    manifest.id = QStringLiteral("terrasoar-base");
+    ts::PackDataset dataset;
+    dataset.id = QStringLiteral("egm96");
+    dataset.kind = ts::PackDataset::Kind::Geoid;
+    dataset.file = QStringLiteral("egm96.tif");
+    manifest.datasets.push_back(dataset);
+    ts::ProviderRegistry registry;
+    registry.setBasePack(dir.path(), manifest);
+    registry.setWmsNetwork(std::make_shared<ts::NetworkClient>(testNetwork()),
+                           ts::WebTileSettings{});
+
+    QJsonObject source{
+        {QStringLiteral("kind"), QStringLiteral("web")},
+        {QStringLiteral("url"),
+         QString(server.url().toString() + QStringLiteral("{z}/{x}/{y}.png"))},
+        {QStringLiteral("encoding"), QStringLiteral("terrarium")},
+        {QStringLiteral("maximumZoom"), 4},
+        {QStringLiteral("verticalDatum"), QStringLiteral("egm96")},
+        {QStringLiteral("attribution"), QStringLiteral("Fixture terrain")}};
+    QString error;
+    std::shared_ptr<ts::ElevationProvider> provider =
+        registry.elevation(source, &error);
+    QVERIFY2(provider, qPrintable(error));
+    QCOMPARE(registry.elevation(source, &error), provider); // shared
+    QCOMPARE(registry.attribution(source), QStringLiteral("Fixture terrain"));
+    QVERIFY(provider->preferredLoaderThreads() > 2);
+
+    // Heights above EGM96 become heights above the ellipsoid.
+    const ts::TileKey key =
+        ts::TileKey::containing(3, ts::Geodetic{30.0, -50.0, 0.0});
+    const std::optional<ts::HeightTile> tile =
+        provider->loadHeights(key, notCancelled);
+    if (!tile) {
+      QFAIL("no heights");
+    }
+    const ts::GeoPoint point = ts::heightSamplePoint(key, 65, 32, 32);
+    const std::pair<double, double> pixel =
+        webPixel(point.latDeg, point.lonDeg, 2);
+    QVERIFY(std::abs(heightAt(*tile, 32, 32) -
+                     webHeight(pixel.first, pixel.second) -
+                     fixtureUndulation(point.latDeg, point.lonDeg)) < 0.02);
+    QCOMPARE(tile->seaLevelM.size(), tile->heightsM.size());
+
+    // EGM2008 isn't in this pack; a broken source says why.
+    source.insert(QStringLiteral("verticalDatum"), QStringLiteral("egm2008"));
+    QVERIFY(!registry.elevation(source, &error));
+    source.insert(QStringLiteral("verticalDatum"), QStringLiteral("egm96"));
+    source.insert(QStringLiteral("encoding"), QStringLiteral("png"));
+    error.clear();
+    QVERIFY(!registry.elevation(source, &error));
+    QVERIFY(!error.isEmpty());
   }
 };
 

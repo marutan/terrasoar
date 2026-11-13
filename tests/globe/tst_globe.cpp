@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <mutex>
 #include <optional>
+#include <unordered_set>
 #include <vector>
 
 #include <QColor>
@@ -209,6 +212,47 @@ public:
     }
     return stored == key ? tile : ts::resampleHeightTile(tile, key, 17);
   }
+};
+
+/**
+ * SineElevation that fails the first time each tile is asked for (an
+ * incomplete tile at sea level, like a web source that didn't answer).
+ */
+class FlakyElevation : public SineElevation
+{
+public:
+  QString id() const override { return QStringLiteral("test:flaky"); }
+
+  std::optional<ts::HeightTile>
+  loadHeights(ts::TileKey key, const std::atomic<bool>& cancelled) override
+  {
+    {
+      const std::lock_guard<std::mutex> lock(m_mutex);
+      if (m_asked.insert(key).second) {
+        ts::HeightTile tile;
+        tile.key = key;
+        tile.samples = 2;
+        tile.heightsM.assign(4, 30.0F);
+        tile.seaLevelM.assign(4, 30.0F);
+        tile.incomplete = true;
+        return tile;
+      }
+      ++m_retries;
+    }
+    return SineElevation::loadHeights(key, cancelled);
+  }
+
+  /** Tiles asked for again after an incomplete answer. */
+  int retries() const
+  {
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    return m_retries;
+  }
+
+private:
+  mutable std::mutex m_mutex;
+  std::unordered_set<ts::TileKey, ts::TileKeyHash> m_asked;
+  int m_retries = 0;
 };
 
 } // namespace
@@ -1425,6 +1469,46 @@ private slots:
     QCOMPARE(differing, 0);
     // And switched on, it does change the picture.
     QVERIFY(changed > plain.width() * plain.height() / 10);
+  }
+
+  void incompleteHeightsAreAskedForAgain()
+  {
+    // A source that couldn't deliver a tile gets asked again, and the
+    // terrain then takes the full heights (the mesh is rebuilt).
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    ts::TileRendererSettings settings;
+    settings.heightsRetryDelay = std::chrono::milliseconds(0);
+    ts::GlobeRenderer renderer(m_gl->device(), settings);
+    std::shared_ptr<FlakyElevation> flaky = std::make_shared<FlakyElevation>();
+    renderer.setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>(256));
+    renderer.setElevationProvider(flaky);
+    renderer.setTerrain(true, 1.0);
+    const ts::CameraPose pose{46.0, 8.0, 3.0e5, 0.0, 0.0};
+    const ts::Camera camera = makeCamera(pose);
+    const std::function<void()> frame = [&]() {
+      m_gl->makeCurrent();
+      ts::PassDesc pass;
+      pass.target = m_target.get();
+      pass.viewportPx = QRect(0, 0, imageWidthPx, imageHeightPx);
+      renderer.render(camera, pass, 1.0);
+    };
+    const double expected = SineElevation::heightM(46.0, 8.0);
+    const bool settled = QTest::qWaitFor(
+        [&]() {
+          frame();
+          const std::optional<double> height =
+              renderer.terrainHeightM(46.0, 8.0);
+          return !renderer.isBusy() && height &&
+                 std::abs(*height - expected) < 50.0;
+        },
+        60000);
+    m_gl->makeCurrent();
+    renderer.setElevationProvider(nullptr);
+    renderer.setImageryProvider(nullptr);
+    QVERIFY2(settled, "the full heights never arrived");
+    QVERIFY(flaky->retries() > 0);
   }
 
   void silhouetteMatchesPicking()

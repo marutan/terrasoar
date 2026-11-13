@@ -40,10 +40,13 @@ QString webCacheFileName(const QString& sourceId)
          QStringLiteral(".sqlite");
 }
 
+// The source, then its server's name.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 CachedTileFetcher::CachedTileFetcher(
     const QString& sourceId, QString host,
     std::shared_ptr<NetworkClient> network, WebTileSettings settings,
     Messages messages, std::function<void(const ProviderStatus&)> report)
+    // NOLINTEND(bugprone-easily-swappable-parameters)
     : m_host(std::move(host)), m_network(std::move(network)),
       m_settings(std::move(settings)), m_messages(std::move(messages)),
       m_report(std::move(report)), m_cache(makeCache(sourceId, m_settings))

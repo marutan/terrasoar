@@ -138,6 +138,7 @@ CompositeElevationProvider::loadHeights(TileKey key,
           std::count_if(result->heightsM.begin(), result->heightsM.end(),
                         [](float h) { return std::isnan(h); }));
     } else {
+      result->incomplete = result->incomplete || loaded->incomplete;
       missing -= fillFrom(*result, withSamples(*loaded, result->samples));
     }
     if (missing == 0 && !result->seaLevelM.empty()) {

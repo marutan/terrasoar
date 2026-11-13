@@ -140,7 +140,9 @@ pattern (at most 0.8 % of the pixels, near the limit).
 ## The provider
 
 `ts::WmsImageryProvider::loadTileImage()` runs on a loader thread for each
-tile:
+tile. Steps 2–4 are `ts::CachedTileFetcher`, which web terrain tiles use
+too ([terrain.md](terrain.md)); the provider adds the GetMap URL, decoding
+the image, and the WMS-specific error messages:
 
 1. No URL for the tile (outside the bounds, beyond the Mercator limit):
    **no data**.

@@ -10,6 +10,7 @@ INCLUDEPATH += $$PWD/src
 RESOURCES += $$PWD/app.qrc
 
 HEADERS += \
+    $$PWD/src/addwebterraindialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
@@ -23,6 +24,7 @@ HEADERS += \
     $$PWD/src/wmscataloguefile.h
 
 SOURCES += \
+    $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \

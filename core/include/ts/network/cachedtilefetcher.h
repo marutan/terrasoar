@@ -120,6 +120,8 @@ public:
    * WebTileSettings::cacheDirectory). @p host names the server in
    * messages; @p report receives status changes (on loader threads).
    */
+  // The source, then its server's name.
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   CachedTileFetcher(const QString& sourceId, QString host,
                     std::shared_ptr<NetworkClient> network,
                     WebTileSettings settings, Messages messages,

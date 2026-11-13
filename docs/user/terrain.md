@@ -44,6 +44,30 @@ a file without overviews isn't read (the built-in terrain shows instead);
 `gdaladdo yourfile.tif` adds overviews, and Cloud Optimized GeoTIFFs have
 them already.
 
+## Terrain from the web
+
+**File → Add Web Terrain…** (or **Web Terrain…** in the layer list's add
+menu) adds heights from a server:
+
+- **Terrain Tiles (AWS Open Data)**, ready to use: free worldwide heights
+  from SRTM and other sources, about 5 m to 30 m apart where they are most
+  detailed.
+- **Terrain tiles of your own choosing**: an address with `{z}`, `{x}` and
+  `{y}` in it, and whether the tiles use the Terrarium or the Terrain-RGB
+  encoding (the provider's documentation says; services that need a key,
+  such as MapTiler or Mapbox, take it in the address). Give the deepest
+  zoom they have and the attribution the provider asks for: it is shown in
+  the corner of the view while the layer is drawn.
+- **A Cloud Optimized GeoTIFF** on a web server: only the parts in view
+  are downloaded.
+
+Web terrain works like the other elevation layers: it goes above them, and
+the built-in terrain fills in wherever it has no heights (beyond 85° north
+and south, or outside the area a service covers). Tiles are kept on your
+computer like WMS tiles, so places you have seen work offline. If the
+server can't be reached, the layer shows a warning and the built-in
+heights stand in until it answers again.
+
 ## Height under the pointer
 
 Once there is an elevation layer (switched on or not), the status bar
@@ -70,5 +94,5 @@ the full detail of the data.
   from (and will be shown as) heights above sea level; see
   [the design notes](../design/vertical-datums.md) if that matters to you.
 
-Web terrain services, elevation profiles, hillshade on the flat map and
-finer geoid models come later (roadmap Phase 7d).
+Elevation profiles, hillshade on the flat map and finer geoid models come
+later (roadmap Phase 7d).
