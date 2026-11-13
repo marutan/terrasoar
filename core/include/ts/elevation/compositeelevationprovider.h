@@ -25,7 +25,10 @@ namespace ts
  * on the same grid whatever source they come from, so there are no cracks
  * at a source's edge (heights may step there, as the sources differ).
  * Samples no source has are sea level; a tile without any data is
- * nothing. Sea level comes from the first source that gives it.
+ * nothing. Sea level comes from the first source that gives it. The tile
+ * is incomplete if a source's tile was (a source that has no tile at all
+ * because it failed to answer can't be told from one with no data, so web
+ * sources answer with an incomplete tile of NaN instead).
  *
  * @threadsafe
  */

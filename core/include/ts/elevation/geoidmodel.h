@@ -64,6 +64,16 @@ private:
   QString m_gridFile;
 };
 
+/**
+ * Turns @p tile's heights, sampled at @p points (one per sample), into
+ * heights above the ellipsoid: adds the undulation of @p datum, the geoid
+ * they are measured from (null for heights already above the ellipsoid),
+ * and sets HeightTile::seaLevelM from @p datum, or @p seaLevel where
+ * @p datum is null (both null: no sea level). NaN heights stay NaN.
+ */
+void applyVerticalDatum(HeightTile& tile, const std::vector<GeoPoint>& points,
+                        const GeoidModel* datum, const GeoidModel* seaLevel);
+
 } // namespace ts
 
 #endif // TS_ELEVATION_GEOIDMODEL_H

@@ -92,7 +92,7 @@ project files, the built-in list, and (Phase 5) server catalogues:
 | `origin` | `builtin` (shipped), `catalogue` (from a server's or pack's catalogue), `user` (added by the user) |
 | `type` | `imagery`, `vector` (Phase 3), `elevation` (Phase 7: the terrain, see [terrain.md](terrain.md)) |
 | `name` | Default name; built-in names are translated |
-| `source` | Provider parameters; `kind` selects the provider. Now: `checkerboard` (`tileSize`, `maximumLevel`), `solid` (`color` as `#aarrggbb`, `tileSize`, `maximumLevel`), `basepack` (`dataset`: a dataset of the base pack, imagery, features or elevation), `file` (elevation: `path` of a DEM GDAL reads, `verticalDatum` `egm2008`, `egm96` or `ellipsoid`; see [terrain.md](terrain.md)), `graticule` (generated lines) |
+| `source` | Provider parameters; `kind` selects the provider. Now: `checkerboard` (`tileSize`, `maximumLevel`), `solid` (`color` as `#aarrggbb`, `tileSize`, `maximumLevel`), `basepack` (`dataset`: a dataset of the base pack, imagery, features or elevation), `file` (elevation: `path` of a DEM GDAL reads, `/vsicurl/<address>` for one on a web server, `verticalDatum` `egm2008`, `egm96` or `ellipsoid`, optional `attribution`; see [terrain.md](terrain.md)), `web` (elevation: web terrain tiles, `url` with `{z}/{x}/{y}`, `encoding` `terrarium` or `terrain-rgb`, `maximumZoom`, `tileSize`, `verticalDatum`, `attribution`), `graticule` (generated lines) |
 | `style` | Optional. Vector layers: `fill` and `outline` as `#rrggbbaa` (alpha last) and `outlineWidthPx` (see [vector-rendering.md](vector-rendering.md)). Elevation layers: `exaggeration` (1; 0.1–20) |
 
 A layer in the tree keeps a copy of its definition, so a project file is

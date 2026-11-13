@@ -30,6 +30,7 @@ HEADERS += \
     include/ts/elevation/heightgrid.h \
     include/ts/elevation/heighttileloader.h \
     include/ts/elevation/sqliteelevationprovider.h \
+    include/ts/elevation/webterrainprovider.h \
     include/ts/geo/ellipsoid.h \
     include/ts/geo/geodesic.h \
     include/ts/geo/geodetic.h \
@@ -52,6 +53,7 @@ HEADERS += \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
+    include/ts/network/cachedtilefetcher.h \
     include/ts/network/httpcache.h \
     include/ts/network/networkclient.h \
     include/ts/network/tilediskcache.h \
@@ -106,6 +108,7 @@ SOURCES += \
     src/elevation/heightgrid.cpp \
     src/elevation/heighttileloader.cpp \
     src/elevation/sqliteelevationprovider.cpp \
+    src/elevation/webterrainprovider.cpp \
     src/geo/ellipsoid.cpp \
     src/geo/geodesic.cpp \
     src/geo/geodetic.cpp \
@@ -122,6 +125,7 @@ SOURCES += \
     src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
+    src/network/cachedtilefetcher.cpp \
     src/network/httpcache.cpp \
     src/network/networkclient.cpp \
     src/network/tilediskcache.cpp \

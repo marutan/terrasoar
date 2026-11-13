@@ -135,4 +135,22 @@ GeoidModel::undulationsM(const std::vector<GeoPoint>& points) const
   return undulations;
 }
 
+void applyVerticalDatum(HeightTile& tile, const std::vector<GeoPoint>& points,
+                        const GeoidModel* datum, const GeoidModel* seaLevel)
+{
+  const GeoidModel* geoid = datum != nullptr ? datum : seaLevel;
+  if (geoid == nullptr) {
+    return;
+  }
+  const std::vector<double> undulations = geoid->undulationsM(points);
+  tile.seaLevelM.assign(points.size(), 0.0F);
+  for (std::size_t i = 0; i < points.size() && i < tile.heightsM.size(); ++i) {
+    const double n = std::isfinite(undulations[i]) ? undulations[i] : 0.0;
+    tile.seaLevelM[i] = static_cast<float>(n);
+    if (datum != nullptr) {
+      tile.heightsM[i] += static_cast<float>(n);
+    }
+  }
+}
+
 } // namespace ts

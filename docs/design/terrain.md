@@ -5,7 +5,8 @@ data (the base pack's global DEM, the elevation provider, height
 sampling), Phase 7c the drawing (displaced tile meshes, skirts,
 exaggeration, the morph, features on the terrain, picking), Phase 7d
 further sources: DEM files through GDAL, priority between sources and
-the height readout (web terrain tiles, profiles and hillshade follow).
+the height readout (7d-1), web terrain tiles and remote GeoTIFFs (7d-2);
+profiles and hillshade follow.
 For users: [terrain.md](../user/terrain.md).
 Heights above the geoid and above the ellipsoid are explained in
 [vertical-datums.md](vertical-datums.md). Code:
@@ -75,6 +76,55 @@ or `ellipsoid`). Add Elevation File reads it from a compound CRS
 (e.g. EPSG:4326+3855) where the file has one (`detectDemVerticalDatum()`)
 and otherwise asks, suggesting EGM2008. The datum's geoid also gives sea
 level; for ellipsoidal heights the base pack's EGM2008 does.
+
+## Web terrain tiles
+
+`ts::WebTerrainProvider` reads XYZ tile sets of PNGs in Web Mercator whose
+colours hold heights (a layer source `{"kind": "web", "url":
+".../{z}/{x}/{y}.png", "encoding": "terrarium" | "terrain-rgb",
+"maximumZoom", "tileSize", "verticalDatum", "attribution"}`):
+
+| Encoding | Height, metres | Used by |
+| --- | --- | --- |
+| Terrarium | R·256 + G + B/256 − 32768 | Mapzen / AWS Terrain Tiles |
+| Terrain-RGB | −10000 + (R·65536 + G·256 + B)·0.1 | Mapbox, MapTiler and others |
+
+Transparent pixels are no data. A quadtree tile of level L is sampled from
+zoom L − 1 (L − 2 for 512-pixel tiles, at most the source's deepest): web
+zoom z has 360° / (256 · 2^z) per pixel, level L 180° / (64 · 2^L) per
+sample, so at the equator they match and towards the poles the web pixels
+are finer. Each sample is bilinear between the centres of the four pixels
+around it on that zoom's **global** pixel grid (wrapping in longitude),
+so neighbouring tiles of a level read the same pixels for their shared
+edge. Beyond ±85.05°, where Mercator stops, samples are NaN and the
+sources below (the base pack's DEM) fill them.
+
+Fetching goes through `ts::CachedTileFetcher`, the same as WMS: the disk
+cache (per source, in the WMS cache directory), freshness and
+revalidation, leaving an unreachable server alone, and the layer's status
+(Offline, Error with the server's answer). 404 and 204 mean no tile there
+(for good); decoded web tiles are kept in a small memory cache (64 tiles),
+since neighbouring height tiles share them. Six loader threads load
+heights while a network source is in use.
+
+**Failed tiles.** A web tile that couldn't be had (no answer, an error)
+leaves its samples NaN and marks the height tile **incomplete**
+(`HeightTile::incomplete`); the composite fills it from the sources below
+and passes the mark on. The renderer shows it, and asks for it again when
+it is still wanted 30 s later (`TileRendererSettings::heightsRetryDelay`);
+a mesh is rebuilt when its tile's heights are replaced (each mesh keeps
+the heights it was built from to tell).
+
+**Remote GeoTIFFs.** A Cloud Optimized GeoTIFF on a web server is a `file`
+source whose path is `/vsicurl/<address>`: GDAL reads the parts it needs
+with range requests, using the file's overviews when zoomed out. That
+needs a GDAL built with curl (`AddWebTerrainDialog::canReadRemoteFiles()`
+checks); GDAL caches what it reads in memory only.
+
+**Adding them.** File → Add Web Terrain… (or the layer list's add menu)
+offers the AWS Terrain Tiles (Terrarium, to zoom 15, heights above EGM96,
+with the attribution they ask for), or any tile address, encoding, deepest
+zoom, tile size, datum, name and attribution, or a GeoTIFF's address.
 
 ## Several sources
 
@@ -261,6 +311,16 @@ overviews, a broken file refused, datums found in compound CRSs, geoid
 conversion, loads from eight threads at once; the composite (a DEM over
 the global heights across its corner, no NaN, sea level where nothing
 has data); the registry's `file` sources and shared composites.
+`tests/elevation` for web terrain: both encodings decoded; the source's
+JSON form and its errors; a mock server's Terrarium tiles read exactly (a
+plane in global pixels), edges shared, web tiles fetched once for
+neighbours, no data beyond the Mercator limit and for 404s, an incomplete
+tile while the server fails and a complete one after, the incomplete mark
+passed through the composite over a DEM; the registry's `web` sources with
+EGM96 heights, attribution and errors. `tests/globe`: a source failing the
+first time for each tile is asked again and its full heights drawn.
+`tests/ui`: the Add Web Terrain dialog's preset, own tiles, refused
+address, GeoTIFF address and translations.
 `tests/layers`: visible layers combined top first, the topmost
 exaggeration, a hidden DEM left out, a missing file reported.
 `tests/ui`: Add Elevation File's layer above the terrain and the readout

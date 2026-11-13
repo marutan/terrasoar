@@ -161,6 +161,10 @@ void LayerTreeDock::rebuildAddLayerMenu()
   elevation->setObjectName(QStringLiteral("addElevationFileAction"));
   connect(elevation, &QAction::triggered, this,
           &LayerTreeDock::addElevationFileRequested);
+  QAction* webTerrain = m_addLayerMenu->addAction(tr("Web Terrain…"));
+  webTerrain->setObjectName(QStringLiteral("addWebTerrainLayerAction"));
+  connect(webTerrain, &QAction::triggered, this,
+          &LayerTreeDock::addWebTerrainRequested);
   QAction* solid = m_addLayerMenu->addAction(tr("Solid Colour…"));
   solid->setObjectName(QStringLiteral("addSolidColourAction"));
   connect(solid, &QAction::triggered, this, &LayerTreeDock::addSolidColorLayer);

@@ -115,8 +115,6 @@ private:
   /** Loads @p key with @p reader (loadHeights() without the pool). */
   std::optional<HeightTile> read(const Reader& reader, TileKey key,
                                  const std::atomic<bool>& cancelled) const;
-  /** Adds the datum's undulations to @p tile and sets its sea level. */
-  void addGeoid(HeightTile& tile, const std::vector<GeoPoint>& points) const;
 
   QString m_path;
   QString m_datumId;

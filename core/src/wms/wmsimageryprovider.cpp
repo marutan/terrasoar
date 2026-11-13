@@ -63,17 +63,6 @@ ImageLoadResult outcome(ImageLoadResult::Outcome kind)
   return result;
 }
 
-std::unique_ptr<TileDiskCache> makeCache(const WmsSource& source,
-                                         const WmsProviderSettings& settings)
-{
-  if (settings.cacheDirectory.isEmpty()) {
-    return nullptr;
-  }
-  return std::make_unique<TileDiskCache>(
-      QDir(settings.cacheDirectory).filePath(wmsCacheFileName(source.id())),
-      settings.cacheBytes);
-}
-
 /** What to say about a response with an error status. */
 QString statusErrorMessage(const HttpResponse& response)
 {
@@ -108,17 +97,18 @@ QString notAnImageMessage(const HttpResponse& response)
 
 QString wmsCacheFileName(const QString& sourceId)
 {
-  return QString::fromLatin1(QCryptographicHash::hash(sourceId.toUtf8(),
-                                                      QCryptographicHash::Sha1)
-                                 .toHex()) +
-         QStringLiteral(".sqlite");
+  return webCacheFileName(sourceId);
 }
 
 WmsImageryProvider::WmsImageryProvider(WmsSource source,
                                        std::shared_ptr<NetworkClient> network,
                                        WmsProviderSettings settings)
-    : m_source(std::move(source)), m_network(std::move(network)),
-      m_settings(std::move(settings)), m_cache(makeCache(m_source, m_settings))
+    : m_source(std::move(source)),
+      m_fetcher(std::make_unique<CachedTileFetcher>(
+          m_source.id(), m_source.url.host(), std::move(network),
+          std::move(settings),
+          CachedTileFetcher::Messages{statusErrorMessage, notAnImageMessage},
+          [this](const ProviderStatus& status) { reportStatus(status); }))
 {
 }
 
@@ -147,7 +137,7 @@ int WmsImageryProvider::tileSizePx() const
 
 int WmsImageryProvider::preferredLoaderThreads() const
 {
-  return m_settings.loaderThreads;
+  return m_fetcher->settings().loaderThreads;
 }
 
 TileImageProjection WmsImageryProvider::imageProjection() const
@@ -157,127 +147,13 @@ TileImageProjection WmsImageryProvider::imageProjection() const
 
 WmsStatistics WmsImageryProvider::statistics() const
 {
-  const std::lock_guard<std::mutex> lock(m_mutex);
-  return m_statistics;
-}
-
-long long WmsImageryProvider::now() const
-{
-  return m_settings.clock ? m_settings.clock()
-                          : QDateTime::currentSecsSinceEpoch();
+  return m_fetcher->statistics();
 }
 
 QImage WmsImageryProvider::loadImage(TileKey key,
                                      const std::atomic<bool>& cancelled)
 {
   return loadTileImage(key, cancelled).image;
-}
-
-ImageLoadResult WmsImageryProvider::fromCache(TileKey key, bool stale)
-{
-  // The caller found it in the cache moments ago; read it again.
-  const std::optional<CachedTile> cached =
-      m_cache ? m_cache->find(key) : std::nullopt;
-  if (!cached) {
-    return outcome(ImageLoadResult::Outcome::Failed);
-  }
-  QImage image = decode(cached->data);
-  if (image.isNull()) {
-    m_cache->remove(key);
-    return outcome(ImageLoadResult::Outcome::Failed);
-  }
-  if (stale) {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    ++m_statistics.servedStale;
-  }
-  return imageResult(std::move(image));
-}
-
-void WmsImageryProvider::noteSuccess()
-{
-  {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    m_unreachableInARow = 0;
-  }
-  reportStatus(ProviderStatus{});
-}
-
-void WmsImageryProvider::noteUnreachable(const QString& detail)
-{
-  {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    ++m_statistics.failures;
-    if (++m_unreachableInARow >= m_settings.failuresBeforeOffline) {
-      m_leftAloneUntil =
-          std::chrono::steady_clock::now() + m_settings.offlineRetry;
-    }
-  }
-  reportStatus(ProviderStatus{
-      ProviderStatus::State::Offline,
-      QCoreApplication::translate("ts::WmsImageryProvider",
-                                  "Can't reach %1 (%2). Saved tiles are "
-                                  "shown where there are some.")
-          .arg(m_source.url.host(), detail)});
-}
-
-void WmsImageryProvider::noteServerError(const QString& message)
-{
-  {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    ++m_statistics.failures;
-    m_unreachableInARow = 0;
-  }
-  reportStatus(ProviderStatus{ProviderStatus::State::Error, message});
-}
-
-ImageLoadResult WmsImageryProvider::staleOrFailed(TileKey key, bool haveCached)
-{
-  return haveCached ? fromCache(key, true)
-                    : outcome(ImageLoadResult::Outcome::Failed);
-}
-
-bool WmsImageryProvider::leftAlone()
-{
-  const std::lock_guard<std::mutex> lock(m_mutex);
-  if (std::chrono::steady_clock::now() < m_leftAloneUntil) {
-    ++m_statistics.skippedOffline;
-    return true;
-  }
-  return false;
-}
-
-ImageLoadResult WmsImageryProvider::revalidated(TileKey key,
-                                                const CachedTile& cached,
-                                                const HttpResponse& response,
-                                                long long nowS)
-{
-  const HttpFreshness previous{true, cached.expiresS, cached.etag,
-                               cached.lastModified};
-  const HttpFreshness renewed = revalidatedFreshness(
-      previous, response, nowS, m_settings.defaultLifetimeS);
-  m_cache->refresh(key, renewed.expiresS, renewed.etag, renewed.lastModified);
-  {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    ++m_statistics.revalidated;
-  }
-  noteSuccess();
-  return fromCache(key, false);
-}
-
-void WmsImageryProvider::store(TileKey key, const HttpResponse& response,
-                               long long nowS)
-{
-  if (!m_cache) {
-    return;
-  }
-  const HttpFreshness freshness =
-      httpFreshness(response, nowS, m_settings.defaultLifetimeS);
-  if (freshness.storable) {
-    m_cache->store(key,
-                   CachedTile{response.body, response.header("content-type"),
-                              freshness.expiresS, freshness.etag,
-                              freshness.lastModified});
-  }
 }
 
 ImageLoadResult
@@ -288,60 +164,25 @@ WmsImageryProvider::loadTileImage(TileKey key,
   if (url.isEmpty()) {
     return outcome(ImageLoadResult::Outcome::NoData);
   }
-  const long long nowS = now();
-  const std::optional<CachedTile> cached =
-      m_cache ? m_cache->find(key) : std::nullopt;
-  if (cached && nowS < cached->expiresS) {
-    QImage image = decode(cached->data);
-    if (!image.isNull()) {
-      const std::lock_guard<std::mutex> lock(m_mutex);
-      ++m_statistics.cacheHits;
-      return imageResult(std::move(image));
-    }
-    m_cache->remove(key);
-  }
-  if (leftAlone()) {
-    return staleOrFailed(key, cached.has_value());
-  }
-
-  HttpRequest request;
-  request.url = url;
-  if (cached) {
-    request.headers = revalidationHeaders(cached->etag, cached->lastModified);
-  }
-  {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    ++m_statistics.requests;
-  }
-  const HttpResponse response = m_network->fetch(request, cancelled);
-  if (response.error == NetworkError::Cancelled || cancelled.load()) {
+  QImage image;
+  const FetchOutcome fetched = m_fetcher->fetch(
+      key, url,
+      [&image](const QByteArray& data) {
+        image = decode(data);
+        return !image.isNull();
+      },
+      cancelled);
+  switch (fetched) {
+  case FetchOutcome::Data:
+    return imageResult(std::move(image));
+  case FetchOutcome::NoData:
+    return outcome(ImageLoadResult::Outcome::NoData);
+  case FetchOutcome::Cancelled:
     return outcome(ImageLoadResult::Outcome::Cancelled);
+  case FetchOutcome::Failed:
+    break;
   }
-  if (response.error == NetworkError::TooLarge) {
-    noteServerError(QCoreApplication::translate(
-        "ts::WmsImageryProvider",
-        "The server sent a tile that is far too large."));
-    return outcome(ImageLoadResult::Outcome::Failed);
-  }
-  if (response.error != NetworkError::None) {
-    noteUnreachable(response.errorString);
-    return staleOrFailed(key, cached.has_value());
-  }
-  if (response.status == 304 && cached) {
-    return revalidated(key, *cached, response, nowS);
-  }
-  if (response.status < 200 || response.status >= 300) {
-    noteServerError(statusErrorMessage(response));
-    return staleOrFailed(key, cached.has_value());
-  }
-  QImage image = decode(response.body);
-  if (image.isNull()) {
-    noteServerError(notAnImageMessage(response));
-    return staleOrFailed(key, cached.has_value());
-  }
-  store(key, response, nowS);
-  noteSuccess();
-  return imageResult(std::move(image));
+  return outcome(ImageLoadResult::Outcome::Failed);
 }
 
 std::optional<GeoRect> WmsImageryProvider::dataBounds() const
@@ -369,15 +210,16 @@ WmsImageryProvider::fetchForRegion(TileKey key, long long region,
     result.outcome = Outcome::NoData;
     return result;
   }
-  if (!m_cache) {
+  TileDiskCache* const cache = m_fetcher->diskCache();
+  if (cache == nullptr) {
     result.errorString = QCoreApplication::translate(
         "ts::WmsImageryProvider", "There is no disk cache to keep tiles in.");
     return result;
   }
-  const long long nowS = now();
-  const std::optional<CachedTile> cached = m_cache->find(key);
+  const long long nowS = m_fetcher->now();
+  const std::optional<CachedTile> cached = cache->find(key);
   if (cached && nowS < cached->expiresS &&
-      (region == 0 || m_cache->pin(region, key))) {
+      (region == 0 || cache->pin(region, key))) {
     result.outcome = Outcome::AlreadyCached;
     result.bytes = cached->data.size();
     return result;
@@ -388,11 +230,8 @@ WmsImageryProvider::fetchForRegion(TileKey key, long long region,
   if (cached) {
     request.headers = revalidationHeaders(cached->etag, cached->lastModified);
   }
-  {
-    const std::lock_guard<std::mutex> lock(m_mutex);
-    ++m_statistics.requests;
-  }
-  const HttpResponse response = m_network->fetch(request, cancelled);
+  m_fetcher->countRequest();
+  const HttpResponse response = m_fetcher->network()->fetch(request, cancelled);
   if (response.error == NetworkError::Cancelled || cancelled.load()) {
     result.outcome = Outcome::Cancelled;
     return result;
@@ -411,12 +250,12 @@ WmsImageryProvider::fetchForRegion(TileKey key, long long region,
     return result;
   }
   if (response.status == 304 && cached) {
-    const HttpFreshness renewed =
-        revalidatedFreshness(HttpFreshness{true, cached->expiresS, cached->etag,
-                                           cached->lastModified},
-                             response, nowS, m_settings.defaultLifetimeS);
-    m_cache->refresh(key, renewed.expiresS, renewed.etag, renewed.lastModified);
-    if (region == 0 || m_cache->pin(region, key)) {
+    const HttpFreshness renewed = revalidatedFreshness(
+        HttpFreshness{true, cached->expiresS, cached->etag,
+                      cached->lastModified},
+        response, nowS, m_fetcher->settings().defaultLifetimeS);
+    cache->refresh(key, renewed.expiresS, renewed.etag, renewed.lastModified);
+    if (region == 0 || cache->pin(region, key)) {
       result.outcome = Outcome::Revalidated;
       result.bytes = cached->data.size();
     }
@@ -431,22 +270,22 @@ WmsImageryProvider::fetchForRegion(TileKey key, long long region,
     return result;
   }
   const HttpFreshness freshness =
-      httpFreshness(response, nowS, m_settings.defaultLifetimeS);
+      httpFreshness(response, nowS, m_fetcher->settings().defaultLifetimeS);
   if (!freshness.storable) {
     result.errorString = QCoreApplication::translate(
         "ts::WmsImageryProvider",
         "The server doesn't allow its tiles to be kept (no-store).");
     return result;
   }
-  if (!m_cache->store(key,
-                      CachedTile{response.body, response.header("content-type"),
-                                 freshness.expiresS, freshness.etag,
-                                 freshness.lastModified},
-                      region)) {
+  if (!cache->store(key,
+                    CachedTile{response.body, response.header("content-type"),
+                               freshness.expiresS, freshness.etag,
+                               freshness.lastModified},
+                    region)) {
     result.errorString =
         QCoreApplication::translate("ts::WmsImageryProvider",
                                     "The tile could not be saved: %1")
-            .arg(m_cache->errorString());
+            .arg(cache->errorString());
     return result;
   }
   result.outcome = Outcome::Downloaded;

@@ -5,5 +5,7 @@
 
 include($$PWD/../tests.pri)
 
+QT += network
+
 TARGET = tst_elevation
 SOURCES += tst_elevation.cpp

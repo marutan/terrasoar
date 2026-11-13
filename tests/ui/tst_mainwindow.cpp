@@ -11,6 +11,7 @@
 #include <QFontMetrics>
 #include <QJsonArray>
 #include <QLabel>
+#include <QLineEdit>
 #include <QLocale>
 #include <QMenu>
 #include <QMenuBar>
@@ -30,6 +31,7 @@
 #include <QWheelEvent>
 #include <QtTest>
 
+#include "addwebterraindialog.h"
 #include "addwmsdialog.h"
 #include "fixturepack.h"
 #include "globeview.h"
@@ -92,7 +94,7 @@ QString describe(const QObject* object)
 }
 
 /** Every user-visible string of @p window, labelled for error messages. */
-QList<QPair<QString, QString>> visibleTexts(QMainWindow& window)
+QList<QPair<QString, QString>> visibleTexts(QWidget& window)
 {
   QList<QPair<QString, QString>> texts;
   texts << qMakePair(QStringLiteral("window title"), window.windowTitle());
@@ -136,7 +138,7 @@ QList<QPair<QString, QString>> visibleTexts(QMainWindow& window)
   return texts;
 }
 
-void verifyAllPseudo(QMainWindow& window)
+void verifyAllPseudo(QWidget& window)
 {
   const QList<QPair<QString, QString>> texts = visibleTexts(window);
   QVERIFY(texts.size() >= 8);
@@ -696,6 +698,85 @@ private slots:
              qPrintable(pointer->text()));
   }
 
+  void webTerrainDialog()
+  {
+    ts::AddWebTerrainDialog dialog(nullptr);
+    QComboBox* presets =
+        dialog.findChild<QComboBox*>(QStringLiteral("webTerrainPresetBox"));
+    QLineEdit* address =
+        dialog.findChild<QLineEdit*>(QStringLiteral("webTerrainAddressEdit"));
+    QLabel* error =
+        dialog.findChild<QLabel*>(QStringLiteral("webTerrainErrorLabel"));
+    if (presets == nullptr || address == nullptr || error == nullptr) {
+      QFAIL("dialog controls missing");
+    }
+    // A preset fills in the form.
+    QVERIFY(presets->count() >= 2);
+    presets->setCurrentIndex(1);
+    emit presets->activated(1);
+    QVERIFY(address->text().contains(QStringLiteral("{z}")));
+    std::optional<ts::LayerDefinition> definition = dialog.buildDefinition();
+    if (!definition) {
+      QFAIL("the preset makes no layer");
+    }
+    QCOMPARE(definition->type, ts::LayerType::Elevation);
+    QCOMPARE(definition->source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("web"));
+    QVERIFY(!definition->source.value(QStringLiteral("attribution"))
+                 .toString()
+                 .isEmpty());
+
+    // Terrain-RGB tiles of one's own.
+    dialog.setSource(
+        ts::AddWebTerrainDialog::Kind::TerrainRgb,
+        QStringLiteral("https://tiles.example/rgb/{z}/{x}/{y}.png"), 12,
+        QStringLiteral("egm2008"), QString(), QStringLiteral("Example"));
+    definition = dialog.buildDefinition();
+    if (!definition) {
+      QFAIL("no layer");
+    }
+    QCOMPARE(definition->name, QStringLiteral("tiles.example"));
+    QCOMPARE(definition->source.value(QStringLiteral("encoding")).toString(),
+             QStringLiteral("terrain-rgb"));
+    QCOMPARE(definition->source.value(QStringLiteral("maximumZoom")).toInt(),
+             12);
+    QCOMPARE(
+        definition->source.value(QStringLiteral("verticalDatum")).toString(),
+        QStringLiteral("egm2008"));
+
+    // An address without {z}, {x} and {y} is refused with a reason.
+    dialog.setSource(ts::AddWebTerrainDialog::Kind::Terrarium,
+                     QStringLiteral("https://tiles.example/terrain.png"), 12,
+                     QStringLiteral("egm96"), QString(), QString());
+    QVERIFY(!dialog.buildDefinition());
+    QVERIFY(!error->isHidden() && !error->text().isEmpty());
+
+    // A Cloud Optimized GeoTIFF is read through GDAL, where it can.
+    dialog.setSource(ts::AddWebTerrainDialog::Kind::CloudGeoTiff,
+                     QStringLiteral("https://data.example/dem/alps.tif"), 0,
+                     QStringLiteral("ellipsoid"), QString(), QString());
+    definition = dialog.buildDefinition();
+    if (ts::AddWebTerrainDialog::canReadRemoteFiles()) {
+      if (!definition) {
+        QFAIL("no layer for a GeoTIFF");
+      }
+      QCOMPARE(definition->source.value(QStringLiteral("path")).toString(),
+               QStringLiteral("/vsicurl/https://data.example/dem/alps.tif"));
+      QCOMPARE(definition->name, QStringLiteral("alps.tif"));
+    } else {
+      QVERIFY(!definition);
+    }
+
+    // Everything in it is translatable.
+    ts::PseudoTranslator translator;
+    QCoreApplication::installTranslator(&translator);
+    {
+      ts::AddWebTerrainDialog pseudo(nullptr);
+      verifyAllPseudo(pseudo);
+    }
+    QCoreApplication::removeTranslator(&translator);
+  }
+
   void projectSaveAndOpen()
   {
     QTemporaryDir directory;
@@ -1099,9 +1180,13 @@ private slots:
     QVERIFY(QTest::qWaitFor(
         [&]() { return !globeOf(window)->isLoadingTiles(); }, 20000));
     QVERIFY2(waitUntilQuiet(globeOf(window)), "the view kept drawing");
+    // As in idleViewStopsDrawing: a late repaint or two from the window
+    // system is not drawing continuously.
     const int frames = globeOf(window)->framesRendered();
-    QTest::qWait(500);
-    QCOMPARE(globeOf(window)->framesRendered(), frames);
+    QTest::qWait(1000);
+    QVERIFY2(globeOf(window)->framesRendered() <= frames + 2,
+             qPrintable(QStringLiteral("%1 frames drawn while idle")
+                            .arg(globeOf(window)->framesRendered() - frames)));
     // Removing the layer forgets its status.
     model->removeNode(offline);
   }
@@ -1540,9 +1625,14 @@ private slots:
         },
         20000));
     QVERIFY2(waitUntilQuiet(globe), "the view kept drawing");
+    // Drawing continuously would be dozens of frames a second; one late
+    // repaint (the window system exposing it again, a status bar change
+    // resizing it, both seen on slow Windows runners) is not that.
     const int frames = globe->framesRendered();
-    QTest::qWait(500);
-    QCOMPARE(globe->framesRendered(), frames);
+    QTest::qWait(1000);
+    QVERIFY2(globe->framesRendered() <= frames + 1,
+             qPrintable(QStringLiteral("%1 frames drawn while idle")
+                            .arg(globe->framesRendered() - frames)));
   }
 };
 

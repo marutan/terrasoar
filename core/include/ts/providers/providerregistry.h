@@ -24,7 +24,7 @@ class ImageryProvider;
 class NetworkClient;
 class PackManifest;
 struct InstalledPack;
-struct WmsProviderSettings;
+struct WebTileSettings;
 
 /**
  * Creates the imagery provider a layer source describes ("kind":
@@ -74,7 +74,12 @@ public:
    *   the base pack;
    * - `{"kind": "file", "path": "<raster>", "verticalDatum": "<datum>"}`:
    *   a DEM file GDAL reads (GdalElevationProvider), its heights above
-   *   `"egm2008"`, `"egm96"` (the base pack's geoids) or `"ellipsoid"`.
+   *   `"egm2008"`, `"egm96"` (the base pack's geoids) or `"ellipsoid"`;
+   *   a path of `/vsicurl/<url>` reads a Cloud Optimized GeoTIFF over
+   *   HTTP;
+   * - `{"kind": "web", "url": …, "encoding": …}`: web terrain tiles
+   *   (WebTerrainSource), through the WMS network and disk cache settings
+   *   (setWmsNetwork()).
    */
   std::shared_ptr<ElevationProvider> elevation(const QJsonObject& source,
                                                QString* errorString);
@@ -128,7 +133,7 @@ public:
    * disk cache. Affects providers created afterwards.
    */
   void setWmsNetwork(std::shared_ptr<NetworkClient> network,
-                     const WmsProviderSettings& settings);
+                     const WebTileSettings& settings);
 
   /** Returns the network client for WMS sources (creating it if needed). */
   std::shared_ptr<NetworkClient> network();
@@ -158,6 +163,15 @@ private:
   basePackElevationLocked(const QJsonObject& source, QString* errorString);
   std::shared_ptr<ElevationProvider>
   fileElevationLocked(const QJsonObject& source, QString* errorString);
+  std::shared_ptr<ElevationProvider>
+  webElevationLocked(const QJsonObject& source, QString* errorString);
+  /**
+   * Sets @p geoid to the model of @p datum (null for "ellipsoid"); false
+   * and @p errorString for an unknown datum or a missing grid.
+   */
+  bool datumGeoidLocked(const QString& datum,
+                        std::shared_ptr<const GeoidModel>* geoid,
+                        const QJsonObject& source, QString* errorString);
 
   mutable std::mutex m_mutex;
   std::unordered_map<QString, std::weak_ptr<ImageryProvider>> m_imagery;
@@ -187,7 +201,7 @@ private:
   /** Base pack dataset id → what replaces it. */
   std::unordered_map<QString, Replacement> m_replacements;
   std::shared_ptr<NetworkClient> m_network;
-  std::unique_ptr<WmsProviderSettings> m_wmsSettings;
+  std::unique_ptr<WebTileSettings> m_wmsSettings;
 };
 
 } // namespace ts
