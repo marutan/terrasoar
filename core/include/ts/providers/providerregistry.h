@@ -24,7 +24,7 @@ class ImageryProvider;
 class NetworkClient;
 class PackManifest;
 struct InstalledPack;
-struct WmsProviderSettings;
+struct WebTileSettings;
 
 /**
  * Creates the imagery provider a layer source describes ("kind":
@@ -128,7 +128,7 @@ public:
    * disk cache. Affects providers created afterwards.
    */
   void setWmsNetwork(std::shared_ptr<NetworkClient> network,
-                     const WmsProviderSettings& settings);
+                     const WebTileSettings& settings);
 
   /** Returns the network client for WMS sources (creating it if needed). */
   std::shared_ptr<NetworkClient> network();
@@ -187,7 +187,7 @@ private:
   /** Base pack dataset id → what replaces it. */
   std::unordered_map<QString, Replacement> m_replacements;
   std::shared_ptr<NetworkClient> m_network;
-  std::unique_ptr<WmsProviderSettings> m_wmsSettings;
+  std::unique_ptr<WebTileSettings> m_wmsSettings;
 };
 
 } // namespace ts

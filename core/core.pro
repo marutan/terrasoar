@@ -52,6 +52,7 @@ HEADERS += \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
     include/ts/perf/frametimestats.h \
+    include/ts/network/cachedtilefetcher.h \
     include/ts/network/httpcache.h \
     include/ts/network/networkclient.h \
     include/ts/network/tilediskcache.h \
@@ -122,6 +123,7 @@ SOURCES += \
     src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
     src/perf/frametimestats.cpp \
+    src/network/cachedtilefetcher.cpp \
     src/network/httpcache.cpp \
     src/network/networkclient.cpp \
     src/network/tilediskcache.cpp \

@@ -15,6 +15,7 @@
 
 #include <QString>
 
+#include "ts/network/cachedtilefetcher.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/wms/wmssource.h"
 
@@ -23,51 +24,12 @@ namespace ts
 
 class NetworkClient;
 class TileDiskCache;
-struct CachedTile;
-struct HttpResponse;
 
-/** Behaviour of a WmsImageryProvider. */
-struct WmsProviderSettings {
-  /**
-   * Directory of the disk caches (one file per source, see
-   * wmsCacheFileName()); empty for no disk cache.
-   */
-  QString cacheDirectory;
-  /** Size limit of this source's disk cache, bytes. */
-  long long cacheBytes = 256LL * 1024 * 1024;
-  /** Freshness of tiles whose server says nothing about it, seconds. */
-  long long defaultLifetimeS = 7LL * 24 * 3600;
-  /**
-   * After this many requests in a row that can't reach the server, it is
-   * left alone for offlineRetry: tiles come from the disk cache only.
-   */
-  int failuresBeforeOffline = 3;
-  /** How long the server is left alone, see failuresBeforeOffline. */
-  std::chrono::seconds offlineRetry{30};
-  /** Loader threads, so several requests are in flight. */
-  int loaderThreads = 6;
-  /**
-   * Seconds since 1970, UTC (for tests); null for the system clock.
-   * Called on loader threads.
-   */
-  std::function<long long()> clock;
-};
+/** Behaviour of a WmsImageryProvider (see WebTileSettings). */
+using WmsProviderSettings = WebTileSettings;
 
-/** What a WmsImageryProvider has done, for tests and the debug overlay. */
-struct WmsStatistics {
-  /** GetMap requests made (each may have been retried). */
-  int requests = 0;
-  /** Tiles served fresh from the disk cache. */
-  int cacheHits = 0;
-  /** Stale tiles the server confirmed with 304 Not Modified. */
-  int revalidated = 0;
-  /** Stale tiles shown because the server couldn't be reached. */
-  int servedStale = 0;
-  /** Tiles that failed (to be retried later). */
-  int failures = 0;
-  /** Requests skipped while the server is left alone. */
-  int skippedOffline = 0;
-};
+/** What a WmsImageryProvider has done (see WebTileStatistics). */
+using WmsStatistics = WebTileStatistics;
 
 /** What became of one tile of an offline region (fetchForRegion()). */
 struct RegionTileResult {
@@ -168,35 +130,14 @@ public:
                                   const std::atomic<bool>& cancelled);
 
   /** Returns the disk cache, or null without one. */
-  TileDiskCache* diskCache() const { return m_cache.get(); }
+  TileDiskCache* diskCache() const { return m_fetcher->diskCache(); }
 
   /** Returns what it has done so far. */
   WmsStatistics statistics() const;
 
 private:
-  long long now() const;
-  ImageLoadResult fromCache(TileKey key, bool stale);
-  /** The saved tile, marked stale, if there is one; else a failure. */
-  ImageLoadResult staleOrFailed(TileKey key, bool haveCached);
-  /** True (and counted) while the server is left alone after failures. */
-  bool leftAlone();
-  /** Renews @p cached after a 304 and returns it. */
-  ImageLoadResult revalidated(TileKey key, const CachedTile& cached,
-                              const HttpResponse& response, long long nowS);
-  /** Saves a freshly fetched tile, if it may be stored. */
-  void store(TileKey key, const HttpResponse& response, long long nowS);
-  void noteSuccess();
-  void noteUnreachable(const QString& detail);
-  void noteServerError(const QString& message);
-
   const WmsSource m_source;
-  const std::shared_ptr<NetworkClient> m_network;
-  const WmsProviderSettings m_settings;
-  const std::unique_ptr<TileDiskCache> m_cache;
-  mutable std::mutex m_mutex;
-  int m_unreachableInARow = 0;
-  std::chrono::steady_clock::time_point m_leftAloneUntil;
-  WmsStatistics m_statistics;
+  const std::unique_ptr<CachedTileFetcher> m_fetcher;
 };
 
 /**

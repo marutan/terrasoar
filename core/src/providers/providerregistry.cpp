@@ -105,14 +105,14 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
 }
 
 ProviderRegistry::ProviderRegistry()
-    : m_wmsSettings(std::make_unique<WmsProviderSettings>())
+    : m_wmsSettings(std::make_unique<WebTileSettings>())
 {
 }
 
 ProviderRegistry::~ProviderRegistry() = default;
 
 void ProviderRegistry::setWmsNetwork(std::shared_ptr<NetworkClient> network,
-                                     const WmsProviderSettings& settings)
+                                     const WebTileSettings& settings)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   m_network = std::move(network);
