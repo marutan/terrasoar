@@ -80,7 +80,7 @@ bool sphereInFrustum(const Camera& camera, const TileBounds& bounds)
 }
 
 bool samplesBehindHorizon(const Camera& camera, TileKey key,
-                          const TileSamples& samples)
+                          const TileSamples& samples, double raisedM)
 {
   // Very large tiles curve too much for nine samples to bound them.
   if (key.level < 2) {
@@ -95,7 +95,9 @@ bool samplesBehindHorizon(const Camera& camera, TileKey key,
   const double b = wgs84::semiMinorAxisM;
   const Vec3& eye = camera.eyeEcef();
   const Vec3 v{eye.x / a, eye.y / a, eye.z / b};
-  const double margin = length(v) * sampleSpacingRad(key) * 1.01;
+  // Terrain raised by h stays visible down to q·v ≈ 1 − h / b.
+  const double margin =
+      length(v) * sampleSpacingRad(key) * 1.01 + std::max(raisedM, 0.0) / b;
   return std::all_of(samples.begin(), samples.end(),
                      [&v, margin, a, b](const Vec3& sample) {
                        const Vec3 q{sample.x / a, sample.y / a, sample.z / b};
@@ -152,6 +154,8 @@ struct TileSelector::View {
   /** The view on the map for culling, map metres. */
   double halfWidthM = 0.0;
   double halfHeightM = 0.0;
+  /** TileSelectionSettings::terrainHeightM. */
+  double terrainHeightM = 0.0;
 
   explicit View(const Camera& viewCamera, bool forceMap = false)
       : camera(&viewCamera), morph(forceMap ? 1.0 : viewCamera.morph())
@@ -171,16 +175,18 @@ struct TileSelector::View {
   bool isVisible(TileKey key, const TileSamples& samples,
                  const TileBounds& bounds) const
   {
+    TileBounds raised = bounds;
+    raised.radiusM += terrainHeightM;
     if (morph <= 0.0) {
-      return sphereInFrustum(*camera, bounds) &&
-             !samplesBehindHorizon(*camera, key, samples);
+      return sphereInFrustum(*camera, raised) &&
+             !samplesBehindHorizon(*camera, key, samples, terrainHeightM);
     }
     if (rectOnMap(frame, key, halfWidthM, halfHeightM)) {
       return true;
     }
     // Changing view: also what the globe shows, the far side included (it
     // unrolls into view).
-    return morph < 1.0 && sphereInFrustum(*camera, bounds);
+    return morph < 1.0 && sphereInFrustum(*camera, raised);
   }
 
   bool isVisible(TileKey key) const
@@ -212,7 +218,7 @@ bool TileSelector::isInFrustum(const Camera& camera, TileKey key)
 
 bool TileSelector::isBehindHorizon(const Camera& camera, TileKey key)
 {
-  return samplesBehindHorizon(camera, key, tileSamples(key));
+  return samplesBehindHorizon(camera, key, tileSamples(key), 0.0);
 }
 
 bool TileSelector::isVisible(const Camera& camera, TileKey key)
@@ -282,7 +288,8 @@ TileSelection TileSelector::select(
     const std::function<bool(const TileKey&)>& isRenderable) const
 {
   TileSelection selection;
-  const View view(camera);
+  View view(camera);
+  view.terrainHeightM = m_settings.terrainHeightM;
   for (const TileKey& root : TileKey::roots()) {
     visit(view, root, isRenderable, selection);
   }

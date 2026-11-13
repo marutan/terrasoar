@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "ts/globe/layerstackdraws.h"
 
+#include <algorithm>
+#include <cmath>
 #include <functional>
 
 #include "ts/providers/providerregistry.h"
@@ -81,7 +83,50 @@ QStringList attributionsForStack(const LayerStack& stack,
   for (std::size_t i = stack.imagery.size(); i-- > 0;) {
     add(stack.imagery[i].definition.source);
   }
+  for (std::size_t i = stack.elevation.size(); i-- > 0;) {
+    if (stack.elevation[i].visible) {
+      add(stack.elevation[i].definition.source);
+      break;
+    }
+  }
   return attributions;
+}
+
+double terrainExaggeration(const LayerDefinition& definition)
+{
+  const double value =
+      definition.style.value(QStringLiteral("exaggeration")).toDouble(1.0);
+  return std::isfinite(value) ? std::clamp(value, 0.1, 20.0) : 1.0;
+}
+
+ElevationDraw elevationDrawForStack(const LayerStack& stack,
+                                    ProviderRegistry& registry,
+                                    QStringList* errors)
+{
+  ElevationDraw draw;
+  if (stack.elevation.empty()) {
+    return draw;
+  }
+  // The topmost visible layer, or the topmost of all (its heights stay
+  // loaded for when it is switched on).
+  const ElevationStackEntry* chosen = &stack.elevation.back();
+  for (std::size_t i = stack.elevation.size(); i-- > 0;) {
+    if (stack.elevation[i].visible) {
+      chosen = &stack.elevation[i];
+      break;
+    }
+  }
+  QString error;
+  draw.provider = registry.elevation(chosen->definition.source, &error);
+  if (!draw.provider) {
+    if (errors != nullptr && chosen->visible) {
+      errors->append(error);
+    }
+    return draw;
+  }
+  draw.visible = chosen->visible;
+  draw.exaggeration = terrainExaggeration(chosen->definition);
+  return draw;
 }
 
 } // namespace ts

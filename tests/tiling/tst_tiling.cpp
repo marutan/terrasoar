@@ -17,6 +17,7 @@
 
 #include "concurrency.h"
 #include "ts/camera/camera.h"
+#include "ts/elevation/heightgrid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/maths/angles.h"
 #include "ts/projection/projection.h"
@@ -254,6 +255,63 @@ private slots:
 
   // --- Meshes
   // -----------------------------------------------------------------
+
+  void meshTerrain()
+  {
+    // A ramp rising eastwards, with a strip below sea level in the west.
+    const ts::TileKey key{6, 70, 20};
+    ts::HeightTile heights;
+    heights.key = key;
+    heights.samples = 5;
+    for (int row = 0; row < 5; ++row) {
+      for (int column = 0; column < 5; ++column) {
+        heights.heightsM.push_back(static_cast<float>(-50.0 + 100.0 * column));
+        heights.seaLevelM.push_back(20.0F);
+      }
+    }
+    const int n = 4;
+    const ts::TileMesh flat = ts::buildTileMesh(key, n);
+    const ts::TileMesh raised = ts::buildTileMesh(key, n, &heights);
+    QCOMPARE(raised.vertices.size(), flat.vertices.size());
+    const std::size_t grid =
+        (static_cast<std::size_t>(n) + 1) * (static_cast<std::size_t>(n) + 1);
+    for (std::size_t i = 0; i < flat.vertices.size(); ++i) {
+      // The same place on the ellipsoid either way: the shader raises it.
+      QCOMPARE(raised.vertices[i].offsetM, flat.vertices[i].offsetM);
+      QCOMPARE(flat.vertices[i].terrain, (std::array<float, 3>{}));
+    }
+    // Grid vertex (column 3, row 2): its height, the sea level, no drop.
+    const ts::TileVertex& vertex = raised.vertices[2 * (n + 1) + 3];
+    QCOMPARE(vertex.terrain[0], 250.0F);
+    QCOMPARE(vertex.terrain[1], 20.0F);
+    QCOMPARE(vertex.terrain[2], 0.0F);
+    // Rising eastwards: a positive slope east, none north.
+    QVERIFY(vertex.slope[0] > 0.0F);
+    QCOMPARE(vertex.slope[1], 0.0F);
+    // Below sea level (column 0) the sea floor is flat: the slope there is
+    // that of the drawn surface, from 0 up to the next column.
+    QCOMPARE(raised.vertices[0].terrain[0], -50.0F);
+    // Skirts hang as far as the drawn heights vary (0 to 330 m) plus 1 m.
+    for (std::size_t i = grid; i < raised.vertices.size(); ++i) {
+      QCOMPARE(raised.vertices[i].terrain[2], 331.0F);
+    }
+  }
+
+  void selectionKeepsMountainsAboveTheHorizon()
+  {
+    // Low over the surface, looking far: with a margin for terrain, tiles
+    // just past the ellipsoid's horizon stay, mountains on them could show.
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{0.0, 0.0, 3.0e4, 90.0, 85.0});
+    ts::TileSelectionSettings settings;
+    const ts::TileSelection plain =
+        ts::TileSelector(settings).select(camera, everythingRenderable);
+    settings.terrainHeightM = 9000.0;
+    const ts::TileSelection raised =
+        ts::TileSelector(settings).select(camera, everythingRenderable);
+    QVERIFY(raised.visited > plain.visited);
+    QVERIFY(!overlaps(raised.render));
+  }
 
   void meshGeometry_data()
   {

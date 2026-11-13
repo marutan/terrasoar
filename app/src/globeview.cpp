@@ -224,6 +224,37 @@ void GlobeView::setVectorDraws(const std::vector<VectorLayerDraw>& draws)
   update();
 }
 
+void GlobeView::setElevationDraw(const ElevationDraw& draw)
+{
+  m_elevationDraw = draw;
+  if (m_globe) {
+    makeCurrent();
+    m_globe->setElevationProvider(m_elevationDraw.provider);
+    m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
+    doneCurrent();
+  }
+  updateSurfaceHeight();
+  update();
+}
+
+bool GlobeView::terrainShown() const
+{
+  return m_globe && m_globe->terrainShown();
+}
+
+void GlobeView::updateSurfaceHeight()
+{
+  // Picking and the camera's floor follow the terrain while it is shown.
+  if (m_globe && m_globe->terrainShown()) {
+    m_controller.setSurfaceHeight([this](double latDeg, double lonDeg) {
+      return m_globe ? m_globe->terrainHeightM(latDeg, lonDeg)
+                     : std::optional<double>();
+    });
+  } else {
+    m_controller.setSurfaceHeight({});
+  }
+}
+
 void GlobeView::setAttributions(const QStringList& attributions)
 {
   if (m_attributions != attributions) {
@@ -345,6 +376,9 @@ void GlobeView::initializeGL()
   style.graticule = false;
   m_globe->setStyle(style);
   m_globe->setVectorLayers(m_vectorDraws);
+  m_globe->setElevationProvider(m_elevationDraw.provider);
+  m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
+  updateSurfaceHeight();
 }
 
 void GlobeView::releaseGl()

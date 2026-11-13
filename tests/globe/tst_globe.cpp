@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -19,6 +20,7 @@
 #include "mockwms.h"
 #include "offscreengl.h"
 #include "ts/camera/camera.h"
+#include "ts/elevation/heightgrid.h"
 #include "ts/geo/ellipsoid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/globe/globerenderer.h"
@@ -165,6 +167,49 @@ bool isGlobe(const QImage& image, int x, int y)
              std::abs(c.blue() - to8Bit(style.backgroundRgb[2])) >
          6;
 }
+
+/**
+ * Steep synthetic mountains: 4 km ridges less than a degree apart, sea
+ * level 30 m above the ellipsoid. Tiles of different levels sample them
+ * differently, so neighbours at different levels disagree, which the
+ * skirts must hide.
+ */
+class SineElevation : public ts::ElevationProvider
+{
+public:
+  QString id() const override { return QStringLiteral("test:sine"); }
+  QString name() const override { return QStringLiteral("Sine"); }
+  int maximumLevel() const override { return 8; }
+
+  static double heightM(double latDeg, double lonDeg)
+  {
+    return 30.0 + 2000.0 +
+           2000.0 * std::sin(latDeg * 7.0) * std::cos(lonDeg * 9.0);
+  }
+
+  std::optional<ts::HeightTile>
+  loadHeights(ts::TileKey key, const std::atomic<bool>& /*cancelled*/) override
+  {
+    // Beyond level 8, the level-8 ancestor's samples interpolated.
+    ts::TileKey stored = key;
+    while (stored.level > maximumLevel()) {
+      stored = stored.parent();
+    }
+    ts::HeightTile tile;
+    tile.key = stored;
+    tile.samples = 17;
+    for (int row = 0; row < 17; ++row) {
+      for (int column = 0; column < 17; ++column) {
+        const ts::GeoPoint point =
+            ts::heightSamplePoint(stored, 17, row, column);
+        tile.heightsM.push_back(
+            static_cast<float>(heightM(point.latDeg, point.lonDeg)));
+        tile.seaLevelM.push_back(30.0F);
+      }
+    }
+    return stored == key ? tile : ts::resampleHeightTile(tile, key, 17);
+  }
+};
 
 } // namespace
 
@@ -1147,39 +1192,56 @@ private slots:
     QTest::addColumn<double>("tiltDeg");
     QTest::addColumn<QString>("projection");
     QTest::addColumn<double>("morph");
+    // The terrain's exaggeration; 0 for none (no elevation source).
+    QTest::addColumn<double>("terrain");
     const QString none;
-    QTest::newRow("base-uk") << 54.5 << -3.0 << 2.0e6 << 0.0 << none << 0.0;
+    QTest::newRow("base-uk")
+        << 54.5 << -3.0 << 2.0e6 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-uk-close")
-        << 51.5 << -0.5 << 1.5e5 << 30.0 << none << 0.0;
+        << 51.5 << -0.5 << 1.5e5 << 30.0 << none << 0.0 << 0.0;
     QTest::newRow("base-pacific-antimeridian")
-        << -17.5 << 179.5 << 1.5e6 << 0.0 << none << 0.0;
+        << -17.5 << 179.5 << 1.5e6 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-pacific-wide")
-        << 0.0 << 180.0 << 1.2e7 << 0.0 << none << 0.0;
+        << 0.0 << 180.0 << 1.2e7 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-north-pole")
-        << 90.0 << 0.0 << 7.0e6 << 0.0 << none << 0.0;
+        << 90.0 << 0.0 << 7.0e6 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-north-pole-close")
-        << 82.0 << -40.0 << 1.5e6 << 30.0 << none << 0.0;
+        << 82.0 << -40.0 << 1.5e6 << 30.0 << none << 0.0 << 0.0;
     QTest::newRow("base-south-pole")
-        << -90.0 << 0.0 << 9.0e6 << 0.0 << none << 0.0;
+        << -90.0 << 0.0 << 9.0e6 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-south-pole-close")
-        << -77.5 << 166.0 << 6.0e5 << 30.0 << none << 0.0;
+        << -77.5 << 166.0 << 6.0e5 << 30.0 << none << 0.0 << 0.0;
     // The same data on the flat maps and half-way there.
     const QString mercator = QStringLiteral("mercator");
     const QString miller = QStringLiteral("miller");
     QTest::newRow("base-map-mercator-world")
-        << 0.0 << 0.0 << 5.0e7 << 0.0 << mercator << 1.0;
+        << 0.0 << 0.0 << 5.0e7 << 0.0 << mercator << 1.0 << 0.0;
     QTest::newRow("base-map-miller-world")
-        << 0.0 << 0.0 << 5.0e7 << 0.0 << miller << 1.0;
+        << 0.0 << 0.0 << 5.0e7 << 0.0 << miller << 1.0 << 0.0;
     QTest::newRow("base-map-uk")
-        << 54.5 << -3.0 << 2.0e6 << 0.0 << mercator << 1.0;
+        << 54.5 << -3.0 << 2.0e6 << 0.0 << mercator << 1.0 << 0.0;
     QTest::newRow("base-map-pacific-antimeridian")
-        << -17.5 << 179.5 << 1.5e6 << 0.0 << mercator << 1.0;
+        << -17.5 << 179.5 << 1.5e6 << 0.0 << mercator << 1.0 << 0.0;
     QTest::newRow("base-map-pacific-wide")
-        << 0.0 << 180.0 << 1.2e7 << 0.0 << miller << 1.0;
+        << 0.0 << 180.0 << 1.2e7 << 0.0 << miller << 1.0 << 0.0;
     QTest::newRow("base-map-antarctica")
-        << -75.0 << 0.0 << 6.0e6 << 0.0 << miller << 1.0;
+        << -75.0 << 0.0 << 6.0e6 << 0.0 << miller << 1.0 << 0.0;
     QTest::newRow("base-morph-half")
-        << 30.0 << 20.0 << 1.6e7 << 0.0 << mercator << 0.5;
+        << 30.0 << 20.0 << 1.6e7 << 0.0 << mercator << 0.5 << 0.0;
+    // Terrain from the base pack's DEM, looking across mountains.
+    QTest::newRow("base-terrain-alps")
+        << 46.0 << 8.0 << 2.0e5 << 65.0 << none << 0.0 << 3.0;
+    QTest::newRow("base-terrain-everest")
+        << 27.0 << 86.9 << 3.0e5 << 65.0 << none << 0.0 << 2.0;
+    QTest::newRow("base-terrain-erebus-antimeridian")
+        << -77.0 << 167.0 << 2.0e5 << 65.0 << none << 0.0 << 3.0;
+    // Half-way to the map the terrain is half flattened.
+    QTest::newRow("base-terrain-morph-half")
+        << 46.0 << 8.0 << 3.0e5 << 45.0 << mercator << 0.5 << 3.0;
+    // Loaded but switched off: the same picture as without terrain (its
+    // golden image is base-uk-close's).
+    QTest::newRow("base-uk-close-terrain-off")
+        << 51.5 << -0.5 << 1.5e5 << 30.0 << none << 0.0 << -1.0;
   }
 
   void basePackGolden()
@@ -1199,6 +1261,7 @@ private slots:
     QFETCH(double, tiltDeg);
     QFETCH(QString, projection);
     QFETCH(double, morph);
+    QFETCH(double, terrain);
     QString error;
     const std::optional<ts::PackManifest> manifest =
         ts::PackManifest::read(directory, &error);
@@ -1232,6 +1295,17 @@ private slots:
     m_renderer->setStyle(style);
     m_renderer->setImageryLayers(imagery.layers, imagery.groupAlphas);
     m_renderer->setVectorLayers(vectors);
+    if (terrain != 0.0) {
+      const std::shared_ptr<ts::ElevationProvider> elevation =
+          registry.elevation(
+              QJsonObject{
+                  {QStringLiteral("kind"), QStringLiteral("basepack")},
+                  {QStringLiteral("dataset"), QStringLiteral("elevation")}},
+              &error);
+      QVERIFY2(elevation, qPrintable(error));
+      m_renderer->setElevationProvider(elevation);
+      m_renderer->setTerrain(terrain > 0.0, std::max(terrain, 1.0));
+    }
     ts::Camera camera =
         makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, tiltDeg});
     if (!projection.isEmpty()) {
@@ -1245,15 +1319,112 @@ private slots:
     m_gl->makeCurrent();
     m_renderer->setVectorLayers({});
     m_renderer->setImageryLayers({}, {});
+    m_renderer->setElevationProvider(nullptr);
+    m_renderer->setTerrain(false, 1.0);
     m_renderer->setStyle(ts::GlobeStyle());
     QCOMPARE(m_gl->device().takeErrors(), QString());
     if (!m_softwareRenderer &&
         qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
       QSKIP("Golden images are compared on Mesa llvmpipe only.");
     }
-    const QString failure = ts::test::checkGolden(
-        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QString golden = QString::fromLatin1(QTest::currentDataTag());
+    golden.remove(QStringLiteral("-terrain-off"));
+    const QString failure =
+        ts::test::checkGolden(image, golden, goldenTolerance);
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void terrainHasNoCracks()
+  {
+    // Steep exaggerated terrain seen at a grazing angle, against a
+    // magenta sky: below the first ground pixel of each column there must
+    // be no sky at all, so no gap between tiles of different levels.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    style.backgroundRgb = {1.0F, 0.0F, 1.0F};
+    m_renderer->setStyle(style);
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>(256));
+    m_renderer->setElevationProvider(std::make_shared<SineElevation>());
+    m_renderer->setTerrain(true, 5.0);
+    const QImage image = renderSettled(
+        makeCamera(ts::CameraPose{20.0, 30.0, 4.0e5, 30.0, 70.0}));
+    m_gl->makeCurrent();
+
+    m_renderer->setElevationProvider(nullptr);
+    m_renderer->setTerrain(false, 1.0);
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(!image.isNull());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    const QString output = qEnvironmentVariable("TS_GOLDEN_OUTPUT");
+    if (!output.isEmpty()) {
+      image.save(QDir(output).filePath(QStringLiteral("terrain-cracks.png")));
+    }
+    const std::function<bool(int, int)> sky = [&image](int x, int y) {
+      const QColor c = image.pixelColor(x, y);
+      return c.red() > 240 && c.green() < 15 && c.blue() > 240;
+    };
+    int ground = 0;
+    int cracks = 0;
+    for (int x = 0; x < image.width(); ++x) {
+      int y = 0;
+      while (y < image.height() && sky(x, y)) {
+        ++y;
+      }
+      for (; y < image.height(); ++y) {
+        ++ground;
+        cracks += sky(x, y) ? 1 : 0;
+      }
+    }
+    QVERIFY(ground > image.width() * image.height() / 3);
+    QCOMPARE(cracks, 0);
+  }
+
+  void terrainOffDrawsTheEllipsoid()
+  {
+    // Heights loaded but the terrain off: the same picture as without
+    // them (the vertex shader adds nothing).
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>(256));
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{20.0, 30.0, 2.0e6, 10.0, 40.0});
+    const QImage plain = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setElevationProvider(std::make_shared<SineElevation>());
+    m_renderer->setTerrain(false, 5.0);
+    const QImage off = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setTerrain(true, 5.0);
+    const QImage on = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setElevationProvider(nullptr);
+    m_renderer->setTerrain(false, 1.0);
+    m_renderer->setImageryProvider(nullptr);
+    QVERIFY(!plain.isNull() && !off.isNull() && !on.isNull());
+    int differing = 0;
+    int changed = 0;
+    for (int y = 0; y < plain.height(); ++y) {
+      for (int x = 0; x < plain.width(); ++x) {
+        const QColor a = plain.pixelColor(x, y);
+        const QColor b = off.pixelColor(x, y);
+        const QColor c = on.pixelColor(x, y);
+        differing += std::abs(a.red() - b.red()) +
+                                 std::abs(a.green() - b.green()) +
+                                 std::abs(a.blue() - b.blue()) >
+                             6
+                         ? 1
+                         : 0;
+        changed += a != c ? 1 : 0;
+      }
+    }
+    QCOMPARE(differing, 0);
+    // And switched on, it does change the picture.
+    QVERIFY(changed > plain.width() * plain.height() / 10);
   }
 
   void silhouetteMatchesPicking()

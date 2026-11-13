@@ -23,6 +23,7 @@
 namespace ts
 {
 
+class ElevationProvider;
 class FeatureProvider;
 
 /** How a VectorTileLoader works. */
@@ -31,6 +32,11 @@ struct VectorTileLoaderSettings {
   int threads = 2;
   /** How the meshes are cut. */
   VectorMeshSettings mesh;
+  /**
+   * The terrain's heights are sampled this many levels below a stored
+   * tile's level (at most the elevation source's deepest level).
+   */
+  int terrainLevelsBelow = 3;
 };
 
 /**
@@ -46,9 +52,14 @@ struct VectorTileLoaderSettings {
 class VectorTileLoader
 {
 public:
-  /** Starts the workers. */
+  /**
+   * Starts the workers. With @p elevation, every vertex gets the
+   * terrain's height under it (VectorVertex::terrain), so the features
+   * lie on the terrain when it is shown.
+   */
   VectorTileLoader(std::shared_ptr<FeatureProvider> provider,
-                   const VectorTileLoaderSettings& settings = {});
+                   const VectorTileLoaderSettings& settings = {},
+                   std::shared_ptr<ElevationProvider> elevation = nullptr);
 
   /** Cancels everything and joins the workers. */
   ~VectorTileLoader();
@@ -90,6 +101,7 @@ private:
 
   std::shared_ptr<FeatureProvider> m_provider;
   VectorTileLoaderSettings m_settings;
+  std::shared_ptr<ElevationProvider> m_elevation;
   mutable std::mutex m_mutex;
   std::condition_variable m_wake;
   bool m_stopping = false;

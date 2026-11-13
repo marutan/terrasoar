@@ -4,7 +4,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <utility>
+#include <vector>
 
+#include "ts/elevation/heightgrid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
@@ -75,7 +78,85 @@ double tileSkirtDepthM(int level, int segments)
   return 2.0 * sagM + 1.0;
 }
 
-TileMesh buildTileMesh(TileKey key, int segments)
+namespace
+{
+
+/**
+ * The terrain at the grid vertices of @p key from @p heights: height
+ * above the ellipsoid, sea level, and the height above sea level with the
+ * sea floor flattened (what is drawn), row by row.
+ */
+struct GridTerrain {
+  std::vector<float> heightM;
+  std::vector<float> seaLevelM;
+  std::vector<double> landM;
+};
+
+GridTerrain sampleTerrain(TileKey key, int n, const HeightTile& heights)
+{
+  const GeoRect rect = key.bounds();
+  GridTerrain terrain;
+  const std::size_t side = static_cast<std::size_t>(n) + 1;
+  const std::size_t count = side * side;
+  terrain.heightM.reserve(count);
+  terrain.seaLevelM.reserve(count);
+  terrain.landM.reserve(count);
+  for (int row = 0; row <= n; ++row) {
+    const double lat = rect.northDeg - rect.heightDeg() * row / n;
+    for (int column = 0; column <= n; ++column) {
+      const double lon = rect.westDeg + rect.widthDeg() * column / n;
+      const double height = sampleHeightM(heights, lat, lon).value_or(0.0);
+      const double sea = sampleSeaLevelM(heights, lat, lon).value_or(0.0);
+      terrain.heightM.push_back(static_cast<float>(height));
+      terrain.seaLevelM.push_back(static_cast<float>(sea));
+      terrain.landM.push_back(std::max(height - sea, 0.0));
+    }
+  }
+  return terrain;
+}
+
+/** The drawn height of grid vertex (@p column, @p row). */
+double landAt(const GridTerrain& terrain, int n, int column, int row)
+{
+  return terrain.landM[static_cast<std::size_t>(gridIndex(n, column, row))];
+}
+
+/**
+ * The slope (east, north) of the drawn terrain at grid vertex (column,
+ * row): central differences inside the grid, one-sided on its border.
+ */
+// Column then row, as gridIndex().
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+std::array<float, 2> slopeAt(const GridTerrain& terrain, TileKey key, int n,
+                             int column, int row)
+// NOLINTEND(bugprone-easily-swappable-parameters)
+{
+  const GeoRect rect = key.bounds();
+  const int west = std::max(column - 1, 0);
+  const int east = std::min(column + 1, n);
+  const int north = std::max(row - 1, 0);
+  const int south = std::min(row + 1, n);
+  const double lat = rect.northDeg - rect.heightDeg() * row / n;
+  // Metres per degree on the ellipsoid, near enough for shading.
+  const double metresPerDegree = degToRad(1.0) * wgs84::semiMajorAxisM;
+  const double dxM = (east - west) * rect.widthDeg() / n * metresPerDegree *
+                     std::max(std::cos(degToRad(lat)), 1e-6);
+  const double dyM = (south - north) * rect.heightDeg() / n * metresPerDegree;
+  const double towardsEast =
+      dxM > 0.0
+          ? (landAt(terrain, n, east, row) - landAt(terrain, n, west, row)) /
+                dxM
+          : 0.0;
+  const double towardsNorth = dyM > 0.0 ? (landAt(terrain, n, column, north) -
+                                           landAt(terrain, n, column, south)) /
+                                              dyM
+                                        : 0.0;
+  return {static_cast<float>(towardsEast), static_cast<float>(towardsNorth)};
+}
+
+} // namespace
+
+TileMesh buildTileMesh(TileKey key, int segments, const HeightTile* heights)
 {
   const int n = clampSegments(segments);
   const GeoRect rect = key.bounds();
@@ -85,6 +166,8 @@ TileMesh buildTileMesh(TileKey key, int segments)
   mesh.centreEcef = key.centreEcef();
   const int vertexCount = (n + 1) * (n + 1) + 4 * n;
   mesh.vertices.reserve(static_cast<std::size_t>(vertexCount));
+  const GridTerrain terrain =
+      heights != nullptr ? sampleTerrain(key, n, *heights) : GridTerrain{};
 
   for (int row = 0; row <= n; ++row) {
     const double v = static_cast<double>(row) / n;
@@ -95,11 +178,30 @@ TileMesh buildTileMesh(TileKey key, int segments)
       const Vec3 position = geodeticToEcef(Geodetic{lat, lon, 0.0});
       const Vec3 offset = position - mesh.centreEcef;
       mesh.radiusM = std::max(mesh.radiusM, length(offset));
-      mesh.vertices.push_back(TileVertex{
-          toFloat3(offset), {static_cast<float>(u), static_cast<float>(v)}});
+      TileVertex vertex{toFloat3(offset),
+                        {static_cast<float>(u), static_cast<float>(v)},
+                        {},
+                        {}};
+      if (heights != nullptr) {
+        const std::size_t i =
+            static_cast<std::size_t>(gridIndex(n, column, row));
+        vertex.terrain = {terrain.heightM[i], terrain.seaLevelM[i], 0.0F};
+        vertex.slope = slopeAt(terrain, key, n, column, row);
+      }
+      mesh.vertices.push_back(vertex);
     }
   }
 
+  // The skirt hangs below the chord sag and, with terrain, as far as the
+  // tile's drawn terrain varies (in terrain metres, so it scales with the
+  // exaggeration), plus a metre.
+  float dropM = 0.0F;
+  if (heights != nullptr) {
+    const std::pair<std::vector<double>::const_iterator,
+                    std::vector<double>::const_iterator>
+        range = std::minmax_element(terrain.landM.begin(), terrain.landM.end());
+    dropM = static_cast<float>(*range.second - *range.first + 1.0);
+  }
   const double depthM = tileSkirtDepthM(key.level, n);
   for (const std::array<int, 2>& cell : borderCells(n)) {
     const TileVertex& top =
@@ -112,7 +214,9 @@ TileMesh buildTileMesh(TileKey key, int segments)
                              static_cast<double>(top.offsetM[2])} +
                         down;
     mesh.radiusM = std::max(mesh.radiusM, length(offset));
-    mesh.vertices.push_back(TileVertex{toFloat3(offset), top.uv});
+    TileVertex skirt{toFloat3(offset), top.uv, top.terrain, top.slope};
+    skirt.terrain[2] = dropM;
+    mesh.vertices.push_back(skirt);
   }
   return mesh;
 }

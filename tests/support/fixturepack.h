@@ -24,6 +24,7 @@
 #include <QString>
 
 #include "ts/deps/sqliteconnection.h"
+#include "ts/elevation/heightgrid.h"
 #include "ts/packs/basepack.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
@@ -156,11 +157,30 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
   }
   const QString countries = QStringLiteral("countries.gpkg");
   writeFixtureCountries(dir.filePath(countries));
+  // Terrain 500 m above the ellipsoid everywhere (no geoid needed).
+  const QString elevation = QStringLiteral("elevation.sqlite");
+  {
+    SqliteTileStoreInfo heightsInfo;
+    heightsInfo.format = QStringLiteral("heights");
+    heightsInfo.tileSizePx = 9;
+    heightsInfo.maxLevel = 1;
+    heightsInfo.name = QStringLiteral("Fixture elevation");
+    SqliteTileStoreWriter writer(dir.filePath(elevation), heightsInfo);
+    const std::vector<float> flat(81, 500.0F);
+    for (int level = 0; level <= 1; ++level) {
+      for (int y = 0; y < TileKey::rows(level); ++y) {
+        for (int x = 0; x < TileKey::columns(level); ++x) {
+          writer.putTile(TileKey{level, x, y}, encodeHeightGrid(flat, 9));
+        }
+      }
+    }
+    writer.finish();
+  }
   const std::atomic<bool> notCancelled{false};
   PackManifest manifest;
   manifest.id = basePackId();
   manifest.version = QStringLiteral("test");
-  for (const QString& path : {file, shoreline, countries}) {
+  for (const QString& path : {file, shoreline, countries, elevation}) {
     PackFile packFile;
     packFile.path = path;
     packFile.sizeBytes = QFileInfo(dir.filePath(path)).size();
@@ -179,6 +199,12 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
   dataset.file = shoreline;
   dataset.name = QStringLiteral("Fixture shoreline");
   dataset.attribution = QStringLiteral("Fixture shoreline");
+  manifest.datasets.push_back(dataset);
+  dataset.id = QStringLiteral("elevation");
+  dataset.kind = PackDataset::Kind::Elevation;
+  dataset.file = elevation;
+  dataset.name = QStringLiteral("Fixture elevation");
+  dataset.attribution = QStringLiteral("Fixture elevation");
   manifest.datasets.push_back(dataset);
   dataset.id = QStringLiteral("countries");
   dataset.kind = PackDataset::Kind::Areas;

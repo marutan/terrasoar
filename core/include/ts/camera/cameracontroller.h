@@ -98,6 +98,9 @@ public:
   /** Returns the camera. */
   const Camera& camera() const { return m_camera; }
 
+  /** See Camera::setSurfaceHeight(). */
+  void setSurfaceHeight(Camera::SurfaceHeight surfaceHeight);
+
   /**
    * Sets the camera pose directly, stopping any animation (a change of
    * view mode in progress finishes at once).

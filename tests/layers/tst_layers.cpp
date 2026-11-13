@@ -694,6 +694,60 @@ private slots:
     QCOMPARE(failures, 0);
   }
 
+  void elevationInTheStack()
+  {
+    // Elevation layers are in the stack hidden or not; the topmost visible
+    // one is the terrain, else the topmost keeps its heights loaded.
+    ts::LayerTreeModel model;
+    ts::LayerDefinition terrain;
+    for (const ts::LayerDefinition& definition :
+         ts::builtinLayerDefinitions()) {
+      if (definition.id == QLatin1String("builtin:terrain")) {
+        terrain = definition;
+      }
+    }
+    QCOMPARE(terrain.type, ts::LayerType::Elevation);
+    QCOMPARE(ts::terrainExaggeration(terrain), 1.0);
+    const QModelIndex lower = model.addLayer(terrain);
+    ts::LayerDefinition steep = terrain;
+    steep.id = QStringLiteral("user:steep");
+    steep.style.insert(QStringLiteral("exaggeration"), 3.0);
+    const QModelIndex collection =
+        model.addCollection(QStringLiteral("Hidden"));
+    model.addLayer(steep, collection);
+    model.setData(collection, Qt::Unchecked, Qt::CheckStateRole);
+
+    ts::LayerStack stack = model.layerStack();
+    QCOMPARE(stack.elevation.size(), std::size_t{2});
+    QVERIFY(stack.elevation[0].visible);  // the lower, checked
+    QVERIFY(!stack.elevation[1].visible); // in a hidden collection
+    QCOMPARE(stack.elevation[1].definition.id, QStringLiteral("user:steep"));
+    QVERIFY(stack.imagery.empty() && stack.vectors.empty());
+
+    // Without a base pack nothing can be opened: an error only for the
+    // visible one.
+    ts::ProviderRegistry registry;
+    QStringList errors;
+    ts::ElevationDraw draw =
+        ts::elevationDrawForStack(stack, registry, &errors);
+    QVERIFY(!draw.provider);
+    QCOMPARE(errors.size(), 1);
+    model.setData(lower, Qt::Unchecked, Qt::CheckStateRole);
+    stack = model.layerStack();
+    QVERIFY(!stack.elevation[0].visible);
+    errors.clear();
+    draw = ts::elevationDrawForStack(stack, registry, &errors);
+    QVERIFY(errors.isEmpty());
+    QVERIFY(!draw.visible);
+
+    // Exaggeration from the style, held to 0.1–20.
+    QCOMPARE(ts::terrainExaggeration(steep), 3.0);
+    steep.style.insert(QStringLiteral("exaggeration"), 500.0);
+    QCOMPARE(ts::terrainExaggeration(steep), 20.0);
+    steep.style.insert(QStringLiteral("exaggeration"), QStringLiteral("x"));
+    QCOMPARE(ts::terrainExaggeration(steep), 1.0);
+  }
+
   void benchmarkLayerStack()
   {
     ts::LayerTreeModel model;

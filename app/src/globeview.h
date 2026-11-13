@@ -115,6 +115,12 @@ public:
   /** Sets the vector layers (and the graticule), bottom to top. */
   void setVectorDraws(const std::vector<VectorLayerDraw>& draws);
 
+  /** Sets the terrain (see elevationDrawForStack()). */
+  void setElevationDraw(const ElevationDraw& draw);
+
+  /** Returns true if terrain is shown. */
+  bool terrainShown() const;
+
   /** Returns the number of vector layers drawn (the graticule included). */
   int vectorLayerCount() const
   {
@@ -283,6 +289,7 @@ protected:
 private:
   double nowS() const;
   void requestFrame();
+  void updateSurfaceHeight();
   void onFrameTimer();
   void releaseGl();
   void updatePointerReadout();
@@ -304,6 +311,7 @@ private:
   std::unique_ptr<GlobeRenderer> m_globe;
   ImageryDraws m_draws;
   std::vector<VectorLayerDraw> m_vectorDraws;
+  ElevationDraw m_elevationDraw;
   QStringList m_attributions;
   RenderDeviceInfo m_deviceInfo;
   QString m_error;

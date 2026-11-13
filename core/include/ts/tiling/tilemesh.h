@@ -16,12 +16,26 @@
 namespace ts
 {
 
-/** One vertex of a tile mesh, as uploaded to the GPU (20 bytes). */
+/** One vertex of a tile mesh, as uploaded to the GPU (40 bytes). */
 struct TileVertex {
-  /** Position relative to the tile centre, ECEF metres. */
+  /** Position on the ellipsoid relative to the tile centre, ECEF metres. */
   std::array<float, 3> offsetM{};
   /** Texture coordinate: u west → east, v north → south, both in [0, 1]. */
   std::array<float, 2> uv{};
+  /**
+   * Terrain, metres: the height above the ellipsoid, the sea level there
+   * (the geoid's height above the ellipsoid), and how far below its border
+   * vertex a skirt vertex hangs, in terrain metres (0 on the grid). The
+   * vertex shader raises the vertex along the ellipsoid's normal by
+   * sea + max(height − sea, 0) × exaggeration − drop × exaggeration, when
+   * terrain is on. All 0 without heights.
+   */
+  std::array<float, 3> terrain{};
+  /**
+   * The terrain's slope above sea level (the sea floor flattened), metres
+   * per metre towards east and towards north, for shading.
+   */
+  std::array<float, 2> slope{};
 };
 
 /**
@@ -60,13 +74,20 @@ struct TileMesh {
   std::vector<TileVertex> vertices;
 };
 
+struct HeightTile;
+
 /**
  * Builds the mesh of @p key with @p segments grid segments per side
- * (2 to 64).
+ * (2 to 64), with the terrain of @p heights (for @p key or an ancestor,
+ * interpolated; heights above the ellipsoid with their sea level) if
+ * given. The skirt then also hangs as far as the tile's terrain varies,
+ * which covers the gap to a neighbour whose terrain is sampled more or
+ * less finely. See docs/design/terrain.md.
  *
  * @threadsafe
  */
-TileMesh buildTileMesh(TileKey key, int segments = TileMesh::defaultSegments);
+TileMesh buildTileMesh(TileKey key, int segments = TileMesh::defaultSegments,
+                       const HeightTile* heights = nullptr);
 
 /**
  * Returns the 16-bit triangle indices shared by every mesh with

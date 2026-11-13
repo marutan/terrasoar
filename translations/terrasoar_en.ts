@@ -186,6 +186,10 @@
             <source>Graticule</source>
             <translation>Graticule</translation>
         </message>
+        <message>
+            <source>Terrain</source>
+            <translation>Terrain</translation>
+        </message>
     </context>
     <context>
         <name>ts::CountryAreas</name>
@@ -610,6 +614,18 @@
         <message>
             <source>Install more detailed imagery and shorelines, or remove them</source>
             <translation>Install more detailed imagery and shorelines, or remove them</translation>
+        </message>
+        <message>
+            <source>Terrain &amp;Exaggeration</source>
+            <translation>Terrain &amp;Exaggeration</translation>
+        </message>
+        <message>
+            <source>%1×</source>
+            <translation>%1×</translation>
+        </message>
+        <message>
+            <source>Draw the terrain %1 times as high as it is</source>
+            <translation>Draw the terrain %1 times as high as it is</translation>
         </message>
     </context>
     <context>

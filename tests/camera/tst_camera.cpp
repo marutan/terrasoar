@@ -142,6 +142,51 @@ class TestCamera : public QObject
 private slots:
   // --- Camera ----------------------------------------------------------------
 
+  void picksTheSurface()
+  {
+    // A plateau 1000 m up everywhere: picks land on it, and the camera
+    // stays above it.
+    ts::Camera camera = makeCamera(ts::CameraPose{10.0, 20.0, 5.0e4, 0.0, 0.0});
+    camera.setSurfaceHeight(
+        [](double, double) { return std::optional<double>(1000.0); });
+    const double cx = 0.5 * widthPx;
+    const double cy = 0.5 * heightPx;
+    const std::optional<ts::Geodetic> down = camera.pickGeodetic(cx, cy);
+    if (!down) {
+      QFAIL("nothing picked");
+    }
+    QVERIFY(std::abs(down->heightM - 1000.0) < 1e-6);
+    QVERIFY(std::abs(down->latDeg - 10.0) < 1e-6);
+    QVERIFY(std::abs(down->lonDeg - 20.0) < 1e-6);
+    // Tilted, the plateau is met before the ellipsoid would be.
+    camera.setPose(ts::CameraPose{10.0, 20.0, 5.0e4, 0.0, 60.0});
+    const std::optional<ts::Geodetic> raised = camera.pickGeodetic(cx, cy);
+    camera.setSurfaceHeight({});
+    const std::optional<ts::Geodetic> plain = camera.pickGeodetic(cx, cy);
+    if (!raised || !plain) {
+      QFAIL("nothing picked when tilted");
+    }
+    const ts::Vec3 eye = camera.eyeEcef();
+    QVERIFY(ts::distance(ts::geodeticToEcef(*raised), eye) <
+            ts::distance(ts::geodeticToEcef(*plain), eye));
+    QVERIFY(raised->latDeg < plain->latDeg); // looking north
+    // The sky is still the sky.
+    camera.setSurfaceHeight(
+        [](double, double) { return std::optional<double>(1000.0); });
+    camera.setPose(ts::CameraPose{10.0, 20.0, 5.0e4, 0.0, 85.0});
+    QVERIFY(!camera.pickGeodetic(cx, 1.0));
+
+    // The eye stays terrainClearanceM above the plateau.
+    camera.setPose(ts::CameraPose{10.0, 20.0, 100.0, 0.0, 0.0});
+    QVERIFY(camera.eyeGeodetic().heightM >=
+            1000.0 + ts::Camera::terrainClearanceM - 1e-3);
+    // Unknown heights (nothing loaded yet) don't hold it up.
+    camera.setSurfaceHeight(
+        [](double, double) { return std::optional<double>(); });
+    camera.setPose(ts::CameraPose{10.0, 20.0, 100.0, 0.0, 0.0});
+    QVERIFY(camera.eyeGeodetic().heightM < 1000.0);
+  }
+
   void poseIsClamped()
   {
     ts::Camera camera;

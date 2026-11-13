@@ -27,13 +27,14 @@ constexpr std::array<std::pair<LayerOrigin, const char*>, 3> originNames = {{
 }};
 
 /** Names of the built-in definitions, for lupdate; translated on load. */
-constexpr std::array<const char*, 6> builtinNames = {
+constexpr std::array<const char*, 7> builtinNames = {
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Blue Marble"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Shoreline"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Land"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Graticule"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Checkerboard"),
     QT_TRANSLATE_NOOP("ts::BuiltinLayers", "White, 50 %"),
+    QT_TRANSLATE_NOOP("ts::BuiltinLayers", "Terrain"),
 };
 
 /** The built-in definitions, in the same JSON as catalogues and projects. */
@@ -60,7 +61,11 @@ const char* const builtinJson = R"([
     "source": { "kind": "checkerboard", "tileSize": 256 } },
   { "id": "builtin:solid-white-50", "origin": "builtin", "type": "imagery",
     "name": "White, 50 %",
-    "source": { "kind": "solid", "color": "#80ffffff", "tileSize": 64 } }
+    "source": { "kind": "solid", "color": "#80ffffff", "tileSize": 64 } },
+  { "id": "builtin:terrain", "origin": "builtin", "type": "elevation",
+    "name": "Terrain",
+    "source": { "kind": "basepack", "dataset": "elevation" },
+    "style": { "exaggeration": 1 } }
 ])";
 
 std::optional<LayerDefinition> fail(QString* errorString,

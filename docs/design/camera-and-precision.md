@@ -103,6 +103,12 @@ even without vsync (remote desktop) or with a 1000 Hz mouse. When nothing
 moves, no timer runs: the view uses no CPU (`tst_smoke` checks idle CPU;
 `tests/ui` checks that no frames are drawn while idle).
 
+### Terrain
+
+With terrain shown, `Camera::setSurfaceHeight()` makes picking find the
+terrain instead of the ellipsoid, and keeps the eye 20 m above it
+([terrain.md](terrain.md#drawing-the-terrain)).
+
 ## Precision
 
 A `float` has a 24-bit mantissa. ECEF coordinates are up to 6.4 × 10⁶ m,

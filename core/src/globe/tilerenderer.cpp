@@ -4,10 +4,13 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <functional>
 #include <unordered_set>
 #include <utility>
 
 #include "ts/camera/camera.h"
+#include "ts/elevation/heightgrid.h"
+#include "ts/elevation/heighttileloader.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
 #include "ts/maths/splitdouble.h"
@@ -112,6 +115,8 @@ layout(std140) uniform Tile {
 const char* const tileVertexGlsl = R"(
 layout(location = 0) in vec3 offset;
 layout(location = 1) in vec2 uv;
+layout(location = 2) in vec3 terrainIn;
+layout(location = 3) in vec2 slopeIn;
 out vec2 vUv;
 out float vDepthW;
 out vec3 vNormal;
@@ -123,6 +128,10 @@ void main()
   // vertex's float offset from the centre.
   vec3 position = (centreHigh.xyz - eyeHigh.xyz) + (centreLow.xyz - eyeLow.xyz)
                 + offset;
+  // The terrain raises the vertex along the ellipsoid's normal.
+  vec3 up = normalize((centreHigh.xyz + offset)
+                      * vec3(ellipsoid.z, ellipsoid.z, ellipsoid.w));
+  position += up * tsTerrainHeight(terrainIn);
   // The same vertex on the map, from its longitude and latitude.
   vec2 dLonLat = vec2(uv.x - 0.5, 0.5 - uv.y) * tileGeo.xy;
   vLonLatDeg = tileGeo.zw + degrees(dLonLat);
@@ -135,8 +144,7 @@ void main()
   vUv = uv;
   vRelative = position;
   vDepthW = clip.w;
-  vNormal = (centreHigh.xyz + offset)
-          * vec3(ellipsoid.z, ellipsoid.z, ellipsoid.w);
+  vNormal = tsTerrainNormal(up, slopeIn);
   gl_Position = clip;
 }
 )";
@@ -280,6 +288,8 @@ struct TileRenderer::GpuMesh {
   Float4 centreLow{};
   std::size_t bytes = 0;
   std::uint64_t lastUsedFrame = 0;
+  /** Level of the heights it was built with; −1 for none. */
+  int heightsLevel = -1;
 };
 
 struct TileRenderer::GpuImage {
@@ -324,7 +334,8 @@ struct TileRenderer::DrawTile {
 
 TileRenderer::TileRenderer(RenderDevice& device,
                            const TileRendererSettings& settings)
-    : m_device(device), m_settings(settings)
+    : m_device(device), m_settings(settings),
+      m_heights(settings.heightCacheBytes)
 {
   m_settings.loader.buildMeshes = false;
   m_settings.selection.minimumMapLevel = m_settings.minimumMapLevel;
@@ -388,7 +399,9 @@ bool TileRenderer::initialise(QString* errorString)
   pipeline.shader = m_shader.get();
   pipeline.bufferLayouts = {{sizeof(TileVertex), false}};
   pipeline.attributes = {{0, VertexFormat::Float3, 0, 0},
-                         {1, VertexFormat::Float2, 0, 12}};
+                         {1, VertexFormat::Float2, 0, 12},
+                         {2, VertexFormat::Float3, 0, 20},
+                         {3, VertexFormat::Float2, 0, 32}};
   // Back faces are the parts of a tile beyond the limb.
   pipeline.cullMode = CullMode::Back;
   pipeline.depthTest = true;
@@ -501,12 +514,140 @@ void TileRenderer::setLayers(const std::vector<ImageryLayerDraw>& layers,
     deepest = std::max(deepest, source->provider->maximumLevel());
     tileSize = std::max(tileSize, source->provider->tileSizePx());
   }
+  m_imageryDeepestLevel = deepest;
+  m_imageryTileSizePx = tileSize;
+  applySelectionSettings();
+}
+
+void TileRenderer::applySelectionSettings()
+{
   TileSelectionSettings selection = m_settings.selection;
   selection.minimumMapLevel = m_settings.minimumMapLevel;
   selection.meshSegments = m_settings.loader.meshSegments;
+  int deepest = m_imageryDeepestLevel;
+  int tileSize = m_imageryTileSizePx;
+  if (terrainShown() && m_layers.empty()) {
+    // Terrain alone: as deep as its data, and a little deeper (its tiles
+    // are interpolated there) for the shape of the land.
+    deepest = m_elevation->maximumLevel() + 3;
+    tileSize = 256;
+  }
   selection.maximumLevel = std::min(selection.maximumLevel, deepest);
-  selection.tileSizePx = tileSize;
+  selection.tileSizePx = std::max(tileSize, 1);
+  // The highest summit (8849 m) plus a margin, exaggerated.
+  selection.terrainHeightM = terrainShown() ? 9000.0 * m_exaggeration : 0.0;
   m_selector.setSettings(selection);
+}
+
+void TileRenderer::setElevationProvider(
+    std::shared_ptr<ElevationProvider> provider)
+{
+  if (provider == m_elevation) {
+    return;
+  }
+  m_heightLoader.reset();
+  m_elevation = std::move(provider);
+  m_heights.clear();
+  m_noHeights.clear();
+  m_deepestHeights = 0;
+  m_meshes.clear();
+  m_meshBytes = 0;
+  m_drawTiles.clear();
+  if (m_elevation) {
+    m_heightLoader = std::make_unique<HeightTileLoader>(
+        m_elevation, m_settings.heightThreads);
+    m_heightLoader->setTilesReadyCallback(m_callback);
+  }
+  applySelectionSettings();
+}
+
+void TileRenderer::setTerrain(bool visible, double exaggeration)
+{
+  m_terrainVisible = visible;
+  m_exaggeration = std::clamp(exaggeration, 0.0, 100.0);
+  applySelectionSettings();
+}
+
+bool TileRenderer::terrainShown() const
+{
+  return m_terrainVisible && m_elevation != nullptr;
+}
+
+std::shared_ptr<const HeightTile> TileRenderer::heightsFor(TileKey key,
+                                                           bool exact)
+{
+  for (TileKey candidate = key;; candidate = candidate.parent()) {
+    std::optional<std::shared_ptr<const HeightTile>> found =
+        m_heights.find(candidate);
+    if (found) {
+      return *found;
+    }
+    if (exact || candidate.level == 0) {
+      return nullptr;
+    }
+  }
+}
+
+std::optional<double> TileRenderer::terrainHeightM(double latDeg, double lonDeg)
+{
+  if (!terrainShown()) {
+    return 0.0;
+  }
+  const Geodetic point{latDeg, lonDeg, 0.0};
+  for (int level = m_deepestHeights; level >= 0; --level) {
+    std::optional<std::shared_ptr<const HeightTile>> found =
+        m_heights.find(TileKey::containing(level, point));
+    if (!found || !*found) {
+      continue;
+    }
+    const HeightTile& tile = **found;
+    const double height = sampleHeightM(tile, latDeg, lonDeg).value_or(0.0);
+    const double sea = sampleSeaLevelM(tile, latDeg, lonDeg).value_or(0.0);
+    return sea + std::max(height - sea, 0.0) * m_exaggeration;
+  }
+  return std::nullopt;
+}
+
+void TileRenderer::takeHeights()
+{
+  if (!m_heightLoader) {
+    return;
+  }
+  for (LoadedHeights& loaded : m_heightLoader->takeLoaded(256)) {
+    if (!loaded.heights) {
+      m_noHeights.insert(loaded.key);
+      continue;
+    }
+    const std::size_t cost =
+        (loaded.heights->heightsM.size() + loaded.heights->seaLevelM.size()) *
+            sizeof(float) +
+        sizeof(HeightTile);
+    m_deepestHeights = std::max(m_deepestHeights, loaded.key.level);
+    m_heights.insert(
+        loaded.key,
+        std::make_shared<const HeightTile>(std::move(*loaded.heights)), cost);
+  }
+}
+
+void TileRenderer::requestHeights(const TileSelection& selection)
+{
+  if (!m_heightLoader) {
+    return;
+  }
+  // Drawn tiles first, then the ones about to be: the selection's order.
+  std::vector<TileKey> wanted;
+  const std::function<void(TileKey)> want = [this, &wanted](TileKey key) {
+    if (m_noHeights.count(key) == 0 && !heightsFor(key, true)) {
+      wanted.push_back(key);
+    }
+  };
+  for (const TileKey& key : selection.render) {
+    want(key);
+  }
+  for (const TileLoadRequest& request : selection.load) {
+    want(request.key);
+  }
+  m_heightLoader->setRequests(wanted);
 }
 
 void TileRenderer::setImageryProvider(std::shared_ptr<ImageryProvider> provider)
@@ -526,6 +667,9 @@ void TileRenderer::setGroupCompositing(bool enabled)
 void TileRenderer::setTilesReadyCallback(std::function<void()> callback)
 {
   m_callback = std::move(callback);
+  if (m_heightLoader) {
+    m_heightLoader->setTilesReadyCallback(m_callback);
+  }
   for (const std::unique_ptr<Source>& source : m_sources) {
     source->loader->setTilesReadyCallback(m_callback);
   }
@@ -533,7 +677,8 @@ void TileRenderer::setTilesReadyCallback(std::function<void()> callback)
 
 bool TileRenderer::isBusy() const
 {
-  if (m_meshesPending) {
+  if (m_meshesPending ||
+      (m_heightLoader && m_heightLoader->outstanding() > 0)) {
     return true;
   }
   return std::any_of(m_sources.begin(), m_sources.end(),
@@ -584,16 +729,40 @@ void TileRenderer::uploadImages()
   }
 }
 
-void TileRenderer::buildMeshes(const std::vector<TileLoadRequest>& wanted)
+void TileRenderer::buildMeshes(const std::vector<TileLoadRequest>& wanted,
+                               const std::vector<TileKey>& rebuild)
 {
   int built = 0;
+  // Meshes that now have their own heights, then new ones.
+  for (const TileKey& key : rebuild) {
+    if (built >= m_settings.meshBuildsPerFrame) {
+      break;
+    }
+    uploadMesh(key);
+    ++built;
+  }
   for (const TileLoadRequest& request : wanted) {
     if (built >= m_settings.meshBuildsPerFrame) {
       break;
     }
+    uploadMesh(request.key);
+    ++built;
+  }
+  // Meshes built this frame let the next selection refine further.
+  m_meshesPending = !wanted.empty() || !rebuild.empty();
+}
+
+void TileRenderer::uploadMesh(TileKey key)
+{
+  {
+    // With terrain, the finest heights there are: the tile's own, or an
+    // ancestor's until they arrive.
+    const std::shared_ptr<const HeightTile> heights =
+        m_elevation ? heightsFor(key, false) : nullptr;
     const TileMesh mesh =
-        buildTileMesh(request.key, m_settings.loader.meshSegments);
+        buildTileMesh(key, m_settings.loader.meshSegments, heights.get());
     std::unique_ptr<GpuMesh> gpu = std::make_unique<GpuMesh>();
+    gpu->heightsLevel = heights ? heights->key.level : -1;
     gpu->bytes = mesh.vertices.size() * sizeof(TileVertex);
     gpu->vertices =
         m_device.createBuffer(BufferType::Vertex, BufferUsage::Static,
@@ -603,13 +772,15 @@ void TileRenderer::buildMeshes(const std::vector<TileLoadRequest>& wanted)
     gpu->centreLow = {centre.lowX, centre.lowY, centre.lowZ, 0.0F};
     gpu->lastUsedFrame = m_frame;
     if (gpu->vertices) {
+      const std::unordered_map<TileKey, std::unique_ptr<GpuMesh>,
+                               TileKeyHash>::iterator old = m_meshes.find(key);
+      if (old != m_meshes.end()) {
+        m_meshBytes -= old->second->bytes;
+      }
       m_meshBytes += gpu->bytes;
-      m_meshes[request.key] = std::move(gpu);
+      m_meshes[key] = std::move(gpu);
     }
-    ++built;
   }
-  // Meshes built this frame let the next selection refine further.
-  m_meshesPending = !wanted.empty();
 }
 
 void TileRenderer::requestImages()
@@ -779,11 +950,12 @@ void TileRenderer::prepare(const Camera& camera)
   m_drawStrips = m_morph >= 1.0 && camera.mapProjection()->isCylindrical();
   // The map's surface and graticule are drawn on the tiles too, so it
   // needs them even without imagery.
-  if (m_layers.empty() && m_morph <= 0.0) {
+  if (m_layers.empty() && m_morph <= 0.0 && !terrainShown()) {
     m_meshesPending = false;
     return;
   }
   uploadImages();
+  takeHeights();
   const TileSelection selection = m_selector.select(
       camera, [this](TileKey key) { return m_meshes.count(key) != 0; });
   m_drawTiles.reserve(selection.render.size());
@@ -822,7 +994,27 @@ void TileRenderer::prepare(const Camera& camera)
       m_drawTiles.push_back(tile);
     }
   }
-  buildMeshes(selection.load);
+  // Drawn meshes built with coarser heights than their own, once those
+  // have arrived.
+  std::vector<TileKey> rebuild;
+  if (m_elevation) {
+    for (const DrawTile& tile : m_drawTiles) {
+      if (tile.mesh->heightsLevel < tile.key.level &&
+          heightsFor(tile.key, true) &&
+          std::find(rebuild.begin(), rebuild.end(), tile.key) ==
+              rebuild.end()) {
+        rebuild.push_back(tile.key);
+      }
+    }
+  }
+  requestHeights(selection);
+  buildMeshes(selection.load, rebuild);
+  if (!rebuild.empty()) {
+    // A rebuilt mesh replaced the one the draw list points to.
+    for (DrawTile& tile : m_drawTiles) {
+      tile.mesh = m_meshes.at(tile.key).get();
+    }
+  }
   bindImages();
   requestImages();
   evict();
@@ -990,7 +1182,9 @@ void TileRenderer::draw(const PassDesc& mainPass,
   if (m_drawTiles.empty() || !m_pipeline) {
     return;
   }
-  bool baseWanted = withBase && m_morph > 0.0;
+  // On the globe the ray-cast ellipsoid is the surface under the layers;
+  // with terrain the tiles have to be (the ellipsoid is not where they are).
+  bool baseWanted = withBase && (m_morph > 0.0 || terrainShown());
   const int count = static_cast<int>(m_layers.size());
   const bool groups = m_settings.groupCompositing;
   // A composite group is drawn on its own offscreen, so the surface can't

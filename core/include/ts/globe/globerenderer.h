@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <QString>
@@ -22,6 +23,7 @@ namespace ts
 {
 
 class Camera;
+class ElevationProvider;
 class ImageryProvider;
 class TileRenderer;
 struct ImageryLayerDraw;
@@ -165,6 +167,21 @@ public:
 
   /** Returns what the vector renderer did in the last frame. */
   VectorStatistics vectorStatistics() const;
+
+  /**
+   * Sets the terrain's source (null for none); see
+   * TileRenderer::setElevationProvider(). Only after initialise().
+   */
+  void setElevationProvider(std::shared_ptr<ElevationProvider> provider);
+
+  /** Shows the terrain with @p exaggeration, or the plain ellipsoid. */
+  void setTerrain(bool visible, double exaggeration);
+
+  /** Returns true if terrain is shown. */
+  bool terrainShown() const;
+
+  /** See TileRenderer::terrainHeightM(). */
+  std::optional<double> terrainHeightM(double latDeg, double lonDeg);
 
   /**
    * Draws a frame as seen by @p camera into @p pass (whose clear colour is

@@ -41,6 +41,7 @@
 #include "offlineregionsdialog.h"
 #include "packmanager.h"
 #include "packmanagerdialog.h"
+#include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
@@ -216,19 +217,23 @@ private slots:
   void basePackStates()
   {
     // Installed and intact: graticule, shoreline and Blue Marble by
-    // default (top to bottom), their sources credited, "Ready" throughout.
+    // default (top to bottom), the terrain under them switched off, their
+    // sources credited, "Ready" throughout.
     {
       ts::MainWindow window;
       QCOMPARE(window.basePackDirectory(), QDir::cleanPath(m_basePack.path()));
       const ts::LayerTreeModel* model = window.layerModel();
-      QCOMPARE(model->rowCount(), 3);
+      QCOMPARE(model->rowCount(), 4);
       const QStringList expected = {QStringLiteral("builtin:graticule"),
                                     QStringLiteral("builtin:shoreline"),
-                                    QStringLiteral("builtin:bluemarble")};
-      for (int row = 0; row < 3; ++row) {
+                                    QStringLiteral("builtin:bluemarble"),
+                                    QStringLiteral("builtin:terrain")};
+      for (int row = 0; row < 4; ++row) {
         QCOMPARE(model->layerDefinition(model->index(row, 0)).id,
                  expected.at(row));
       }
+      QCOMPARE(model->data(model->index(3, 0), Qt::CheckStateRole).toInt(),
+               static_cast<int>(Qt::Unchecked));
       ts::GlobeView* globe = globeOf(window);
       if (globe != nullptr) {
         QCOMPARE(globe->imageryLayerCount(), 1);
@@ -544,9 +549,9 @@ private slots:
         remove == nullptr) {
       QFAIL("layer dock widgets missing");
     }
-    // A new project shows the graticule and shoreline over Blue Marble,
-    // and the dock says vectors stay above imagery.
-    QCOMPARE(model->rowCount(), 3);
+    // A new project shows the graticule and shoreline over Blue Marble
+    // (and the terrain, off), and the dock says vectors stay above imagery.
+    QCOMPARE(model->rowCount(), 4);
     QVERIFY(!window.findChild<QLabel*>(QStringLiteral("layerOrderNote"))
                  ->text()
                  .isEmpty());
@@ -578,13 +583,55 @@ private slots:
              0.4);
     // A collection goes above the selected layer; remove takes it away.
     addCollection->click();
-    QCOMPARE(model->rowCount(), 4);
+    QCOMPARE(model->rowCount(), 5);
     QVERIFY(
         model->data(model->index(2, 0), ts::LayerTreeModel::IsCollectionRole)
             .toBool());
     view->setCurrentIndex(model->index(2, 0));
     remove->click();
-    QCOMPARE(model->rowCount(), 3);
+    QCOMPARE(model->rowCount(), 4);
+  }
+
+  void terrainLayer()
+  {
+    // The terrain comes off by default; ticking it shows it, the View menu
+    // sets its exaggeration in the layer's style.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex terrain = model->index(model->rowCount() - 1, 0);
+    QCOMPARE(model->layerDefinition(terrain).id,
+             QStringLiteral("builtin:terrain"));
+    QAction* triple =
+        window.findChild<QAction*>(QStringLiteral("exaggeration30Action"));
+    QAction* single =
+        window.findChild<QAction*>(QStringLiteral("exaggeration10Action"));
+    if (triple == nullptr || single == nullptr) {
+      QFAIL("exaggeration actions missing");
+    }
+    QVERIFY(single->isChecked() && triple->isEnabled());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QVERIFY(!globe->terrainShown());
+    }
+    model->setData(terrain, Qt::Checked, Qt::CheckStateRole);
+    if (globe != nullptr) {
+      QVERIFY(globe->terrainShown());
+      QVERIFY(
+          globe->attributions().contains(QStringLiteral("Fixture elevation")));
+    }
+    triple->trigger();
+    QCOMPARE(ts::terrainExaggeration(model->layerDefinition(terrain)), 3.0);
+    QVERIFY(triple->isChecked() && !single->isChecked());
+    // Without an elevation layer the menu is off.
+    const int rows = model->rowCount();
+    QVERIFY(model->removeNode(terrain));
+    QCOMPARE(model->rowCount(), rows - 1);
+    QVERIFY(!triple->isEnabled());
+    if (globe != nullptr) {
+      QVERIFY(!globe->terrainShown());
+    }
   }
 
   void projectSaveAndOpen()

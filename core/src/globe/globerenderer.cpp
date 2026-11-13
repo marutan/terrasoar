@@ -560,8 +560,8 @@ void GlobeRenderer::drawGraticule(std::size_t index)
   if (!r.graticuleUniforms) {
     return;
   }
-  if (m_morph > 0.0) {
-    // Not the globe: on the tiles, wherever they are now.
+  if (m_morph > 0.0 || terrainShown()) {
+    // Not the ellipsoid: on the tiles, wherever they are now.
     m_device.setUniformBuffer(graticuleBinding, *r.graticuleUniforms,
                               index * r.graticuleStride,
                               sizeof(GraticuleBlock));
@@ -572,6 +572,42 @@ void GlobeRenderer::drawGraticule(std::size_t index)
   m_device.setUniformBuffer(graticuleBinding, *r.graticuleUniforms,
                             index * r.graticuleStride, sizeof(GraticuleBlock));
   m_device.draw(3, 0, 1);
+}
+
+void GlobeRenderer::setElevationProvider(
+    std::shared_ptr<ElevationProvider> provider)
+{
+  if (m_vectors) {
+    m_vectors->setElevationProvider(provider);
+  }
+  if (m_tiles) {
+    m_tiles->setElevationProvider(std::move(provider));
+  }
+}
+
+void GlobeRenderer::setTerrain(bool visible, double exaggeration)
+{
+  if (m_tiles) {
+    m_tiles->setTerrain(visible, exaggeration);
+  }
+  if (m_vectors) {
+    m_vectors->setTerrainHeightMargin(terrainShown() ? 9000.0 * exaggeration
+                                                     : 0.0);
+  }
+}
+
+bool GlobeRenderer::terrainShown() const
+{
+  return m_tiles && m_tiles->terrainShown();
+}
+
+std::optional<double> GlobeRenderer::terrainHeightM(double latDeg,
+                                                    double lonDeg)
+{
+  if (!m_tiles) {
+    return 0.0;
+  }
+  return m_tiles->terrainHeightM(latDeg, lonDeg);
 }
 
 void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
@@ -597,9 +633,15 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   frame.viewport = {static_cast<float>(widthPx), static_cast<float>(heightPx),
                     static_cast<float>(1.0 / widthPx),
                     static_cast<float>(1.0 / heightPx)};
+  const bool terrain = terrainShown();
   frame.depthParams = {static_cast<float>(1.0 / std::log2(camera.farM() + 1.0)),
                        static_cast<float>(devicePixelRatio),
-                       static_cast<float>(camera.tanHalfFovY()), 0.0F};
+                       static_cast<float>(camera.tanHalfFovY()),
+                       terrain ? 0.99F : 0.9F};
+  // The terrain flattens as the view becomes the map.
+  frame.terrain = {terrain ? static_cast<float>(1.0 - m_morph) : 0.0F,
+                   static_cast<float>(m_tiles ? m_tiles->exaggeration() : 1.0),
+                   0.0F, 0.0F};
   if (m_morph > 0.0) {
     const MapFrame map = camera.mapFrame();
     const LocalFrame local =
@@ -662,10 +704,13 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   // On the map and during the morph the surface is the tiles themselves,
   // drawn with the first imagery layers unless the style's graticule goes
   // in between.
-  const bool baseFirst = m_morph > 0.0 && m_style.graticule;
+  // With terrain the ray-cast ellipsoid would cut through it: the tiles
+  // are the surface, as on the map.
+  const bool onTiles = m_morph > 0.0 || terrain;
+  const bool baseFirst = onTiles && m_style.graticule;
   if (baseFirst) {
     m_tiles->drawBase();
-  } else if (m_morph <= 0.0) {
+  } else if (!onTiles) {
     m_device.setPipeline(*r.globePipeline);
     m_device.draw(3, 0, 1);
   }

@@ -205,6 +205,15 @@ void Camera::setPose(const CameraPose& pose)
   if (!(clamped.rangeM > 0.0) || eyeHeightM(clamped) < minimumEyeHeightM) {
     clamped.rangeM = rangeForEyeHeight(clamped, minimumEyeHeightM);
   }
+  if (m_surfaceHeight && m_morph <= 0.0) {
+    // Above the terrain, too: the range grows until the eye is clear.
+    const Geodetic eye = ecefToGeodetic(eyeEcefForPose(clamped));
+    const std::optional<double> ground =
+        m_surfaceHeight(eye.latDeg, eye.lonDeg);
+    if (ground && eye.heightM < *ground + terrainClearanceM) {
+      clamped.rangeM = rangeForEyeHeight(clamped, *ground + terrainClearanceM);
+    }
+  }
   m_pose = clamped;
   update();
 }
@@ -318,8 +327,59 @@ Vec3 Camera::mapPlanePoint(MapPoint offset) const
          m_local.northEcef * (offset.yM * scale);
 }
 
+void Camera::setSurfaceHeight(SurfaceHeight surfaceHeight)
+{
+  m_surfaceHeight = std::move(surfaceHeight);
+  setPose(m_pose);
+}
+
+std::optional<Geodetic> Camera::pickSurface(const Ray& ray) const
+{
+  if (!m_surfaceHeight) {
+    return std::nullopt;
+  }
+  const Vec3 direction = normalized(ray.direction);
+  const std::function<double(double)> above = [&](double t) {
+    const Geodetic point = ecefToGeodetic(ray.origin + direction * t);
+    return point.heightM -
+           m_surfaceHeight(point.latDeg, point.lonDeg).value_or(0.0);
+  };
+  // March: the surface is at least as far along the ray as the height
+  // above it (half that, for slopes), but at least a thousandth of the
+  // way so far, so grazing rays progress.
+  double previous = 0.0;
+  double t = 0.0;
+  double height = above(t);
+  for (int i = 0; i < 4000 && t < m_farM; ++i) {
+    if (height <= 0.0) {
+      // Bisect between the last point above and the first below.
+      double low = previous;
+      double high = t;
+      for (int j = 0; j < 40; ++j) {
+        const double mid = 0.5 * (low + high);
+        (above(mid) > 0.0 ? low : high) = mid;
+      }
+      Geodetic hit = ecefToGeodetic(ray.origin + direction * high);
+      hit.heightM = m_surfaceHeight(hit.latDeg, hit.lonDeg).value_or(0.0);
+      return hit;
+    }
+    // Climbing away above the highest terrain (with a wide margin): a miss.
+    const Vec3 point = ray.origin + direction * t;
+    if (height > 2.0e5 && dot(direction, normalized(point)) > 0.0) {
+      return std::nullopt;
+    }
+    previous = t;
+    t += std::max(0.5 * height, std::max(1.0e-3 * t, 0.5));
+    height = above(t);
+  }
+  return std::nullopt;
+}
+
 std::optional<Geodetic> Camera::pickGeodetic(double xPx, double yPx) const
 {
+  if (m_surfaceHeight && m_morph <= 0.0) {
+    return pickSurface(rayThroughPixel(xPx, yPx));
+  }
   if (isMap()) {
     // The ray against the map's plane: through the target, facing up.
     const Ray ray = rayThroughPixel(xPx, yPx);

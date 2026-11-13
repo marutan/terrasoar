@@ -25,6 +25,7 @@ namespace ts
 {
 
 class Camera;
+class ElevationProvider;
 class FeatureProvider;
 
 /** One vector layer to draw, in tree order (bottom first). */
@@ -133,6 +134,15 @@ public:
    */
   void setLayers(const std::vector<VectorLayerDraw>& layers);
 
+  /**
+   * Sets the terrain's source (null for none): the features are meshed
+   * again with its heights under every vertex (VectorVertex::terrain).
+   */
+  void setElevationProvider(std::shared_ptr<ElevationProvider> provider);
+
+  /** See TileSelectionSettings::terrainHeightM. */
+  void setTerrainHeightMargin(double metres);
+
   /** Sets the function called (on a worker) when meshes are ready. */
   void setTilesReadyCallback(std::function<void()> callback);
 
@@ -185,6 +195,8 @@ private:
   std::size_t m_uniformCapacity = 0;
   std::size_t m_uniformStride = 0;
   std::vector<std::unique_ptr<Source>> m_sources;
+  std::shared_ptr<ElevationProvider> m_elevation;
+  double m_terrainMarginM = 0.0;
   /** Per layer: its source (null for the graticule) and style. */
   std::vector<std::pair<Source*, VectorLayerDraw>> m_layers;
   /** Per layer: the first uniform block of its draws this frame. */

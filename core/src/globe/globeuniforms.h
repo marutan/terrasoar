@@ -23,7 +23,11 @@ struct FrameBlock {
   Float4 eyeLow{};
   /** Viewport width, height (device px), 1/width, 1/height. */
   Float4 viewport{};
-  /** 1 / log2(far + 1), device pixel ratio, tan(vertical fov / 2), unused. */
+  /**
+   * 1 / log2(far + 1), device pixel ratio, tan(vertical fov / 2), and the
+   * factor overlays' distances are multiplied by for their depth (0.9;
+   * 0.99 with terrain; see tsOverlayDepth()).
+   */
   Float4 depthParams{};
   /**
    * Morph factor (0 globe, 1 flat map), metres on the map's plane per map
@@ -36,6 +40,12 @@ struct FrameBlock {
   Float4 planeNorth{};
   /** The centre of the map (the camera's target) relative to the eye. */
   Float4 planeOrigin{};
+  /**
+   * Terrain: how much of it is drawn (0 when off, 1 on the globe, falling
+   * to 0 as the view becomes the flat map), the vertical exaggeration,
+   * unused, unused. See docs/design/terrain.md.
+   */
+  Float4 terrain{};
 };
 
 /** Uniform block "Globe" (std140). Binding 1. */
@@ -62,7 +72,7 @@ struct GlobeBlock {
   Float4 gridParams{};
 };
 
-static_assert(sizeof(FrameBlock) == 192, "std140 layout of Frame");
+static_assert(sizeof(FrameBlock) == 208, "std140 layout of Frame");
 static_assert(sizeof(GlobeBlock) == 160, "std140 layout of Globe");
 
 /** Binding of the "Frame" block. */
@@ -87,7 +97,32 @@ layout(std140) uniform Frame {
   vec4 planeEast;
   vec4 planeNorth;
   vec4 planeOrigin;
+  vec4 terrain;
 };
+
+// The height a vertex is drawn at above the ellipsoid: its sea level plus
+// its height above sea level (the sea floor flattened) exaggerated, less a
+// skirt's drop; none when terrain is off. t: height above the ellipsoid,
+// sea level, drop (TileVertex::terrain).
+float tsTerrainHeight(vec3 t)
+{
+  return terrain.x * (t.y + (max(t.x - t.y, 0.0) - t.z) * terrain.y);
+}
+
+// The normal of the terrain at a point whose ellipsoid normal is up, from
+// its slopes towards east and north (metres per metre).
+vec3 tsTerrainNormal(vec3 up, vec2 slope)
+{
+  vec3 east = vec3(-up.y, up.x, 0.0);
+  float length2 = dot(east, east);
+  if (terrain.x <= 0.0 || length2 < 1e-12) {
+    return up;
+  }
+  east *= inversesqrt(length2);
+  vec3 north = cross(up, east);
+  float k = terrain.x * terrain.y;
+  return normalize(up - k * (slope.x * east + slope.y * north));
+}
 )";
 
 /**
@@ -115,15 +150,18 @@ vec3 tsMorph(vec3 relative, vec2 dLonLatRad, vec4 mapOrigin, vec4 r0, vec4 r1)
 
 /**
  * tsOverlayDepth(): the depth of things drawn on the surface while it is
- * a map or morphing. They are tested against the tiles' depth so that the
- * unrolling globe hides what is behind it, but brought a tenth nearer
- * (and 10 m), because their triangles differ from the tiles'. Goes after
- * frameBlockGlsl.
+ * a map or morphing, or carries terrain. They are tested against the
+ * tiles' depth so that the unrolling globe, or a mountain, hides what is
+ * behind it, but brought nearer by a fraction of their distance
+ * (FrameBlock::depthParams w: a tenth, or a hundredth with terrain, where
+ * a tenth would let them show through mountains) and 10 m, because their
+ * triangles differ from the tiles'. Goes after frameBlockGlsl.
  */
 inline const char* const overlayDepthGlsl = R"(
 float tsOverlayDepth(float w)
 {
-  return clamp(log2(1.0 + max(0.9 * w - 10.0, 0.0)) * depthParams.x, 0.0, 1.0);
+  return clamp(log2(1.0 + max(depthParams.w * w - 10.0, 0.0)) * depthParams.x,
+               0.0, 1.0);
 }
 )";
 
