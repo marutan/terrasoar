@@ -309,6 +309,72 @@
         </message>
     </context>
     <context>
+        <name>ts::ElevationProfileChart</name>
+        <message>
+            <source>%1 km</source>
+            <translation>%1 km</translation>
+        </message>
+        <message>
+            <source>%1 m</source>
+            <translation>%1 m</translation>
+        </message>
+        <message>
+            <source>%1, %2</source>
+            <translation>%1, %2</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ElevationProfileDialog</name>
+        <message>
+            <source>Length %1 · lowest %2 · highest %3 · climb %4 · descent %5 (heights above sea level)</source>
+            <translation>Length %1 · lowest %2 · highest %3 · climb %4 · descent %5 (heights above sea level)</translation>
+        </message>
+        <message>
+            <source>Save Elevation Profile</source>
+            <translation>Save Elevation Profile</translation>
+        </message>
+        <message>
+            <source>profile.csv</source>
+            <translation>profile.csv</translation>
+        </message>
+        <message>
+            <source>CSV files (*.csv);;All files (*)</source>
+            <translation>CSV files (*.csv);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Cannot save "%1": %2</source>
+            <translation>Cannot save "%1": %2</translation>
+        </message>
+        <message>
+            <source>Elevation Profile</source>
+            <translation>Elevation Profile</translation>
+        </message>
+        <message>
+            <source>&amp;Draw Another Line</source>
+            <translation>&amp;Draw Another Line</translation>
+        </message>
+        <message>
+            <source>&amp;Save as CSV…</source>
+            <translation>&amp;Save as CSV…</translation>
+        </message>
+        <message>
+            <source>Close</source>
+            <translation>Close</translation>
+        </message>
+        <message>
+            <source>Click points along the line on the globe or map; double-click or press Enter to finish.</source>
+            <translation>Click points along the line on the globe or map; double-click or press Enter to finish.</translation>
+        </message>
+        <message>
+            <source>Reading the heights along the line…</source>
+            <translation>Reading the heights along the line…</translation>
+        </message>
+        <message>
+            <source>Point at the chart to see where a height is on the globe.</source>
+            <translation>Point at the chart to see where a height is on the globe.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::GdalElevationProvider</name>
         <message>
             <source>The file has no raster band.</source>
@@ -459,6 +525,10 @@
         <message>
             <source>Click each corner of the area; double-click or press Enter to finish. Backspace removes a corner, Esc cancels.</source>
             <translation>Click each corner of the area; double-click or press Enter to finish. Backspace removes a corner, Esc cancels.</translation>
+        </message>
+        <message>
+            <source>Click each point of the line to profile; double-click or press Enter to finish. Backspace removes a point, Esc cancels.</source>
+            <translation>Click each point of the line to profile; double-click or press Enter to finish. Backspace removes a point, Esc cancels.</translation>
         </message>
     </context>
     <context>
@@ -831,6 +901,30 @@
         <message>
             <source>Add elevation from a web terrain tile service or a Cloud Optimized GeoTIFF on a server</source>
             <translation>Add elevation from a web terrain tile service or a Cloud Optimized GeoTIFF on a server</translation>
+        </message>
+        <message>
+            <source>Elevation &amp;Profile…</source>
+            <translation>Elevation &amp;Profile…</translation>
+        </message>
+        <message>
+            <source>Draw a line on the globe and see the heights along it</source>
+            <translation>Draw a line on the globe and see the heights along it</translation>
+        </message>
+        <message>
+            <source>&amp;Hillshade on the Map</source>
+            <translation>&amp;Hillshade on the Map</translation>
+        </message>
+        <message>
+            <source>Shade the terrain's slopes on the flat map, as if lit from the north-west</source>
+            <translation>Shade the terrain's slopes on the flat map, as if lit from the north-west</translation>
+        </message>
+        <message>
+            <source>There is no elevation layer to read heights from.</source>
+            <translation>There is no elevation layer to read heights from.</translation>
+        </message>
+        <message>
+            <source>There are no heights along the line.</source>
+            <translation>There are no heights along the line.</translation>
         </message>
     </context>
     <context>

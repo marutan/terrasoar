@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <thread>
 #include <vector>
 
 #include <QAction>
@@ -34,6 +35,7 @@
 
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
+#include "elevationprofiledialog.h"
 #include "globeview.h"
 #include "layertreedock.h"
 #include "newregiondialog.h"
@@ -42,7 +44,9 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "ts/base/buildinfo.h"
+#include "ts/elevation/elevationprofile.h"
 #include "ts/elevation/gdalelevationprovider.h"
+#include "ts/geo/geodetic.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/layers/layertreemodel.h"
@@ -110,6 +114,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_globeView = new GlobeView(this);
     setCentralWidget(m_globeView);
     m_eyeHeightM = m_globeView->controller().camera().eyeGeodetic().heightM;
+    connect(m_globeView, &GlobeView::lineDrawn, this, &MainWindow::profileLine);
     connect(m_globeView, &GlobeView::pointerPositionChanged, this,
             &MainWindow::showPointerPosition);
     connect(m_globeView, &GlobeView::cameraChanged, this,
@@ -203,7 +208,11 @@ MainWindow::MainWindow(QWidget* parent)
 
 MainWindow::~MainWindow()
 {
+  if (m_profileCancel) {
+    m_profileCancel->store(true);
+  }
   // Dialogs first: they refer to the regions, which go before the registry.
+  delete m_profileDialog;
   delete m_newRegionDialog;
   delete m_offlineRegionsDialog;
   delete m_packsDialog;
@@ -443,6 +452,20 @@ void MainWindow::createActions()
                                     action->data().toDouble());
             m_layers->setLayerDefinition(index, definition);
           });
+  m_profileAction = new QAction(this);
+  m_profileAction->setObjectName(QStringLiteral("profileAction"));
+  connect(m_profileAction, &QAction::triggered, this,
+          [this]() { showElevationProfile(); });
+
+  m_hillshadeAction = new QAction(this);
+  m_hillshadeAction->setObjectName(QStringLiteral("hillshadeAction"));
+  m_hillshadeAction->setCheckable(true);
+  connect(m_hillshadeAction, &QAction::triggered, this, [this](bool checked) {
+    const QModelIndex index = topmostElevationLayer();
+    LayerDefinition definition = m_layers->layerDefinition(index);
+    definition.style.insert(QStringLiteral("hillshade"), checked);
+    m_layers->setLayerDefinition(index, definition);
+  });
   connect(m_layers, &LayerTreeModel::layerStackChanged, this,
           &MainWindow::syncTerrainActions);
 
@@ -628,6 +651,10 @@ void MainWindow::syncTerrainActions()
   for (QAction* action : m_exaggerationGroup->actions()) {
     action->setChecked(std::abs(action->data().toDouble() - current) < 1e-9);
   }
+  m_hillshadeAction->setEnabled(index.isValid());
+  m_profileAction->setEnabled(index.isValid() && m_globeView != nullptr);
+  m_hillshadeAction->setChecked(
+      !index.isValid() || terrainHillshade(m_layers->layerDefinition(index)));
 }
 
 void MainWindow::createMenus()
@@ -658,6 +685,8 @@ void MainWindow::createMenus()
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
+  m_viewMenu->addAction(m_hillshadeAction);
+  m_viewMenu->addAction(m_profileAction);
   syncTerrainActions();
   m_viewMenu->addAction(m_ellipsoidalHeightsAction);
   m_viewMenu->addSeparator();
@@ -695,6 +724,13 @@ void MainWindow::retranslateUi()
                                .arg(projection->displayName()));
     }
   }
+  m_profileAction->setText(tr("Elevation &Profile…"));
+  m_profileAction->setStatusTip(
+      tr("Draw a line on the globe and see the heights along it"));
+  m_hillshadeAction->setText(tr("&Hillshade on the Map"));
+  m_hillshadeAction->setStatusTip(
+      tr("Shade the terrain's slopes on the flat map, as if lit from the "
+         "north-west"));
   m_exaggerationMenu->setTitle(tr("Terrain &Exaggeration"));
   for (QAction* action : m_exaggerationGroup->actions()) {
     const QString factor = QLocale().toString(action->data().toDouble());
@@ -902,6 +938,103 @@ void MainWindow::addWmsLayer(const QString& address)
   if (definition) {
     m_layerDock->addLayer(*definition);
   }
+}
+
+ElevationProfileDialog* MainWindow::showElevationProfile()
+{
+  if (m_globeView == nullptr) {
+    return nullptr;
+  }
+  if (!m_profileDialog) {
+    m_profileDialog = new ElevationProfileDialog(this);
+    m_profileDialog->setAttribute(Qt::WA_DeleteOnClose);
+    connect(m_profileDialog, &ElevationProfileDialog::drawAnotherRequested,
+            this, [this]() {
+              m_profileDialog->setDrawing();
+              m_globeView->startRegionDrawing(GlobeView::RegionDrawing::Line);
+            });
+    connect(m_profileDialog, &ElevationProfileDialog::pointHovered, this,
+            [this](std::optional<GeoPoint> point) {
+              m_globeView->setProfileLine(
+                  m_profileLine, point ? std::optional<LonLat>(LonLat{
+                                             point->lonDeg, point->latDeg})
+                                       : std::nullopt);
+            });
+    connect(m_profileDialog, &QObject::destroyed, this, [this]() {
+      if (m_profileCancel) {
+        m_profileCancel->store(true);
+      }
+      m_profileLine.clear();
+      if (m_globeView != nullptr) {
+        m_globeView->setProfileLine({});
+        if (m_globeView->regionDrawing() == GlobeView::RegionDrawing::Line) {
+          m_globeView->startRegionDrawing(GlobeView::RegionDrawing::None);
+        }
+      }
+    });
+  }
+  m_profileDialog->show();
+  m_profileDialog->raise();
+  m_profileDialog->setDrawing();
+  m_globeView->startRegionDrawing(GlobeView::RegionDrawing::Line);
+  return m_profileDialog;
+}
+
+void MainWindow::profileLine(const std::vector<LonLat>& points)
+{
+  if (m_globeView == nullptr || points.size() < 2) {
+    return;
+  }
+  if (!m_profileDialog) {
+    showElevationProfile();
+  }
+  if (m_globeView->regionDrawing() == GlobeView::RegionDrawing::Line) {
+    m_globeView->startRegionDrawing(GlobeView::RegionDrawing::None);
+  }
+  m_profileLine = points;
+  m_globeView->setProfileLine(points);
+  const ElevationDraw draw =
+      elevationDrawForStack(m_layers->layerStack(), *m_registry, nullptr);
+  if (!draw.provider) {
+    m_profileDialog->setFailed(
+        tr("There is no elevation layer to read heights from."));
+    return;
+  }
+  if (m_profileCancel) {
+    m_profileCancel->store(true);
+  }
+  std::shared_ptr<std::atomic<bool>> cancel =
+      std::make_shared<std::atomic<bool>>(false);
+  m_profileCancel = cancel;
+  m_profileDialog->setComputing();
+  std::vector<GeoPoint> vertices;
+  vertices.reserve(points.size());
+  for (const LonLat& point : points) {
+    vertices.push_back(GeoPoint{point.latDeg, normaliseLonDeg(point.lonDeg)});
+  }
+  // Only the GUI thread touches the window (through this guard).
+  std::shared_ptr<QPointer<ElevationProfileDialog>> target =
+      std::make_shared<QPointer<ElevationProfileDialog>>(m_profileDialog);
+  std::shared_ptr<ElevationProvider> provider = draw.provider;
+  std::thread([provider, vertices, cancel, target]() mutable {
+    std::optional<ElevationProfile> profile =
+        computeElevationProfile(*provider, vertices, profileSamples, *cancel);
+    QMetaObject::invokeMethod(
+        qApp,
+        [profile = std::move(profile), cancel = std::move(cancel),
+         target = std::move(target)]() {
+          if (cancel->load() || !*target) {
+            return;
+          }
+          if (profile) {
+            (*target)->setProfile(*profile);
+          } else {
+            (*target)->setFailed(
+                MainWindow::tr("There are no heights along the line."));
+          }
+        },
+        Qt::QueuedConnection);
+  }).detach();
 }
 
 OfflineRegionsDialog* MainWindow::showOfflineRegions()

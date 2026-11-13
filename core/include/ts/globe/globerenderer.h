@@ -178,6 +178,23 @@ public:
   /** Shows the terrain with @p exaggeration, or the plain ellipsoid. */
   void setTerrain(bool visible, double exaggeration);
 
+  /**
+   * Sets how strongly the terrain is hillshaded on the flat map (0 for
+   * not at all, 1 fully; default 1). It fades in with the morph, and only
+   * while the terrain is shown.
+   */
+  void setHillshade(double strength);
+
+  /** Returns the hillshade's strength. */
+  double hillshade() const { return m_hillshade; }
+
+  /**
+   * How much steeper the hillshade takes the slopes than the meshes give
+   * them: meshes smooth the terrain to their vertices, and on a map seen
+   * from above relief needs the help.
+   */
+  static constexpr double hillshadeSlopeFactor = 4.0;
+
   /** Returns true if terrain is shown. */
   bool terrainShown() const;
 
@@ -217,6 +234,8 @@ private:
   bool m_markersDirty = true;
   bool m_markersMorphed = false;
   double m_morph = 0.0;
+  /** The flat map's hillshade strength (setHillshade()). */
+  double m_hillshade = 1.0;
 };
 
 } // namespace ts

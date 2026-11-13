@@ -43,7 +43,8 @@ struct FrameBlock {
   /**
    * Terrain: how much of it is drawn (0 when off, 1 on the globe, falling
    * to 0 as the view becomes the flat map), the vertical exaggeration,
-   * unused, unused. See docs/design/terrain.md.
+   * the strength of the map's hillshade (0 for none; it fades in with the
+   * morph), and the hillshade's slope factor. See docs/design/terrain.md.
    */
   Float4 terrain{};
 };

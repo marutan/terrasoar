@@ -33,6 +33,7 @@
 
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
+#include "elevationprofiledialog.h"
 #include "fixturepack.h"
 #include "globeview.h"
 #include "mainwindow.h"
@@ -627,11 +628,23 @@ private slots:
     triple->trigger();
     QCOMPARE(ts::terrainExaggeration(model->layerDefinition(terrain)), 3.0);
     QVERIFY(triple->isChecked() && !single->isChecked());
+    // The map's hillshade, on by default, is kept in the style too.
+    QAction* hillshade =
+        window.findChild<QAction*>(QStringLiteral("hillshadeAction"));
+    if (hillshade == nullptr) {
+      QFAIL("hillshade action missing");
+    }
+    QVERIFY(hillshade->isEnabled() && hillshade->isChecked());
+    hillshade->trigger();
+    QVERIFY(!ts::terrainHillshade(model->layerDefinition(terrain)));
+    QVERIFY(!hillshade->isChecked());
+    hillshade->trigger();
+    QVERIFY(ts::terrainHillshade(model->layerDefinition(terrain)));
     // Without an elevation layer the menu is off.
     const int rows = model->rowCount();
     QVERIFY(model->removeNode(terrain));
     QCOMPARE(model->rowCount(), rows - 1);
-    QVERIFY(!triple->isEnabled());
+    QVERIFY(!triple->isEnabled() && !hillshade->isEnabled());
     if (globe != nullptr) {
       QVERIFY(!globe->terrainShown());
     }
@@ -696,6 +709,96 @@ private slots:
     ellipsoidal->trigger();
     QVERIFY2(pointer->text().contains(metres + QStringLiteral(" ellipsoidal")),
              qPrintable(pointer->text()));
+  }
+
+  void elevationProfile()
+  {
+    // View → Elevation Profile: draw a line, see the heights along it.
+    const QTemporaryDir directory;
+    const QString dem = directory.filePath(QStringLiteral("hills.tif"));
+    QVERIFY(ts::test::writeFixtureDem(dem, 1500.0F));
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    QAction* action =
+        window.findChild<QAction*>(QStringLiteral("profileAction"));
+    if (action == nullptr) {
+      QFAIL("profile action missing");
+    }
+    if (globe == nullptr) {
+      QVERIFY(!action->isEnabled());
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QVERIFY(action->isEnabled());
+    window.addElevationLayer(dem, QStringLiteral("ellipsoid"));
+
+    // Drawing: click the points, Enter finishes.
+    action->trigger();
+    QPointer<ts::ElevationProfileDialog> dialog =
+        window.findChild<ts::ElevationProfileDialog*>();
+    QVERIFY(dialog && dialog->isVisible());
+    QCOMPARE(globe->regionDrawing(), ts::GlobeView::RegionDrawing::Line);
+    QSignalSpy drawn(globe, &ts::GlobeView::lineDrawn);
+    const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
+    for (const QPointF& at :
+         {centre - QPointF(20.0, 0.0), centre + QPointF(20.0, 0.0)}) {
+      sendMouse(globe, QEvent::MouseButtonPress, at, Qt::LeftButton,
+                Qt::LeftButton);
+      sendMouse(globe, QEvent::MouseButtonRelease, at, Qt::LeftButton,
+                Qt::NoButton);
+    }
+    QTest::keyClick(globe, Qt::Key_Return);
+    QCOMPARE(drawn.size(), 1);
+    QCOMPARE(globe->regionDrawing(), ts::GlobeView::RegionDrawing::None);
+    QCOMPARE(globe->profileLine().size(), std::size_t{2});
+
+    // A line across the DEM (1500 m above the ellipsoid; the fixture pack
+    // has no geoid, so sea level is the ellipsoid).
+    window.profileLine({ts::LonLat{9.0, 19.0}, ts::LonLat{11.0, 21.0}});
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return dialog->chart()->profile().has_value(); }, 20000));
+    const std::optional<ts::ElevationProfile> shown =
+        dialog->chart()->profile();
+    if (!shown) {
+      QFAIL("no profile");
+    }
+    const ts::ElevationProfile& profile = *shown;
+    QCOMPARE(profile.points.size(),
+             static_cast<std::size_t>(ts::MainWindow::profileSamples));
+    QVERIFY(std::abs(profile.minimumM - 1500.0) < 0.5);
+    QVERIFY(std::abs(profile.maximumM - 1500.0) < 0.5);
+    QVERIFY(profile.lengthM > 300000.0 && profile.lengthM < 320000.0);
+    QVERIFY2(dialog->summaryText().contains(QLocale().toString(1500)),
+             qPrintable(dialog->summaryText()));
+    const QByteArray csv = ts::ElevationProfileDialog::toCsv(profile);
+    QVERIFY(csv.startsWith("distance_m,latitude,longitude,height_m,"));
+    QCOMPARE(csv.count('\n'), ts::MainWindow::profileSamples + 1);
+    QVERIFY(
+        csv.split('\n').at(1).startsWith("0.0,19.0000000,9.0000000,1500.0"));
+
+    // Pointing at the chart marks the point on the globe.
+    QSignalSpy hovered(dialog.data(),
+                       &ts::ElevationProfileDialog::pointHovered);
+    ts::ElevationProfileChart* chart = dialog->chart();
+    const std::optional<std::size_t> middle =
+        chart->pointAt(chart->width() / 2.0);
+    QVERIFY(middle && *middle > 100 && *middle < 400);
+    sendMouse(chart, QEvent::MouseMove,
+              QPointF(chart->width() / 2.0, chart->height() / 2.0),
+              Qt::NoButton, Qt::NoButton);
+    QVERIFY(!hovered.isEmpty());
+
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      dialog->grab().save(
+          QDir(shots).filePath(QStringLiteral("elevation-profile.png")));
+    }
+
+    // Closing the window takes the line off the globe.
+    dialog->close();
+    QVERIFY(QTest::qWaitFor([&]() { return dialog.isNull(); }, 5000));
+    QVERIFY(globe->profileLine().empty());
   }
 
   void webTerrainDialog()

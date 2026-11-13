@@ -596,6 +596,11 @@ void GlobeRenderer::setTerrain(bool visible, double exaggeration)
   }
 }
 
+void GlobeRenderer::setHillshade(double strength)
+{
+  m_hillshade = std::clamp(strength, 0.0, 1.0);
+}
+
 bool GlobeRenderer::terrainShown() const
 {
   return m_tiles && m_tiles->terrainShown();
@@ -646,9 +651,11 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
                        static_cast<float>(camera.tanHalfFovY()),
                        terrain ? 0.99F : 0.9F};
   // The terrain flattens as the view becomes the map.
+  // The hillshade replaces it on the map.
   frame.terrain = {terrain ? static_cast<float>(1.0 - m_morph) : 0.0F,
                    static_cast<float>(m_tiles ? m_tiles->exaggeration() : 1.0),
-                   0.0F, 0.0F};
+                   terrain ? static_cast<float>(m_hillshade) : 0.0F,
+                   static_cast<float>(hillshadeSlopeFactor)};
   if (m_morph > 0.0) {
     const MapFrame map = camera.mapFrame();
     const LocalFrame local =

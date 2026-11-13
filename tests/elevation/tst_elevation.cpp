@@ -22,6 +22,7 @@
 #include "mockhttpserver.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/compositeelevationprovider.h"
+#include "ts/elevation/elevationprofile.h"
 #include "ts/elevation/gdalelevationprovider.h"
 #include "ts/elevation/geoidmodel.h"
 #include "ts/elevation/heightgrid.h"
@@ -1184,6 +1185,87 @@ private slots:
     error.clear();
     QVERIFY(!registry.elevation(source, &error));
     QVERIFY(!error.isEmpty());
+  }
+
+  void profilePath()
+  {
+    // Evenly spaced along geodesic legs, the ends exact.
+    const std::vector<std::pair<double, ts::GeoPoint>> along =
+        ts::samplePath({ts::GeoPoint{0.0, 0.0}, ts::GeoPoint{0.0, 1.0}}, 11);
+    QCOMPARE(along.size(), std::size_t{11});
+    QVERIFY(std::abs(along.back().first - 111319.49) < 0.1);
+    for (int i = 0; i < 11; ++i) {
+      const std::pair<double, ts::GeoPoint>& at =
+          along[static_cast<std::size_t>(i)];
+      QVERIFY(std::abs(at.second.lonDeg - 0.1 * i) < 1e-9);
+      QVERIFY(std::abs(at.first - 11131.949 * i) < 0.01);
+    }
+    // Two legs: the corner is passed at its distance.
+    const std::vector<std::pair<double, ts::GeoPoint>> bent =
+        ts::samplePath({ts::GeoPoint{0.0, 0.0}, ts::GeoPoint{0.0, 1.0},
+                        ts::GeoPoint{1.0, 1.0}},
+                       3);
+    QVERIFY(std::abs(bent[1].second.lonDeg - 1.0) < 0.01);
+    QVERIFY(std::abs(bent[2].second.latDeg - 1.0) < 1e-12);
+    QVERIFY(ts::samplePath({ts::GeoPoint{0.0, 0.0}}, 10).empty());
+    QVERIFY(ts::samplePath({ts::GeoPoint{0.0, 0.0}, ts::GeoPoint{0.0, 1.0}}, 1)
+                .empty());
+
+    // The level whose samples are as close as the profile's.
+    QCOMPARE(ts::profileLevel(5000.0, 20), 6);
+    QCOMPARE(ts::profileLevel(5000.0, 4), 4);
+    QCOMPARE(ts::profileLevel(1.0e7, 20), 0);
+  }
+
+  void profileOfDem()
+  {
+    // Across the plane DEM: the heights GDAL reads there, exactly.
+    const QTemporaryDir dir;
+    QVERIFY(writeFixtureGeoid(dir.filePath(QStringLiteral("geoid.tif"))));
+    const QString path = dir.filePath(QStringLiteral("dem.tif"));
+    QVERIFY(writeGeographicDem(path));
+    std::shared_ptr<const ts::GeoidModel> geoid =
+        std::make_shared<const ts::GeoidModel>(dir.path(),
+                                               QStringLiteral("geoid.tif"));
+    ts::GdalElevationProvider provider(path, QStringLiteral("geoid"), geoid,
+                                       nullptr);
+    const std::optional<ts::ElevationProfile> profile =
+        ts::computeElevationProfile(
+            provider, {ts::GeoPoint{45.5, 7.5}, ts::GeoPoint{46.5, 8.5}}, 101,
+            notCancelled);
+    if (!profile) {
+      QFAIL("no profile");
+    }
+    const ts::ElevationProfile& result = *profile;
+    QCOMPARE(result.points.size(), std::size_t{101});
+    QVERIFY(result.lengthM > 130000.0 && result.lengthM < 140000.0);
+    QVERIFY(result.level >= 6 && result.level <= 9);
+    for (const ts::ProfilePoint& point : result.points) {
+      QVERIFY2(std::abs(point.aboveSeaLevelM() -
+                        demHeight(point.position.latDeg,
+                                  point.position.lonDeg)) < 0.05,
+               qPrintable(QString::number(point.aboveSeaLevelM())));
+      QVERIFY(std::abs(point.seaLevelM -
+                       fixtureUndulation(point.position.latDeg,
+                                         point.position.lonDeg)) < 1e-3);
+    }
+    // Uphill all the way: north-east is up on the plane.
+    QVERIFY(std::abs(result.minimumM - demHeight(45.5, 7.5)) < 0.05);
+    QVERIFY(std::abs(result.maximumM - demHeight(46.5, 8.5)) < 0.05);
+    QVERIFY(std::abs(result.ascentM - (result.maximumM - result.minimumM)) <
+            0.1);
+    QVERIFY(result.descentM < 0.1);
+
+    // Off the DEM, too short, or cancelled: nothing.
+    QVERIFY(!ts::computeElevationProfile(
+        provider, {ts::GeoPoint{10.0, 10.0}, ts::GeoPoint{10.5, 10.5}}, 11,
+        notCancelled));
+    QVERIFY(!ts::computeElevationProfile(provider, {ts::GeoPoint{46.0, 8.0}},
+                                         11, notCancelled));
+    std::atomic<bool> cancelled{true};
+    QVERIFY(!ts::computeElevationProfile(
+        provider, {ts::GeoPoint{45.5, 7.5}, ts::GeoPoint{46.5, 8.5}}, 11,
+        cancelled));
   }
 };
 

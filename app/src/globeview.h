@@ -211,6 +211,7 @@ public:
     None,      ///< Not drawing.
     Rectangle, ///< Drag from corner to corner.
     Polygon,   ///< Click each corner; double-click or Enter finishes.
+    Line,      ///< Click each point; double-click or Enter finishes.
   };
 
   /**
@@ -222,6 +223,16 @@ public:
 
   /** Returns how a region is being drawn (None when not). */
   RegionDrawing regionDrawing() const { return m_drawing; }
+
+  /**
+   * Draws @p points as a line over the globe (an elevation profile's
+   * path; fewer than two: none), and a marker at @p marker if given.
+   */
+  void setProfileLine(const std::vector<LonLat>& points,
+                      const std::optional<LonLat>& marker = std::nullopt);
+
+  /** Returns the profile line drawn (setProfileLine()). */
+  const std::vector<LonLat>& profileLine() const { return m_profileLine; }
 
   /** Draws the outlines of @p regions over the globe (none: nothing). */
   void setRegionOutlines(const std::vector<RegionGeometry>& regions);
@@ -264,6 +275,9 @@ signals:
 
   /** The user finished drawing a region (startRegionDrawing()). */
   void regionDrawn(const ts::RegionGeometry& region);
+
+  /** The user finished drawing a line (RegionDrawing::Line). */
+  void lineDrawn(const std::vector<ts::LonLat>& points);
 
   /** The user cancelled drawing a region, or it was cancelled. */
   void regionDrawingCancelled();
@@ -309,6 +323,10 @@ private:
   void drawRegionInProgress(QPainter& painter) const;
   void drawRegionHint(QPainter& painter) const;
   void finishPolygon();
+  /** Ends drawing a line, if it has two points. */
+  void finishLine();
+  /** Draws the profile's line and marker. */
+  void drawProfileLine(QPainter& painter) const;
   std::optional<LonLat> pickLonLat(QPointF positionPx) const;
   std::vector<QPolygonF> outlineOnScreen(const std::vector<LonLat>& points,
                                          bool closed) const;
@@ -344,6 +362,8 @@ private:
   int m_framesRendered = 0;
 
   RegionDrawing m_drawing = RegionDrawing::None;
+  std::vector<LonLat> m_profileLine;
+  std::optional<LonLat> m_profileMarker;
   /** Corners drawn so far (a rectangle's first corner, a polygon's). */
   std::vector<LonLat> m_drawnPoints;
   /** True while dragging out a rectangle. */
@@ -355,5 +375,6 @@ private:
 
 // For queued connections and QSignalSpy (Qt 5 needs it declared).
 Q_DECLARE_METATYPE(ts::RegionGeometry)
+Q_DECLARE_METATYPE(std::vector<ts::LonLat>)
 
 #endif // TS_APP_GLOBEVIEW_H

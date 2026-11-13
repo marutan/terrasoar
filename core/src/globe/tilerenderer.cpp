@@ -122,6 +122,7 @@ out float vDepthW;
 out vec3 vNormal;
 out vec3 vRelative;
 out vec2 vLonLatDeg;
+out vec2 vSlope;
 void main()
 {
   // Relative to the eye: centre (high/low) minus eye (high/low), plus the
@@ -145,6 +146,7 @@ void main()
   vRelative = position;
   vDepthW = clip.w;
   vNormal = tsTerrainNormal(up, slopeIn);
+  vSlope = slopeIn;
   gl_Position = clip;
 }
 )";
@@ -162,6 +164,7 @@ in vec2 vUv;
 in float vDepthW;
 in vec3 vNormal;
 in vec3 vRelative;
+in vec2 vSlope;
 out vec4 fragColor;
 
 // Where this fragment is in a layer's image. A Web Mercator image's rows
@@ -219,6 +222,17 @@ void main()
     result.rgb += surfaceColor.rgb * mix(shade, 1.0, morph.x)
                 * (1.0 - result.a);
     result.a = 1.0;
+  }
+  // Hillshade on the map, where the terrain is flat: the classic shading
+  // of a sun in the north-west, 45° up, fading in with the morph.
+  float hillshade = terrain.z * morph.x;
+  if (hillshade > 0.0) {
+    vec2 slope = vSlope * terrain.y * terrain.w;
+    vec3 ground = normalize(vec3(-slope, 1.0));
+    float lit = max(dot(ground, vec3(-0.5, 0.5, 0.70710678)), 0.0)
+              / 0.70710678;
+    result.rgb = min(result.rgb * mix(1.0, clamp(lit, 0.3, 1.3), hillshade),
+                     vec3(result.a));
   }
   fragColor = result;
   gl_FragDepth = clamp(log2(1.0 + max(vDepthW, 0.0)) * depthParams.x, 0.0, 1.0);

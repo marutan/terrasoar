@@ -5,8 +5,8 @@ data (the base pack's global DEM, the elevation provider, height
 sampling), Phase 7c the drawing (displaced tile meshes, skirts,
 exaggeration, the morph, features on the terrain, picking), Phase 7d
 further sources: DEM files through GDAL, priority between sources and
-the height readout (7d-1), web terrain tiles and remote GeoTIFFs (7d-2);
-profiles and hillshade follow.
+the height readout (7d-1), web terrain tiles and remote GeoTIFFs (7d-2),
+hillshade on the map and elevation profiles (7d-3).
 For users: [terrain.md](../user/terrain.md).
 Heights above the geoid and above the ellipsoid are explained in
 [vertical-datums.md](vertical-datums.md). Code:
@@ -125,6 +125,51 @@ checks); GDAL caches what it reads in memory only.
 offers the AWS Terrain Tiles (Terrarium, to zoom 15, heights above EGM96,
 with the attribution they ask for), or any tile address, encoding, deepest
 zoom, tile size, datum, name and attribution, or a GeoTIFF's address.
+
+## Hillshade on the map
+
+On the flat map the terrain is flat (`terrain.x = 1 − t`), so its relief
+is shown by shading instead. The tile vertex shader passes the mesh's
+slopes (`TileVertex::slope`, towards east and north) to the fragment
+shader, which shades like a GIS hillshade: the ground's normal from the
+slopes, lit by a sun in the north-west 45° above the horizon, the
+brightness divided by that of flat ground and held to 0.3–1.3, then
+multiplied into the colour (premultiplied, so held to its alpha).
+
+- `FrameBlock::terrain.z` is the strength (1, or 0 when the topmost
+  elevation layer's style says `"hillshade": false`; View → Hillshade on
+  the Map). It is multiplied by the morph, so the shading fades in as the
+  terrain flattens and the globe itself is never hillshaded.
+- `terrain.w` multiplies the slopes (`GlobeRenderer::hillshadeSlopeFactor`,
+  4): the meshes smooth the terrain to their vertices, and the slopes are
+  also multiplied by the exaggeration.
+- Without terrain shown the map is exactly as before: all the map golden
+  images are unchanged.
+
+## Elevation profiles
+
+View → Elevation Profile… opens a window and lets the user click points
+on the globe or map (`GlobeView::RegionDrawing::Line`, finished with a
+double-click or Enter; the same keys as drawing a region). For the line,
+`computeElevationProfile()`, on a worker thread:
+
+1. spaces 512 points evenly along it, each leg a geodesic on WGS 84
+   (`samplePath()`, GeographicLib);
+2. picks the level whose height samples are as close as the points
+   (`profileLevel()`, at most the source's deepest), so a long line reads
+   coarse tiles and a short one fine ones;
+3. loads each tile under the points once from the elevation source the
+   terrain uses (all visible elevation layers combined, see above) and
+   samples it bilinearly: height above the ellipsoid and sea level;
+4. sums the lowest and highest point, the climb and the descent (above sea
+   level).
+
+It reads the source directly, not the tiles loaded for the view, so the
+profile doesn't depend on what is on screen. The window charts height
+against distance; pointing at the chart marks the point on the globe
+(`GlobeView::setProfileLine()`), and Save as CSV writes distance,
+latitude, longitude and both heights per point. Closing the window or
+drawing another line cancels a profile still being computed.
 
 ## Several sources
 
@@ -321,6 +366,15 @@ EGM96 heights, attribution and errors. `tests/globe`: a source failing the
 first time for each tile is asked again and its full heights drawn.
 `tests/ui`: the Add Web Terrain dialog's preset, own tiles, refused
 address, GeoTIFF address and translations.
+For hillshade and profiles: `tests/elevation` checks the path sampling
+(even spacing, geodesic legs, exact ends), the level choice, and a
+profile across the plane DEM matching GDAL's heights to 5 cm with the
+right minimum, maximum, climb and descent; `tests/globe` that the map is
+shaded lighter and darker with the hillshade on and unchanged with it off
+or the terrain hidden, and golden images of the Alps and Everest on the
+map; `tests/ui` the hillshade menu item and style, drawing a line with
+clicks and Enter, a profile over a DEM, its summary and CSV, pointing at
+the chart, and closing the window clearing the line.
 `tests/layers`: visible layers combined top first, the topmost
 exaggeration, a hidden DEM left out, a missing file reported.
 `tests/ui`: Add Elevation File's layer above the terrain and the readout

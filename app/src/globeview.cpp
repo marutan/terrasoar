@@ -130,6 +130,7 @@ GlobeView::GlobeView(QWidget* parent) : QOpenGLWidget(parent)
   // Qt 5 needs the type registered by name for queued connections and
   // QSignalSpy.
   qRegisterMetaType<ts::RegionGeometry>("ts::RegionGeometry");
+  qRegisterMetaType<std::vector<ts::LonLat>>("std::vector<ts::LonLat>");
   QSurfaceFormat format = QSurfaceFormat::defaultFormat();
   format.setRenderableType(QSurfaceFormat::OpenGL);
   format.setVersion(3, 3);
@@ -231,6 +232,7 @@ void GlobeView::setElevationDraw(const ElevationDraw& draw)
     makeCurrent();
     m_globe->setElevationProvider(m_elevationDraw.provider);
     m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
+    m_globe->setHillshade(m_elevationDraw.hillshade ? 1.0 : 0.0);
     doneCurrent();
   }
   updateSurfaceHeight();
@@ -378,6 +380,7 @@ void GlobeView::initializeGL()
   m_globe->setVectorLayers(m_vectorDraws);
   m_globe->setElevationProvider(m_elevationDraw.provider);
   m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
+  m_globe->setHillshade(m_elevationDraw.hillshade ? 1.0 : 0.0);
   updateSurfaceHeight();
 }
 
@@ -565,6 +568,11 @@ void GlobeView::mouseDoubleClickEvent(QMouseEvent* event)
     event->accept();
     return;
   }
+  if (m_drawing == RegionDrawing::Line) {
+    finishLine();
+    event->accept();
+    return;
+  }
   if (m_drawing != RegionDrawing::None) {
     event->accept();
     return;
@@ -598,14 +606,19 @@ void GlobeView::keyPressEvent(QKeyEvent* event)
       event->accept();
       return;
     }
-    if (m_drawing == RegionDrawing::Polygon &&
+    const bool clicked =
+        m_drawing == RegionDrawing::Polygon || m_drawing == RegionDrawing::Line;
+    if (clicked &&
         (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter)) {
-      finishPolygon();
+      if (m_drawing == RegionDrawing::Line) {
+        finishLine();
+      } else {
+        finishPolygon();
+      }
       event->accept();
       return;
     }
-    if (m_drawing == RegionDrawing::Polygon &&
-        event->key() == Qt::Key_Backspace) {
+    if (clicked && event->key() == Qt::Key_Backspace) {
       if (!m_drawnPoints.empty()) {
         m_drawnPoints.pop_back();
         update();
@@ -691,6 +704,64 @@ void GlobeView::finishPolygon()
   m_drawnPoints.clear();
   update();
   emit regionDrawn(*polygon);
+}
+
+void GlobeView::finishLine()
+{
+  if (m_drawnPoints.size() < 2) {
+    return; // carry on drawing
+  }
+  // A double-click adds its point twice.
+  std::vector<LonLat> points;
+  for (const LonLat& point : m_drawnPoints) {
+    if (points.empty() ||
+        std::abs(point.lonDeg - points.back().lonDeg) +
+                std::abs(point.latDeg - points.back().latDeg) >
+            1e-9) {
+      points.push_back(point);
+    }
+  }
+  if (points.size() < 2) {
+    return;
+  }
+  m_drawing = RegionDrawing::None;
+  m_drawnPoints.clear();
+  update();
+  emit lineDrawn(points);
+}
+
+void GlobeView::setProfileLine(const std::vector<LonLat>& points,
+                               const std::optional<LonLat>& marker)
+{
+  m_profileLine = points;
+  m_profileMarker = marker;
+  update();
+}
+
+void GlobeView::drawProfileLine(QPainter& painter) const
+{
+  if (m_profileLine.size() < 2) {
+    return;
+  }
+  std::vector<LonLat> line = m_profileLine;
+  for (std::size_t i = 1; i < line.size(); ++i) {
+    line[i].lonDeg =
+        line[i - 1].lonDeg + shortLonDelta(line[i].lonDeg - line[i - 1].lonDeg);
+  }
+  painter.setPen(QPen(QColor(255, 90, 60), 2.5));
+  for (const QPolygonF& piece : outlineOnScreen(line, false)) {
+    painter.drawPolyline(piece);
+  }
+  if (m_profileMarker) {
+    const std::optional<ScreenPoint> screen =
+        m_controller.camera().projectGeodetic(m_profileMarker->latDeg,
+                                              m_profileMarker->lonDeg);
+    if (screen) {
+      painter.setBrush(QColor(255, 90, 60));
+      painter.setPen(QPen(Qt::white, 1.5));
+      painter.drawEllipse(QPointF(screen->xPx, screen->yPx), 5.0, 5.0);
+    }
+  }
 }
 
 void GlobeView::setRegionOutlines(const std::vector<RegionGeometry>& regions)
@@ -789,11 +860,13 @@ GlobeView::outlineOnScreen(const std::vector<LonLat>& points, bool closed) const
 
 void GlobeView::drawRegions()
 {
-  if (m_outlines.empty() && m_drawing == RegionDrawing::None) {
+  if (m_outlines.empty() && m_drawing == RegionDrawing::None &&
+      m_profileLine.size() < 2) {
     return;
   }
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing, true);
+  drawProfileLine(painter);
   painter.setPen(QPen(QColor(255, 200, 40), 2.0));
   for (const RegionGeometry& region : m_outlines) {
     for (const std::vector<LonLat>& ring : region.rings()) {
@@ -819,7 +892,8 @@ void GlobeView::drawRegionInProgress(QPainter& painter) const
       const LonLat start = drawn.front();
       drawn = {start, LonLat{pointer->lonDeg, start.latDeg}, *pointer,
                LonLat{start.lonDeg, pointer->latDeg}};
-    } else if (m_drawing == RegionDrawing::Polygon) {
+    } else if (m_drawing == RegionDrawing::Polygon ||
+               m_drawing == RegionDrawing::Line) {
       drawn.push_back(*pointer);
     }
   }
@@ -830,7 +904,8 @@ void GlobeView::drawRegionInProgress(QPainter& painter) const
     drawn[i].lonDeg = drawn[i - 1].lonDeg +
                       shortLonDelta(drawn[i].lonDeg - drawn[i - 1].lonDeg);
   }
-  const bool closed = m_drawing == RegionDrawing::Rectangle || drawn.size() > 2;
+  const bool closed = m_drawing == RegionDrawing::Rectangle ||
+                      (m_drawing == RegionDrawing::Polygon && drawn.size() > 2);
   for (const QPolygonF& piece : outlineOnScreen(drawn, closed)) {
     painter.drawPolyline(piece);
   }
@@ -846,11 +921,17 @@ void GlobeView::drawRegionInProgress(QPainter& painter) const
 void GlobeView::drawRegionHint(QPainter& painter) const
 {
   // How to draw, at the top.
-  const QString text =
-      m_drawing == RegionDrawing::Rectangle
-          ? tr("Drag across the area to keep for offline use. Esc cancels.")
-          : tr("Click each corner of the area; double-click or press Enter "
-               "to finish. Backspace removes a corner, Esc cancels.");
+  QString text;
+  if (m_drawing == RegionDrawing::Rectangle) {
+    text = tr("Drag across the area to keep for offline use. Esc cancels.");
+  } else if (m_drawing == RegionDrawing::Line) {
+    text = tr("Click each point of the line to profile; double-click or "
+              "press Enter to finish. Backspace removes a point, Esc "
+              "cancels.");
+  } else {
+    text = tr("Click each corner of the area; double-click or press Enter "
+              "to finish. Backspace removes a corner, Esc cancels.");
+  }
   const QFontMetrics metrics(painter.font());
   const int margin = 6;
   const int textWidth =

@@ -22,6 +22,7 @@
 #include "ts/layers/layerdefinition.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/tileprovider.h"
+#include "ts/regions/regiongeometry.h"
 
 class QAction;
 class QActionGroup;
@@ -33,6 +34,8 @@ class QTimer;
 
 namespace ts
 {
+
+class ElevationProfileDialog;
 
 class CountryAreas;
 class GlobeView;
@@ -120,6 +123,22 @@ public:
    * current exaggeration.
    */
   void addElevationDefinition(const LayerDefinition& layer);
+
+  /**
+   * Shows the Elevation Profile window (not modal) and starts drawing a
+   * line on the globe; returns the window (null without an OpenGL view).
+   */
+  ElevationProfileDialog* showElevationProfile();
+
+  /**
+   * Computes the profile along @p points (longitude, latitude) on a worker
+   * thread and shows it in the Elevation Profile window (lines drawn on
+   * the globe come here; tests call it directly).
+   */
+  void profileLine(const std::vector<LonLat>& points);
+
+  /** Points of an elevation profile. */
+  static constexpr int profileSamples = 512;
 
   /**
    * Shows the Offline Regions window (not modal) and returns it.
@@ -220,6 +239,13 @@ private:
   QAction* m_mapViewAction = nullptr;
   QAction* m_scaleBarAction = nullptr;
   QAction* m_ellipsoidalHeightsAction = nullptr;
+  QAction* m_hillshadeAction = nullptr;
+  QAction* m_profileAction = nullptr;
+  QPointer<ElevationProfileDialog> m_profileDialog;
+  /** Cancels the profile being computed, if any. */
+  std::shared_ptr<std::atomic<bool>> m_profileCancel;
+  /** The line of the profile shown. */
+  std::vector<LonLat> m_profileLine;
   QAction* m_addElevationAction = nullptr;
   QAction* m_addWebTerrainAction = nullptr;
   QMenu* m_projectionMenu = nullptr;
