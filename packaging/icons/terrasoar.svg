@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!-- Terra Soar's icon: the globe with a graticule, and an arc soaring
+     over it. Drawn for the project. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <radialGradient id="ocean" cx="0.38" cy="0.34" r="0.75">
+      <stop offset="0" stop-color="#5fb2ec"/>
+      <stop offset="0.55" stop-color="#2273b8"/>
+      <stop offset="1" stop-color="#0d3768"/>
+    </radialGradient>
+    <linearGradient id="land" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8fc46a"/>
+      <stop offset="1" stop-color="#4f8f3a"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffb347" stop-opacity="0"/>
+      <stop offset="0.35" stop-color="#ffa23a"/>
+      <stop offset="1" stop-color="#ff7a1a"/>
+    </linearGradient>
+    <clipPath id="globe">
+      <circle cx="128" cy="134" r="94"/>
+    </clipPath>
+  </defs>
+  <circle cx="128" cy="134" r="94" fill="url(#ocean)"/>
+  <g clip-path="url(#globe)">
+    <path d="M70 92c18-14 44-16 58-6 10 7 4 18-8 22-14 5-10 18 4 22 16 5 12 22-4 28-20 8-38-2-46-18-8-14-16-34-4-48z" fill="url(#land)"/>
+    <path d="M150 70c20 2 40 14 46 32 4 12-6 18-16 14-12-4-20 6-14 18 6 12-2 26-16 28-10 2-14-10-10-20 4-12-8-16-12-26-6-16 6-48 22-46z" fill="url(#land)"/>
+    <path d="M140 196c10-8 26-6 30 4 2 8-8 12-18 10-8-2-16-8-12-14z" fill="url(#land)"/>
+    <g fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="2">
+      <ellipse cx="128" cy="134" rx="94" ry="32"/>
+      <ellipse cx="128" cy="134" rx="94" ry="66"/>
+      <line x1="34" y1="134" x2="222" y2="134"/>
+      <ellipse cx="128" cy="134" rx="32" ry="94"/>
+      <ellipse cx="128" cy="134" rx="66" ry="94"/>
+      <line x1="128" y1="40" x2="128" y2="228"/>
+    </g>
+  </g>
+  <circle cx="128" cy="134" r="94" fill="none" stroke="#0a2a52" stroke-width="3"/>
+  <path d="M26 206C60 120 140 52 228 30" fill="none" stroke="url(#arc)" stroke-width="12" stroke-linecap="round"/>
+  <path d="M228 30l-30 2 14 22z" fill="#ff7a1a"/>
+</svg>

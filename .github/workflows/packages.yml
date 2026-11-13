@@ -1,0 +1,202 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Linux packages: the AppImage and the Flatpak bundle, each with the base
+# pack, built and install-tested (installed, started with --measure under
+# Xvfb, the base pack found and imagery drawn, uninstalled). Runs on
+# changes to the packaging, nightly, by hand, and from the release
+# workflow, which publishes the packages it uploads. See
+# docs/release/packaging.md.
+
+name: Packages
+
+on:
+  pull_request:
+    paths:
+      - packaging/**
+      - app/app.pro
+      - terrasoar.pro
+      - .github/workflows/packages.yml
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Keep in step with ci.yml.
+  QT6_VERSION: "6.8.3"
+  LINUX_DEPS: >-
+    libgdal-dev libproj-dev libgeos-dev libsqlite3-dev libgeographiclib-dev
+    libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
+    libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1
+    libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0
+    xvfb
+
+jobs:
+  basepack:
+    name: Base pack
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Restore the pack's sources
+        id: sources
+        uses: actions/cache/restore@v6
+        with:
+          path: basepack-sources
+          key: basepack-sources-${{ hashFiles('tools/packager/basepack.json') }}
+
+      - name: Build the packager
+        run: |
+          mkdir build-ci && cd build-ci
+          qmake -r ../terrasoar.pro CONFIG+=release
+          make -j"$(nproc)" sub-tools
+
+      - name: Build the base pack
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TS_BASEPACK_SOURCES: ${{ github.workspace }}/basepack-sources
+        run: python3 tools/packager/build_basepack.py --build-dir build-ci
+
+      - name: Upload the base pack
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-basepack
+          retention-days: 7
+          path: build-ci/basepack
+
+  appimage:
+    name: AppImage
+    needs: basepack
+    # The oldest Linux the AppImage runs on is the one it is built on
+    # (glibc 2.39); GDAL 3.6 or later is needed (docs/release/packaging.md).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $LINUX_DEPS \
+            libfuse2t64 desktop-file-utils appstream
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          cache: true
+
+      - name: Download the base pack
+        uses: actions/download-artifact@v7
+        with:
+          name: package-basepack
+          path: basepack
+
+      - name: Check the desktop entry and AppStream metadata
+        run: |
+          desktop-file-validate packaging/linux/io.github.marutan.TerraSoar.desktop
+          appstreamcli validate --no-net packaging/linux/io.github.marutan.TerraSoar.metainfo.xml
+
+      - name: Build
+        run: |
+          mkdir build-ci && cd build-ci
+          qmake ../terrasoar.pro CONFIG+=release CONFIG+=ts_app_only
+          make -j"$(nproc)"
+
+      - name: Build the AppImage
+        run: >-
+          python3 packaging/linux/build_appimage.py --build-dir build-ci
+          --basepack basepack --output-dir dist --qmake "$(command -v qmake)"
+
+      - name: Install test
+        run: >-
+          xvfb-run -a -s "-screen 0 1280x1024x24"
+          python3 packaging/linux/test_package.py appimage dist/TerraSoar-*-x86_64.AppImage
+
+      - name: Upload the AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-appimage
+          retention-days: 14
+          path: |
+            dist/*.AppImage
+            dist/*.AppImage.sha256
+
+  flatpak:
+    name: Flatpak
+    needs: basepack
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.8
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download the base pack
+        uses: actions/download-artifact@v7
+        with:
+          name: package-basepack
+          path: basepack
+
+      - name: Version
+        id: version
+        run: echo "version=$(sed -n 's/^TS_VERSION *= *//p' common.pri)" >> "$GITHUB_OUTPUT"
+
+      - name: Build the Flatpak
+        uses: flathub-infra/flatpak-github-actions/flatpak-builder@933e9e8ca36e85046ebca8e211f0785c6becac40 # master, 2025-04-24
+        with:
+          manifest-path: packaging/flatpak/io.github.marutan.TerraSoar.yml
+          bundle: TerraSoar-${{ steps.version.outputs.version }}.flatpak
+          upload-artifact: false
+          cache-key: flatpak-builder-${{ hashFiles('packaging/flatpak/*.yml') }}
+
+      - name: Checksum
+        run: |
+          mkdir -p dist
+          mv TerraSoar-*.flatpak dist/
+          cd dist && for f in *.flatpak; do sha256sum "$f" > "$f.sha256"; done
+
+      - name: Upload the Flatpak bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-flatpak
+          retention-days: 14
+          path: dist
+
+  flatpak-install:
+    name: Flatpak install test
+    needs: flatpak
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Flatpak
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak xvfb \
+            libgl1-mesa-dri
+
+      - name: Download the bundle
+        uses: actions/download-artifact@v7
+        with:
+          name: package-flatpak
+          path: dist
+
+      - name: Install test
+        run: >-
+          xvfb-run -a -s "-screen 0 1280x1024x24"
+          python3 packaging/linux/test_package.py flatpak dist/TerraSoar-*.flatpak

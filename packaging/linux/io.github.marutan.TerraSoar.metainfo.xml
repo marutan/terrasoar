@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<component type="desktop-application">
+  <id>io.github.marutan.TerraSoar</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>Terra Soar</name>
+  <summary>View the Earth as a 3D globe or a 2D map, online and offline</summary>
+  <developer id="io.github.marutan">
+    <name>The Terra Soar developers</name>
+  </developer>
+  <description>
+    <p>
+      Terra Soar shows the Earth as a 3D globe that turns smoothly into a
+      flat map and back. Built-in data (NASA Blue Marble imagery,
+      shorelines, country outlines and global terrain) makes it work
+      offline from the first start.
+    </p>
+    <ul>
+      <li>Layers from web map servers (WMS), with a disk cache and offline regions</li>
+      <li>Terrain from the built-in elevation data, your own GeoTIFF files or web terrain tiles</li>
+      <li>Heights above sea level, hillshade on the map and elevation profiles</li>
+      <li>Mercator, Web Mercator and Miller Cylindrical maps</li>
+      <li>Downloadable data packs for more detail</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.marutan.TerraSoar.desktop</launchable>
+  <url type="homepage">https://github.com/marutan/terrasoar</url>
+  <url type="bugtracker">https://github.com/marutan/terrasoar/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>The globe with Blue Marble imagery and shorelines</caption>
+      <image>https://raw.githubusercontent.com/marutan/terrasoar/main/docs/images/screenshot-globe.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Terrain over the Alps</caption>
+      <image>https://raw.githubusercontent.com/marutan/terrasoar/main/docs/images/screenshot-terrain.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>The flat map in the Mercator projection</caption>
+      <image>https://raw.githubusercontent.com/marutan/terrasoar/main/docs/images/screenshot-map.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <requires>
+    <display_length compare="ge">768</display_length>
+  </requires>
+  <recommends>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </recommends>
+  <provides>
+    <binary>terrasoar</binary>
+    <mediatype>application/x-terrasoar-project</mediatype>
+  </provides>
+  <categories>
+    <category>Science</category>
+    <category>Geography</category>
+  </categories>
+  <releases>
+    <release version="0.0.1" date="2026-11-13">
+      <description>
+        <p>The first release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

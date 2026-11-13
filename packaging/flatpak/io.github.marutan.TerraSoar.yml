@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Flatpak build of Terra Soar, with the base pack. Built by the packages
+# workflow into TerraSoar-<version>.flatpak (docs/release/packaging.md):
+#
+#   flatpak-builder --repo=repo build packaging/flatpak/io.github.marutan.TerraSoar.yml
+#   flatpak build-bundle repo TerraSoar-<version>.flatpak io.github.marutan.TerraSoar
+#
+# The base pack must be at basepack/ in the source tree first (CI puts the
+# base pack job's artefact there). Libraries the KDE runtime doesn't have
+# are built from their release tarballs, pinned by SHA-256.
+
+app-id: io.github.marutan.TerraSoar
+runtime: org.kde.Platform
+runtime-version: "6.8"
+sdk: org.kde.Sdk
+command: terrasoar
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  # WMS servers, web terrain and data packs.
+  - --share=network
+  # Elevation files and projects: projects refer to files by their path.
+  - --filesystem=home
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/man
+  - /share/doc/geographiclib
+  - "*.a"
+  - "*.la"
+
+modules:
+  - name: geos
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+      - -DBUILD_DOCUMENTATION=OFF
+    sources:
+      - type: archive
+        url: https://download.osgeo.org/geos/geos-3.12.2.tar.bz2
+        sha256: 34c7770bf0090ee88488af98767d08e779f124fa33437e0aabec8abd4609fec6
+
+  - name: proj
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+      - -DBUILD_APPS=OFF
+      - -DENABLE_TIFF=ON
+      - -DENABLE_CURL=ON
+    sources:
+      - type: archive
+        url: https://download.osgeo.org/proj/proj-9.4.1.tar.gz
+        sha256: ffe20170ee2b952207adf8a195e2141eab12cda181e49fdeb54425d98c7171d7
+
+  - name: geographiclib
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_DOCUMENTATION=OFF
+      - -DBUILD_MANPAGES=OFF
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: archive
+        url: https://github.com/geographiclib/geographiclib/archive/refs/tags/v2.4.tar.gz
+        sha256: aa7edc6d86fcc297be6e6d6d53ddb6e622a46ef36fe9317335cac91bf471b5a9
+
+  - name: gdal
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_APPS=OFF
+      - -DBUILD_TESTING=OFF
+      - -DBUILD_PYTHON_BINDINGS=OFF
+      - -DBUILD_JAVA_BINDINGS=OFF
+      - -DBUILD_CSHARP_BINDINGS=OFF
+      - -DGDAL_USE_GEOS=ON
+      - -DGDAL_USE_TIFF_INTERNAL=ON
+      - -DGDAL_USE_GEOTIFF_INTERNAL=ON
+    sources:
+      - type: archive
+        url: https://github.com/OSGeo/gdal/releases/download/v3.9.3/gdal-3.9.3.tar.gz
+        sha256: f293d8ccc6b98f617db88f8593eae37f7e4b32d49a615b2cba5ced12c7bebdae
+
+  - name: terrasoar
+    buildsystem: qmake
+    config-opts:
+      - CONFIG+=release
+      - CONFIG+=ts_app_only
+      - PREFIX=/app
+      - BASEPACK_DIR=/run/build/terrasoar/basepack
+    sources:
+      - type: dir
+        path: ../..
+        skip:
+          - .git
+          - build
+          - build-ci
+          - build-analyze
+          - .flatpak-builder
+          - flatpak-build
+          - flatpak-repo
