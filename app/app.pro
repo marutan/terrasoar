@@ -17,6 +17,17 @@ DESTDIR = $$OUT_PWD
 
 SOURCES += src/main.cpp
 
+# The Windows program's icon and version information (Explorer's
+# Properties, the installer's list of programs).
+win32 {
+    RC_ICONS = $$PWD/../packaging/icons/terrasoar.ico
+    VERSION = $${TS_VERSION}.0
+    QMAKE_TARGET_COMPANY = "Peter Howkins"
+    QMAKE_TARGET_PRODUCT = "Terra Soar"
+    QMAKE_TARGET_DESCRIPTION = "Terra Soar"
+    QMAKE_TARGET_COPYRIGHT = "Peter Howkins. GNU GPL v2 or later."
+}
+
 # `make install` (INSTALL_ROOT=<dir> to stage it) lays out a Linux install
 # under PREFIX: bin/terrasoar, share/terrasoar/basepack (the application
 # finds it there), the desktop entry, AppStream metadata, MIME type, icons

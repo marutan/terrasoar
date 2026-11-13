@@ -87,9 +87,61 @@ by hand, and from the release workflow, which publishes what it uploads.
 
 ## Windows
 
-The NSIS installer is [Phase 8c](../Terra%20Soar%20–%20Phased%20Roadmap.md#phase-8--packaging-and-first-release).
+`TerraSoar-<version>-setup.exe`, an NSIS installer, built by the packages
+workflow's Windows job (MSVC 2022, Qt 6.8, vcpkg's GDAL, PROJ, GEOS,
+SQLite and GeographicLib) in two steps:
+
+1. `packaging/windows/deploy.py` stages the installation in a new
+   directory: `terrasoar.exe` (with the icon and version information from
+   `app.pro`); Qt and its plugins (`windeployqt`); the vcpkg DLLs the
+   program imports, and theirs (followed with `dumpbin /dependents`); the
+   Microsoft C++ runtime, app-local; Mesa llvmpipe as `opengl32sw.dll`
+   (for `--software-gl`; Qt 6 ships none) from mesa-dist-win, pinned by
+   SHA-256; PROJ's `share/proj/proj.db`; the base pack in `basepack/`; the
+   notices and `licences/` (each vcpkg package's copyright file, Qt's LGPL,
+   Mesa's and LLVM's licences). **Every DLL is audited**: it must come
+   from vcpkg (by vcpkg's own lists of installed files), Qt, the C++
+   runtime or Mesa; the list is `licences/bundled-libraries.txt`. It also
+   writes `uninstall.nsh`, the exact list of staged files for the
+   uninstaller.
+2. `makensis packaging/windows/terrasoar.nsi` packs it:
+   - for all users into `Program Files\Terra Soar` (administrator
+     rights), with the GPL as the licence page;
+   - a Start menu entry, an optional desktop shortcut (off by default);
+   - `.terrasoar` project files opened by Terra Soar;
+   - an entry in Settings → Apps (publisher Peter Howkins, version, size);
+   - over an earlier installation, its uninstaller runs first;
+   - the uninstaller removes exactly the installed files (never a folder
+     wholesale), the shortcuts, the association and the entry. Users'
+     data (`%LOCALAPPDATA%\Terra Soar`) is never touched.
+
+   Silent use: `setup.exe /S [/D=<folder>]`, `uninstall.exe /S`.
+
+`packaging/windows/test_installer.py` then installs it silently into a
+folder with spaces in its path, checks the files, the Settings → Apps
+entry, the association and the shortcut, and starts the installed program
+with its own software OpenGL and PROJ's own places emptied: the base pack
+must be found and verified, imagery drawn, PROJ's database usable (the
+installed `proj.db`). It installs again over it with users' data in place
+(an upgrade: the data must survive), then uninstalls and checks that
+everything installed is gone and the users' data is still there.
+
+## PROJ's database
+
+GDAL needs PROJ's `proj.db` to read coordinate reference systems by code
+(a UTM GeoTIFF, for example), and libproj looks for it where it was built.
+So the packages ship it: `share/proj/` next to the program on Windows,
+`usr/share/proj/` in the AppImage (the Flatpak's PROJ is built for its own
+prefix). At start-up the program points PROJ and GDAL there
+(`ts::useProjData()`) when it finds one. The state report's
+`crs_database` says whether it works, and the install tests require
+`ok` with PROJ's own places emptied.
 
 ## Signing
 
-Not yet (see [process.md](process.md#signing)); the Linux packages are
-published with their SHA-256 checksums.
+Not yet (see [process.md](process.md#signing)). The Windows job signs
+`terrasoar.exe` before staging and the installer after building it, with
+`signtool` and a timestamp, when the repository has the secrets
+`WINDOWS_SIGNING_CERTIFICATE` (a PFX, base64) and
+`WINDOWS_SIGNING_PASSWORD`; without them those steps are skipped. The
+Linux packages are published with their SHA-256 checksums.

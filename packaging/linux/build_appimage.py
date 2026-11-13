@@ -9,7 +9,9 @@
   3. the bundled libraries are audited: each must come from a Debian
      package (its copyright file is shipped and listed in
      usr/share/doc/terrasoar/bundled-libraries.txt) or from the Qt in use
-     (the LGPL and GPL texts are shipped); anything else fails the build;
+     (the LGPL and GPL texts are shipped); anything else fails the build.
+     PROJ's database goes into usr/share/proj, where the program points
+     PROJ and GDAL;
   4. linuxdeploy packs the AppDir into the AppImage.
 
 Usage:
@@ -113,11 +115,12 @@ def original_of(relative, qt_libs, qt_plugins):
     return None
 
 
-def audit(appdir, qt_libs, qt_plugins, qt_prefix):
-    """Ships the copyright of every bundled library; fails on unknown ones."""
+def audit(appdir, qt_libs, qt_plugins, qt_prefix, extra):
+    """Ships the copyright of every bundled library; fails on unknown ones.
+    `extra` lists other bundled files already accounted for."""
     doc = os.path.join(appdir, "usr", "share", "doc")
     qt_root = os.path.realpath(qt_prefix) + os.sep
-    lines = []
+    lines = list(extra)
     problems = []
     for directory, _, files in sorted(os.walk(os.path.join(appdir, "usr"))):
         for name in sorted(files):
@@ -165,6 +168,35 @@ def audit(appdir, qt_libs, qt_plugins, qt_prefix):
     print(f"Licence audit: {len(lines)} bundled libraries accounted for.")
 
 
+def ship_proj_data(appdir):
+    """Copies PROJ's database into usr/share/proj, where the program points
+    PROJ and GDAL (libproj's built-in path is the build machine's)."""
+    datadir = subprocess.run(["pkg-config", "--variable=datadir", "proj"],
+                             capture_output=True, text=True).stdout.strip()
+    candidates = [os.path.join(datadir, "proj")] if datadir else []
+    candidates.append("/usr/share/proj")
+    source = next((c for c in candidates
+                   if os.path.exists(os.path.join(c, "proj.db"))), None)
+    if source is None:
+        sys.exit("PROJ's proj.db not found (install proj-data)")
+    target = os.path.join(appdir, "usr", "share", "proj")
+    os.makedirs(target, exist_ok=True)
+    for name in ("proj.db", "proj.ini"):
+        if os.path.exists(os.path.join(source, name)):
+            shutil.copyfile(os.path.join(source, name),
+                            os.path.join(target, name))
+    package = owning_package(os.path.join(source, "proj.db"))
+    if package is None:
+        sys.exit("proj.db doesn't come from a package")
+    package = package.split(",")[0].split(":")[0]
+    copyright_file = f"/usr/share/doc/{package}/copyright"
+    doc = os.path.join(appdir, "usr", "share", "doc", package)
+    os.makedirs(doc, exist_ok=True)
+    shutil.copyfile(copyright_file, os.path.join(doc, "copyright"))
+    print(f"Shipped proj.db from {source} ({package})")
+    return f"usr/share/proj/proj.db\t{package}"
+
+
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--build-dir", required=True)
@@ -207,8 +239,9 @@ def main(argv):
                             "256x256", "apps", f"{APP_ID}.png")
         run([linuxdeploy, "--appdir", appdir, "--plugin", "qt",
              "--desktop-file", desktop, "--icon-file", icon], env=env)
+        proj = ship_proj_data(appdir)
         audit(appdir, qt_query(qmake, "QT_INSTALL_LIBS"), qt_plugins,
-              qt_query(qmake, "QT_INSTALL_PREFIX"))
+              qt_query(qmake, "QT_INSTALL_PREFIX"), [proj])
         run([linuxdeploy, "--appdir", appdir, "--output", "appimage"],
             env=env, cwd=output)
     path = os.path.join(output, name)

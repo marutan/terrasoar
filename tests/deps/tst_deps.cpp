@@ -302,6 +302,40 @@ private slots:
     QCOMPARE(failures, 0);
   }
 
+  void projDataNextToTheProgram()
+  {
+    // The packages ship proj.db next to the program and point PROJ and
+    // GDAL at it; here a copy of the system's.
+    QVERIFY(ts::projDatabaseUsable());
+    const QStringList before = ts::projSearchPaths();
+    QString systemDb;
+    for (const QString& path : before) {
+      if (QFile::exists(QDir(path).filePath(QStringLiteral("proj.db")))) {
+        systemDb = QDir(path).filePath(QStringLiteral("proj.db"));
+        break;
+      }
+    }
+    if (systemDb.isEmpty()) {
+      QSKIP("No proj.db in PROJ's search path to copy.");
+    }
+    const QTemporaryDir empty;
+    QVERIFY(!ts::useProjData(empty.path()));
+    QCOMPARE(ts::projSearchPaths(), before);
+
+    const QTemporaryDir shipped;
+    QVERIFY(QFile::copy(
+        systemDb, QDir(shipped.path()).filePath(QStringLiteral("proj.db"))));
+    QVERIFY(ts::useProjData(shipped.path()));
+    QCOMPARE(QDir::cleanPath(QDir::fromNativeSeparators(
+                 ts::projSearchPaths().constFirst())),
+             QDir::cleanPath(shipped.path()));
+    QVERIFY(ts::projDatabaseUsable());
+    const ts::ProjContext context;
+    PJ* crs = proj_create(context.get(), "EPSG:32632");
+    QVERIFY(crs != nullptr);
+    proj_destroy(crs);
+  }
+
   void benchmarkGeodeticToEcef()
   {
     const ts::ProjContext context;
