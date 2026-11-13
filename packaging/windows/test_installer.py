@@ -47,8 +47,12 @@ def registry_value(path, name, root=winreg.HKEY_LOCAL_MACHINE):
 
 
 def install(setup, folder):
-    # /D must come last and unquoted, spaces and all.
-    result = run([setup, "/S", f"/D={folder}"], timeout=900)
+    # /D must come last and unquoted, spaces and all: a command line of our
+    # own (a list would be quoted where it has spaces, and NSIS would then
+    # ignore /D and install into Program Files).
+    command = f'"{setup}" /S /D={folder}'
+    print("+ " + command, flush=True)
+    result = subprocess.run(command, timeout=900)
     return [] if result.returncode == 0 else [
         f"installer exit code {result.returncode}"]
 
@@ -77,6 +81,9 @@ def check_installed(folder, version):
 
 
 def start(folder, work):
+    program = os.path.join(folder, "terrasoar.exe")
+    if not os.path.exists(program):
+        return [f"no {program} to start"]
     report = os.path.join(work, "measure.json")
     if os.path.exists(report):
         os.remove(report)
@@ -85,7 +92,7 @@ def start(folder, work):
     env = dict(os.environ, GALLIUM_DRIVER="llvmpipe", PROJ_DATA=no_proj,
                PROJ_LIB=no_proj)
     env.pop("TS_BASEPACK_DIR", None)
-    result = run([os.path.join(folder, "terrasoar.exe"), "--software-gl",
+    result = run([program, "--software-gl",
                   "--measure", report, "--idle-seconds", "1"], env=env,
                  timeout=600)
     if result.returncode != 0:
@@ -105,8 +112,11 @@ def start(folder, work):
 
 
 def uninstall(folder):
+    uninstaller = os.path.join(folder, "uninstall.exe")
+    if not os.path.exists(uninstaller):
+        return [f"no {uninstaller}"]
     # The uninstaller copies itself away and returns at once: wait for it.
-    result = run([os.path.join(folder, "uninstall.exe"), "/S"], timeout=300)
+    result = run([uninstaller, "/S"], timeout=300)
     if result.returncode != 0:
         return [f"uninstaller exit code {result.returncode}"]
     deadline = time.monotonic() + 120
