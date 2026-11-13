@@ -3,7 +3,8 @@
 """Stages the Windows installation of Terra Soar for the NSIS installer.
 
 Into a new, empty staging directory:
-  - terrasoar.exe, and Qt with its plugins (windeployqt);
+  - terrasoar.exe, and Qt with its plugins (windeployqt; not Direct3D's
+    shader compilers, which the OpenGL program doesn't use);
   - the DLLs the program and those DLLs import from vcpkg (GDAL, PROJ,
     GEOS, SQLite, GeographicLib and theirs), found with `dumpbin
     /dependents`;
@@ -188,6 +189,7 @@ def main(argv):
     shutil.copyfile(args.exe, os.path.join(stage, "terrasoar.exe"))
     run([os.path.join(args.qt_bin, "windeployqt.exe"), "--release",
          "--no-compiler-runtime", "--no-opengl-sw", "--no-system-d3d-compiler",
+         "--no-system-dxc-compiler",
          os.path.join(stage, "terrasoar.exe")])
     deploy_vcpkg_dlls(stage, vcpkg)
     crt = copy_crt(stage)
