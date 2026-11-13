@@ -24,6 +24,7 @@
 
 class QAction;
 class QActionGroup;
+class QModelIndex;
 class QEvent;
 class QLabel;
 class QMenu;
@@ -161,6 +162,8 @@ protected:
 
 private:
   void createActions();
+  QModelIndex topmostElevationLayer() const;
+  void syncTerrainActions();
   void createMenus();
   void retranslateUi();
   void showAbout();
@@ -190,6 +193,8 @@ private:
   QAction* m_scaleBarAction = nullptr;
   QMenu* m_projectionMenu = nullptr;
   QActionGroup* m_projectionGroup = nullptr;
+  QMenu* m_exaggerationMenu = nullptr;
+  QActionGroup* m_exaggerationGroup = nullptr;
   QAction* m_openAction = nullptr;
   QAction* m_saveAction = nullptr;
   QAction* m_saveAsAction = nullptr;

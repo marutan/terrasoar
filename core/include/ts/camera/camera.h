@@ -6,6 +6,7 @@
 #ifndef TS_CAMERA_CAMERA_H
 #define TS_CAMERA_CAMERA_H
 
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -194,6 +195,24 @@ public:
    */
   void setPose(const CameraPose& pose);
 
+  /**
+   * The height of the surface above the ellipsoid at a point as drawn
+   * (the terrain), or nothing where it isn't known yet.
+   */
+  using SurfaceHeight =
+      std::function<std::optional<double>(double latDeg, double lonDeg)>;
+
+  /**
+   * Sets the surface the camera picks and keeps above (empty: the
+   * ellipsoid). On the globe pickGeodetic() then finds where a ray meets
+   * the terrain, and setPose() keeps the eye terrainClearanceM above it.
+   * See docs/design/terrain.md.
+   */
+  void setSurfaceHeight(SurfaceHeight surfaceHeight);
+
+  /** How far above the terrain the eye stays, metres. */
+  static constexpr double terrainClearanceM = 20.0;
+
   /** Returns the (clamped) pose. */
   const CameraPose& pose() const { return m_pose; }
 
@@ -272,6 +291,13 @@ public:
   std::optional<Geodetic> pickGeodetic(double xPx, double yPx) const;
 
   /**
+   * Returns where @p ray (from the eye) first meets the surface of
+   * setSurfaceHeight() on the globe, the height being the surface's, or
+   * nothing if it doesn't within the far distance.
+   */
+  std::optional<Geodetic> pickSurface(const Ray& ray) const;
+
+  /**
    * Returns where the ECEF point @p pointEcef lands on the screen, or
    * nothing if it is behind the eye. Points off screen still return their
    * (outside) coordinates. On the flat map (isMap()) the point's latitude
@@ -312,6 +338,7 @@ private:
   Vec3 m_up;
   Vec3 m_right;
   LocalFrame m_local;
+  SurfaceHeight m_surfaceHeight;
   double m_nearM = 1.0;
   double m_farM = 1.0e8;
 };

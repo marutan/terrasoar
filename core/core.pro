@@ -26,6 +26,7 @@ HEADERS += \
     include/ts/deps/sqliteconnection.h \
     include/ts/elevation/geoidmodel.h \
     include/ts/elevation/heightgrid.h \
+    include/ts/elevation/heighttileloader.h \
     include/ts/elevation/sqliteelevationprovider.h \
     include/ts/geo/ellipsoid.h \
     include/ts/geo/geodesic.h \
@@ -99,6 +100,7 @@ SOURCES += \
     src/deps/sqliteconnection.cpp \
     src/elevation/geoidmodel.cpp \
     src/elevation/heightgrid.cpp \
+    src/elevation/heighttileloader.cpp \
     src/elevation/sqliteelevationprovider.cpp \
     src/geo/ellipsoid.cpp \
     src/geo/geodesic.cpp \

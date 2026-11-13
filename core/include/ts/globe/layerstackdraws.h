@@ -7,6 +7,7 @@
 #ifndef TS_GLOBE_LAYERSTACKDRAWS_H
 #define TS_GLOBE_LAYERSTACKDRAWS_H
 
+#include <memory>
 #include <vector>
 
 #include <QStringList>
@@ -51,6 +52,34 @@ ImageryDraws imageryDrawsForStack(const LayerStack& stack,
 std::vector<VectorLayerDraw> vectorDrawsForStack(const LayerStack& stack,
                                                  ProviderRegistry& registry,
                                                  QStringList* errors);
+
+/** The terrain for GlobeRenderer::setElevationProvider() and setTerrain(). */
+struct ElevationDraw {
+  /** Where the heights come from; null for none. */
+  std::shared_ptr<ElevationProvider> provider;
+  /** True if the terrain is shown. */
+  bool visible = false;
+  /** Vertical exaggeration. */
+  double exaggeration = 1.0;
+};
+
+/**
+ * Returns the exaggeration in an elevation layer's style
+ * (`{"exaggeration": 2}`), 1 if none, held to 0.1–20.
+ */
+double terrainExaggeration(const LayerDefinition& definition);
+
+/**
+ * Returns the terrain of @p stack: the topmost visible elevation layer,
+ * or, if none is visible, the topmost hidden one with visible false (its
+ * heights stay loaded, so switching it on is immediate). A visible layer
+ * whose source can't be opened adds its error to @p errors.
+ *
+ * @guithread
+ */
+ElevationDraw elevationDrawForStack(const LayerStack& stack,
+                                    ProviderRegistry& registry,
+                                    QStringList* errors);
 
 /**
  * Returns the attributions of the layers of @p stack that are drawn, each

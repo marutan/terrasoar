@@ -36,9 +36,14 @@ struct VectorVertex {
    * centreLatDeg, degrees.
    */
   std::array<float, 2> lonLatOffsetDeg{};
+  /**
+   * The terrain under the vertex: its height above the ellipsoid and the
+   * sea level there, metres (as TileVertex::terrain); 0 without terrain.
+   */
+  std::array<float, 2> terrain{};
 };
 
-static_assert(sizeof(VectorVertex) == 20, "vertex stride");
+static_assert(sizeof(VectorVertex) == 28, "vertex stride");
 
 /** One straight piece of an outline or line string, drawn as one quad. */
 struct VectorSegment {
@@ -48,7 +53,7 @@ struct VectorSegment {
   VectorVertex b;
 };
 
-static_assert(sizeof(VectorSegment) == 40, "segment stride");
+static_assert(sizeof(VectorSegment) == 56, "segment stride");
 
 /**
  * The triangles and segments of one stored feature tile.

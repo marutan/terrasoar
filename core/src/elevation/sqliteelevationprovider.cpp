@@ -81,10 +81,12 @@ SqliteElevationProvider::loadHeights(TileKey key,
       }
     }
     const std::vector<double> undulations = m_geoid->undulationsM(points);
+    tile.seaLevelM.assign(tile.heightsM.size(), 0.0F);
     for (std::size_t i = 0; i < undulations.size(); ++i) {
       // A grid always covers the Earth; never let one bad value through.
       if (std::isfinite(undulations[i])) {
         tile.heightsM[i] += static_cast<float>(undulations[i]);
+        tile.seaLevelM[i] = static_cast<float>(undulations[i]);
       }
     }
   }

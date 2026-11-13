@@ -177,6 +177,13 @@ mostly triangles (see Measurements).
 
 Vector sources use the same selector.
 
+## Terrain
+
+The terrain flattens as the view becomes the map: the vertex shaders
+raise a vertex by its terrain height times (1 − t), so at t = 1 the
+meshes are exactly the flat ones and the map's golden images did not
+change ([terrain.md](terrain.md)).
+
 ## The camera during the change
 
 `CameraController::setViewMode(mode, duration)` animates t with an

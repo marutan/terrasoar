@@ -2,17 +2,68 @@
 #include "ts/vector/vectortileloader.h"
 
 #include <algorithm>
+#include <functional>
 #include <optional>
+#include <unordered_map>
 #include <utility>
 
+#include "ts/elevation/heightgrid.h"
+#include "ts/geo/geodetic.h"
 #include "ts/providers/tileprovider.h"
 
 namespace ts
 {
 
+namespace
+{
+
+/**
+ * Puts the terrain's height and sea level under every vertex of @p mesh,
+ * from @p elevation's tiles at @p level (loaded once per mesh).
+ */
+void liftMesh(VectorTileMesh& mesh, ElevationProvider& elevation, int level,
+              const std::atomic<bool>& cancelled)
+{
+  std::unordered_map<TileKey, std::optional<HeightTile>, TileKeyHash> tiles;
+  const std::function<void(VectorVertex&)> lift = [&](VectorVertex& vertex) {
+    const double lat = mesh.latDeg(vertex);
+    const double lon = mesh.lonDeg(vertex);
+    const TileKey key = TileKey::containing(level, Geodetic{lat, lon, 0.0});
+    std::unordered_map<TileKey, std::optional<HeightTile>,
+                       TileKeyHash>::iterator found = tiles.find(key);
+    if (found == tiles.end()) {
+      found = tiles.emplace(key, elevation.loadHeights(key, cancelled)).first;
+    }
+    if (!found->second) {
+      return;
+    }
+    // Clamp onto the tile: a vertex on its edge may round just outside.
+    const GeoRect bounds = key.bounds();
+    const double clampedLat = std::clamp(lat, bounds.southDeg, bounds.northDeg);
+    const double clampedLon = std::clamp(lon, bounds.westDeg, bounds.eastDeg);
+    vertex.terrain = {
+        static_cast<float>(sampleHeightM(*found->second, clampedLat, clampedLon)
+                               .value_or(0.0)),
+        static_cast<float>(
+            sampleSeaLevelM(*found->second, clampedLat, clampedLon)
+                .value_or(0.0))};
+  };
+  for (VectorVertex& vertex : mesh.triangles) {
+    lift(vertex);
+  }
+  for (VectorSegment& segment : mesh.segments) {
+    lift(segment.a);
+    lift(segment.b);
+  }
+}
+
+} // namespace
+
 VectorTileLoader::VectorTileLoader(std::shared_ptr<FeatureProvider> provider,
-                                   const VectorTileLoaderSettings& settings)
-    : m_provider(std::move(provider)), m_settings(settings)
+                                   const VectorTileLoaderSettings& settings,
+                                   std::shared_ptr<ElevationProvider> elevation)
+    : m_provider(std::move(provider)), m_settings(settings),
+      m_elevation(std::move(elevation))
 {
   const int threads = std::clamp(m_settings.threads, 1, 16);
   m_workers.reserve(static_cast<std::size_t>(threads));
@@ -119,6 +170,12 @@ void VectorTileLoader::work()
     if (mesh) {
       // Keyed by the requested (stored) tile, whatever the source said.
       mesh->key = key;
+      if (m_elevation) {
+        const int level =
+            std::min(key.level + m_settings.terrainLevelsBelow,
+                     std::max(m_elevation->maximumLevel(), key.level));
+        liftMesh(*mesh, *m_elevation, level, *cancelled);
+      }
     }
 
     std::function<void()> callback;

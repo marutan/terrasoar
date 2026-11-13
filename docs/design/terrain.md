@@ -1,10 +1,11 @@
 # Terrain
 
-How heights are stored, read and sampled. Phase 7b covers the data:
-the base pack's global DEM, the elevation provider and height sampling.
-Drawing the terrain (displaced tile meshes, skirts, exaggeration, the
-morph) is Phase 7c and further sources (web terrain tiles, GeoTIFF/COG
-files, priority between sources) Phase 7d; this document grows with them.
+How heights are stored, read, sampled and drawn. Phase 7b covered the
+data (the base pack's global DEM, the elevation provider, height
+sampling), Phase 7c the drawing (displaced tile meshes, skirts,
+exaggeration, the morph, features on the terrain, picking). Further
+sources (web terrain tiles, GeoTIFF/COG files, priority between sources)
+are Phase 7d. For users: [terrain.md](../user/terrain.md).
 Heights above the geoid and above the ellipsoid are explained in
 [vertical-datums.md](vertical-datums.md). Code:
 `core/include/ts/elevation/`, the interface in
@@ -78,8 +79,109 @@ The store is the same SQLite tile store as the imagery's, with `format`
 `egm2008` ([base-pack.md](../data/base-pack.md#file-formats)). Its pages
 are 64 KB: at 8 KB, tiles of 2–3 KB left a quarter of every page empty.
 
+## Drawing the terrain
+
+```
+Terrain layer (elevation, style {"exaggeration": k})
+  └─ elevationDrawForStack(): provider, visible, k
+       GlobeRenderer::setElevationProvider() / setTerrain()
+         TileRenderer: HeightTileLoader (2 threads) → LRU of HeightTile (64 MB)
+           mesh of a tile built with its heights (or an ancestor's for now)
+         VectorTileLoader: heights under every feature vertex
+       Frame block: terrain = (shown × (1 − morph), k)
+       vertex shaders: raise along the ellipsoid's normal
+```
+
+**Always loaded, shown on demand.** While a project has an elevation
+layer, even unticked, its heights are loaded for every tile drawn and
+built into the meshes. Showing the terrain, hiding it and changing the
+exaggeration only change two uniforms (`FrameBlock::terrain`), so they
+are instant. `LayerStack::elevation` therefore lists hidden elevation
+layers too; the topmost visible one is drawn, or, if none is visible, the
+topmost keeps its heights loaded.
+
+**Meshes.** A tile mesh's vertices stay on the ellipsoid
+(`TileVertex::offsetM`) and carry the terrain beside them
+(`TileVertex::terrain`: height above the ellipsoid h, sea level N, a
+skirt's drop d; `slope`: the terrain's slope towards east and north). The
+vertex shader puts the vertex at
+
+    N + (max(h − N, 0) − d) × k            along the ellipsoid's normal
+
+times the uniform's first component (0 when off, falling to 0 as the view
+becomes the map). Two choices are in that formula:
+
+- **The exaggeration applies above sea level**, not above the ellipsoid:
+  exaggerating h would also exaggerate the geoid (London's 46 m, Sri
+  Lanka's −107 m).
+- **The sea floor is flattened to sea level** (`max(h − N, 0)`): with
+  bathymetry the oceans would be pits 4 km deep under imagery of the sea
+  surface, and coastlines walls. Land below sea level (the Dead Sea, the
+  Netherlands) is flattened too; a land mask could keep it (Phase 7d).
+
+The tile's mesh is built with the heights of its own key once they have
+arrived, with the finest ancestor's meanwhile (interpolated, so the
+terrain is there at once and only sharpens), and rebuilt when its own
+arrive (`GpuMesh::heightsLevel`).
+
+**Shading.** The tile shader shades imagery by the surface normal. With
+terrain the normal is tilted by the slopes (`tsTerrainNormal()`), scaled
+by the exaggeration, so relief is lit by the same sun as the globe.
+
+**Skirts and cracks.** Neighbouring tiles of different levels sample the
+terrain at different spacings, so their shared edges differ. Every
+tile's skirt already hung below its border by the chord's sag; with
+terrain it hangs further, by the range of the tile's drawn heights plus
+1 m (`d`, scaled by the exaggeration in the shader), which covers any
+neighbour. `tests/globe` draws steep exaggerated terrain against a
+magenta sky and checks that no sky shows below the horizon; without the
+drop it finds the cracks.
+
+**The ray-cast ellipsoid.** On the globe the surface colour and the
+graticule are normally ray-cast against the ellipsoid in one full-screen
+pass ([camera-and-precision.md](camera-and-precision.md)). The terrain is
+not on the ellipsoid, so while it is shown the tiles carry the surface
+colour themselves (the base pass, as on the map) and the graticule is
+drawn on the tiles.
+
+**Selection.** A tile behind the ellipsoid's horizon or just outside the
+view may carry a mountain that is in view. While terrain is shown, the
+tile and vector selections widen each tile's bounds by 9000 m × k
+(`TileSelectionSettings::terrainHeightM`), and the horizon test allows
+for it.
+
+**Features.** Shorelines, the land fill and other features are meshed as
+before, then every vertex gets the terrain's height and sea level under
+it (`VectorVertex::terrain`), from height tiles three levels below the
+stored tile's (at most the DEM's deepest level), and the vector shaders
+raise it like a tile vertex. Their depth is pulled towards the eye by 1 %
+of their distance instead of 10 % (`depthParams.w`), so they lie on the
+ground but a mountain still hides what is behind it.
+
+**Picking and the camera.** `Camera::setSurfaceHeight()` gives the camera
+the terrain as drawn (`TileRenderer::terrainHeightM()`: the finest loaded
+heights, exaggerated, the sea floor flattened). On the globe
+`pickGeodetic()` then marches along the ray (steps of half its height
+above the surface, at least a thousandth of the distance) and bisects
+where it goes below, so zooming to the pointer, dragging and the pointer
+readout use the terrain; and `setPose()` keeps the eye 20 m above it.
+Where no heights are loaded the ellipsoid stands in.
+
+**The morph.** The terrain flattens as the view becomes the map
+(`terrain.x = 1 − t`). On the map itself (t = 1) the meshes are exactly
+the old ones, so all map golden images are unchanged; so are all globe
+golden images with terrain off.
+
 ## Tests
 
+`tests/tiling`: mesh terrain values, slopes and skirt drop; the
+selection keeping mountains past the horizon. `tests/camera`: picking a
+raised surface, the sky still the sky, the eye kept above it. `tests/layers`:
+elevation layers in the stack, hidden or not. `tests/globe`: no cracks
+(steep synthetic terrain, magenta sky), terrain off identical to none,
+golden images of the Alps, Everest, Mount Erebus by the antimeridian and
+the Alps half-way to the map from the real base pack. `tests/ui`: the
+Terrain layer off by default, ticking it, the exaggeration menu.
 `tests/elevation`: the quantization steps; encoding round trips (and
 damaged, truncated or mismatched data refused); bilinear sampling and
 resampling exact on a plane; a fixture geoid through PROJ; the provider

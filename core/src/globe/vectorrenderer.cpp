@@ -96,6 +96,14 @@ vec3 morphed(vec3 relative, vec2 lonLat)
 
 // Positive where the ellipsoid faces the eye at that point (on this side
 // of the horizon).
+// The vertex raised onto the terrain (when shown), relative to the eye.
+vec3 onTerrain(vec3 offset, vec2 terrainIn)
+{
+  vec3 up = normalize((centreHigh.xyz + offset)
+                      * vec3(ellipsoid.z, ellipsoid.z, ellipsoid.w));
+  return relativeToEye(offset) + up * tsTerrainHeight(vec3(terrainIn, 0.0));
+}
+
 float facing(vec3 offset, vec3 relative)
 {
   vec3 normal = (centreHigh.xyz + offset)
@@ -124,12 +132,13 @@ bool hidden(float facing)
 const char* const fillVertexGlsl = R"(
 layout(location = 0) in vec3 offset;
 layout(location = 1) in vec2 lonLat;
+layout(location = 2) in vec2 terrainIn;
 out vec2 vLonLat;
 out float vFacing;
 out float vDepthW;
 void main()
 {
-  vec3 relative = relativeToEye(offset);
+  vec3 relative = onTerrain(offset, terrainIn);
   vLonLat = lonLat;
   vFacing = facing(offset, relative);
   gl_Position = viewProjection * vec4(morphed(relative, lonLat), 1.0);
@@ -159,6 +168,8 @@ layout(location = 0) in vec3 aOffset;
 layout(location = 1) in vec2 aLonLat;
 layout(location = 2) in vec3 bOffset;
 layout(location = 3) in vec2 bLonLat;
+layout(location = 4) in vec2 aTerrain;
+layout(location = 5) in vec2 bTerrain;
 out vec2 vLonLat;
 out float vFacing;
 out float vDepthW;
@@ -173,8 +184,8 @@ vec2 toScreen(vec4 clip)
 
 void main()
 {
-  vec3 relA = relativeToEye(aOffset);
-  vec3 relB = relativeToEye(bOffset);
+  vec3 relA = onTerrain(aOffset, aTerrain);
+  vec3 relB = onTerrain(bOffset, bTerrain);
   vec4 clipA = viewProjection * vec4(morphed(relA, aLonLat), 1.0);
   vec4 clipB = viewProjection * vec4(morphed(relB, bLonLat), 1.0);
   float nearW = params.y;
@@ -321,7 +332,8 @@ bool VectorRenderer::initialise(QString* errorString)
   fillPipeline.shader = m_fillShader.get();
   fillPipeline.bufferLayouts = {{sizeof(VectorVertex), false}};
   fillPipeline.attributes = {{0, VertexFormat::Float3, 0, 0},
-                             {1, VertexFormat::Float2, 0, 12}};
+                             {1, VertexFormat::Float2, 0, 12},
+                             {2, VertexFormat::Float2, 0, 20}};
   fillPipeline.blend = BlendMode::PremultipliedAlpha;
   m_fillPipeline = m_device.createPipeline(fillPipeline);
 
@@ -329,10 +341,10 @@ bool VectorRenderer::initialise(QString* errorString)
   linePipeline.shader = m_lineShader.get();
   linePipeline.topology = PrimitiveTopology::TriangleStrip;
   linePipeline.bufferLayouts = {{sizeof(VectorSegment), true}};
-  linePipeline.attributes = {{0, VertexFormat::Float3, 0, 0},
-                             {1, VertexFormat::Float2, 0, 12},
-                             {2, VertexFormat::Float3, 0, 20},
-                             {3, VertexFormat::Float2, 0, 32}};
+  linePipeline.attributes = {
+      {0, VertexFormat::Float3, 0, 0},  {1, VertexFormat::Float2, 0, 12},
+      {2, VertexFormat::Float3, 0, 28}, {3, VertexFormat::Float2, 0, 40},
+      {4, VertexFormat::Float2, 0, 20}, {5, VertexFormat::Float2, 0, 48}};
   linePipeline.blend = BlendMode::PremultipliedAlpha;
   m_linePipeline = m_device.createPipeline(linePipeline);
 
@@ -355,6 +367,37 @@ bool VectorRenderer::initialise(QString* errorString)
     return false;
   }
   return true;
+}
+
+void VectorRenderer::setElevationProvider(
+    std::shared_ptr<ElevationProvider> provider)
+{
+  if (provider == m_elevation) {
+    return;
+  }
+  m_elevation = std::move(provider);
+  // Every mesh again, with (or without) heights.
+  std::vector<VectorLayerDraw> draws;
+  draws.reserve(m_layers.size());
+  for (const std::pair<Source*, VectorLayerDraw>& layer : m_layers) {
+    draws.push_back(layer.second);
+  }
+  m_layers.clear();
+  for (std::unique_ptr<Source>& source : m_sources) {
+    source->loader.reset();
+  }
+  m_sources.clear();
+  setLayers(draws);
+}
+
+void VectorRenderer::setTerrainHeightMargin(double metres)
+{
+  m_terrainMarginM = metres;
+  for (const std::unique_ptr<Source>& source : m_sources) {
+    TileSelectionSettings selection = source->selector.settings();
+    selection.terrainHeightM = metres;
+    source->selector.setSettings(selection);
+  }
 }
 
 void VectorRenderer::setLayers(const std::vector<VectorLayerDraw>& layers)
@@ -381,12 +424,13 @@ void VectorRenderer::setLayers(const std::vector<VectorLayerDraw>& layers)
       } else {
         std::unique_ptr<Source> created = std::make_unique<Source>();
         created->provider = draw.provider;
-        created->loader = std::make_unique<VectorTileLoader>(draw.provider,
-                                                             m_settings.loader);
+        created->loader = std::make_unique<VectorTileLoader>(
+            draw.provider, m_settings.loader, m_elevation);
         created->loader->setTilesReadyCallback(m_callback);
         TileSelectionSettings selection = m_settings.selection;
         selection.maximumLevel =
             std::min(selection.maximumLevel, draw.provider->maximumLevel());
+        selection.terrainHeightM = m_terrainMarginM;
         created->selector.setSettings(selection);
         sources.push_back(std::move(created));
       }

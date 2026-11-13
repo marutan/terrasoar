@@ -227,6 +227,17 @@ void LayerTreeModel::setStatusIcons(const QIcon& offline, const QIcon& error)
   m_errorIcon = error;
 }
 
+bool LayerTreeModel::setLayerDefinition(const QModelIndex& index,
+                                        const LayerDefinition& definition)
+{
+  if (!index.isValid() || nodeAt(index)->kind == Node::Kind::Collection) {
+    return false;
+  }
+  nodeAt(index)->definition = definition;
+  emitSubtreeChanged(index);
+  return true;
+}
+
 bool LayerTreeModel::setData(const QModelIndex& index, const QVariant& value,
                              int role)
 {
@@ -462,8 +473,9 @@ namespace
 
 /** What a node inherits from its ancestors. */
 struct Inherited {
-  double alpha = 1.0; ///< Product of the ancestors' opacities.
-  int group = -1;     ///< Enclosing composite group, or -1.
+  double alpha = 1.0;  ///< Product of the ancestors' opacities.
+  int group = -1;      ///< Enclosing composite group, or -1.
+  bool visible = true; ///< All ancestors checked.
 };
 
 /** Walks the tree bottom to top, collecting what is drawn. */
@@ -485,7 +497,17 @@ private:
   void visit(const LayerTreeModel& model, const QModelIndex& index,
              Inherited inherited)
   {
-    if (model.data(index, Qt::CheckStateRole).toInt() != Qt::Checked) {
+    if (model.data(index, Qt::CheckStateRole).toInt() != Qt::Checked ||
+        !inherited.visible) {
+      // Hidden, but its elevation layers still count (see
+      // LayerStack::elevation).
+      if (model.data(index, LayerTreeModel::IsCollectionRole).toBool()) {
+        visitChildren(model, index, Inherited{0.0, -1, false});
+      } else if (model.layerDefinition(index).type == LayerType::Elevation) {
+        stack.elevation.push_back(ElevationStackEntry{
+            model.data(index, LayerTreeModel::NodeIdRole).toString(),
+            model.layerDefinition(index), false});
+      }
       return;
     }
     const int group = inherited.group;
@@ -501,9 +523,9 @@ private:
             model.data(index, LayerTreeModel::NodeIdRole).toString(), alpha});
         visitChildren(
             model, index,
-            Inherited{1.0, static_cast<int>(stack.groups.size()) - 1});
+            Inherited{1.0, static_cast<int>(stack.groups.size()) - 1, true});
       } else {
-        visitChildren(model, index, Inherited{alpha, group});
+        visitChildren(model, index, Inherited{alpha, group, true});
       }
       return;
     }
@@ -518,6 +540,8 @@ private:
               ? alpha * stack.groups[static_cast<std::size_t>(group)].alpha
               : alpha;
       stack.vectors.push_back(VectorStackEntry{id, definition, vectorAlpha});
+    } else if (definition.type == LayerType::Elevation) {
+      stack.elevation.push_back(ElevationStackEntry{id, definition, true});
     }
   }
 };

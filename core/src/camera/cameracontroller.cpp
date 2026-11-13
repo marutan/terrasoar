@@ -548,4 +548,9 @@ void CameraController::advanceMotion(double elapsedS)
   applyPose(pose);
 }
 
+void CameraController::setSurfaceHeight(Camera::SurfaceHeight surfaceHeight)
+{
+  m_camera.setSurfaceHeight(std::move(surfaceHeight));
+}
+
 } // namespace ts

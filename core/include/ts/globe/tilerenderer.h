@@ -10,19 +10,26 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <QSize>
 #include <QString>
 
 #include "ts/render/renderdevice.h"
+#include "ts/tiling/lrucache.h"
 #include "ts/tiling/tilekey.h"
 #include "ts/tiling/tileloader.h"
 #include "ts/tiling/tileselector.h"
 
 namespace ts
 {
+
+class ElevationProvider;
+class HeightTileLoader;
+struct HeightTile;
 
 class Camera;
 class ImageryProvider;
@@ -33,6 +40,10 @@ struct TileRendererSettings {
   TileSelectionSettings selection;
   /** Loader threads and decoded-image cache, per imagery source. */
   TileLoaderSettings loader;
+  /** Budget of the terrain's height tiles in memory (64 MB). */
+  std::size_t heightCacheBytes = std::size_t{64} * 1024 * 1024;
+  /** Threads loading height tiles. */
+  int heightThreads = 2;
   /** Budget of tile textures and meshes on the GPU (common use: 96 MB). */
   std::size_t gpuBytes = std::size_t{96} * 1024 * 1024;
   /** Most imagery tiles uploaded to the GPU per frame, all sources. */
@@ -159,6 +170,35 @@ public:
   void setGroupCompositing(bool enabled);
 
   /**
+   * Sets the terrain's source (null for none). While there is one, its
+   * heights are loaded for every tile drawn and built into the meshes,
+   * whether the terrain is shown or not, so that setTerrain() needs no new
+   * meshes. Drops the meshes built so far. See docs/design/terrain.md.
+   */
+  void setElevationProvider(std::shared_ptr<ElevationProvider> provider);
+
+  /**
+   * Shows the terrain (if there is a source) with @p exaggeration, or the
+   * plain ellipsoid. The vertex shader does it (FrameBlock::terrain).
+   */
+  void setTerrain(bool visible, double exaggeration);
+
+  /** Returns true if the terrain is shown (there is a source and it's on). */
+  bool terrainShown() const;
+
+  /** Returns the vertical exaggeration. */
+  double exaggeration() const { return m_exaggeration; }
+
+  /**
+   * Returns the height above the ellipsoid the surface is drawn at, at
+   * (@p latDeg, @p lonDeg) on the globe (exaggerated, the sea floor at sea
+   * level), from the finest heights loaded there; 0 without terrain;
+   * nothing where none are loaded yet. For picking and keeping the camera
+   * above ground.
+   */
+  std::optional<double> terrainHeightM(double latDeg, double lonDeg);
+
+  /**
    * Sets the function called (on a worker thread) when imagery tiles
    * finish loading, so the application can schedule a frame.
    */
@@ -230,7 +270,13 @@ private:
   };
 
   void uploadImages();
-  void buildMeshes(const std::vector<TileLoadRequest>& wanted);
+  void buildMeshes(const std::vector<TileLoadRequest>& wanted,
+                   const std::vector<TileKey>& rebuild);
+  void uploadMesh(TileKey key);
+  void takeHeights();
+  void requestHeights(const TileSelection& selection);
+  std::shared_ptr<const HeightTile> heightsFor(TileKey key, bool exact);
+  void applySelectionSettings();
   void requestImages();
   void bindImages();
   static void setMercatorImage(LayerImage& image, TileKey imageKey);
@@ -267,6 +313,17 @@ private:
   std::unique_ptr<RenderTarget> m_groupTarget;
 
   std::unordered_map<TileKey, std::unique_ptr<GpuMesh>, TileKeyHash> m_meshes;
+  std::shared_ptr<ElevationProvider> m_elevation;
+  std::unique_ptr<HeightTileLoader> m_heightLoader;
+  LruCache<TileKey, std::shared_ptr<const HeightTile>, TileKeyHash> m_heights;
+  /** Keys the source has no heights for. */
+  std::unordered_set<TileKey, TileKeyHash> m_noHeights;
+  bool m_terrainVisible = false;
+  /** Deepest level of the heights in m_heights (where lookups start). */
+  int m_deepestHeights = 0;
+  double m_exaggeration = 1.0;
+  int m_imageryDeepestLevel = 0;
+  int m_imageryTileSizePx = 256;
   std::vector<std::unique_ptr<Source>> m_sources;
   std::vector<Layer> m_layers;
   std::vector<double> m_groupAlphas;

@@ -43,6 +43,12 @@ struct TileSelectionSettings {
    * maximumLevel says. See docs/design/morph.md.
    */
   double maximumMapGeometryErrorPx = 0.5;
+  /**
+   * How high the terrain may raise the surface, metres (0 without
+   * terrain): tiles are kept while a mountain on them could still be in
+   * the view or above the horizon.
+   */
+  double terrainHeightM = 0.0;
   /** Grid segments per side of the tile meshes (TileMesh::segments). */
   int meshSegments = 16;
 };

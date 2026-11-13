@@ -47,6 +47,14 @@ std::optional<double> sampleHeightM(const HeightTile& tile, double latDeg,
                                     double lonDeg);
 
 /**
+ * Returns the sea level at (@p latDeg, @p lonDeg) in @p tile
+ * (HeightTile::seaLevelM), interpolated bilinearly; 0 where the tile has
+ * none; nothing outside the tile.
+ */
+std::optional<double> sampleSeaLevelM(const HeightTile& tile, double latDeg,
+                                      double lonDeg);
+
+/**
  * Returns the heights of @p key, a descendant of @p ancestor's key, as
  * @p samples² samples interpolated bilinearly from @p ancestor (for keys
  * deeper than a source stores).

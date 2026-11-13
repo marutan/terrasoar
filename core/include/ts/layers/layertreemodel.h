@@ -54,6 +54,16 @@ struct VectorStackEntry {
   double alpha = 1.0;
 };
 
+/** One elevation layer of the tree (LayerStack::elevation). */
+struct ElevationStackEntry {
+  /** The tree entry. */
+  QString nodeId;
+  /** What it draws. */
+  LayerDefinition definition;
+  /** True if it and all its ancestors are checked. */
+  bool visible = false;
+};
+
 /**
  * The visible layers flattened for drawing: imagery bottom to top (the
  * members of one composite group contiguous), then vectors bottom to top,
@@ -68,6 +78,12 @@ struct LayerStack {
   std::vector<StackGroup> groups;
   /** Vector layers, bottom to top. */
   std::vector<VectorStackEntry> vectors;
+  /**
+   * Elevation layers, bottom to top, hidden ones too: the topmost visible
+   * one is the terrain drawn, and the topmost of all keeps its heights
+   * loaded, so that switching it on shows the terrain at once.
+   */
+  std::vector<ElevationStackEntry> elevation;
 };
 
 /**
@@ -162,6 +178,13 @@ public:
    */
   QModelIndex addLayer(const LayerDefinition& definition,
                        const QModelIndex& parent = QModelIndex(), int row = 0);
+
+  /**
+   * Replaces the definition of the layer at @p index (to change its
+   * style, such as a terrain's exaggeration). False for a collection.
+   */
+  bool setLayerDefinition(const QModelIndex& index,
+                          const LayerDefinition& definition);
 
   /** Adds an empty collection named @p name. Returns its index. */
   QModelIndex addCollection(const QString& name,

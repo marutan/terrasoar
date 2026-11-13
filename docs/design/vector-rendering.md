@@ -136,6 +136,15 @@ of every layer on screen: each pack dataset's attribution from its
 manifest, once, top layer first (`ts::attributionsForStack()`). It goes
 when the layer is hidden.
 
+## On the terrain
+
+While a project has an elevation layer, every vertex also carries the
+terrain's height and sea level under it (`VectorVertex::terrain`, now 28
+bytes), sampled when the tile is meshed, and the vertex shaders raise it
+as the tiles' are, so features lie on the terrain when it is shown. Their
+depth is then pulled 1 % nearer instead of 10 %, so that mountains hide
+what is behind them. See [terrain.md](terrain.md#drawing-the-terrain).
+
 ## Tests
 
 - `tests/vector`: meshing (area covered, triangles within a cell, vertices

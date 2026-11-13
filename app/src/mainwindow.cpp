@@ -2,9 +2,11 @@
 #include "mainwindow.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include <QAction>
 #include <QActionGroup>
@@ -135,6 +137,18 @@ MainWindow::MainWindow(QWidget* parent)
     for (const LayerDefinition& definition : builtins) {
       if (definition.id == id) {
         m_layers->addLayer(definition);
+      }
+    }
+  }
+  // The terrain, off: its heights load meanwhile, so ticking it shows the
+  // terrain at once.
+  if (m_basePackState != BasePackState::Missing) {
+    for (const LayerDefinition& definition : builtins) {
+      if (definition.id == QLatin1String("builtin:terrain")) {
+        // At the bottom: it is drawn as the surface, under everything.
+        const QModelIndex terrain =
+            m_layers->addLayer(definition, QModelIndex(), m_layers->rowCount());
+        m_layers->setData(terrain, Qt::Unchecked, Qt::CheckStateRole);
       }
     }
   }
@@ -402,6 +416,27 @@ void MainWindow::createActions()
   }
   syncViewActions();
 
+  // Terrain exaggeration: the style of the topmost elevation layer.
+  m_exaggerationGroup = new QActionGroup(this);
+  for (const double factor : {1.0, 1.5, 2.0, 3.0, 5.0}) {
+    QAction* action = new QAction(this);
+    action->setCheckable(true);
+    action->setData(factor);
+    action->setObjectName(QStringLiteral("exaggeration%1Action")
+                              .arg(QString::number(factor * 10.0)));
+    m_exaggerationGroup->addAction(action);
+  }
+  connect(m_exaggerationGroup, &QActionGroup::triggered, this,
+          [this](const QAction* action) {
+            const QModelIndex index = topmostElevationLayer();
+            LayerDefinition definition = m_layers->layerDefinition(index);
+            definition.style.insert(QStringLiteral("exaggeration"),
+                                    action->data().toDouble());
+            m_layers->setLayerDefinition(index, definition);
+          });
+  connect(m_layers, &LayerTreeModel::layerStackChanged, this,
+          &MainWindow::syncTerrainActions);
+
   m_addWmsAction = new QAction(this);
   m_addWmsAction->setObjectName(QStringLiteral("addWmsAction"));
   connect(m_addWmsAction, &QAction::triggered, this,
@@ -444,6 +479,39 @@ void MainWindow::createActions()
   connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
 }
 
+QModelIndex MainWindow::topmostElevationLayer() const
+{
+  // Depth first from the top row: the first elevation layer met.
+  std::vector<QModelIndex> pending;
+  for (int row = m_layers->rowCount() - 1; row >= 0; --row) {
+    pending.push_back(m_layers->index(row, 0));
+  }
+  while (!pending.empty()) {
+    const QModelIndex index = pending.back();
+    pending.pop_back();
+    if (m_layers->data(index, LayerTreeModel::IsCollectionRole).toBool()) {
+      for (int row = m_layers->rowCount(index) - 1; row >= 0; --row) {
+        pending.push_back(m_layers->index(row, 0, index));
+      }
+    } else if (m_layers->layerDefinition(index).type == LayerType::Elevation) {
+      return index;
+    }
+  }
+  return QModelIndex();
+}
+
+void MainWindow::syncTerrainActions()
+{
+  const QModelIndex index = topmostElevationLayer();
+  m_exaggerationGroup->setEnabled(index.isValid());
+  const double current =
+      index.isValid() ? terrainExaggeration(m_layers->layerDefinition(index))
+                      : 1.0;
+  for (QAction* action : m_exaggerationGroup->actions()) {
+    action->setChecked(std::abs(action->data().toDouble() - current) < 1e-9);
+  }
+}
+
 void MainWindow::createMenus()
 {
   m_fileMenu = menuBar()->addMenu(QString());
@@ -467,6 +535,10 @@ void MainWindow::createMenus()
   m_projectionMenu->setObjectName(QStringLiteral("projectionMenu"));
   m_projectionMenu->addActions(m_projectionGroup->actions());
   m_viewMenu->addAction(m_scaleBarAction);
+  m_exaggerationMenu = m_viewMenu->addMenu(QString());
+  m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
+  m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
+  syncTerrainActions();
   m_viewMenu->addSeparator();
   QAction* layers = m_layerDock->toggleViewAction();
   layers->setObjectName(QStringLiteral("layersDockAction"));
@@ -501,6 +573,13 @@ void MainWindow::retranslateUi()
       action->setStatusTip(tr("Draw the flat map in the %1 projection")
                                .arg(projection->displayName()));
     }
+  }
+  m_exaggerationMenu->setTitle(tr("Terrain &Exaggeration"));
+  for (QAction* action : m_exaggerationGroup->actions()) {
+    const QString factor = QLocale().toString(action->data().toDouble());
+    action->setText(tr("%1×").arg(factor));
+    action->setStatusTip(
+        tr("Draw the terrain %1 times as high as it is").arg(factor));
   }
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
@@ -602,6 +681,8 @@ void MainWindow::refreshLayers()
   m_globeView->setImageryDraws(
       imageryDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
+  m_globeView->setElevationDraw(
+      elevationDrawForStack(stack, *m_registry, &errors));
   m_globeView->setAttributions(attributionsForStack(stack, *m_registry));
   if (!errors.isEmpty()) {
     statusBar()->showMessage(errors.join(QLatin1Char(' ')), 10000);

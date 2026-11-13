@@ -195,6 +195,12 @@ struct HeightTile {
   int samples = 0;
   /** samples² heights above the WGS 84 ellipsoid, metres, row by row. */
   std::vector<float> heightsM;
+  /**
+   * samples² heights of sea level (the geoid) above the ellipsoid at the
+   * same samples, metres; empty if the source doesn't know them (then
+   * sea level is taken as the ellipsoid).
+   */
+  std::vector<float> seaLevelM;
 };
 
 /**

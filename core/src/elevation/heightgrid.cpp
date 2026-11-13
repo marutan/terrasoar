@@ -58,11 +58,6 @@ std::int32_t predicted(const std::vector<std::int32_t>& codes, int samples,
          codes[(r - 1) * n + c - 1];
 }
 
-double heightAt(const HeightTile& tile, int row, int column)
-{
-  return static_cast<double>(tile.heightsM[indexOf(row, column, tile.samples)]);
-}
-
 } // namespace
 
 double quantizedHeightM(double heightM)
@@ -145,13 +140,26 @@ std::optional<std::vector<float>> decodeHeightGrid(const QByteArray& data,
   return heights;
 }
 
-std::optional<double> sampleHeightM(const HeightTile& tile, double latDeg,
-                                    double lonDeg)
+namespace
+{
+
+/** Value (@p row, @p column) of an @p n-wide grid. */
+// Row then column, as everywhere in a height grid.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+double gridValue(const std::vector<float>& values, int n, int row, int column)
+{
+  return static_cast<double>(values[indexOf(row, column, n)]);
+}
+
+/** Bilinear interpolation of @p values (samples² of @p tile's grid). */
+std::optional<double> sampleGrid(const HeightTile& tile,
+                                 const std::vector<float>& values,
+                                 double latDeg, double lonDeg)
 {
   const GeoRect bounds = tile.key.bounds();
   const int n = tile.samples;
   if (n < 2 ||
-      tile.heightsM.size() !=
+      values.size() !=
           static_cast<std::size_t>(n) * static_cast<std::size_t>(n) ||
       latDeg < bounds.southDeg || latDeg > bounds.northDeg ||
       lonDeg < bounds.westDeg || lonDeg > bounds.eastDeg) {
@@ -164,11 +172,32 @@ std::optional<double> sampleHeightM(const HeightTile& tile, double latDeg,
   const int column = std::clamp(static_cast<int>(std::floor(x)), 0, n - 2);
   const double fy = y - row;
   const double fx = x - column;
-  const double north = heightAt(tile, row, column) * (1.0 - fx) +
-                       heightAt(tile, row, column + 1) * fx;
-  const double south = heightAt(tile, row + 1, column) * (1.0 - fx) +
-                       heightAt(tile, row + 1, column + 1) * fx;
+  const double north = gridValue(values, n, row, column) * (1.0 - fx) +
+                       gridValue(values, n, row, column + 1) * fx;
+  const double south = gridValue(values, n, row + 1, column) * (1.0 - fx) +
+                       gridValue(values, n, row + 1, column + 1) * fx;
   return north * (1.0 - fy) + south * fy;
+}
+
+} // namespace
+
+std::optional<double> sampleHeightM(const HeightTile& tile, double latDeg,
+                                    double lonDeg)
+{
+  return sampleGrid(tile, tile.heightsM, latDeg, lonDeg);
+}
+
+std::optional<double> sampleSeaLevelM(const HeightTile& tile, double latDeg,
+                                      double lonDeg)
+{
+  const GeoRect bounds = tile.key.bounds();
+  if (tile.seaLevelM.empty()) {
+    const bool inside = latDeg >= bounds.southDeg &&
+                        latDeg <= bounds.northDeg && lonDeg >= bounds.westDeg &&
+                        lonDeg <= bounds.eastDeg;
+    return inside ? std::optional<double>(0.0) : std::nullopt;
+  }
+  return sampleGrid(tile, tile.seaLevelM, latDeg, lonDeg);
 }
 
 // Size, then row and column, as everywhere in a height grid.

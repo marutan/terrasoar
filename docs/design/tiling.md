@@ -173,7 +173,9 @@ farther, so that a tile's flat triangles, which lie slightly below the
 curved surface, pass the depth test), then the tiles (depth test and
 write, back faces culled), then markers. All write logarithmic depth.
 The ray-cast globe shows wherever no tile is drawn: before the first
-tiles load, and where a provider has no data.
+tiles load, and where a provider has no data. While terrain is shown the
+ray-cast pass is left out and the tiles carry the surface colour, since
+the terrain is not on the ellipsoid ([terrain.md](terrain.md)).
 
 ## Budgets and measurements
 
