@@ -12,6 +12,7 @@ RESOURCES += $$PWD/app.qrc
 HEADERS += \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/addwmsdialog.h \
+    $$PWD/src/elevationprofiledialog.h \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
     $$PWD/src/mainwindow.h \
@@ -26,6 +27,7 @@ HEADERS += \
 SOURCES += \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
+    $$PWD/src/elevationprofiledialog.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \

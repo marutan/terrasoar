@@ -68,6 +68,33 @@ computer like WMS tiles, so places you have seen work offline. If the
 server can't be reached, the layer shows a warning and the built-in
 heights stand in until it answers again.
 
+## On the flat map
+
+The terrain lies flat on the map, so its relief is shown by **hillshade**:
+slopes facing the north-west are lighter, those facing away darker, as on
+a printed relief map. It fades in as the globe turns into the map. Switch
+it off with **View → Hillshade on the Map**; the choice is saved with the
+project.
+
+## Elevation profiles
+
+**View → Elevation Profile…** shows the heights along a line:
+
+1. Click the points of the line on the globe or map; double-click or
+   press Enter to finish (Backspace removes the last point, Esc cancels).
+2. The window charts the height above sea level against the distance
+   along the line, and gives its length, lowest and highest point, and the
+   total climb and descent.
+3. Point at the chart to see where a height is: a marker follows on the
+   globe.
+4. **Save as CSV…** writes every point (distance, latitude, longitude,
+   height above sea level and above the ellipsoid) for a spreadsheet.
+
+**Draw Another Line** starts again. The heights come from the visible
+elevation layers (your own files first), at a detail suited to the line's
+length: 512 points along it, so a 5 km line shows detail every 10 m where
+the data has it, a 500 km line every kilometre.
+
 ## Height under the pointer
 
 Once there is an elevation layer (switched on or not), the status bar
@@ -94,5 +121,5 @@ the full detail of the data.
   from (and will be shown as) heights above sea level; see
   [the design notes](../design/vertical-datums.md) if that matters to you.
 
-Elevation profiles, hillshade on the flat map and finer geoid models come
-later (roadmap Phase 7d).
+Finer geoid models (EGM2008 at 2.5′ and 1′, and OSGM15 for Britain) come
+later as downloadable packs (roadmap Phase 7d).

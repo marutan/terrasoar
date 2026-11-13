@@ -1508,7 +1508,6 @@ private slots:
             !hidden.isNull());
     int darker = 0;
     int lighter = 0;
-    int unchanged = 0;
     for (int y = 0; y < plain.height(); ++y) {
       for (int x = 0; x < plain.width(); ++x) {
         const int base = qGray(plain.pixel(x, y));
@@ -1517,7 +1516,6 @@ private slots:
         const int shaded = qGray(on.pixel(x, y));
         darker += shaded < base - 8 ? 1 : 0;
         lighter += shaded > base + 8 ? 1 : 0;
-        unchanged += std::abs(shaded - base) <= 8 ? 1 : 0;
       }
     }
     const int pixels = plain.width() * plain.height();
