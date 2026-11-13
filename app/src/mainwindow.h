@@ -36,6 +36,7 @@ namespace ts
 {
 
 class ElevationProfileDialog;
+struct AboutDataRow;
 
 class CountryAreas;
 class GlobeView;
@@ -90,6 +91,12 @@ public:
    * @p errorString on failure.
    */
   bool saveProject(const QString& path, QString* errorString);
+
+  /**
+   * Returns the datasets for the About window: the base pack's and the
+   * installed packs', with their sources, licences and attributions.
+   */
+  std::vector<AboutDataRow> aboutData() const;
 
   /**
    * Opens the Add WMS Layer dialog and adds what the user chooses. With

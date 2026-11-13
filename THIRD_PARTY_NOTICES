@@ -11,7 +11,7 @@ binary packages, under licenses/ next to this file.
 Libraries linked by Terra Soar
 ------------------------------
 
-Qt 5.15 / Qt 6 (Core, Gui, Widgets, OpenGL, OpenGLWidgets, Test)
+Qt 5.15 / Qt 6 (Core, Gui, Widgets, Network, OpenGL, OpenGLWidgets, Test)
   The Qt Company Ltd. and other contributors
   Licence: GNU LGPL v3 (also available under GPL v2/v3)
   https://www.qt.io/
@@ -58,6 +58,7 @@ Blue Marble Next Generation with topography and bathymetry (July 2004)
   NASA Earth Observatory (Reto Stöckli and others)
   Licence: public domain (NASA); credit requested
   Attribution: "Blue Marble: NASA Earth Observatory"
+  Source file: world.topo.bathy.200407.3x21600x10800.jpg
   https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/
 
 GSHHG 2.3.7 (Global Self-consistent, Hierarchical, High-resolution
@@ -67,6 +68,7 @@ Geography Database), resolutions c, l and i, cut to tiles
   COPYING.LESSERv3, gpl-3.0.txt) are in basepack/licences/gshhg/
   Attribution: "Shoreline: GSHHG 2.3.7, P. Wessel and W. H. F. Smith (LGPL)"
   Source: https://github.com/GenericMappingTools/gshhg-gmt/releases/tag/2.3.7
+  Source file: gshhg-shp-2.3.7.zip
   The program that turns it into the pack's form is tools/packager in
   this source tree.
 
@@ -76,6 +78,7 @@ resampled to a 2.64′ grid
   15 Arc-Second Global Relief Model. https://doi.org/10.25921/fd45-gt74
   Licence: public domain (US government work); credit requested
   Attribution: "Elevation: ETOPO 2022, NOAA NCEI"
+  Source file: ETOPO_2022_v1_60s_N90W180_surface.tif
 
 EGM2008 and EGM96 geoid models (Earth Gravitational Models), as the
 grids us_nga_egm08_25.tif and us_nga_egm96_15.tif distributed by PROJ
@@ -90,6 +93,28 @@ widened by about 5 km and simplified
   Licence: public domain; credit requested
   Attribution: "Countries: Made with Natural Earth"
   Source: https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2
+  Source file: ne_10m_admin_0_countries.geojson
+
+Downloadable data packs
+-----------------------
+
+The data packs offered in the program (File > Data Packs, hosted at
+https://github.com/marutan/terrasoar-packs) are not part of the program;
+each carries its licence notices in its licences/ folder. They contain:
+
+bluemarble-full: the Blue Marble image above at full resolution
+  (world.topo.bathy.200407.3x21600x10800.jpg). Public domain (NASA).
+
+shoreline-full: GSHHG 2.3.7 above with its high and full resolutions
+  (gshhg-shp-2.3.7.zip). GNU LGPL v3 or later.
+
+geoid-egm2008-fine: the EGM2008 geoid above at its 2.5' grid
+  (us_nga_egm08_25.tif). Public domain (NGA).
+
+geoid-osgm15: OSGM15, Ordnance Survey's geoid model for Ordnance Datum
+  Newlyn, Great Britain (uk_os_OSGM15_GB.tif as distributed by PROJ,
+  unchanged). BSD 2-Clause licence (Ordnance Survey, via PROJ).
+  Attribution: "OSGM15: Ordnance Survey"
 
 The source tree also has test data that is not distributed:
 tests/data/geodtest-sample.dat, a sample of C. F. F. Karney's "Test set

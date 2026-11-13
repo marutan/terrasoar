@@ -23,6 +23,7 @@
 #include <QSignalSpy>
 #include <QSlider>
 #include <QStandardPaths>
+#include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QTreeView>
@@ -31,6 +32,7 @@
 #include <QWheelEvent>
 #include <QtTest>
 
+#include "aboutdialog.h"
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
 #include "elevationprofiledialog.h"
@@ -335,6 +337,60 @@ private slots:
     QCOMPARE(file->title(), QStringLiteral("&File"));
     QAction* about = window.findChild<QAction*>(QStringLiteral("aboutAction"));
     QCOMPARE(about->text(), QStringLiteral("&About Terra Soar"));
+  }
+
+  void aboutDialog()
+  {
+    // Help > About: the version, the data in use with its sources and
+    // licences, the third-party notices and the GPL, all built in.
+    ts::MainWindow window;
+    const std::vector<ts::AboutDataRow> data = window.aboutData();
+    QVERIFY(!data.empty());
+    bool elevation = false;
+    for (const ts::AboutDataRow& row : data) {
+      QCOMPARE(row.pack, QStringLiteral("Base pack"));
+      elevation =
+          elevation || row.attribution == QLatin1String("Fixture elevation");
+    }
+    QVERIFY(elevation);
+    ts::AboutDialog dialog(&window, data);
+    QLabel* label = dialog.findChild<QLabel*>(QStringLiteral("aboutLabel"));
+    QTreeWidget* tree =
+        dialog.findChild<QTreeWidget*>(QStringLiteral("aboutDataTree"));
+    if (label == nullptr || tree == nullptr) {
+      QFAIL("about dialog controls missing");
+    }
+    QVERIFY(label->text().contains(QStringLiteral(TS_VERSION_STRING)));
+    QVERIFY(label->text().contains(ts::AboutDialog::homePage()));
+    QCOMPARE(tree->topLevelItemCount(), static_cast<int>(data.size()));
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      dialog.show();
+      dialog.grab().save(QDir(shots).filePath(QStringLiteral("about.png")));
+      dialog.findChild<QTabWidget*>(QStringLiteral("aboutTabs"))
+          ->setCurrentIndex(1);
+      dialog.grab().save(
+          QDir(shots).filePath(QStringLiteral("about-data.png")));
+    }
+    // The notices and licence as shipped (the licence audit keeps the
+    // notices complete: tools/checks/check_notices.py).
+    QVERIFY(ts::AboutDialog::thirdPartyNotices().contains(
+        QStringLiteral("GeographicLib")));
+    QVERIFY(ts::AboutDialog::thirdPartyNotices().contains(
+        QStringLiteral("uk_os_OSGM15_GB.tif")));
+    QVERIFY(ts::AboutDialog::licenceText().contains(
+        QStringLiteral("GNU GENERAL PUBLIC LICENSE")));
+
+    ts::PseudoTranslator translator;
+    QCoreApplication::installTranslator(&translator);
+    {
+      ts::AboutDialog pseudo(nullptr, data);
+      QVERIFY(ts::PseudoTranslator::isPseudoTranslated(pseudo.windowTitle()));
+      QLabel* text = pseudo.findChild<QLabel*>(QStringLiteral("aboutLabel"));
+      QVERIFY(text != nullptr &&
+              ts::PseudoTranslator::isPseudoTranslated(text->text()));
+    }
+    QCoreApplication::removeTranslator(&translator);
   }
 
   void pseudoLocaleAtCreation()

@@ -10,6 +10,7 @@ INCLUDEPATH += $$PWD/src
 RESOURCES += $$PWD/app.qrc
 
 HEADERS += \
+    $$PWD/src/aboutdialog.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/elevationprofiledialog.h \
@@ -25,6 +26,7 @@ HEADERS += \
     $$PWD/src/wmscataloguefile.h
 
 SOURCES += \
+    $$PWD/src/aboutdialog.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
