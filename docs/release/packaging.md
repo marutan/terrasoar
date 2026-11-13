@@ -55,7 +55,7 @@ systems can use the Flatpak, which brings its own libraries.
 ## Flatpak
 
 `packaging/flatpak/io.github.marutan.TerraSoar.yml`, on the KDE runtime
-6.8 (Qt 6.8), builds GEOS, PROJ, GeographicLib and GDAL from their release
+6.11 (Qt 6.11), builds GEOS, PROJ, GeographicLib and GDAL from their release
 tarballs (pinned by SHA-256; GDAL with its internal TIFF and GeoTIFF),
 then Terra Soar from the source tree (`CONFIG+=ts_app_only`: the program
 without the packager and the tests) with the base pack, which must be at
