@@ -221,7 +221,8 @@ python3 tools/checks/run_all.py
 ```
 
 These run clang-format, the include-order check, the no-`auto` check, the
-translatable-string check, the translation-file check and Doxygen
+translatable-string check, the licence audit, the translation-file check
+and Doxygen
 (see [coding-standards.md](coding-standards.md)). CI fails on any of them.
 
 ## Translation tests

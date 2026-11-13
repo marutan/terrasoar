@@ -15,6 +15,7 @@ python3 tools/checks/check_format.py --fix # reformat in place
 | Include order | `check_include_order.py` | Includes out of group order, or groups not separated |
 | No `auto` | `check_no_auto.py` | The `auto` keyword anywhere |
 | Translatable strings | `check_translatable.py` | A literal passed to a user-visible API without `tr()` |
+| Licence audit | `check_notices.py` | A Qt module, linked library or data source missing from `THIRD_PARTY_NOTICES` |
 | Translations up to date | `tools/i18n/update_translations.py --check` | `terrasoar_en.ts` out of step with the code |
 | API docs | `check_doxygen.py` | Any Doxygen warning, including undocumented public items |
 

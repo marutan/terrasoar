@@ -425,6 +425,8 @@ Goal: terrain can be switched on from local or online elevation sources, and the
 
 Goal: installable, signed builds for Windows 10+ and Linux, released as version 1.0.
 
+**Decisions (2026-11-13)**: the first release is **0.0.1**, not 1.0 (1.0 comes later); the Windows installer is NSIS; 0.0.1 is not code-signed, but the release workflow has a signing step that switches on when certificate secrets are added; Flatpak is a bundle attached to each release (no Flathub submission yet). Split: 8a About window, licence audit, user guide, changelog and release process; 8b Linux packages; 8c Windows installer; 8d the release workflow. Phase 8a delivered the About window (version, data with sources, licences and credits, the third-party notices and GPL built in), the licence audit (`tools/checks/check_notices.py`: Qt modules, linked libraries and every data source named in `THIRD_PARTY_NOTICES`), the user guide (installation, getting around, layers and projects, alongside WMS, terrain and offline use), `CHANGELOG.md` and `docs/release/process.md`.
+
 **Deliverables**
 
 - Windows: `windeployqt` + installer (NSIS, WiX or Qt Installer Framework), optionally code-signed
@@ -446,7 +448,7 @@ Goal: installable, signed builds for Windows 10+ and Linux, released as version 
 - Upgrade test: user settings, projects, packs and caches from the previous build survive an upgrade
 - Licence audit: every bundled library and dataset listed in `THIRD_PARTY_NOTICES`
 
-**Exit criteria**: 1.0 installers published for Windows and Linux; full regression suite green on the release tag.
+**Exit criteria**: 0.0.1 installers published for Windows and Linux; full regression suite green on the release tag.
 
 ## Regression strategy, later work and open questions
 

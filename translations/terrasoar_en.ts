@@ -71,6 +71,49 @@
         </message>
     </context>
     <context>
+        <name>ts::AboutDialog</name>
+        <message>
+            <source>About Terra Soar</source>
+            <translation>About Terra Soar</translation>
+        </message>
+        <message>
+            <source>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</source>
+            <translation>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</translation>
+        </message>
+        <message>
+            <source>About</source>
+            <translation>About</translation>
+        </message>
+        <message>
+            <source>Data</source>
+            <translation>Data</translation>
+        </message>
+        <message>
+            <source>Third-Party Notices</source>
+            <translation>Third-Party Notices</translation>
+        </message>
+        <message>
+            <source>Licence</source>
+            <translation>Licence</translation>
+        </message>
+        <message>
+            <source>Pack</source>
+            <translation>Pack</translation>
+        </message>
+        <message>
+            <source>Source</source>
+            <translation>Source</translation>
+        </message>
+        <message>
+            <source>Attribution</source>
+            <translation>Attribution</translation>
+        </message>
+        <message>
+            <source>Close</source>
+            <translation>Close</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::AddWebTerrainDialog</name>
         <message>
             <source>The address has {z}, {x} and {y} where the zoom, column and row go, e.g. https://example.org/terrain/{z}/{x}/{y}.png. Tiles are kept on this computer like WMS tiles.</source>
@@ -675,14 +718,6 @@
             <translation>Ready</translation>
         </message>
         <message>
-            <source>About %1</source>
-            <translation>About %1</translation>
-        </message>
-        <message>
-            <source>&lt;h3&gt;%1 %2&lt;/h3&gt;&lt;p&gt;A 3D globe and 2D map viewer.&lt;/p&gt;&lt;p&gt;Built with Qt %3 (running on Qt %4) and %5.&lt;/p&gt;&lt;p&gt;This program is free software, licensed under the GNU General Public License, version 2 or later.&lt;/p&gt;</source>
-            <translation>&lt;h3&gt;%1 %2&lt;/h3&gt;&lt;p&gt;A 3D globe and 2D map viewer.&lt;/p&gt;&lt;p&gt;Built with Qt %3 (running on Qt %4) and %5.&lt;/p&gt;&lt;p&gt;This program is free software, licensed under the GNU General Public License, version 2 or later.&lt;/p&gt;</translation>
-        </message>
-        <message>
             <source>&amp;View</source>
             <translation>&amp;View</translation>
         </message>
@@ -921,6 +956,14 @@
         <message>
             <source>Heights of "%1" are above Ordnance Datum Newlyn. Install the OSGM15 geoid pack (File → Data Packs) to convert them exactly; until then EGM2008 is within about a metre:</source>
             <translation>Heights of "%1" are above Ordnance Datum Newlyn. Install the OSGM15 geoid pack (File → Data Packs) to convert them exactly; until then EGM2008 is within about a metre:</translation>
+        </message>
+        <message>
+            <source>Base pack</source>
+            <translation>Base pack</translation>
+        </message>
+        <message>
+            <source>%1, %2</source>
+            <translation>%1, %2</translation>
         </message>
     </context>
     <context>

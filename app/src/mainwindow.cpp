@@ -33,6 +33,7 @@
 #include <QUuid>
 #include <QWidget>
 
+#include "aboutdialog.h"
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
 #include "elevationprofiledialog.h"
@@ -1209,18 +1210,48 @@ void MainWindow::changeEvent(QEvent* event)
   QMainWindow::changeEvent(event);
 }
 
+std::vector<AboutDataRow> MainWindow::aboutData() const
+{
+  // Each pack shown with its name for the user: the base pack, then the
+  // installed packs.
+  std::vector<std::pair<QString, PackManifest>> packs;
+  if (!m_basePackDirectory.isEmpty()) {
+    QString error;
+    std::optional<PackManifest> base =
+        PackManifest::read(m_basePackDirectory, &error);
+    if (base) {
+      packs.emplace_back(tr("Base pack"), std::move(*base));
+    }
+  }
+  if (m_packs) {
+    for (const InstalledPack& pack : m_packs->installed()) {
+      if (!pack.damaged) {
+        packs.emplace_back(pack.manifest.id, pack.manifest);
+      }
+    }
+  }
+  std::vector<AboutDataRow> rows;
+  for (const std::pair<QString, PackManifest>& pack : packs) {
+    for (const PackDataset& dataset : pack.second.datasets) {
+      AboutDataRow row;
+      row.pack = pack.first;
+      row.name = dataset.name.isEmpty() ? dataset.id : dataset.name;
+      row.source =
+          dataset.source.version.isEmpty()
+              ? dataset.source.name
+              : tr("%1, %2").arg(dataset.source.name, dataset.source.version);
+      row.licence = dataset.licence;
+      row.attribution = dataset.attribution;
+      rows.push_back(row);
+    }
+  }
+  return rows;
+}
+
 void MainWindow::showAbout()
 {
-  const BuildInfo info = buildInfo();
-  QMessageBox::about(
-      this, tr("About %1").arg(programName()),
-      tr("<h3>%1 %2</h3>"
-         "<p>A 3D globe and 2D map viewer.</p>"
-         "<p>Built with Qt %3 (running on Qt %4) and %5.</p>"
-         "<p>This program is free software, licensed under the GNU General "
-         "Public License, version 2 or later.</p>")
-          .arg(programName(), info.version, info.qtCompileVersion,
-               info.qtRuntimeVersion, info.compiler));
+  AboutDialog dialog(this, aboutData());
+  dialog.exec();
 }
 
 } // namespace ts

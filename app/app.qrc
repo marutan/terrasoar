@@ -5,4 +5,9 @@
     <qresource prefix="/data">
         <file alias="wms-catalogue.json">../data/wms-catalogue.json</file>
     </qresource>
+    <!-- Shown in Help > About (see AboutDialog). -->
+    <qresource prefix="/notices">
+        <file alias="THIRD_PARTY_NOTICES">../THIRD_PARTY_NOTICES</file>
+        <file alias="COPYING">../COPYING</file>
+    </qresource>
 </RCC>
