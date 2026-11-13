@@ -70,10 +70,12 @@ struct ElevationDraw {
 double terrainExaggeration(const LayerDefinition& definition);
 
 /**
- * Returns the terrain of @p stack: the topmost visible elevation layer,
- * or, if none is visible, the topmost hidden one with visible false (its
- * heights stay loaded, so switching it on is immediate). A visible layer
- * whose source can't be opened adds its error to @p errors.
+ * Returns the terrain of @p stack: its visible elevation layers as one
+ * source, each over those below it (ProviderRegistry::elevationComposite()),
+ * with the topmost one's exaggeration; or, if none is visible, the topmost
+ * hidden one with visible false (its heights stay loaded, so switching it
+ * on is immediate). Visible layers whose source can't be opened add their
+ * errors to @p errors and are left out.
  *
  * @guithread
  */

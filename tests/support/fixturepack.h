@@ -23,6 +23,10 @@
 #include <QJsonDocument>
 #include <QString>
 
+#include <gdal.h>
+#include <ogr_srs_api.h>
+
+#include "ts/deps/dependencies.h"
 #include "ts/deps/sqliteconnection.h"
 #include "ts/elevation/heightgrid.h"
 #include "ts/packs/basepack.h"
@@ -217,6 +221,36 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
     json.write(QJsonDocument(manifest.toJson()).toJson());
   }
   return manifest;
+}
+
+/**
+ * Writes a DEM GeoTIFF (EPSG:4326, no vertical datum) of @p heightM
+ * everywhere, 0.05° pixels over 15°–25° N, 5°–15° E (the start view's
+ * centre, 20° N 10° E, in the middle). Returns false on failure.
+ */
+inline bool writeFixtureDem(const QString& path, float heightM)
+{
+  initialiseGdal();
+  const int size = 200;
+  const QByteArray encoded = path.toUtf8();
+  GDALDatasetH dataset =
+      GDALCreate(GDALGetDriverByName("GTiff"), encoded.constData(), size, size,
+                 1, GDT_Float32, nullptr);
+  if (dataset == nullptr) {
+    return false;
+  }
+  std::array<double, 6> transform{5.0, 0.05, 0.0, 25.0, 0.0, -0.05};
+  GDALSetGeoTransform(dataset, transform.data());
+  OGRSpatialReferenceH srs = OSRNewSpatialReference(nullptr);
+  OSRImportFromEPSG(srs, 4326);
+  GDALSetSpatialRef(dataset, srs);
+  OSRRelease(srs);
+  std::vector<float> heights(static_cast<std::size_t>(size) * size, heightM);
+  const bool ok = GDALRasterIO(GDALGetRasterBand(dataset, 1), GF_Write, 0, 0,
+                               size, size, const_cast<float*>(heights.data()),
+                               size, size, GDT_Float32, 0, 0) == CE_None;
+  GDALClose(dataset);
+  return ok;
 }
 
 } // namespace ts::test

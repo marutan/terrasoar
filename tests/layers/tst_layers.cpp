@@ -18,6 +18,7 @@
 
 #include "concurrency.h"
 #include "fixturepack.h"
+#include "ts/elevation/compositeelevationprovider.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/layers/layerdefinition.h"
 #include "ts/layers/layertreemodel.h"
@@ -746,6 +747,90 @@ private slots:
     QCOMPARE(ts::terrainExaggeration(steep), 20.0);
     steep.style.insert(QStringLiteral("exaggeration"), QStringLiteral("x"));
     QCOMPARE(ts::terrainExaggeration(steep), 1.0);
+  }
+
+  void elevationSourcesInPriority()
+  {
+    // Visible elevation layers combine, the upper over the lower; the
+    // exaggeration is the topmost one's.
+    const QTemporaryDir dir;
+    const ts::PackManifest manifest =
+        ts::test::writeFixtureBasePack(dir.path());
+    const QString dem = dir.filePath(QStringLiteral("dem.tif"));
+    QVERIFY(ts::test::writeFixtureDem(dem, 1500.0F));
+    ts::ProviderRegistry registry;
+    registry.setBasePack(dir.path(), manifest);
+
+    ts::LayerTreeModel model;
+    ts::LayerDefinition terrain;
+    for (const ts::LayerDefinition& definition :
+         ts::builtinLayerDefinitions()) {
+      if (definition.id == QLatin1String("builtin:terrain")) {
+        terrain = definition;
+      }
+    }
+    model.addLayer(terrain);
+    ts::LayerDefinition file;
+    file.id = QStringLiteral("user:dem");
+    file.type = ts::LayerType::Elevation;
+    file.name = QStringLiteral("dem");
+    file.source = QJsonObject{
+        {QStringLiteral("kind"), QStringLiteral("file")},
+        {QStringLiteral("path"), dem},
+        {QStringLiteral("verticalDatum"), QStringLiteral("ellipsoid")}};
+    file.style = QJsonObject{{QStringLiteral("exaggeration"), 2.0}};
+    const QModelIndex upper = model.addLayer(file, QModelIndex(), 0);
+
+    QStringList errors;
+    ts::ElevationDraw draw =
+        ts::elevationDrawForStack(model.layerStack(), registry, &errors);
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char(' '))));
+    QVERIFY(draw.visible);
+    QCOMPARE(draw.exaggeration, 2.0);
+    const ts::CompositeElevationProvider* composite =
+        dynamic_cast<const ts::CompositeElevationProvider*>(
+            draw.provider.get());
+    if (composite == nullptr) {
+      QFAIL("not a composite");
+    }
+    QCOMPARE(composite->sources().size(), std::size_t{2});
+    QVERIFY(composite->sources()[0]->id().startsWith(
+        QStringLiteral("gdalheights:")));
+    // The same layers, the same provider (the renderer keeps its heights).
+    QCOMPARE(ts::elevationDrawForStack(model.layerStack(), registry, &errors)
+                 .provider,
+             draw.provider);
+    // The DEM's heights where it has them, the base pack's elsewhere.
+    const std::atomic<bool> notCancelled{false};
+    const std::optional<ts::HeightTile> inside = draw.provider->loadHeights(
+        ts::TileKey::containing(6, ts::Geodetic{20.0, 10.0, 0.0}),
+        notCancelled);
+    const std::optional<ts::HeightTile> outside = draw.provider->loadHeights(
+        ts::TileKey::containing(6, ts::Geodetic{-40.0, 100.0, 0.0}),
+        notCancelled);
+    if (!inside || !outside) {
+      QFAIL("no heights");
+    }
+    QCOMPARE(inside->heightsM[inside->heightsM.size() / 2], 1500.0F);
+    QCOMPARE(outside->heightsM[outside->heightsM.size() / 2], 500.0F);
+
+    // Hiding the DEM leaves the base pack's terrain alone, at 1×.
+    model.setData(upper, Qt::Unchecked, Qt::CheckStateRole);
+    draw = ts::elevationDrawForStack(model.layerStack(), registry, &errors);
+    composite = dynamic_cast<const ts::CompositeElevationProvider*>(
+        draw.provider.get());
+    QVERIFY(composite != nullptr && composite->sources().size() == 1);
+    QCOMPARE(draw.exaggeration, 1.0);
+
+    // A DEM that can't be opened is said, and left out.
+    model.setData(upper, Qt::Checked, Qt::CheckStateRole);
+    file.source.insert(QStringLiteral("path"),
+                       dir.filePath(QStringLiteral("gone.tif")));
+    model.setLayerDefinition(upper, file);
+    errors.clear();
+    draw = ts::elevationDrawForStack(model.layerStack(), registry, &errors);
+    QCOMPARE(errors.size(), 1);
+    QVERIFY(draw.provider && draw.visible);
   }
 
   void benchmarkLayerStack()

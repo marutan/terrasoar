@@ -21,6 +21,7 @@
 
 #include "ts/camera/cameracontroller.h"
 #include "ts/globe/layerstackdraws.h"
+#include "ts/globe/tilerenderer.h"
 #include "ts/perf/frametimestats.h"
 #include "ts/regions/regiongeometry.h"
 #include "ts/render/framepacer.h"
@@ -237,6 +238,13 @@ public:
    */
   std::optional<RegionGeometry> visibleArea() const;
 
+  /**
+   * Returns the ground's height at the point under the pointer (as of the
+   * last pointerPositionChanged()), or nothing if there are no heights
+   * there or the pointer is off the globe.
+   */
+  std::optional<GroundHeight> pointerGround() const { return m_pointerGround; }
+
 signals:
   /**
    * The point under the pointer changed. @p onGlobe is false when the
@@ -325,6 +333,7 @@ private:
 
   bool m_pointerInside = false;
   QPointF m_pointerPx;
+  std::optional<GroundHeight> m_pointerGround;
 
   bool m_overlayVisible = false;
   bool m_scaleBarVisible = true;

@@ -5,7 +5,10 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QJsonDocument>
+#include <QStringList>
 
+#include "ts/elevation/compositeelevationprovider.h"
+#include "ts/elevation/gdalelevationprovider.h"
 #include "ts/elevation/geoidmodel.h"
 #include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/network/networkclient.h"
@@ -310,6 +313,96 @@ std::shared_ptr<ElevationProvider>
 ProviderRegistry::elevation(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
+  if (source.value(QStringLiteral("kind")).toString() ==
+      QLatin1String("file")) {
+    return fileElevationLocked(source, errorString);
+  }
+  return basePackElevationLocked(source, errorString);
+}
+
+std::shared_ptr<ElevationProvider>
+ProviderRegistry::fileElevationLocked(const QJsonObject& source,
+                                      QString* errorString)
+{
+  const QString path = source.value(QStringLiteral("path")).toString();
+  const QString datum =
+      source.value(QStringLiteral("verticalDatum")).toString();
+  if (path.isEmpty() ||
+      (datum != QLatin1String("ellipsoid") &&
+       datum != QLatin1String("egm2008") && datum != QLatin1String("egm96"))) {
+    if (errorString) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Unknown or invalid elevation source: %1")
+              .arg(canonical(source));
+    }
+    return nullptr;
+  }
+  const QString key = path + QLatin1Char('|') + datum;
+  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
+      it = m_elevation.find(key);
+  if (it != m_elevation.end()) {
+    std::shared_ptr<ElevationProvider> live = it->second.lock();
+    if (live) {
+      return live;
+    }
+  }
+  std::shared_ptr<const GeoidModel> datumGeoid;
+  if (datum != QLatin1String("ellipsoid")) {
+    datumGeoid = geoidLocked(datum, errorString);
+    if (!datumGeoid) {
+      return nullptr;
+    }
+  }
+  // Sea level for heights above the ellipsoid; without the base pack the
+  // ellipsoid stands in for it.
+  QString ignored;
+  std::shared_ptr<const GeoidModel> seaLevel =
+      datumGeoid ? datumGeoid
+                 : geoidLocked(QStringLiteral("egm2008"), &ignored);
+  std::shared_ptr<GdalElevationProvider> provider =
+      std::make_shared<GdalElevationProvider>(path, datum, datumGeoid,
+                                              seaLevel);
+  if (!provider->isValid()) {
+    if (errorString) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Cannot read \"%1\": %2")
+              .arg(QDir::toNativeSeparators(path), provider->errorString());
+    }
+    return nullptr;
+  }
+  m_elevation[key] = provider;
+  return provider;
+}
+
+std::shared_ptr<ElevationProvider> ProviderRegistry::elevationComposite(
+    std::vector<std::shared_ptr<ElevationProvider>> sources)
+{
+  QStringList ids;
+  for (const std::shared_ptr<ElevationProvider>& source : sources) {
+    ids << source->id();
+  }
+  const QString key = ids.join(QLatin1Char('\n'));
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
+      it = m_composites.find(key);
+  if (it != m_composites.end()) {
+    std::shared_ptr<ElevationProvider> live = it->second.lock();
+    if (live) {
+      return live;
+    }
+  }
+  std::shared_ptr<ElevationProvider> composite =
+      std::make_shared<CompositeElevationProvider>(std::move(sources));
+  m_composites[key] = composite;
+  return composite;
+}
+
+std::shared_ptr<ElevationProvider>
+ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
+                                          QString* errorString)
+{
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
   const std::unordered_map<QString, QString>::const_iterator file =
       m_basePackElevation.find(dataset);

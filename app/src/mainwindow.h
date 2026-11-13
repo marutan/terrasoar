@@ -94,6 +94,21 @@ public:
   void addWmsLayer(const QString& address = QString());
 
   /**
+   * Asks for a DEM file and what its heights are measured from, and adds
+   * it as an elevation layer.
+   */
+  void addElevationFile();
+
+  /**
+   * Adds the DEM file @p path, its heights above @p datum ("egm2008",
+   * "egm96" or "ellipsoid"), as a visible elevation layer above the
+   * others, with the terrain's current exaggeration.
+   */
+  // The file, then its datum.
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  void addElevationLayer(const QString& path, const QString& datum);
+
+  /**
    * Shows the Offline Regions window (not modal) and returns it.
    */
   OfflineRegionsDialog* showOfflineRegions();
@@ -191,6 +206,8 @@ private:
   QAction* m_resetViewAction = nullptr;
   QAction* m_mapViewAction = nullptr;
   QAction* m_scaleBarAction = nullptr;
+  QAction* m_ellipsoidalHeightsAction = nullptr;
+  QAction* m_addElevationAction = nullptr;
   QMenu* m_projectionMenu = nullptr;
   QActionGroup* m_projectionGroup = nullptr;
   QMenu* m_exaggerationMenu = nullptr;

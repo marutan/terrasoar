@@ -157,6 +157,10 @@ void LayerTreeDock::rebuildAddLayerMenu()
   QAction* wms = m_addLayerMenu->addAction(tr("WMS Layer…"));
   wms->setObjectName(QStringLiteral("addWmsLayerAction"));
   connect(wms, &QAction::triggered, this, &LayerTreeDock::addWmsLayerRequested);
+  QAction* elevation = m_addLayerMenu->addAction(tr("Elevation File…"));
+  elevation->setObjectName(QStringLiteral("addElevationFileAction"));
+  connect(elevation, &QAction::triggered, this,
+          &LayerTreeDock::addElevationFileRequested);
   QAction* solid = m_addLayerMenu->addAction(tr("Solid Colour…"));
   solid->setObjectName(QStringLiteral("addSolidColourAction"));
   connect(solid, &QAction::triggered, this, &LayerTreeDock::addSolidColorLayer);

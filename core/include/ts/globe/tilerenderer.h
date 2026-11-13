@@ -76,6 +76,18 @@ struct ImageryLayerDraw {
   int group = -1;
 };
 
+/** The ground's height at a point (TileRenderer::groundHeight()). */
+struct GroundHeight {
+  /** Height above the WGS 84 ellipsoid, metres. */
+  double ellipsoidalM = 0.0;
+  /** Sea level (the geoid) above the ellipsoid there, metres. */
+  double seaLevelM = 0.0;
+  /** Returns the height above sea level, metres. */
+  double aboveSeaLevelM() const { return ellipsoidalM - seaLevelM; }
+  /** The level of the heights it came from (finer is more exact). */
+  int level = 0;
+};
+
 /** What the last frame did, for the debug overlay and tests. */
 struct TileStatistics {
   /** Tiles drawn (geometry). */
@@ -197,6 +209,14 @@ public:
    * above ground.
    */
   std::optional<double> terrainHeightM(double latDeg, double lonDeg);
+
+  /**
+   * Returns the ground's real height at (@p latDeg, @p lonDeg) (not
+   * exaggerated, the sea floor too) from the finest heights loaded there,
+   * shown or not; nothing without a source or before any have loaded.
+   * For the height readout.
+   */
+  std::optional<GroundHeight> groundHeight(double latDeg, double lonDeg);
 
   /**
    * Sets the function called (on a worker thread) when imagery tiles

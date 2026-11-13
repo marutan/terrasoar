@@ -68,13 +68,24 @@ public:
                                             QString* errorString);
 
   /**
-   * Returns the elevation provider for @p source (`{"kind": "basepack",
-   * "dataset": "<id>"}` for an elevation dataset of the base pack), with
-   * the geoid model of its vertical datum, shared like imagery(), or null
-   * and @p errorString.
+   * Returns the elevation provider for @p source, with the geoid model of
+   * its vertical datum, shared like imagery(), or null and @p errorString:
+   * - `{"kind": "basepack", "dataset": "<id>"}`: an elevation dataset of
+   *   the base pack;
+   * - `{"kind": "file", "path": "<raster>", "verticalDatum": "<datum>"}`:
+   *   a DEM file GDAL reads (GdalElevationProvider), its heights above
+   *   `"egm2008"`, `"egm96"` (the base pack's geoids) or `"ellipsoid"`.
    */
   std::shared_ptr<ElevationProvider> elevation(const QJsonObject& source,
                                                QString* errorString);
+
+  /**
+   * Returns @p sources (most important first) as one provider
+   * (CompositeElevationProvider), shared: the same sources give the same
+   * provider while it is in use, so the renderer keeps its heights.
+   */
+  std::shared_ptr<ElevationProvider>
+  elevationComposite(std::vector<std::shared_ptr<ElevationProvider>> sources);
 
   /**
    * Returns the geoid model of the base pack's geoid dataset @p dataset
@@ -143,6 +154,10 @@ private:
   std::shared_ptr<NetworkClient> networkLocked();
   std::shared_ptr<const GeoidModel> geoidLocked(const QString& dataset,
                                                 QString* errorString);
+  std::shared_ptr<ElevationProvider>
+  basePackElevationLocked(const QJsonObject& source, QString* errorString);
+  std::shared_ptr<ElevationProvider>
+  fileElevationLocked(const QJsonObject& source, QString* errorString);
 
   mutable std::mutex m_mutex;
   std::unordered_map<QString, std::weak_ptr<ImageryProvider>> m_imagery;
@@ -156,6 +171,8 @@ private:
   /** Dataset id → file name, of the base pack's geoid grids. */
   std::unordered_map<QString, QString> m_basePackGeoids;
   std::unordered_map<QString, std::weak_ptr<ElevationProvider>> m_elevation;
+  /** Composite id → composite. */
+  std::unordered_map<QString, std::weak_ptr<ElevationProvider>> m_composites;
   /** Geoid models stay loaded once read (a few MB each). */
   std::unordered_map<QString, std::shared_ptr<const GeoidModel>> m_geoids;
   /** Dataset id → attribution. */
