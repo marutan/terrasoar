@@ -38,6 +38,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DBUILD_TESTING=OFF
       - -DBUILD_DOCUMENTATION=OFF
     sources:
@@ -49,6 +50,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DBUILD_TESTING=OFF
       - -DBUILD_APPS=OFF
       - -DENABLE_TIFF=ON
@@ -62,6 +64,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DBUILD_DOCUMENTATION=OFF
       - -DBUILD_MANPAGES=OFF
       - -DBUILD_TESTING=OFF
@@ -74,6 +77,7 @@ modules:
     buildsystem: cmake-ninja
     config-opts:
       - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
       - -DBUILD_APPS=OFF
       - -DBUILD_TESTING=OFF
       - -DBUILD_PYTHON_BINDINGS=OFF

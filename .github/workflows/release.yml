@@ -1,0 +1,144 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Release: pushing a tag v<version> builds every package from the tagged
+# commit, runs the whole test suite (ci.yml, nightly.yml) and the package
+# install tests (packages.yml), and only if all of it passes publishes the
+# GitHub release with the packages, the source tarball and their SHA-256
+# checksums, its notes the version's section of CHANGELOG.md. A failure
+# publishes nothing.
+#
+# Dry run (a pull request changing this workflow or tools/release/, or run
+# by hand): the same, for the version in common.pri, except that a version
+# check failure is only reported and nothing is published; the release's
+# files are uploaded as the artefact release-dry-run instead.
+# See docs/release/process.md.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - tools/release/**
+  workflow_dispatch:
+
+# A newer push to a pull request replaces its dry run; a tag's run is never
+# cancelled.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  version:
+    name: Version check
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Version
+        id: version
+        run: |
+          VERSION="$(sed -n 's/^TS_VERSION *= *//p' common.pri)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The tag is TS_VERSION, and CHANGELOG.md, the AppStream metadata and
+      # the installation guide all name the version. A dry run only reports.
+      - name: Check
+        continue-on-error: ${{ github.event_name != 'push' }}
+        run: python3 tools/release/check_release.py check "${{ steps.version.outputs.tag }}"
+
+  ci:
+    name: CI
+    needs: version
+    uses: ./.github/workflows/ci.yml
+
+  full-suite:
+    name: Full suite
+    needs: version
+    uses: ./.github/workflows/nightly.yml
+
+  packages:
+    name: Packages
+    needs: version
+    uses: ./.github/workflows/packages.yml
+    secrets: inherit
+
+  publish:
+    name: Publish
+    needs: [version, ci, full-suite, packages]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download the AppImage
+        uses: actions/download-artifact@v7
+        with:
+          name: package-appimage
+          path: dist
+
+      - name: Download the Flatpak bundle
+        uses: actions/download-artifact@v7
+        with:
+          name: package-flatpak
+          path: dist
+
+      - name: Download the Windows installer
+        uses: actions/download-artifact@v7
+        with:
+          name: package-windows
+          path: dist
+
+      - name: Source tarball
+        run: |
+          NAME="terrasoar-$VERSION"
+          git archive --format=tar.gz --prefix="$NAME/" -o "dist/$NAME.tar.gz" HEAD
+          (cd dist && sha256sum "$NAME.tar.gz" > "$NAME.tar.gz.sha256")
+
+      # Every file, and a checksum that matches it.
+      - name: Check the files
+        run: |
+          cd dist
+          for f in "TerraSoar-$VERSION-setup.exe" \
+                   "TerraSoar-$VERSION-x86_64.AppImage" \
+                   "TerraSoar-$VERSION.flatpak" \
+                   "terrasoar-$VERSION.tar.gz"; do
+            test -f "$f" || { echo "missing $f"; exit 1; }
+            sha256sum -c "$f.sha256"
+          done
+          ls -l
+
+      - name: Release notes
+        run: python3 tools/release/check_release.py notes "$VERSION" > release-notes.md
+
+      - name: Publish
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
+            --title "Terra Soar $VERSION" \
+            --notes-file release-notes.md \
+            dist/*
+
+      - name: Upload what would be published
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-dry-run
+          retention-days: 7
+          path: |
+            dist
+            release-notes.md

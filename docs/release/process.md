@@ -36,22 +36,32 @@ The release notes are the version's section of `CHANGELOG.md`.
 ## Making a release
 
 1. **Changelog.** Move the `[Unreleased]` entries under a new
-   `[<version>] – <date>` heading in `CHANGELOG.md`, and update the links
-   at the bottom.
-2. **Version.** Set `TS_VERSION` in `common.pri`; update the version in
-   `docs/user/installation.md` (download names) and the Flatpak and
-   AppStream metadata ([packaging.md](packaging.md)).
-3. **Pull request.** Open one with these changes; CI must be green, and the
-   nightly workflow (golden images, performance, full static analysis)
-   should be run on the branch (`workflow_dispatch`).
+   `## [<version>] – <YYYY-MM-DD>` heading in `CHANGELOG.md`, and update
+   the links at the bottom.
+2. **Version.** Set `TS_VERSION` in `common.pri`; update the download
+   names in `docs/user/installation.md` and the `<release>` (version and
+   date) in `packaging/linux/io.github.marutan.TerraSoar.metainfo.xml`.
+   `python3 tools/release/check_release.py check v<version>` says what
+   still disagrees.
+3. **Pull request.** Open one with these changes; CI must be green. To
+   rehearse the release, run the release workflow by hand on the branch
+   (`workflow_dispatch`, a dry run: everything below but publishing; the
+   files it would publish are its artefact `release-dry-run`).
 4. **Tag.** After merging: `git tag -a v<version> -m "Terra Soar
    <version>"` on the merge commit, and push the tag. **Tagging publishes:**
    the maintainer decides when.
 5. **The release workflow** (`.github/workflows/release.yml`, run by the
-   tag) builds every package from the tag, runs the full test suite and
-   the install tests on each, and creates the GitHub release with the
-   files above and their checksums. If anything fails nothing is
-   published; fix it, delete the tag, and tag again.
+   tag) checks the version (`check_release.py check`: the tag is
+   `v<TS_VERSION>`, the changelog section is there and dated, the metadata
+   and guide name it), then runs, all on the tagged commit, the whole CI
+   suite (`ci.yml`), the full suite (`nightly.yml`: golden images,
+   performance, full static analysis, MSVC `/analyze`) and the packages
+   workflow (`packages.yml`: AppImage, Flatpak and Windows installer, each
+   built and install-tested). Only if every one passes does it create the
+   GitHub release: the four packages and the source tarball, each with its
+   `.sha256` (checked again before publishing), the notes the version's
+   changelog section. If anything fails nothing is published; fix it,
+   delete the tag (`git push --delete origin v<version>`), and tag again.
 6. **Check** the published release: download each file, verify its
    checksum, install it and start it (the install tests did this in CI;
    this is the human look).
@@ -60,7 +70,8 @@ The release notes are the version's section of `CHANGELOG.md`.
 
 - [ ] `CHANGELOG.md` has the version, date and links
 - [ ] `TS_VERSION`, installation guide and packaging metadata agree
-- [ ] CI and the nightly workflow green on the release commit
+- [ ] CI green on the release commit; a release dry run green
+      (`check_release.py check` passing)
 - [ ] Licence audit green (`tools/checks/check_notices.py`, part of
       `run_all.py`), and the packaging jobs' audit of bundled libraries
 - [ ] Tag pushed; release workflow green; files and checksums on the
