@@ -314,7 +314,7 @@ terrariumHandler(const std::shared_ptr<std::atomic<bool>>& failing)
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 std::pair<double, double> webPixel(double latDeg, double lonDeg, int zoom)
 {
-  const double world = 256.0 * (1 << zoom);
+  const double world = std::ldexp(256.0, zoom);
   const double lat = latDeg * 3.14159265358979323846 / 180.0;
   return {(lonDeg + 180.0) / 360.0 * world,
           (1.0 - std::asinh(std::tan(lat)) / 3.14159265358979323846) / 2.0 *
