@@ -24,9 +24,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The release workflow runs it on the tagged commit.
+  workflow_call:
 
 concurrency:
-  group: ci-${{ github.ref }}
+  # The workflow name too: when the release workflow calls this one, its
+  # run must not cancel (or be cancelled by) the pull request's own CI.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:

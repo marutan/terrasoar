@@ -277,7 +277,9 @@ during the flights, and a fake-clock test that replays the same input at
 | Workflow | When | Jobs |
 | --- | --- | --- |
 | `ci.yml` | Every push and pull request | Style checks; Linux GCC and Clang × Qt 5.15/6 (GL tests under Xvfb + llvmpipe); Windows MSVC × Qt 5.15/6; ThreadSanitizer; AddressSanitizer + UBSan; static analysis of the changed files (whole tree on `main`), after the tooling self-test |
-| `nightly.yml` | Nightly, on `v*` tags, on demand | Benchmarks, start-up/memory/idle checks, API docs artefact, optional reference-PC run; full-tree static analysis and MSVC `/analyze`, with reports as artefacts; on tags, source tarball published to GitHub Releases (after the analysis jobs pass) |
+| `nightly.yml` | Nightly, on demand, from `release.yml` | Benchmarks, start-up/memory/idle checks, API docs artefact, optional reference-PC run; full-tree static analysis and MSVC `/analyze`, with reports as artefacts |
+| `packages.yml` | Changes to the packaging, nightly, on demand, from `release.yml` | The AppImage, Flatpak bundle and Windows installer, each built with the base pack and install-tested (installed, started, base pack and PROJ database checked, imagery drawn; Windows also upgraded and uninstalled), with the licence audit of what they bundle ([packaging.md](release/packaging.md)) |
+| `release.yml` | `v*` tags; dry run on changes to it or `tools/release/`, on demand | Version check, then `ci.yml`, `nightly.yml` and `packages.yml` on the tagged commit; only if all pass, the GitHub release with the packages, source tarball and checksums ([process.md](release/process.md)) |
 
 On Windows, CI installs Mesa llvmpipe (from
 [mesa-dist-win](https://github.com/pal1000/mesa-dist-win), version and
