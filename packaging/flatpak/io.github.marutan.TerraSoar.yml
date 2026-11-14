@@ -15,6 +15,11 @@ runtime: org.kde.Platform
 runtime-version: "6.11"
 sdk: org.kde.Sdk
 command: terrasoar
+# No AppStream catalogue: the bundle is installed from a file, not a
+# repository's catalogue. (Ubuntu 24.04's appstreamcli, which CI's
+# flatpak-builder runs, stops at a "file-read-error" composing it.) The
+# metadata itself is installed and validated (packages.yml, AppImage job).
+appstream-compose: false
 finish-args:
   - --share=ipc
   - --socket=fallback-x11
