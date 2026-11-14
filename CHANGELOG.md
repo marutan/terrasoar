@@ -7,7 +7,7 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
-## [0.0.1] – the first release
+## [0.0.1] – 2026-11-14
 
 The first public build: everything below is new.
 
