@@ -57,9 +57,22 @@ notices.
 Runtime components bundled in Windows packages
 ----------------------------------------------
 
-Qt software OpenGL fallback (opengl32sw.dll, Qt 5 builds)
-  A Mesa llvmpipe build shipped with Qt
-  Licence: MIT (Mesa); LLVM: Apache 2.0 with LLVM exception
+The Windows installer bundles Qt, the libraries above and the libraries
+they use, built with vcpkg, listed with where each comes from in
+licences\bundled-libraries.txt, with each vcpkg package's copyright file
+in licences\vcpkg\<package>\. It also bundles:
+
+Mesa llvmpipe (opengl32sw.dll, libgallium_wgl.dll), the software OpenGL
+for --software-gl, as built by mesa-dist-win
+  The Mesa project; mesa-dist-win by pal1000
+  Licence: MIT (Mesa, mesa-dist-win); the LLVM it contains: Apache 2.0
+  with LLVM exceptions (licences\Mesa-*, licences\LLVM-LICENSE.txt,
+  licences\mesa-dist-win-LICENSE.txt)
+  https://mesa3d.org/, https://github.com/pal1000/mesa-dist-win
+
+Microsoft Visual C++ runtime (msvcp140.dll, vcruntime140.dll and others)
+  Microsoft Corporation; redistributable with programs built with Visual
+  Studio, under its licence terms
 
 Data
 ----

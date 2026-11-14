@@ -3,7 +3,7 @@
 """Install test of a Linux package: installs it (Flatpak) or makes it
 runnable (AppImage), starts it offline-capable with --measure, checks the
 state it reports (the built-in base pack found and verified, imagery
-drawn on the globe), then uninstalls it and checks that it is gone.
+drawn on the globe, PROJ's database usable), then uninstalls it and checks that it is gone.
 
 Run inside an X server (xvfb-run). HOME is a fresh directory, so the run
 starts as on a new machine.
@@ -39,21 +39,29 @@ def check_state(report_path):
         problems.append("no imagery drawn")
     if state.get("view") != "globe":
         problems.append(f"view: {state.get('view')}")
+    if state.get("crs_database") != "ok":
+        problems.append(f"PROJ's database: {state.get('crs_database')}")
     return problems
 
 
 def test_appimage(path, home, env):
     os.chmod(path, 0o755)
     report = os.path.join(home, "measure.json")
+    # As on a machine without PROJ: PROJ's own places are empty, so only the
+    # AppImage's proj.db can serve.
+    no_proj = os.path.join(home, "no-proj-data")
+    os.makedirs(no_proj)
     result = run([os.path.abspath(path), "--measure", report,
                   "--idle-seconds", "1"],
-                 env=dict(env, APPIMAGE_EXTRACT_AND_RUN="1"), timeout=600)
+                 env=dict(env, APPIMAGE_EXTRACT_AND_RUN="1",
+                          PROJ_DATA=no_proj, PROJ_LIB=no_proj), timeout=600)
     if result.returncode != 0:
         return [f"exit code {result.returncode}"]
     problems = check_state(report)
     # An AppImage is removed by deleting it; it installs nothing else.
     for name in os.listdir(home):
-        if name not in (".cache", ".local", ".config", "measure.json"):
+        if name not in (".cache", ".local", ".config", "measure.json",
+                        "no-proj-data"):
             problems.append(f"unexpected file in HOME: {name}")
     return problems
 

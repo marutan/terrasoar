@@ -7,6 +7,7 @@
 #define TS_DEPS_DEPENDENCIES_H
 
 #include <QString>
+#include <QStringList>
 
 namespace ts
 {
@@ -50,6 +51,35 @@ DependencyVersions dependencyVersions();
  * @threadsafe
  */
 void initialiseGdal();
+
+/**
+ * Makes PROJ (its default context) and GDAL look for their database
+ * (proj.db) and grids in @p directory before PROJ's built-in places. The
+ * packages ship proj.db next to the program, since the built-in place is
+ * where the library was built. Call it at start-up, before any coordinate
+ * system work. Returns false, changing nothing, if there's no proj.db in
+ * @p directory.
+ *
+ * @threadsafe
+ */
+bool useProjData(const QString& directory);
+
+/**
+ * Returns the directories PROJ looks in for proj.db and grids: those of
+ * useProjData(), then PROJ's built-in ones. For PROJ contexts of their own
+ * (GeoidModel).
+ *
+ * @threadsafe
+ */
+QStringList projSearchPaths();
+
+/**
+ * Returns true if GDAL can look up a coordinate reference system by its
+ * EPSG code (UTM zone 32 N), that is, if PROJ's database is there.
+ *
+ * @threadsafe
+ */
+bool projDatabaseUsable();
 
 } // namespace ts
 

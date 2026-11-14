@@ -45,6 +45,7 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "ts/base/buildinfo.h"
+#include "ts/deps/dependencies.h"
 #include "ts/elevation/elevationprofile.h"
 #include "ts/elevation/gdalelevationprovider.h"
 #include "ts/geo/geodetic.h"
@@ -307,6 +308,11 @@ QJsonObject MainWindow::stateReport() const
   }
   QJsonObject state;
   state.insert(QStringLiteral("base_pack"), basePack);
+  // PROJ's database, which GDAL needs to read coordinate systems by code
+  // (the packages ship it; see useProjData()).
+  state.insert(QStringLiteral("crs_database"), projDatabaseUsable()
+                                                   ? QStringLiteral("ok")
+                                                   : QStringLiteral("missing"));
   const LayerStack stack = m_layers->layerStack();
   QJsonArray layers;
   for (std::size_t i = stack.vectors.size(); i-- > 0;) {

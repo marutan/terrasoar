@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QCommandLineOption>
 #include <QCommandLineParser>
+#include <QDir>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QIcon>
@@ -22,6 +23,7 @@
 #include "mainwindow.h"
 #include "startupmeasurement.h"
 #include "ts/base/buildinfo.h"
+#include "ts/deps/dependencies.h"
 #include "ts/gl/glprobe.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/i18n/translationloader.h"
@@ -125,6 +127,16 @@ int main(int argc, char* argv[])
     icon.addFile(QStringLiteral(":/icons/terrasoar-%1.png").arg(size));
   }
   QApplication::setWindowIcon(icon);
+  // PROJ's database where the packages put it: share/proj next to the
+  // program (Windows) or beside its bin directory (AppImage). Elsewhere
+  // PROJ's own places stand.
+  const QDir programDir(QCoreApplication::applicationDirPath());
+  for (const QString& candidate :
+       {QStringLiteral("share/proj"), QStringLiteral("../share/proj")}) {
+    if (ts::useProjData(QDir::cleanPath(programDir.filePath(candidate)))) {
+      break;
+    }
+  }
   QGuiApplication::setDesktopFileName(
       QStringLiteral("io.github.marutan.TerraSoar"));
 

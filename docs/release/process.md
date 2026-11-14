@@ -74,7 +74,9 @@ SmartScreen warns on the first runs of the installer (the
 [installation guide](../user/installation.md#windows) says what to do).
 The release workflow has a signing step for the Windows installer and the
 program that runs only when the repository has the secrets it needs
-(`WINDOWS_SIGNING_*`, see [packaging.md](packaging.md)); adding a
+(`WINDOWS_SIGNING_CERTIFICATE`, a base64 PFX, and
+`WINDOWS_SIGNING_PASSWORD`; see [packaging.md](packaging.md#signing));
+adding a
 certificate later (SignPath Foundation, a commercial certificate or Azure
 Trusted Signing) needs no other change. The Linux packages aren't signed;
 their checksums are published with them.

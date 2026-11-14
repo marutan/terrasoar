@@ -28,6 +28,8 @@ concurrency:
 env:
   # Keep in step with ci.yml.
   QT6_VERSION: "6.8.3"
+  MESA_VERSION: "26.2.6"
+  MESA_SHA256: "da0f71d9181b672c1918f3c342f11118c687f6059a46b16502845160733cc388"
   LINUX_DEPS: >-
     libgdal-dev libproj-dev libgeos-dev libsqlite3-dev libgeographiclib-dev
     libgl1-mesa-dev libgl1-mesa-dri libegl1 libxkbcommon-x11-0
@@ -200,3 +202,147 @@ jobs:
         run: >-
           xvfb-run -a -s "-screen 0 1280x1024x24"
           python3 packaging/linux/test_package.py flatpak dist/TerraSoar-*.flatpak
+
+  windows:
+    name: Windows installer
+    needs: basepack
+    runs-on: windows-2022
+    env:
+      VCPKG_TRIPLET: x64-windows
+      VCPKG_INSTALLED: ${{ github.workspace }}\vcpkg_installed
+      # Empty until the repository has a signing certificate; the signing
+      # steps run only when it is set (a step's `if` sees the job's env).
+      WINDOWS_SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # The same libraries and cache as ci.yml's Windows jobs.
+      - name: Restore third-party libraries
+        id: deps-cache
+        uses: actions/cache/restore@v6
+        with:
+          path: vcpkg_installed
+          key: vcpkg-${{ env.VCPKG_TRIPLET }}-gdal-proj-geos-sqlite3-geographiclib-v1
+          restore-keys: vcpkg-${{ env.VCPKG_TRIPLET }}-
+
+      - name: Build third-party libraries
+        if: steps.deps-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install `
+            --triplet $env:VCPKG_TRIPLET `
+            --x-install-root="$env:VCPKG_INSTALLED" `
+            gdal proj geos sqlite3 geographiclib
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT6_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Set up MSVC environment
+        uses: ./.github/actions/msvc-env
+
+      - name: Install jom
+        shell: pwsh
+        run: choco install jom -y --no-progress
+
+      - name: Build
+        shell: cmd
+        run: |
+          mkdir build-ci && cd build-ci
+          qmake ..\terrasoar.pro CONFIG+=release CONFIG+=ts_app_only ^
+            DEPS_ROOT=%VCPKG_INSTALLED%\%VCPKG_TRIPLET%
+          jom
+
+      # The software OpenGL the installer ships as opengl32sw.dll, pinned
+      # like ci.yml's.
+      - name: Download Mesa llvmpipe
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $name = "mesa3d-$env:MESA_VERSION-release-mingw.7z"
+          gh release download $env:MESA_VERSION -R pal1000/mesa-dist-win `
+            -p $name -D $env:RUNNER_TEMP
+          $archive = Join-Path $env:RUNNER_TEMP $name
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne $env:MESA_SHA256) {
+            throw "SHA-256 of $name is $hash, expected $env:MESA_SHA256"
+          }
+          7z e -y "-o$env:RUNNER_TEMP\mesa" $archive x64/opengl32.dll x64/libgallium_wgl.dll
+          if ($LASTEXITCODE -ne 0) { throw "7z failed" }
+
+      - name: Download the base pack
+        uses: actions/download-artifact@v7
+        with:
+          name: package-basepack
+          path: basepack
+
+      - name: Version
+        id: version
+        shell: bash
+        run: echo "version=$(sed -n 's/^TS_VERSION *= *//p' common.pri)" >> "$GITHUB_OUTPUT"
+
+      # Signing switches on when the repository has a certificate
+      # (docs/release/process.md#signing): a base64 PFX and its password.
+      - name: Sign the program
+        if: env.WINDOWS_SIGNING_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP signing.pfx
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE))
+          signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+            /f $pfx /p $env:WINDOWS_SIGNING_PASSWORD build-ci\app\terrasoar.exe
+          Remove-Item $pfx
+
+      - name: Stage the installation
+        shell: cmd
+        run: >-
+          python packaging\windows\deploy.py
+          --exe build-ci\app\terrasoar.exe --qt-bin %QT_ROOT_DIR%\bin
+          --vcpkg %VCPKG_INSTALLED%\%VCPKG_TRIPLET% --mesa %RUNNER_TEMP%\mesa
+          --basepack basepack --stage stage --uninstall-list uninstall.nsh
+
+      - name: Build the installer
+        shell: cmd
+        run: |
+          mkdir dist
+          "C:\Program Files (x86)\NSIS\makensis.exe" /V3 ^
+            /DVERSION=${{ steps.version.outputs.version }} ^
+            /DSTAGE=%CD%\stage /DUNINSTALL_LIST=%CD%\uninstall.nsh ^
+            /DOUTFILE=%CD%\dist\TerraSoar-${{ steps.version.outputs.version }}-setup.exe ^
+            %CD%\packaging\windows\terrasoar.nsi
+
+      - name: Sign the installer
+        if: env.WINDOWS_SIGNING_CERTIFICATE != ''
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP signing.pfx
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_SIGNING_CERTIFICATE))
+          signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+            /f $pfx /p $env:WINDOWS_SIGNING_PASSWORD (Get-ChildItem dist\*.exe).FullName
+          Remove-Item $pfx
+
+      - name: Install test
+        shell: cmd
+        run: >-
+          python packaging\windows\test_installer.py
+          dist\TerraSoar-${{ steps.version.outputs.version }}-setup.exe
+          ${{ steps.version.outputs.version }}
+
+      - name: Checksum
+        shell: bash
+        run: cd dist && for f in *.exe; do sha256sum "$f" > "$f.sha256"; done
+
+      - name: Upload the installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: package-windows
+          retention-days: 14
+          path: dist

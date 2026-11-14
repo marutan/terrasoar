@@ -48,17 +48,10 @@ GeoidModel::GeoidModel(const QString& directory, const QString& gridFile)
     d->error = QStringLiteral("Cannot create a PROJ context");
     return;
   }
-  // The grid's directory first, then PROJ's own (for proj.db).
-#ifdef Q_OS_WIN
-  const QChar separator = QLatin1Char(';');
-#else
-  const QChar separator = QLatin1Char(':');
-#endif
+  // The grid's directory first, then PROJ's (for proj.db; the packages'
+  // own copy, see useProjData()).
   QStringList paths{QDir::toNativeSeparators(QDir(directory).absolutePath())};
-  const char* defaults = proj_info().searchpath;
-  if (defaults != nullptr) {
-    paths += QString::fromUtf8(defaults).split(separator, Qt::SkipEmptyParts);
-  }
+  paths += projSearchPaths();
   std::vector<QByteArray> encoded;
   std::vector<const char*> pointers;
   encoded.reserve(static_cast<std::size_t>(paths.size()));
