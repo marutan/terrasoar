@@ -73,7 +73,7 @@ jobs:
     secrets: inherit
 
   publish:
-    name: ${{ github.event_name == 'push' && 'Publish' || 'Publish (dry run)' }}
+    name: Publish
     needs: [version, ci, full-suite, packages]
     runs-on: ubuntu-24.04
     permissions:
