@@ -109,6 +109,10 @@ werror {
 msvc_analyze {
     !msvc: error("CONFIG+=msvc_analyze needs MSVC.")
     QMAKE_CXXFLAGS += /analyze /analyze:external-
+    # C6393 ("a lookup table of size 365 is not sufficient to handle leap
+    # years") fires on any 365-element array; moc's generated string
+    # tables (included into our test sources) can be that long.
+    QMAKE_CXXFLAGS += /wd6393
 }
 
 # CONFIG+=compiledb (Clang): every object also writes a compile-database
