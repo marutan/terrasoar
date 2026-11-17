@@ -803,7 +803,9 @@ Goal: users can change the colours of the graticule and shoreline layers to suit
 
 Goal: an overlay of controls on the view (the globe and the flat map) to rotate, pan, zoom and tilt with the mouse or a touch screen, without needing to know the mouse buttons and keys.
 
-**Already in place**: the camera already moves in all of these ways from the keyboard. `CameraController` has motions for moving, zooming, turning and tilting, with inertia and smooth flights. The view already draws overlays (the scale bar and the attributions). On the flat map, though, turning and tilting are not possible today ("a map isn't turned or tilted"). This phase adds them there (see below).
+**Decisions (2026-11-17)**: the flat map can be turned and tilted, like the globe. The rotate and tilt controls work on both views, and north-up and straight down stay the defaults.
+
+**Already in place**: the camera already moves in all of these ways from the keyboard. `CameraController` has motions for moving, zooming, turning and tilting, with inertia and smooth flights. The view already draws overlays (the scale bar and the attributions). On the flat map, though, turning and tilting are not possible today ("a map isn't turned or tilted"). This phase adds them there, as decided (see below).
 
 **Deliverables**
 
@@ -908,4 +910,4 @@ These need a decision before the phases they affect:
 6. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
 7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
 8. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
-9. **Turning and tilting the flat map** (Phase 24): the map is always north-up and flat today. The navigation controls are planned to add rotation and a perspective tilt to the map. Is that wanted, or should the map stay north-up and flat, with the rotate and tilt controls greyed out on it?
+9. ~~**Turning and tilting the flat map** (Phase 24)~~: decided 2026-11-17. The flat map turns and tilts (see Phase 24's Decisions).
