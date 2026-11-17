@@ -927,7 +927,7 @@ They are published in the Vector Product Format (VPF, MIL-STD-2407). Its themes 
 - vegetation
 - data quality
 
-It is a US Government (NGA) product approved for public release. The exact terms of the edition used are confirmed and recorded before publishing, as they were for every existing pack (see open question 10).
+It is a US Government (NGA) product approved for public release. The exact terms of the edition used are confirmed and recorded before publishing, as they were for every existing pack (see open question 9).
 
 **Approach (proposed)**:
 - **Packager only:** the work is in the packager (`tools/packager`), not the program. The program already installs packs and draws vector layers.
@@ -1022,10 +1022,9 @@ These need a decision before the phases they affect:
 1. **Phase order and scope**: is the order above right, and is every phase wanted?
 2. **1.0 criteria**: Phases 9 (the user guide in the program) and 10 come before 1.0. Is that enough, or should 1.0 also include Phase 11 (local data files)?
 3. **Qt 5 support**: Qt 5.15 is past its open-source end of life. When does Terra Soar drop Qt 5? Dropping it simplifies Phase 16.
-4. **macOS**: the first roadmap targets Windows and Linux only. Is macOS wanted? If so, it needs its own packaging phase (and OpenGL is deprecated there, which points to Phase 16's backend).
-5. **Translations**: which languages first, and who reviews them?
-6. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
-7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
-8. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
-9. ~~**Turning and tilting the flat map** (Phase 24)~~: decided 2026-11-17. The flat map turns and tilts (see Phase 24's Decisions).
-10. **VMAP0 terms and hosting** (Phase 25): confirm the release terms of the VMAP0 edition used (public release, any NGA disclaimers on boundaries and names), and approve the pack sizes before publishing to `marutan/terrasoar-packs`.
+4. **Translations**: which languages first, and who reviews them?
+5. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
+6. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
+7. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
+8. ~~**Turning and tilting the flat map** (Phase 24)~~: decided 2026-11-17. The flat map turns and tilts (see Phase 24's Decisions).
+9. **VMAP0 terms and hosting** (Phase 25): confirm the release terms of the VMAP0 edition used (public release, any NGA disclaimers on boundaries and names), and approve the pack sizes before publishing to `marutan/terrasoar-packs`.
