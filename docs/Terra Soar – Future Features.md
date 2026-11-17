@@ -24,7 +24,7 @@ The first roadmap's rules still apply to every phase here:
 | 9 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
 | 10 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
 | 11 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
-| 12 | More projections | Plate Carrée, UTM/British National Grid, LCC, polar stereographic, world projections |
+| 12 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
 | 13 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
 | 14 | Realism | Atmosphere, sun lighting, glTF models |
 | 15 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
@@ -128,29 +128,76 @@ Goal: the common web map services beyond WMS.
 
 ## Phase 12 – More projections
 
-Goal: the flat map in the projections people need for regional and world maps.
+Goal: the flat map in the projections people need for regional, national, navigation and world maps. The first roadmap delivered Mercator, Web Mercator and Miller Cylindrical.
 
 **Deliverables**
 
-- Plate Carrée
-- Transverse Mercator, with UTM zones and the British National Grid
-- Lambert Conformal Conic
-- Polar stereographic (north and south)
-- World maps: Robinson, Mollweide, Winkel Tripel
-- The morph and hillshade working in each. Non-cylindrical projections need the morph to handle curved outlines and interrupted edges.
-- A graticule for projected grids (UTM, BNG) with coordinate readout in that grid
+Projections, grouped by kind. Each is in View → Map Projection, with its parameters (centre, central meridian, standard parallels, zone) in a Map Projection Settings dialog where it has any.
+
+- **Cylindrical:**
+  - **Equidistant Cylindrical**, with a chosen standard parallel. Plate Carrée is its case at the equator.
+  - **Gall Stereographic**: secant at 45° N and S, a compromise for world maps.
+  - **Gall–Peters**: cylindrical equal-area with standard parallels at 45°.
+  - **Gall Orthographic**: Gall's name for the same projection as Gall–Peters, so it is one entry in the menu, named "Gall–Peters (Gall Orthographic)".
+  - **Rotated Mercator**: Mercator about a rotated pole (oblique Mercator), with the centre line chosen by a point and an azimuth, or by two points. It suits long, narrow areas that don't run north–south, such as a coastline or a flight route.
+- **Transverse:**
+  - **Transverse Mercator**, with a chosen central meridian, scale factor and false origin, and UTM zones (chosen, or picked automatically from the view's centre).
+  - **Cassini** (Cassini–Soldner): the transverse equidistant cylindrical, still the basis of many older national and cadastral surveys.
+  - **UK National Grid** (Ordnance Survey National Grid, EPSG:27700): Transverse Mercator on the Airy 1830 ellipsoid with the OSGB36 datum.
+    - **Datum:** positions convert from WGS 84 through PROJ with the OSTN15 grid, accurate to about 0.1 m, falling back to the Helmert transform, accurate to about 5 m, without the grid. OSTN15 can join the existing `geoid-osgm15` pack as a "UK grids" pack.
+    - **Grid:** the 100 km grid squares (e.g. `TQ`) and grid references (`TQ 30080 80729`) in the status bar.
+- **Conic:**
+  - **Lambert Conformal Conic**, with one or two standard parallels, the standard projection for aeronautical charts and many national grids.
+  - **Polyconic** (American Polyconic): a cone per parallel, used for older topographic series.
+- **Azimuthal:**
+  - **Azimuthal Equidistant**, centred on any point. Distances and directions from the centre are true, as on radio and great-circle range maps. The polar case is offered as a preset.
+  - **Gnomonic**, centred on any point: every great circle is a straight line, so routes plan as straight lines. It shows less than a hemisphere, and the map is clipped where the projection runs to infinity.
+  - **Polar Stereographic** (north and south), carried over from this phase's first list.
+- **World maps:**
+  - **Robinson, Mollweide and Winkel Tripel**, carried over from the first list.
+- **Raster Product Format (RPF) Native**:
+  - **What it is:** the ARC (Equal Arc-second Raster Chart) system of the RPF products, CADRG maps and CIB imagery. It has 18 latitude zones, nine per hemisphere. Each zone is equirectangular with its own east–west pixel spacing, and the polar zones are azimuthal equidistant.
+  - **What it gives:** RPF charts shown in it are drawn pixel for pixel, as they were made. The map shows the zone in view and changes zone as the view moves.
+  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`) and fits this phase best. If added, it joins Phase 10's local imagery.
+- **Graticule and readout**: a latitude/longitude graticule in every projection, and a grid for projected systems (UTM, UK National Grid, Cassini and Lambert zones). The status bar reads coordinates in the current projection's system (eastings and northings, grid references) beside latitude and longitude.
+- **Everywhere:**
+  - Layers, terrain hillshade, the scale bar, attributions, picking and the 3D/2D morph work in every projection.
+  - **Beyond cylindrical:** the renderer and the morph must handle:
+    - curved and interrupted map outlines;
+    - projections that show only part of the Earth (gnomonic, one RPF zone);
+    - parameters that move the map's centre.
+  - The scale bar shows when the scale varies across the view, which most of these projections do.
+- **Projection framework:** the current cylindrical-only `Projection` classes are generalised to any projection with forward, inverse, a valid domain and its outline. The shader reprojection, which draws quadtree tiles, takes per-projection code for each one. PROJ is the reference implementation in the tests, not a run-time dependency of drawing.
 
 **Technical documentation**
 
-- `docs/design/projections.md`: each projection, its domain, and how the morph handles it
+- `docs/design/projections.md`:
+  - each projection, with its formulas, parameters, valid domain and distortion
+  - how the morph and clipping handle non-cylindrical outlines
+  - the RPF ARC zone system
+  - the OSGB36 datum conversion
+- `docs/user/getting-around.md`: choosing a projection and its settings
 
 **Regression tests**
 
-- Forward and inverse transforms against PROJ at reference points, for each projection.
-- Golden images of the world and a regional map in each projection.
-- The morph is continuous (no frame jumps) for each projection.
+- **Transforms:**
+  - Forward and inverse at reference points match PROJ (`+proj=tmerc`, `cass`, `aeqd`, `eqc`, `gnom`, `lcc`, `poly`, `omerc`, `gall`, `cea`, `stere`, `robin`, `moll`, `wintri`) to within millimetres, including near each projection's edges and poles.
+  - A forward-then-inverse round trip returns the start point.
+- **UK National Grid:**
+  - the Ordnance Survey's published OSTN15 test points to their stated accuracy;
+  - grid references formatted and parsed for known points;
+  - the Helmert fallback within 5 m.
+- **Gall–Peters/Gall Orthographic:** equal-area: the areas of graticule cells match the ellipsoid's.
+- **Rotated Mercator:** the chosen centre line maps to a straight line, with scale true along it.
+- **Gnomonic:** great circles map to straight lines, and points beyond the horizon are rejected, not drawn.
+- **RPF ARC zones:**
+  - the zone limits and pixel spacings match MIL-PRF-89038 (the RPF specification);
+  - a fixture CADRG frame is drawn without resampling in its own zone.
+- **Golden images:** a world map and a regional map in each projection, with the graticule, and the UK in the National Grid lined up with the shoreline.
+- **Morph:** each projection morphs without frame jumps (continuity at every step).
+- **Settings:** changing parameters (centre, zone, standard parallels) redraws correctly and is saved in the project.
 
-**Exit criteria**: every listed projection draws, morphs and reads coordinates correctly.
+**Exit criteria**: every listed projection draws, morphs, picks and reads coordinates correctly, matches PROJ, and stays within the frame budget.
 
 ## Phase 13 – Terrain analysis
 
