@@ -36,8 +36,9 @@ The first roadmap's rules still apply to every phase here:
 | 21 | Aircraft from ADS-B | Recorded, live-receiver and airplanes.live ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
 | 22 | Ships from AIS | Recorded, live-receiver and open online AIS data as vessels on the map and globe, with trails like Phase 21's |
 | 23 | Vector layer colours | Change the colours (and line width) of the graticule and shoreline layers |
+| 24 | On-screen navigation controls | An overlay on the view with rotate, pan, zoom and tilt controls, on the globe and the map |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 10's vector files then reuse its style dialog.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 10's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0.
 
 ## Phase 9 – Road to 1.0
 
@@ -798,6 +799,69 @@ Goal: users can change the colours of the graticule and shoreline layers to suit
 
 **Exit criteria**: the graticule and shoreline colours, opacity and widths can be changed, previewed, reset, saved with the project and set as defaults, and every existing golden image is unchanged at the default style.
 
+## Phase 24 – On-screen navigation controls
+
+Goal: an overlay of controls on the view (the globe and the flat map) to rotate, pan, zoom and tilt with the mouse or a touch screen, without needing to know the mouse buttons and keys.
+
+**Already in place**: the camera already moves in all of these ways from the keyboard. `CameraController` has motions for moving, zooming, turning and tilting, with inertia and smooth flights. The view already draws overlays (the scale bar and the attributions). On the flat map, though, turning and tilting are not possible today ("a map isn't turned or tilted"). This phase adds them there (see below).
+
+**Deliverables**
+
+- **The overlay**: a compact group of controls in a corner of the view.
+  - **Placement:** top right by default, clear of the attributions (bottom right) and the scale bar. It can be moved to another corner.
+  - **Look:** the controls are semi-transparent until the pointer is over them.
+  - **Show and hide:** View → Navigation Controls switches them on and off (shown by default, saved in the user's settings).
+  - **The controls:**
+    - **Rotate**: a compass ring showing north. Dragging the ring turns the view, the arrows on either side turn it while held, and clicking the "N" turns it back to north-up with a smooth flight.
+    - **Pan**: four arrows (or a small joystick) that move the view while held, accelerating the longer they are held. A click moves by a set fraction of the view.
+    - **Zoom**: + and − buttons, and a slider showing the current height (eye height on the globe, scale on the map). Clicking or dragging the slider flies to that height.
+    - **Tilt**: up and down buttons, and a small arc slider from straight down to the horizon limit, showing the current tilt. Double-clicking it returns to straight down.
+  - **Reset**: a home button, the same as View → Reset View.
+- **Behaviour:**
+  - The controls drive the existing `CameraController` motions, so they share their speeds, inertia, limits and terrain clearance.
+  - Holding a button is the same as holding the matching key.
+  - Clicks on the overlay don't reach the globe, and clicks elsewhere aren't affected.
+- **On the flat map:**
+  - **Rotation**: the map can be turned away from north-up, as the globe can. The graticule, labels, picking, the scale bar and region drawing follow the rotation.
+  - **Tilt**: a perspective view of the flat map, looking towards the horizon. Terrain draws in relief when it is on.
+  - Both are smooth through the 3D/2D morph, and "N" or Reset View returns the map to north-up and straight down.
+  - The right mouse button, and the turn and tilt keys, then work on the map as on the globe.
+- **Sizes and input:**
+  - The controls scale with the screen's DPI and the system font size.
+  - They are large enough for touch screens (at least 9 mm targets).
+  - They respond to touch as well as the mouse.
+- **Accessibility:**
+  - Each control has a tooltip, an accessible name, and its keyboard shortcut in the tooltip.
+  - The overlay can be reached from the keyboard (Tab into the view, then arrow keys and Enter), in line with Phase 9's accessibility work.
+- **Performance:** the overlay costs nothing measurable when idle, and the view still stops redrawing when nothing moves.
+
+**Technical documentation**
+
+- `docs/design/camera-and-precision.md`: the controls' mapping to camera motions, and the flat map's new rotation and tilt
+- `docs/design/morph.md`: rotation and tilt through the morph
+- `docs/user/getting-around.md`: the navigation controls, and turning and tilting the map
+
+**Regression tests**
+
+- **Each control (UI test with simulated mouse and touch events):**
+  - rotate, pan, zoom and tilt move the camera in the expected direction and by the expected amount;
+  - holding a button keeps moving and releasing it stops, with inertia;
+  - "N" returns the heading to 0, and the home button returns to the start view.
+- **Limits:**
+  - zoom and tilt stop at the camera's limits;
+  - terrain clearance still holds;
+  - the sliders show the camera's current state after moving by mouse, keys or controls.
+- **Hit-testing:** clicks on the overlay don't move or pick on the globe, and clicks beside it do.
+- **Flat map rotation and tilt:**
+  - picking, the graticule and the scale bar are correct on a turned and tilted map;
+  - the morph is continuous from a turned, tilted globe to the map and back;
+  - north-up and straight down remain the default.
+- **Settings:** the overlay's visibility and corner are saved and restored, and View → Navigation Controls hides it.
+- **Golden images:** the overlay in each corner, at normal and high DPI, and a turned and tilted flat map.
+- **Idle:** with the overlay shown and nothing moving, the view stops drawing.
+
+**Exit criteria**: every control works by mouse, touch and keyboard on the globe and the flat map. The flat map can be turned and tilted, the overlay can be hidden and moved, and the idle and frame budgets hold.
+
 ## Items deferred from 0.0.1
 
 These came up during Phases 6–8 and were left out on purpose. They are small enough to fit into any phase.
@@ -830,3 +894,4 @@ These need a decision before the phases they affect:
 6. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
 7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
 8. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
+9. **Turning and tilting the flat map** (Phase 24): the map is always north-up and flat today. The navigation controls are planned to add rotation and a perspective tilt to the map. Is that wanted, or should the map stay north-up and flat, with the rotate and tilt controls greyed out on it?
