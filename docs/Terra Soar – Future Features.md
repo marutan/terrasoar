@@ -35,8 +35,9 @@ The first roadmap's rules still apply to every phase here:
 | 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
 | 21 | Aircraft from ADS-B | Recorded, live-receiver and airplanes.live ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
 | 22 | Ships from AIS | Recorded, live-receiver and open online AIS data as vessels on the map and globe, with trails like Phase 21's |
+| 23 | Vector layer colours | Change the colours (and line width) of the graticule and shoreline layers |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 10's vector files then reuse its style dialog.
 
 ## Phase 9 – Road to 1.0
 
@@ -752,6 +753,50 @@ Goal: AIS (Automatic Identification System) data, from files, a receiver or open
 - **Performance:** the day-long NOAA fixture loads within the time and memory budgets and plays within the frame budget.
 
 **Exit criteria**: AIS logs and CSV play back with vessels at the right positions, headings and types. Each trail mode is correct at any clock time, a local receiver and at least one open online feed work live, and the budgets hold.
+
+## Phase 23 – Vector layer colours
+
+Goal: users can change the colours of the graticule and shoreline layers to suit the imagery beneath them, their eyes or a screenshot.
+
+**Already in place**: every vector layer already has a style in its layer definition: fill colour, outline colour (with alpha) and outline width (`VectorStyle`, the layer's `"style"` object). It is saved in the project, and the graticule draws with the outline colour and width. What's missing is a way for users to change it.
+
+**Deliverables**
+
+- **Layer Style… dialog**, opened from the layer tree's context menu, by double-clicking a vector layer, or from Layer → Style…:
+  - **Graticule:** line colour, line opacity and line width.
+  - **Shoreline:** outline colour, opacity and width, and, for the filled shoreline, the land fill colour and opacity.
+  - **Colour picker:** the system colour dialog with alpha, plus a row of recent colours.
+  - **Live preview:** changes show on the globe and the map as they are made. OK keeps them, Cancel restores the previous style, and Reset returns the layer to its built-in default.
+- **Presets**: a few named styles for common needs:
+  - **Default.**
+  - **Light on dark imagery:** today's look, for the Blue Marble.
+  - **Dark on light imagery:** for pale WMS maps.
+  - **High contrast:** for accessibility, matching Phase 9's high-contrast check.
+  - **Print:** black lines, no fill.
+- **Saved with the project**: the style is part of the layer definition, so projects keep it, as they already keep terrain exaggeration and hillshade.
+- **New-project default**: "Use as default for new projects", saved in the user's settings, so the user's preferred colours apply without restyling every project.
+- **Undo**: a style change can be undone (Edit → Undo) if the program gains an undo stack by then (Phase 19b brings one), or else through Reset.
+- **For every vector layer**: the dialog works on any vector layer, so Phase 10's files, Phase 19's KML (where a document doesn't set its own styles) and Phase 13's contours reuse it.
+- **Layer list**: a small colour swatch beside each vector layer's name shows its current colours.
+
+**Technical documentation**
+
+- `docs/user/layers.md`: changing a layer's colours, presets and the default
+- `docs/design/layer-model.md`: the style object, defaults and how the user default is applied to new projects
+
+**Regression tests**
+
+- **Style model:**
+  - Every style value round-trips through the layer definition JSON and the project file.
+  - Invalid or missing colours fall back to the layer's default.
+- **Dialog (UI test):**
+  - Changing each colour, opacity and width updates the layer definition, and the view redraws.
+  - Cancel restores the previous style, and Reset restores the built-in default.
+  - Each preset applies its values.
+- **Rendering:** golden images of the graticule and the filled and outline shoreline in non-default colours and widths, on the globe and the map, with the default style still matching the existing golden images.
+- **Defaults:** "Use as default" applies to a new project and doesn't change existing projects.
+
+**Exit criteria**: the graticule and shoreline colours, opacity and widths can be changed, previewed, reset, saved with the project and set as defaults, and every existing golden image is unchanged at the default style.
 
 ## Items deferred from 0.0.1
 
