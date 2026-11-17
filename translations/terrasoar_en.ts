@@ -957,6 +957,14 @@
             <source>%1, %2</source>
             <translation>%1, %2</translation>
         </message>
+        <message>
+            <source>&amp;Attributions</source>
+            <translation>&amp;Attributions</translation>
+        </message>
+        <message>
+            <source>Show the sources of the layers drawn in the corner of the view</source>
+            <translation>Show the sources of the layers drawn in the corner of the view</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>

@@ -340,6 +340,14 @@ void GlobeView::setScaleBarVisible(bool visible)
   }
 }
 
+void GlobeView::setAttributionsVisible(bool visible)
+{
+  if (m_attributionsVisible != visible) {
+    m_attributionsVisible = visible;
+    update();
+  }
+}
+
 void GlobeView::setPose(const CameraPose& pose)
 {
   m_controller.setPose(pose);
@@ -1054,7 +1062,7 @@ void GlobeView::drawOverlay()
 
 void GlobeView::drawAttributions()
 {
-  if (m_attributions.isEmpty()) {
+  if (!m_attributionsVisible || m_attributions.isEmpty()) {
     return;
   }
   // Small text on a translucent band in the bottom-right corner, one

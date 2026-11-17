@@ -156,6 +156,12 @@ public:
   /** Returns the attributions shown. */
   const QStringList& attributions() const { return m_attributions; }
 
+  /** Shows or hides the attributions in the corner of the view. */
+  void setAttributionsVisible(bool visible);
+
+  /** Returns true if the attributions are shown (the default). */
+  bool isAttributionsVisible() const { return m_attributionsVisible; }
+
   /** Returns what the tile renderer did in the last frame. */
   TileStatistics tileStatistics() const;
 
@@ -358,6 +364,7 @@ private:
   std::vector<VectorLayerDraw> m_vectorDraws;
   ElevationDraw m_elevationDraw;
   QStringList m_attributions;
+  bool m_attributionsVisible = true;
   RenderDeviceInfo m_deviceInfo;
   QString m_error;
 
