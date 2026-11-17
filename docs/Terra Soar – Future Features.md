@@ -29,8 +29,9 @@ The first roadmap's rules still apply to every phase here:
 | 14 | Realism | Atmosphere, sun lighting, glTF models |
 | 15 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
 | 16 | Commercial sources | API-key services, key storage, terms handling |
+| 17 | User guide in the program | The `docs/user` guide in a window from the Help menu |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0.
 
 ## Phase 9 – Road to 1.0
 
@@ -243,6 +244,42 @@ Goal: sources that need an account, without putting keys at risk or breaking the
 
 **Exit criteria**: at least one commercial source works end to end with its terms respected.
 
+## Phase 17 – User guide in the program
+
+Goal: the user guide in `docs/user/` can be read inside Terra Soar, offline, from the Help menu, so it matches the installed version.
+
+**Deliverables**
+
+- **Help → User Guide (F1)** opens a help window. It is non-modal, so the guide can stay open beside the globe.
+- The window shows the guide's contents (`docs/user/README.md`) as its start page, with a contents list down the side.
+- **Every page in `docs/user/` is built into the program** as a Qt resource, with the screenshots it uses (`docs/images/`). The window works offline and always shows the guide for the version installed.
+- **Markdown is shown directly** with `QTextBrowser`/`QTextDocument::setMarkdown` (Qt 5.14 and later, so both Qt 5.15 and Qt 6). The pages stay plain Markdown, and the same files are what GitHub shows.
+- **Links:**
+  - Links between pages, and to headings within them (`offline-use.md#space-on-disk`), open in the window.
+  - Back, Forward and Home buttons.
+  - Web links open in the system browser.
+  - Links that leave the guide (`../building.md`, `../design/...`) open the file's page in the repository on GitHub for this version's tag.
+- Find in page (Ctrl+F), and a search across all pages.
+- The window remembers its size, position and last page.
+- Context help, if wanted: F1 in a dialog (Add WMS Layer, Offline Regions, Data Packs, Elevation Profile) opens the guide at that dialog's section.
+- The About window's About tab links to the guide.
+- The packages need nothing extra, because the guide is inside the program.
+
+**Technical documentation**
+
+- `docs/design/help.md`: how the guide is built in, how links are resolved, and how to add a page.
+- `docs/user/README.md`: the guide's contents. A new page appears in the window by being added there and to the resource list (checked in CI).
+
+**Regression tests**
+
+- Every Markdown file in `docs/user/` is in the program's resources, and every resource has a source file (a style check like `check_notices.py`, so a new page can't be forgotten).
+- Every page loads and renders, and every image it uses is found.
+- Link check: every link between pages, and every heading anchor, resolves. Links out of the guide map to a repository URL.
+- UI test: Help → User Guide opens the window at the contents. Following a link, Back and Home show the right pages, and search finds a known phrase.
+- Context help, if built: each dialog's F1 opens its section.
+
+**Exit criteria**: the whole user guide reads in the program offline, every link and image works, and CI fails if a page is added to `docs/user/` without being built in.
+
 ## Items deferred from 0.0.1
 
 These came up during Phases 6–8 and were left out on purpose. They are small enough to fit into any phase.
@@ -268,7 +305,7 @@ Candidates to discuss, with no phase or commitment:
 These need a decision before the phases they affect:
 
 1. **Phase order and scope**: is the order above right, and is every phase wanted?
-2. **1.0 criteria**: is Phase 9 enough for 1.0, or should 1.0 also include Phase 10 (local data files)?
+2. **1.0 criteria**: is Phase 9 enough for 1.0, or should 1.0 also include Phase 10 (local data files) or Phase 17 (the user guide in the program)?
 3. **Qt 5 support**: Qt 5.15 is past its open-source end of life. When does Terra Soar drop Qt 5? Dropping it simplifies Phase 15.
 4. **macOS**: the first roadmap targets Windows and Linux only. Is macOS wanted? If so, it needs its own packaging phase (and OpenGL is deprecated there, which points to Phase 15's backend).
 5. **Translations**: which languages first, and who reviews them?
