@@ -809,8 +809,18 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
 
 - **The overlay**: a compact group of controls in a corner of the view.
   - **Placement:** top right by default, clear of the attributions (bottom right) and the scale bar. It can be moved to another corner.
-  - **Look:** the controls are semi-transparent until the pointer is over them.
-  - **Show and hide:** View → Navigation Controls switches them on and off (shown by default, saved in the user's settings).
+  - **Look:** the controls are semi-transparent until the pointer is over them, never below a minimum opacity that keeps them readable (see below).
+  - **Show and hide, from the View menu**: **View → Navigation Controls** is a checkable item beside View → Scale Bar and View → Attributions, and works like them:
+    - checked shows the overlay, unchecked hides it completely, and its clicks then go to the view;
+    - shown by default;
+    - the choice is saved in the user's settings and restored at the next start;
+    - it works in both the globe and the flat map, and stays as set when switching between them.
+  - **Readable on light and dark backgrounds**: the view can be anything from snow, desert and pale WMS maps to dark ocean, night imagery and the black of space, so the controls never rely on the background for contrast:
+    - each control sits on its own backing plate, a translucent dark disc or panel with a thin light edge;
+    - its symbols are light, with a dark outline (halo);
+    - so one of plate edge, symbol or halo always stands out, whatever is behind it;
+    - the hover and pressed states change the plate's brightness, not just its transparency, so they show on any background;
+    - Phase 9's high-contrast mode (and the system's high-contrast setting) switches to opaque plates and the system's high-contrast colours.
   - **The controls:**
     - **Rotate**: a compass ring showing north. Dragging the ring turns the view, the arrows on either side turn it while held, and clicking the "N" turns it back to north-up with a smooth flight.
     - **Pan**: four arrows (or a small joystick) that move the view while held, accelerating the longer they are held. A click moves by a set fraction of the view.
@@ -856,11 +866,15 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
   - picking, the graticule and the scale bar are correct on a turned and tilted map;
   - the morph is continuous from a turned, tilted globe to the map and back;
   - north-up and straight down remain the default.
-- **Settings:** the overlay's visibility and corner are saved and restored, and View → Navigation Controls hides it.
-- **Golden images:** the overlay in each corner, at normal and high DPI, and a turned and tilted flat map.
+- **View menu:**
+  - View → Navigation Controls is checkable, sits beside Scale Bar and Attributions, and is checked by default;
+  - unchecking it hides the overlay on the globe and the map, and clicks where it was reach the view;
+  - the setting, and the overlay's corner, are saved and restored across a restart.
+- **Contrast on light and dark backgrounds:** the overlay is drawn over solid white, solid black, mid-grey and busy imagery (Blue Marble cloud and desert, a pale WMS fixture). For each control, the symbol's contrast against what surrounds it meets WCAG 2.1's non-text contrast (at least 3:1), in the normal, hover, pressed and least-opaque states.
+- **Golden images:** the overlay in each corner, at normal and high DPI, over light and dark backgrounds, in high-contrast mode, and a turned and tilted flat map.
 - **Idle:** with the overlay shown and nothing moving, the view stops drawing.
 
-**Exit criteria**: every control works by mouse, touch and keyboard on the globe and the flat map. The flat map can be turned and tilted, the overlay can be hidden and moved, and the idle and frame budgets hold.
+**Exit criteria**: every control works by mouse, touch and keyboard on the globe and the flat map, and stays readable (3:1 contrast) on light and dark backgrounds. View → Navigation Controls shows and hides the overlay and is remembered. The flat map can be turned and tilted, the overlay can be moved, and the idle and frame budgets hold.
 
 ## Items deferred from 0.0.1
 
