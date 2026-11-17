@@ -21,15 +21,15 @@ The first roadmap's rules still apply to every phase here:
 
 | Phase | Theme | Main deliverables |
 | --- | --- | --- |
-| 9 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
-| 10 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
-| 11 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
-| 12 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
-| 13 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
-| 14 | Realism | Atmosphere, sun lighting, glTF models |
-| 15 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
-| 16 | Commercial sources | API-key services, key storage, terms handling |
-| 17 | User guide in the program | The `docs/user` guide in a window from the Help menu |
+| 9 | User guide in the program | The `docs/user` guide in a window from the Help menu |
+| 10 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
+| 11 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
+| 12 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
+| 13 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
+| 14 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
+| 15 | Realism | Atmosphere, sun lighting, glTF models |
+| 16 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
+| 17 | Commercial sources | API-key services, key storage, terms handling |
 | 18 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
 | 19 | KML | 19a: import KML/KMZ and draw it on the globe and map; 19b: create KML, add elements, export |
 | 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
@@ -39,9 +39,45 @@ The first roadmap's rules still apply to every phase here:
 | 24 | On-screen navigation controls | An overlay on the view with rotate, pan, zoom and tilt controls, on the globe and the map |
 | 25 | VMAP0 data pack | NGA's Vector Map Level 0 (1:1,000,000 world vector map) prepared, tested and published as downloadable packs |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 10's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0. Phase 25 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 19, 21 and 22 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
+The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 10 follows and finishes the release work, so the guide is in 1.0. Phases 11 and 12 share the vector pipeline, so Phase 11 should come before Phase 12's WFS. Phase 15's lighting is easier after Phase 16, if both are wanted. Phase 18 needs a program-wide clock, which Phase 12's WMS time slider and Phase 15's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 11's vector pipeline (feature styles, picking, draping), so it comes after Phase 11. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 12, Phase 12's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 15's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 11's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0. Phase 25 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 19, 21 and 22 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
 
-## Phase 9 – Road to 1.0
+## Phase 9 – User guide in the program
+
+Goal: the user guide in `docs/user/` can be read inside Terra Soar, offline, from the Help menu, so it matches the installed version.
+
+**Deliverables**
+
+- **Help → User Guide (F1)** opens a help window. It is non-modal, so the guide can stay open beside the globe.
+- The window shows the guide's contents (`docs/user/README.md`) as its start page, with a contents list down the side.
+- **Every page in `docs/user/` is built into the program** as a Qt resource, with the screenshots it uses (`docs/images/`). The window works offline and always shows the guide for the version installed.
+- **Markdown is shown directly** with `QTextBrowser`/`QTextDocument::setMarkdown` (Qt 5.14 and later, so both Qt 5.15 and Qt 6). The pages stay plain Markdown, and the same files are what GitHub shows.
+- **Links:**
+  - Links between pages, and to headings within them (`offline-use.md#space-on-disk`), open in the window.
+  - Back, Forward and Home buttons.
+  - Web links open in the system browser.
+  - Links that leave the guide (`../building.md`, `../design/...`) open the file's page in the repository on GitHub for this version's tag.
+- Find in page (Ctrl+F), and a search across all pages.
+- The window remembers its size, position and last page.
+- Context help, if wanted: F1 in a dialog (Add WMS Layer, Offline Regions, Data Packs, Elevation Profile) opens the guide at that dialog's section.
+- The About window's About tab links to the guide.
+- The packages need nothing extra, because the guide is inside the program.
+
+**Technical documentation**
+
+- `docs/design/help.md`: how the guide is built in, how links are resolved, and how to add a page.
+- `docs/user/README.md`: the guide's contents. A new page appears in the window by being added there and to the resource list (checked in CI).
+
+**Regression tests**
+
+- Every Markdown file in `docs/user/` is in the program's resources, and every resource has a source file (a style check like `check_notices.py`, so a new page can't be forgotten).
+- Every page loads and renders, and every image it uses is found.
+- Link check: every link between pages, and every heading anchor, resolves. Links out of the guide map to a repository URL.
+- UI test: Help → User Guide opens the window at the contents. Following a link, Back and Home show the right pages, and search finds a known phrase.
+- Context help, if built: each dialog's F1 opens its section.
+
+**Exit criteria**: the whole user guide reads in the program offline, every link and image works, and CI fails if a page is added to `docs/user/` without being built in.
+
+## Phase 10 – Road to 1.0
 
 Goal: Terra Soar 1.0, a release users can trust to install, update and use in their language.
 
@@ -72,7 +108,7 @@ Goal: Terra Soar 1.0, a release users can trust to install, update and use in th
 
 **Exit criteria**: a signed 1.0 is published, the Flathub listing is live, and at least one translation is complete.
 
-## Phase 10 – Local data files
+## Phase 11 – Local data files
 
 Goal: users can open their own vector and imagery files, as they already can DEMs.
 
@@ -102,7 +138,7 @@ Goal: users can open their own vector and imagery files, as they already can DEM
 
 **Exit criteria**: every listed format opens, draws, styles and picks correctly, within the budgets.
 
-## Phase 11 – More web services
+## Phase 12 – More web services
 
 Goal: the common web map services beyond WMS.
 
@@ -110,7 +146,7 @@ Goal: the common web map services beyond WMS.
 
 - XYZ/TMS tile services (`{z}/{x}/{y}` templates), reprojected from Web Mercator onto the quadtree, through `CachedTileFetcher` (disk cache, revalidation, offline regions).
 - (WMTS has its own phase, 20.)
-- WFS 2.0: features in the visible area, with paging, into the Phase 10 vector pipeline.
+- WFS 2.0: features in the visible area, with paging, into the Phase 11 vector pipeline.
 - WMS extras:
   - The TIME dimension, with a time slider and a play button
   - GetFeatureInfo on click
@@ -130,7 +166,7 @@ Goal: the common web map services beyond WMS.
 
 **Exit criteria**: each service type adds, draws, caches and goes offline like WMS.
 
-## Phase 12 – More projections
+## Phase 13 – More projections
 
 Goal: the flat map in the projections people need for regional, national, navigation and world maps. The first roadmap delivered Mercator, Web Mercator and Miller Cylindrical.
 
@@ -162,7 +198,7 @@ Projections, grouped by kind. Each is in View → Map Projection, with its param
 - **Raster Product Format (RPF) Native**:
   - **What it is:** the ARC (Equal Arc-second Raster Chart) system of the RPF products, CADRG maps and CIB imagery. It has 18 latitude zones, nine per hemisphere. Each zone is equirectangular with its own east–west pixel spacing, and the polar zones are azimuthal equidistant.
   - **What it gives:** RPF charts shown in it are drawn pixel for pixel, as they were made. The map shows the zone in view and changes zone as the view moves.
-  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`) and fits this phase best. If added, it joins Phase 10's local imagery.
+  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`) and fits this phase best. If added, it joins Phase 11's local imagery.
 - **Graticule and readout**: a latitude/longitude graticule in every projection, and a grid for projected systems (UTM, UK National Grid, Cassini and Lambert zones). The status bar reads coordinates in the current projection's system (eastings and northings, grid references) beside latitude and longitude.
 - **Everywhere:**
   - Layers, terrain hillshade, the scale bar, attributions, picking and the 3D/2D morph work in every projection.
@@ -203,7 +239,7 @@ Projections, grouped by kind. Each is in View → Map Projection, with its param
 
 **Exit criteria**: every listed projection draws, morphs, picks and reads coordinates correctly, matches PROJ, and stays within the frame budget.
 
-## Phase 13 – Terrain analysis
+## Phase 14 – Terrain analysis
 
 Goal: answers from the terrain, not just pictures of it.
 
@@ -228,7 +264,7 @@ Goal: answers from the terrain, not just pictures of it.
 
 **Exit criteria**: every analysis matches its reference within the source's accuracy.
 
-## Phase 14 – Realism
+## Phase 15 – Realism
 
 Goal: a globe that looks like the Earth from space, and objects on it.
 
@@ -255,7 +291,7 @@ Goal: a globe that looks like the Earth from space, and objects on it.
 
 **Exit criteria**: lighting is correct for any date, models draw correctly, and the budgets hold.
 
-## Phase 15 – Rendering backend
+## Phase 16 – Rendering backend
 
 Goal: a modern graphics API where OpenGL 3.3 is weak, behind the existing backend abstraction.
 
@@ -278,7 +314,7 @@ Goal: a modern graphics API where OpenGL 3.3 is weak, behind the existing backen
 
 **Note**: this phase overlaps the question of when Qt 5 support ends (see [Open questions](#open-questions)).
 
-## Phase 16 – Commercial sources
+## Phase 17 – Commercial sources
 
 Goal: sources that need an account, without putting keys at risk or breaking their terms.
 
@@ -299,42 +335,6 @@ Goal: sources that need an account, without putting keys at risk or breaking the
 
 **Exit criteria**: at least one commercial source works end to end with its terms respected.
 
-## Phase 17 – User guide in the program
-
-Goal: the user guide in `docs/user/` can be read inside Terra Soar, offline, from the Help menu, so it matches the installed version.
-
-**Deliverables**
-
-- **Help → User Guide (F1)** opens a help window. It is non-modal, so the guide can stay open beside the globe.
-- The window shows the guide's contents (`docs/user/README.md`) as its start page, with a contents list down the side.
-- **Every page in `docs/user/` is built into the program** as a Qt resource, with the screenshots it uses (`docs/images/`). The window works offline and always shows the guide for the version installed.
-- **Markdown is shown directly** with `QTextBrowser`/`QTextDocument::setMarkdown` (Qt 5.14 and later, so both Qt 5.15 and Qt 6). The pages stay plain Markdown, and the same files are what GitHub shows.
-- **Links:**
-  - Links between pages, and to headings within them (`offline-use.md#space-on-disk`), open in the window.
-  - Back, Forward and Home buttons.
-  - Web links open in the system browser.
-  - Links that leave the guide (`../building.md`, `../design/...`) open the file's page in the repository on GitHub for this version's tag.
-- Find in page (Ctrl+F), and a search across all pages.
-- The window remembers its size, position and last page.
-- Context help, if wanted: F1 in a dialog (Add WMS Layer, Offline Regions, Data Packs, Elevation Profile) opens the guide at that dialog's section.
-- The About window's About tab links to the guide.
-- The packages need nothing extra, because the guide is inside the program.
-
-**Technical documentation**
-
-- `docs/design/help.md`: how the guide is built in, how links are resolved, and how to add a page.
-- `docs/user/README.md`: the guide's contents. A new page appears in the window by being added there and to the resource list (checked in CI).
-
-**Regression tests**
-
-- Every Markdown file in `docs/user/` is in the program's resources, and every resource has a source file (a style check like `check_notices.py`, so a new page can't be forgotten).
-- Every page loads and renders, and every image it uses is found.
-- Link check: every link between pages, and every heading anchor, resolves. Links out of the guide map to a repository URL.
-- UI test: Help → User Guide opens the window at the contents. Following a link, Back and Home show the right pages, and search finds a known phrase.
-- Context help, if built: each dialog's F1 opens its section.
-
-**Exit criteria**: the whole user guide reads in the program offline, every link and image works, and CI fails if a page is added to `docs/user/` without being built in.
-
 ## Phase 18 – Satellite orbits
 
 Goal: satellites shown where they are, where they have been and where they are going, computed from two-line element sets (TLEs).
@@ -346,7 +346,7 @@ Goal: satellites shown where they are, where they have been and where they are g
 - **TLE sources:**
   - A `.tle`/`.txt` file, or text pasted in (two-line and three-line forms, with checksums checked)
   - CelesTrak's published groups (stations, GPS, weather, Starlink and so on), and its OMM/JSON form, fetched over HTTP. Fetches go through the disk cache, so the last download works offline.
-  - Space-Track, which needs an account, comes with Phase 16's key storage.
+  - Space-Track, which needs an account, comes with Phase 17's key storage.
 - **Orbit propagation with SGP4/SDP4**, the model TLEs are made for. It is our own implementation, in `core/` as its own subsection (`ts/orbits`) with its own unit test project (`tests/orbits`):
   - Positions in TEME, converted to Earth-fixed WGS 84 through sidereal time (polar motion is negligible at this scale)
   - Computed off the GUI thread
@@ -442,7 +442,7 @@ Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make the
   - Unknown or unsupported elements are skipped and listed (not an error).
   - Malformed files report the line and column.
   - Large files (100,000 placemarks) load off the GUI thread within the memory budget.
-- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through Phase 10's vector pipeline.
+- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through Phase 11's vector pipeline.
 
 ### Phase 19b – Create, edit and export
 
@@ -598,7 +598,7 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Decoder**: CRC checking, aircraft identification (callsign), airborne and surface positions (global and local CPR decoding), barometric and geometric altitude, velocity, vertical rate, squawk and emergency status.
 - **Aircraft in 3D:**
   - A marker at the aircraft's position and altitude above the globe, oriented by its track (heading).
-  - The marker is a simple aircraft shape scaled to stay visible, or a 3D model if Phase 14's models exist.
+  - The marker is a simple aircraft shape scaled to stay visible, or a 3D model if Phase 15's models exist.
   - A label (callsign, or ICAO address), optionally with altitude and speed.
   - On the flat map, a rotated aircraft symbol at the point below it.
   - Optional drop lines from each aircraft to the ground, which make heights readable in 3D.
@@ -617,7 +617,7 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Live data (second step):**
   - a connection to a local receiver (dump1090/readsb: SBS on port 30003, Beast on port 30005, or its JSON over HTTP), drawn in real time;
   - the session optionally recorded to a file for replay.
-  - Online services that need an account come with Phase 16's key and terms handling. OpenSky Network (free, with rate limits and terms) is one candidate.
+  - Online services that need an account come with Phase 17's key and terms handling. OpenSky Network (free, with rate limits and terms) is one candidate.
 - **airplanes.live**: worldwide live aircraft from the community network [airplanes.live](https://airplanes.live/api-docs/), through its REST API (`https://api.airplanes.live/v2/`):
   - **Adding it:** an "airplanes.live" entry in the catalogue adds a live aircraft layer with no receiver of your own and no API key.
   - **Area query:** aircraft are fetched for the area in view through the point query (`/point/{lat}/{lon}/{radius}`, radius up to 250 nautical miles), centred on the view. When the view is larger than the radius, the view's centre is used and the layer says so.
@@ -713,7 +713,7 @@ Goal: AIS (Automatic Identification System) data, from files, a receiver or open
     - the Norwegian Coastal Administration's open AIS (NLOD licence)
     - other open national feeds found later
     - Each is a catalogue entry with its terms and attribution, like WMS services, and the terms are confirmed before release.
-  - **Services that need a key** (e.g. aisstream.io) come with Phase 16.
+  - **Services that need a key** (e.g. aisstream.io) come with Phase 17.
 - **Details on click:**
   - MMSI, name, callsign and IMO number;
   - ship type, dimensions and draught;
@@ -773,12 +773,12 @@ Goal: users can change the colours of the graticule and shoreline layers to suit
   - **Default.**
   - **Light on dark imagery:** today's look, for the Blue Marble.
   - **Dark on light imagery:** for pale WMS maps.
-  - **High contrast:** for accessibility, matching Phase 9's high-contrast check.
+  - **High contrast:** for accessibility, matching Phase 10's high-contrast check.
   - **Print:** black lines, no fill.
 - **Saved with the project**: the style is part of the layer definition, so projects keep it, as they already keep terrain exaggeration and hillshade.
 - **New-project default**: "Use as default for new projects", saved in the user's settings, so the user's preferred colours apply without restyling every project.
 - **Undo**: a style change can be undone (Edit → Undo) if the program gains an undo stack by then (Phase 19b brings one), or else through Reset.
-- **For every vector layer**: the dialog works on any vector layer, so Phase 10's files, Phase 19's KML (where a document doesn't set its own styles) and Phase 13's contours reuse it.
+- **For every vector layer**: the dialog works on any vector layer, so Phase 11's files, Phase 19's KML (where a document doesn't set its own styles) and Phase 14's contours reuse it.
 - **Layer list**: a small colour swatch beside each vector layer's name shows its current colours.
 
 **Technical documentation**
@@ -823,7 +823,7 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
     - its symbols are light, with a dark outline (halo);
     - so one of plate edge, symbol or halo always stands out, whatever is behind it;
     - the hover and pressed states change the plate's brightness, not just its transparency, so they show on any background;
-    - Phase 9's high-contrast mode (and the system's high-contrast setting) switches to opaque plates and the system's high-contrast colours.
+    - Phase 10's high-contrast mode (and the system's high-contrast setting) switches to opaque plates and the system's high-contrast colours.
   - **The controls:**
     - **Rotate**: a compass ring showing north. Dragging the ring turns the view, the arrows on either side turn it while held, and clicking the "N" turns it back to north-up with a smooth flight.
     - **Pan**: four arrows (or a small joystick) that move the view while held, accelerating the longer they are held. A click moves by a set fraction of the view.
@@ -845,7 +845,7 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
   - They respond to touch as well as the mouse.
 - **Accessibility:**
   - Each control has a tooltip, an accessible name, and its keyboard shortcut in the tooltip.
-  - The overlay can be reached from the keyboard (Tab into the view, then arrow keys and Enter), in line with Phase 9's accessibility work.
+  - The overlay can be reached from the keyboard (Tab into the view, then arrow keys and Enter), in line with Phase 10's accessibility work.
 - **Performance:** the overlay costs nothing measurable when idle, and the view still stops redrawing when nothing moves.
 - **Tile detail by distance from the camera, and performance when tilted:** a tilted view, especially near the horizon, shows far more of the Earth than a view straight down. Detail must therefore fall off with distance, or the tile count, downloads and frame time grow without limit.
   - **On the globe:** this already holds. A tile's screen-space error uses the distance from the eye to the tile (`docs/design/tiling.md`), so distant tiles are coarser. This phase checks it at the new tilt limits and keeps it.
@@ -853,7 +853,7 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
   - **The horizon on a tilted map:** a tilted flat map never reaches a horizon of its own, so it needs limits:
     - a far limit, past which nothing is drawn, set so that the coarsest level still meets the error limit there;
     - a tilt limit, so the view can't look along the map's surface;
-    - a haze or sky band at the far limit, shared with Phase 14's atmosphere if that exists, to fade the edge rather than cut it.
+    - a haze or sky band at the far limit, shared with Phase 15's atmosphere if that exists, to fade the edge rather than cut it.
   - **Terrain:** height meshes use the same distance-based levels, so distant terrain uses coarser meshes. Skirts keep tiles of different levels crack-free.
   - **Loading order:** requests are ordered by screen-space error and then by distance from the camera, so near tiles load first. Tiles beyond the far limit are never requested, including from WMS, WMTS and web terrain servers.
   - **Budgets:**
@@ -953,7 +953,7 @@ It is a US Government (NGA) product approved for public release. The exact terms
   - **`vmap0-hydrography`**: rivers (perennial and intermittent), lakes, reservoirs, canals and coastlines.
   - **`vmap0-transportation`**: roads by class, railways, airports and ferry routes.
   - **`vmap0-population`**: built-up areas, and place names once labels exist.
-  - **`vmap0-elevation`**: contours and spot heights (where Terra Soar's own DEM and Phase 13's contours don't already cover the need).
+  - **`vmap0-elevation`**: contours and spot heights (where Terra Soar's own DEM and Phase 14's contours don't already cover the need).
   - **`vmap0-physiography`, `vmap0-vegetation`, `vmap0-industry` and `vmap0-utilities`**: smaller packs, or one "other themes" pack, decided by size.
   - **Pack index:** each has a manifest, licence and attribution ("Vector Map Level 0, NGA"), and a version (`vmap0-<theme>-5.<n>`), in the pack index in `marutan/terrasoar-packs`.
 - **Sizes:** measured per pack and recorded in `docs/data/`, with a target set before building (VMAP0 is about 1 GB as VPF). A pack too big to download comfortably is split by region along VMAP0's libraries.
@@ -1000,7 +1000,7 @@ It is a US Government (NGA) product approved for public release. The exact terms
 These came up during Phases 6–8 and were left out on purpose. They are small enough to fit into any phase.
 
 - **EGM2008 1′ geoid pack.** It isn't published on the PROJ CDN (about 1 GB from NGA), and it differs from the 2.5′ pack by centimetres outside high mountains. Build it if users ask.
-- **Code signing and Flathub**: Phase 9.
+- **Code signing and Flathub**: Phase 10.
 - **Coverage report per subsection.** The first roadmap set an 80% line target for `core/`. Publish the numbers from CI and close the gaps.
 
 ## Ideas (not yet planned)
@@ -1009,7 +1009,7 @@ Candidates to discuss, with no phase or commitment:
 
 - Bookmarks and saved views, with a fly-through tour between them
 - Place search (geocoding), online through a service like Nominatim and offline through a downloadable gazetteer pack
-- Distance and area measurement (if Phase 13 is postponed)
+- Distance and area measurement (if Phase 14 is postponed)
 - Export the view as an image at a chosen size, and printing
 - More downloadable packs: higher-resolution regional imagery and DEMs where licences allow
 - A command-line or scripting interface (e.g. `--open`, `--fly-to`, render to file) for automation
@@ -1020,9 +1020,9 @@ Candidates to discuss, with no phase or commitment:
 These need a decision before the phases they affect:
 
 1. **Phase order and scope**: is the order above right, and is every phase wanted?
-2. **1.0 criteria**: is Phase 9 enough for 1.0, or should 1.0 also include Phase 10 (local data files) or Phase 17 (the user guide in the program)?
-3. **Qt 5 support**: Qt 5.15 is past its open-source end of life. When does Terra Soar drop Qt 5? Dropping it simplifies Phase 15.
-4. **macOS**: the first roadmap targets Windows and Linux only. Is macOS wanted? If so, it needs its own packaging phase (and OpenGL is deprecated there, which points to Phase 15's backend).
+2. **1.0 criteria**: Phases 9 (the user guide in the program) and 10 come before 1.0. Is that enough, or should 1.0 also include Phase 11 (local data files)?
+3. **Qt 5 support**: Qt 5.15 is past its open-source end of life. When does Terra Soar drop Qt 5? Dropping it simplifies Phase 16.
+4. **macOS**: the first roadmap targets Windows and Linux only. Is macOS wanted? If so, it needs its own packaging phase (and OpenGL is deprecated there, which points to Phase 16's backend).
 5. **Translations**: which languages first, and who reviews them?
 6. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
 7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
