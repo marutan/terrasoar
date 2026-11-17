@@ -23,23 +23,23 @@ The first roadmap's rules still apply to every phase here:
 | --- | --- | --- |
 | 9 | User guide in the program | The `docs/user` guide in a window from the Help menu |
 | 10 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
-| 11 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
-| 12 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
-| 13 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
-| 14 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
-| 15 | Realism | Atmosphere, sun lighting, glTF models |
-| 16 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
-| 17 | Commercial sources | API-key services, key storage, terms handling |
-| 18 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
-| 19 | KML | 19a: import KML/KMZ and draw it on the globe and map; 19b: create KML, add elements, export |
-| 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
+| 11 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
+| 12 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
+| 13 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
+| 14 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
+| 15 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
+| 16 | Realism | Atmosphere, sun lighting, glTF models |
+| 17 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
+| 18 | Commercial sources | API-key services, key storage, terms handling |
+| 19 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
+| 20 | KML | 20a: import KML/KMZ and draw it on the globe and map; 20b: create KML, add elements, export |
 | 21 | Aircraft from ADS-B | Recorded, live-receiver and airplanes.live ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
 | 22 | Ships from AIS | Recorded, live-receiver and open online AIS data as vessels on the map and globe, with trails like Phase 21's |
 | 23 | Vector layer colours | Change the colours (and line width) of the graticule and shoreline layers |
 | 24 | On-screen navigation controls | An overlay on the view with rotate, pan, zoom and tilt controls, on the globe and the map |
 | 25 | VMAP0 data pack | NGA's Vector Map Level 0 (1:1,000,000 world vector map) prepared, tested and published as downloadable packs |
 
-The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 10 follows and finishes the release work, so the guide is in 1.0. Phases 11 and 12 share the vector pipeline, so Phase 11 should come before Phase 12's WFS. Phase 15's lighting is easier after Phase 16, if both are wanted. Phase 18 needs a program-wide clock, which Phase 12's WMS time slider and Phase 15's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 11's vector pipeline (feature styles, picking, draping), so it comes after Phase 11. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 12, Phase 12's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 15's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 11's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0. Phase 25 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 19, 21 and 22 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
+The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 10 follows and finishes the release work, so the guide is in 1.0. Phases 12 and 13 share the vector pipeline, so Phase 12 should come before Phase 13's WFS. Phase 16's lighting is easier after Phase 17, if both are wanted. Phase 19 needs a program-wide clock, which Phase 13's WMS time slider and Phase 16's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 20 draws through Phase 12's vector pipeline (feature styles, picking, draping), so it comes after Phase 12. KML's time elements use the same clock. Phase 11 (WMTS) reuses the WMS machinery and needs nothing else, so it comes early. Phase 13's XYZ tiles then reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 19's way of drawing moving objects and their tracks, so it is easiest after Phase 19. It can use Phase 16's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 12's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0. Phase 25 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 20, 21 and 22 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
 
 ## Phase 9 – User guide in the program
 
@@ -108,14 +108,86 @@ Goal: Terra Soar 1.0, a release users can trust to install, update and use in th
 
 **Exit criteria**: a signed 1.0 is published, the Flathub listing is live, and at least one translation is complete.
 
-## Phase 11 – Local data files
+## Phase 11 – WMTS
+
+Goal: users add any WMTS layer by URL or from the catalogue, and it streams, caches, blends and goes offline like a WMS layer. WMTS serves pre-cut tiles, so it is usually faster than WMS and is how many national mapping agencies and NASA GIBS publish their maps.
+
+**Approach**: the same structure as WMS (Phase 5), sharing what WMS already built:
+- `CachedTileFetcher` for the network, disk cache, revalidation and offline handling
+- the catalogue
+- the layer tree and project storage
+- offline regions and the attribution display
+
+What is new is the capabilities model, tile matrix sets, and fitting their tiles to the EPSG:4326 quadtree.
+
+**Deliverables**
+
+- **Capabilities parser** (WMTS 1.0.0), for both KVP (`GetCapabilities` by query) and RESTful (`WMTSCapabilities.xml`) services:
+  - layers
+  - styles (and the default)
+  - formats
+  - tile matrix sets: CRS, scale denominators, top-left corners, tile and matrix sizes, and limits per layer
+  - dimensions (TIME and others)
+  - resource URL templates
+  - bounding boxes, legends, and the service's attribution and access constraints
+- **`WmtsImageryProvider`:**
+  - **Requests:** each quadtree tile is drawn from the tile matrix whose resolution best matches it, by `GetTile` (KVP) or the resource URL template (RESTful).
+  - **Tile matrix sets:**
+    - In EPSG:4326 (including `WorldCRS84Quad`), the tiles are used directly when they line up with the quadtree, and cut or combined when they don't.
+    - In EPSG:3857 (`GoogleMapsCompatible`/`WebMercatorQuad`), they are reprojected as WMS's EPSG:3857 fallback is.
+    - Other CRSs that PROJ knows (e.g. British National Grid, EPSG:27700; national grids) are reprojected through PROJ.
+  - **Axis order** as each CRS defines it (WMTS uses the CRS's own axis order, like WMS 1.3.0).
+  - **Coverage:** areas outside a layer's tile matrix limits are never requested.
+- **Formats:** PNG with transparency for overlays and JPEG for opaque layers, choosing the service's best offer by default. The format can be changed per layer.
+- **Dimensions:** TIME follows the program's clock (see Phase 19), with the service's default when there is no clock. Other dimensions are chosen in the layer's properties. Cache keys include every dimension value.
+- **Add WMTS Layer… dialog**, like Add WMS Layer…:
+  - the service URL, or a pick from the catalogue
+  - a layer browser with titles, abstracts and legends
+  - style, format, tile matrix set and dimension choices
+  - the service's terms and attribution shown before adding
+  - adding to the layer tree
+- **Catalogue:** open WMTS services in the online catalogue (JSON), editable without a release, with their terms and attribution. Candidates include:
+  - NASA GIBS
+  - national mapping agencies with open WMTS services (Ordnance Survey's open data, swisstopo, basemap.at, the Dutch PDOK and others)
+  - EMODnet Bathymetry
+- **Network behaviour, as WMS:**
+  - concurrency limit
+  - off-screen tiles cancelled
+  - retries with back-off
+  - per-layer error and offline states
+  - HTTP cache headers honoured
+- **Offline regions:** WMTS layers can be kept offline, counting tiles by the service's own tile matrices, and only where the service's terms allow it.
+- **Everywhere:** WMTS layers work in the 2D views, through the morph and draped on terrain, like every other layer.
+
+**Technical documentation**
+
+- `docs/design/wmts.md`: the capabilities model, tile matrix selection, alignment with the quadtree, reprojection, axis order, dimensions and cache keys
+- `docs/user/adding-wmts-layers.md`: the user guide, alongside `adding-wms-layers.md`
+
+**Regression tests**
+
+- **Capabilities parsing:** a stored set of real-world capabilities documents, KVP and RESTful, including odd-but-valid ones, multiple tile matrix sets and per-layer limits.
+- **Tile matrix maths:** the tile chosen for a quadtree tile, and its pixel window, match hand-computed values in EPSG:4326, EPSG:3857 and EPSG:27700. The scale denominator to resolution conversion is checked for degree- and metre-based CRSs.
+- **Request building:** `GetTile` URLs and filled resource templates match expected strings, including style, format, dimension and tile matrix values.
+- **Mock WMTS server** (local `QTcpServer`, as for WMS): slow, failing, oversized, wrong-format and missing-tile (404) responses.
+- **Cancellation:** tiles leaving the view are cancelled and never uploaded.
+- **Cache and offline:** hits and misses, revalidation, cache keys that differ by dimension value, and offline regions downloaded and used without a network.
+- **Golden images:**
+  - a mock WMTS overlay at 50% alpha over Blue Marble, in EPSG:4326 and EPSG:3857 tile matrix sets
+  - the same overlay in Mercator, in Miller and at morph t = 0.5
+  - a British National Grid layer lined up with the shoreline
+- **Dialog:** the UI test adds a layer from a mock service through Add WMTS Layer…
+
+**Exit criteria**: a public WMTS service can be added and browsed smoothly in 3D and 2D, in each supported tile matrix set, and taken offline. All tests run without internet access.
+
+## Phase 12 – Local data files
 
 Goal: users can open their own vector and imagery files, as they already can DEMs.
 
 **Deliverables**
 
 - Vector files through GDAL/OGR (already linked):
-  - GeoJSON, ESRI shapefile, GPX and GeoPackage (KML and KMZ have their own phase, 19)
+  - GeoJSON, ESRI shapefile, GPX and GeoPackage (KML and KMZ have their own phase, 20)
   - Any CRS, reprojected with PROJ
   - Drawn with the existing vector renderer, draped on terrain
 - A simple style per layer (line colour and width, fill, point symbol), kept in the project file.
@@ -138,15 +210,15 @@ Goal: users can open their own vector and imagery files, as they already can DEM
 
 **Exit criteria**: every listed format opens, draws, styles and picks correctly, within the budgets.
 
-## Phase 12 – More web services
+## Phase 13 – More web services
 
 Goal: the common web map services beyond WMS.
 
 **Deliverables**
 
 - XYZ/TMS tile services (`{z}/{x}/{y}` templates), reprojected from Web Mercator onto the quadtree, through `CachedTileFetcher` (disk cache, revalidation, offline regions).
-- (WMTS has its own phase, 20.)
-- WFS 2.0: features in the visible area, with paging, into the Phase 11 vector pipeline.
+- (WMTS has its own phase, 11.)
+- WFS 2.0: features in the visible area, with paging, into the Phase 12 vector pipeline.
 - WMS extras:
   - The TIME dimension, with a time slider and a play button
   - GetFeatureInfo on click
@@ -166,7 +238,7 @@ Goal: the common web map services beyond WMS.
 
 **Exit criteria**: each service type adds, draws, caches and goes offline like WMS.
 
-## Phase 13 – More projections
+## Phase 14 – More projections
 
 Goal: the flat map in the projections people need for regional, national, navigation and world maps. The first roadmap delivered Mercator, Web Mercator and Miller Cylindrical.
 
@@ -198,7 +270,7 @@ Projections, grouped by kind. Each is in View → Map Projection, with its param
 - **Raster Product Format (RPF) Native**:
   - **What it is:** the ARC (Equal Arc-second Raster Chart) system of the RPF products, CADRG maps and CIB imagery. It has 18 latitude zones, nine per hemisphere. Each zone is equirectangular with its own east–west pixel spacing, and the polar zones are azimuthal equidistant.
   - **What it gives:** RPF charts shown in it are drawn pixel for pixel, as they were made. The map shows the zone in view and changes zone as the view moves.
-  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`) and fits this phase best. If added, it joins Phase 11's local imagery.
+  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`) and fits this phase best. If added, it joins Phase 12's local imagery.
 - **Graticule and readout**: a latitude/longitude graticule in every projection, and a grid for projected systems (UTM, UK National Grid, Cassini and Lambert zones). The status bar reads coordinates in the current projection's system (eastings and northings, grid references) beside latitude and longitude.
 - **Everywhere:**
   - Layers, terrain hillshade, the scale bar, attributions, picking and the 3D/2D morph work in every projection.
@@ -239,7 +311,7 @@ Projections, grouped by kind. Each is in View → Map Projection, with its param
 
 **Exit criteria**: every listed projection draws, morphs, picks and reads coordinates correctly, matches PROJ, and stays within the frame budget.
 
-## Phase 14 – Terrain analysis
+## Phase 15 – Terrain analysis
 
 Goal: answers from the terrain, not just pictures of it.
 
@@ -264,7 +336,7 @@ Goal: answers from the terrain, not just pictures of it.
 
 **Exit criteria**: every analysis matches its reference within the source's accuracy.
 
-## Phase 15 – Realism
+## Phase 16 – Realism
 
 Goal: a globe that looks like the Earth from space, and objects on it.
 
@@ -291,7 +363,7 @@ Goal: a globe that looks like the Earth from space, and objects on it.
 
 **Exit criteria**: lighting is correct for any date, models draw correctly, and the budgets hold.
 
-## Phase 16 – Rendering backend
+## Phase 17 – Rendering backend
 
 Goal: a modern graphics API where OpenGL 3.3 is weak, behind the existing backend abstraction.
 
@@ -314,7 +386,7 @@ Goal: a modern graphics API where OpenGL 3.3 is weak, behind the existing backen
 
 **Note**: this phase overlaps the question of when Qt 5 support ends (see [Open questions](#open-questions)).
 
-## Phase 17 – Commercial sources
+## Phase 18 – Commercial sources
 
 Goal: sources that need an account, without putting keys at risk or breaking their terms.
 
@@ -335,7 +407,7 @@ Goal: sources that need an account, without putting keys at risk or breaking the
 
 **Exit criteria**: at least one commercial source works end to end with its terms respected.
 
-## Phase 18 – Satellite orbits
+## Phase 19 – Satellite orbits
 
 Goal: satellites shown where they are, where they have been and where they are going, computed from two-line element sets (TLEs).
 
@@ -346,7 +418,7 @@ Goal: satellites shown where they are, where they have been and where they are g
 - **TLE sources:**
   - A `.tle`/`.txt` file, or text pasted in (two-line and three-line forms, with checksums checked)
   - CelesTrak's published groups (stations, GPS, weather, Starlink and so on), and its OMM/JSON form, fetched over HTTP. Fetches go through the disk cache, so the last download works offline.
-  - Space-Track, which needs an account, comes with Phase 17's key storage.
+  - Space-Track, which needs an account, comes with Phase 18's key storage.
 - **Orbit propagation with SGP4/SDP4**, the model TLEs are made for. It is our own implementation, in `core/` as its own subsection (`ts/orbits`) with its own unit test project (`tests/orbits`):
   - Positions in TEME, converted to Earth-fixed WGS 84 through sidereal time (polar motion is negligible at this scale)
   - Computed off the GUI thread
@@ -394,16 +466,16 @@ Goal: satellites shown where they are, where they have been and where they are g
 
 **Exit criteria**: satellites from a file or CelesTrak show at positions matching the reference propagator, with correct past and future tracks for any chosen spans and clock time, within the frame budget.
 
-## Phase 19 – KML
+## Phase 20 – KML
 
-Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make them in, and can create, edit and export KML of its own. Phase 19a (import and display) is useful alone. Phase 19b (authoring and export) builds on it.
+Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make them in, and can create, edit and export KML of its own. Phase 20a (import and display) is useful alone. Phase 20b (authoring and export) builds on it.
 
 **Approach (proposed)**: our own KML 2.2 reader and writer on `QXmlStreamReader`/`QXmlStreamWriter`, in a `core` subsection (`ts/kml`) with its own unit test project (`tests/kml`).
 - GDAL's KML drivers flatten documents into layers and lose most styling and structure, which both display and round-tripping need.
 - KMZ archives are read and written through GDAL's zip support (`/vsizip/`, `CPLCreateZip`), which is already linked.
 - The `gx:` extensions that Google Earth writes are read where they matter (`gx:Track`, `gx:altitudeMode`).
 
-### Phase 19a – Import and display
+### Phase 20a – Import and display
 
 **Deliverables**
 
@@ -442,9 +514,9 @@ Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make the
   - Unknown or unsupported elements are skipped and listed (not an error).
   - Malformed files report the line and column.
   - Large files (100,000 placemarks) load off the GUI thread within the memory budget.
-- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through Phase 11's vector pipeline.
+- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through Phase 12's vector pipeline.
 
-### Phase 19b – Create, edit and export
+### Phase 20b – Create, edit and export
 
 **Deliverables**
 
@@ -491,90 +563,18 @@ Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make the
 - **Display:** golden images of styled placemarks, lines, polygons, extruded and clamped geometry on terrain, and ground and screen overlays, on the globe and the map.
 - **Network links:** refresh by interval and view, against a mock server, and offline reuse.
 - **Time:** features appear and disappear as the clock passes their time stamps and spans, and `gx:Track` positions interpolate.
-- **Editing (19b):**
+- **Editing (20b):**
   - each edit, and its undo and redo, leaves the document as expected
   - vertex dragging changes only that vertex
-- **Writing (19b):**
+- **Writing (20b):**
   - Exported files validate against the OGC KML 2.2 schema (`xmllint`, schema stored in the tests).
   - GDAL reads every exported file with the same geometry.
   - A round trip of each fixture through Terra Soar keeps every element it doesn't edit.
 - **Performance:** the large-file fixture loads within the time and memory budgets and draws within the frame budget.
 
 **Exit criteria**:
-- **19a:** the fixture KML from Google Earth, QGIS and the OGC examples displays correctly on the globe and the map.
-- **19b:** documents made in Terra Soar export to valid KML and KMZ that other programs open, and round trips lose nothing.
-
-## Phase 20 – WMTS
-
-Goal: users add any WMTS layer by URL or from the catalogue, and it streams, caches, blends and goes offline like a WMS layer. WMTS serves pre-cut tiles, so it is usually faster than WMS and is how many national mapping agencies and NASA GIBS publish their maps.
-
-**Approach**: the same structure as WMS (Phase 5), sharing what WMS already built:
-- `CachedTileFetcher` for the network, disk cache, revalidation and offline handling
-- the catalogue
-- the layer tree and project storage
-- offline regions and the attribution display
-
-What is new is the capabilities model, tile matrix sets, and fitting their tiles to the EPSG:4326 quadtree.
-
-**Deliverables**
-
-- **Capabilities parser** (WMTS 1.0.0), for both KVP (`GetCapabilities` by query) and RESTful (`WMTSCapabilities.xml`) services:
-  - layers
-  - styles (and the default)
-  - formats
-  - tile matrix sets: CRS, scale denominators, top-left corners, tile and matrix sizes, and limits per layer
-  - dimensions (TIME and others)
-  - resource URL templates
-  - bounding boxes, legends, and the service's attribution and access constraints
-- **`WmtsImageryProvider`:**
-  - **Requests:** each quadtree tile is drawn from the tile matrix whose resolution best matches it, by `GetTile` (KVP) or the resource URL template (RESTful).
-  - **Tile matrix sets:**
-    - In EPSG:4326 (including `WorldCRS84Quad`), the tiles are used directly when they line up with the quadtree, and cut or combined when they don't.
-    - In EPSG:3857 (`GoogleMapsCompatible`/`WebMercatorQuad`), they are reprojected as WMS's EPSG:3857 fallback is.
-    - Other CRSs that PROJ knows (e.g. British National Grid, EPSG:27700; national grids) are reprojected through PROJ.
-  - **Axis order** as each CRS defines it (WMTS uses the CRS's own axis order, like WMS 1.3.0).
-  - **Coverage:** areas outside a layer's tile matrix limits are never requested.
-- **Formats:** PNG with transparency for overlays and JPEG for opaque layers, choosing the service's best offer by default. The format can be changed per layer.
-- **Dimensions:** TIME follows the program's clock (see Phase 18), with the service's default when there is no clock. Other dimensions are chosen in the layer's properties. Cache keys include every dimension value.
-- **Add WMTS Layer… dialog**, like Add WMS Layer…:
-  - the service URL, or a pick from the catalogue
-  - a layer browser with titles, abstracts and legends
-  - style, format, tile matrix set and dimension choices
-  - the service's terms and attribution shown before adding
-  - adding to the layer tree
-- **Catalogue:** open WMTS services in the online catalogue (JSON), editable without a release, with their terms and attribution. Candidates include:
-  - NASA GIBS
-  - national mapping agencies with open WMTS services (Ordnance Survey's open data, swisstopo, basemap.at, the Dutch PDOK and others)
-  - EMODnet Bathymetry
-- **Network behaviour, as WMS:**
-  - concurrency limit
-  - off-screen tiles cancelled
-  - retries with back-off
-  - per-layer error and offline states
-  - HTTP cache headers honoured
-- **Offline regions:** WMTS layers can be kept offline, counting tiles by the service's own tile matrices, and only where the service's terms allow it.
-- **Everywhere:** WMTS layers work in the 2D views, through the morph and draped on terrain, like every other layer.
-
-**Technical documentation**
-
-- `docs/design/wmts.md`: the capabilities model, tile matrix selection, alignment with the quadtree, reprojection, axis order, dimensions and cache keys
-- `docs/user/adding-wmts-layers.md`: the user guide, alongside `adding-wms-layers.md`
-
-**Regression tests**
-
-- **Capabilities parsing:** a stored set of real-world capabilities documents, KVP and RESTful, including odd-but-valid ones, multiple tile matrix sets and per-layer limits.
-- **Tile matrix maths:** the tile chosen for a quadtree tile, and its pixel window, match hand-computed values in EPSG:4326, EPSG:3857 and EPSG:27700. The scale denominator to resolution conversion is checked for degree- and metre-based CRSs.
-- **Request building:** `GetTile` URLs and filled resource templates match expected strings, including style, format, dimension and tile matrix values.
-- **Mock WMTS server** (local `QTcpServer`, as for WMS): slow, failing, oversized, wrong-format and missing-tile (404) responses.
-- **Cancellation:** tiles leaving the view are cancelled and never uploaded.
-- **Cache and offline:** hits and misses, revalidation, cache keys that differ by dimension value, and offline regions downloaded and used without a network.
-- **Golden images:**
-  - a mock WMTS overlay at 50% alpha over Blue Marble, in EPSG:4326 and EPSG:3857 tile matrix sets
-  - the same overlay in Mercator, in Miller and at morph t = 0.5
-  - a British National Grid layer lined up with the shoreline
-- **Dialog:** the UI test adds a layer from a mock service through Add WMTS Layer…
-
-**Exit criteria**: a public WMTS service can be added and browsed smoothly in 3D and 2D, in each supported tile matrix set, and taken offline. All tests run without internet access.
+- **20a:** the fixture KML from Google Earth, QGIS and the OGC examples displays correctly on the globe and the map.
+- **20b:** documents made in Terra Soar export to valid KML and KMZ that other programs open, and round trips lose nothing.
 
 ## Phase 21 – Aircraft from ADS-B
 
@@ -585,7 +585,7 @@ Goal: ADS-B data imported from files (and, as a second step, from a live receive
 - our own Mode S/ADS-B message decoder for raw data, including CPR position decoding;
 - a track store holding each aircraft's reports in time order.
 
-Drawing shares Phase 18's machinery for moving objects and tracks, and the program-wide clock. ADS-B's geometric altitude is a height above the WGS 84 ellipsoid, which Terra Soar already uses internally. Barometric altitude is converted through the standard atmosphere and marked as approximate.
+Drawing shares Phase 19's machinery for moving objects and tracks, and the program-wide clock. ADS-B's geometric altitude is a height above the WGS 84 ellipsoid, which Terra Soar already uses internally. Barometric altitude is converted through the standard atmosphere and marked as approximate.
 
 **Deliverables**
 
@@ -598,7 +598,7 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Decoder**: CRC checking, aircraft identification (callsign), airborne and surface positions (global and local CPR decoding), barometric and geometric altitude, velocity, vertical rate, squawk and emergency status.
 - **Aircraft in 3D:**
   - A marker at the aircraft's position and altitude above the globe, oriented by its track (heading).
-  - The marker is a simple aircraft shape scaled to stay visible, or a 3D model if Phase 15's models exist.
+  - The marker is a simple aircraft shape scaled to stay visible, or a 3D model if Phase 16's models exist.
   - A label (callsign, or ICAO address), optionally with altitude and speed.
   - On the flat map, a rotated aircraft symbol at the point below it.
   - Optional drop lines from each aircraft to the ground, which make heights readable in 3D.
@@ -617,7 +617,7 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Live data (second step):**
   - a connection to a local receiver (dump1090/readsb: SBS on port 30003, Beast on port 30005, or its JSON over HTTP), drawn in real time;
   - the session optionally recorded to a file for replay.
-  - Online services that need an account come with Phase 17's key and terms handling. OpenSky Network (free, with rate limits and terms) is one candidate.
+  - Online services that need an account come with Phase 18's key and terms handling. OpenSky Network (free, with rate limits and terms) is one candidate.
 - **airplanes.live**: worldwide live aircraft from the community network [airplanes.live](https://airplanes.live/api-docs/), through its REST API (`https://api.airplanes.live/v2/`):
   - **Adding it:** an "airplanes.live" entry in the catalogue adds a live aircraft layer with no receiver of your own and no API key.
   - **Area query:** aircraft are fetched for the area in view through the point query (`/point/{lat}/{lon}/{radius}`, radius up to 250 nautical miles), centred on the view. When the view is larger than the radius, the view's centre is used and the layer says so.
@@ -634,7 +634,7 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Details on click:** ICAO address, callsign, registration and type (from an optional, downloadable aircraft database pack, if a suitably licensed one exists), altitude (geometric and barometric), ground speed, track, vertical rate, squawk, and the time of the last report.
 - **Follow mode:** the camera follows the selected aircraft.
 - **Filters:** by callsign, ICAO address, altitude band and area.
-- **Export:** a selected aircraft's track exported as KML (`gx:Track`, with Phase 19), GPX or CSV.
+- **Export:** a selected aircraft's track exported as KML (`gx:Track`, with Phase 20), GPX or CSV.
 - **Performance:**
   - A busy live view (1,000 aircraft) and a full day's recording (several million reports) stay within the frame and memory budgets.
   - Trails are GPU line strips with a time per vertex, so the time span is applied in the shader, and moving the clock rebuilds nothing.
@@ -713,7 +713,7 @@ Goal: AIS (Automatic Identification System) data, from files, a receiver or open
     - the Norwegian Coastal Administration's open AIS (NLOD licence)
     - other open national feeds found later
     - Each is a catalogue entry with its terms and attribution, like WMS services, and the terms are confirmed before release.
-  - **Services that need a key** (e.g. aisstream.io) come with Phase 17.
+  - **Services that need a key** (e.g. aisstream.io) come with Phase 18.
 - **Details on click:**
   - MMSI, name, callsign and IMO number;
   - ship type, dimensions and draught;
@@ -722,7 +722,7 @@ Goal: AIS (Automatic Identification System) data, from files, a receiver or open
   - speed, course, heading and rate of turn;
   - the time of the last position and static reports.
 - **Follow mode, and filters** by name or MMSI, ship type, navigational status, speed and area.
-- **Export:** a vessel's track as KML (with Phase 19), GPX or CSV.
+- **Export:** a vessel's track as KML (with Phase 20), GPX or CSV.
 - **Performance:**
   - A live national feed (tens of thousands of vessels) and a day of NOAA data (millions of reports) stay within the frame and memory budgets.
   - Symbols are instanced, and trails are time-filtered in the shader, as in Phase 21.
@@ -777,8 +777,8 @@ Goal: users can change the colours of the graticule and shoreline layers to suit
   - **Print:** black lines, no fill.
 - **Saved with the project**: the style is part of the layer definition, so projects keep it, as they already keep terrain exaggeration and hillshade.
 - **New-project default**: "Use as default for new projects", saved in the user's settings, so the user's preferred colours apply without restyling every project.
-- **Undo**: a style change can be undone (Edit → Undo) if the program gains an undo stack by then (Phase 19b brings one), or else through Reset.
-- **For every vector layer**: the dialog works on any vector layer, so Phase 11's files, Phase 19's KML (where a document doesn't set its own styles) and Phase 14's contours reuse it.
+- **Undo**: a style change can be undone (Edit → Undo) if the program gains an undo stack by then (Phase 20b brings one), or else through Reset.
+- **For every vector layer**: the dialog works on any vector layer, so Phase 12's files, Phase 20's KML (where a document doesn't set its own styles) and Phase 15's contours reuse it.
 - **Layer list**: a small colour swatch beside each vector layer's name shows its current colours.
 
 **Technical documentation**
@@ -853,7 +853,7 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
   - **The horizon on a tilted map:** a tilted flat map never reaches a horizon of its own, so it needs limits:
     - a far limit, past which nothing is drawn, set so that the coarsest level still meets the error limit there;
     - a tilt limit, so the view can't look along the map's surface;
-    - a haze or sky band at the far limit, shared with Phase 15's atmosphere if that exists, to fade the edge rather than cut it.
+    - a haze or sky band at the far limit, shared with Phase 16's atmosphere if that exists, to fade the edge rather than cut it.
   - **Terrain:** height meshes use the same distance-based levels, so distant terrain uses coarser meshes. Skirts keep tiles of different levels crack-free.
   - **Loading order:** requests are ordered by screen-space error and then by distance from the camera, so near tiles load first. Tiles beyond the far limit are never requested, including from WMS, WMTS and web terrain servers.
   - **Budgets:**
@@ -953,7 +953,7 @@ It is a US Government (NGA) product approved for public release. The exact terms
   - **`vmap0-hydrography`**: rivers (perennial and intermittent), lakes, reservoirs, canals and coastlines.
   - **`vmap0-transportation`**: roads by class, railways, airports and ferry routes.
   - **`vmap0-population`**: built-up areas, and place names once labels exist.
-  - **`vmap0-elevation`**: contours and spot heights (where Terra Soar's own DEM and Phase 14's contours don't already cover the need).
+  - **`vmap0-elevation`**: contours and spot heights (where Terra Soar's own DEM and Phase 15's contours don't already cover the need).
   - **`vmap0-physiography`, `vmap0-vegetation`, `vmap0-industry` and `vmap0-utilities`**: smaller packs, or one "other themes" pack, decided by size.
   - **Pack index:** each has a manifest, licence and attribution ("Vector Map Level 0, NGA"), and a version (`vmap0-<theme>-5.<n>`), in the pack index in `marutan/terrasoar-packs`.
 - **Sizes:** measured per pack and recorded in `docs/data/`, with a target set before building (VMAP0 is about 1 GB as VPF). A pack too big to download comfortably is split by region along VMAP0's libraries.
@@ -1009,7 +1009,7 @@ Candidates to discuss, with no phase or commitment:
 
 - Bookmarks and saved views, with a fly-through tour between them
 - Place search (geocoding), online through a service like Nominatim and offline through a downloadable gazetteer pack
-- Distance and area measurement (if Phase 14 is postponed)
+- Distance and area measurement (if Phase 15 is postponed)
 - Export the view as an image at a chosen size, and printing
 - More downloadable packs: higher-resolution regional imagery and DEMs where licences allow
 - A command-line or scripting interface (e.g. `--open`, `--fly-to`, render to file) for automation
@@ -1020,11 +1020,11 @@ Candidates to discuss, with no phase or commitment:
 These need a decision before the phases they affect:
 
 1. **Phase order and scope**: is the order above right, and is every phase wanted?
-2. **1.0 criteria**: Phases 9 (the user guide in the program) and 10 come before 1.0. Is that enough, or should 1.0 also include Phase 11 (local data files)?
-3. **Qt 5 support**: Qt 5.15 is past its open-source end of life. When does Terra Soar drop Qt 5? Dropping it simplifies Phase 16.
+2. **1.0 criteria**: Phases 9 (the user guide in the program) and 10 come before 1.0. Is that enough, or should 1.0 also include Phase 12 (local data files)?
+3. **Qt 5 support**: Qt 5.15 is past its open-source end of life. When does Terra Soar drop Qt 5? Dropping it simplifies Phase 17.
 4. **Translations**: which languages first, and who reviews them?
 5. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
-6. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
+6. ~~**SGP4 implementation** (Phase 19)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 19's Decisions).
 7. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
 8. ~~**Turning and tilting the flat map** (Phase 24)~~: decided 2026-11-17. The flat map turns and tilts (see Phase 24's Decisions).
 9. **VMAP0 terms and hosting** (Phase 25): confirm the release terms of the VMAP0 edition used (public release, any NGA disclaimers on boundaries and names), and approve the pack sizes before publishing to `marutan/terrasoar-packs`.
