@@ -33,7 +33,7 @@ The first roadmap's rules still apply to every phase here:
 | 18 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
 | 19 | KML | 19a: import KML/KMZ and draw it on the globe and map; 19b: create KML, add elements, export |
 | 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
-| 21 | Aircraft from ADS-B | Recorded (and live) ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
+| 21 | Aircraft from ADS-B | Recorded, live-receiver and airplanes.live ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
 
 The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not.
 
@@ -566,7 +566,20 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Live data (second step):**
   - a connection to a local receiver (dump1090/readsb: SBS on port 30003, Beast on port 30005, or its JSON over HTTP), drawn in real time;
   - the session optionally recorded to a file for replay.
-  - Online services such as OpenSky Network (free, with rate limits and terms) and services that need an account come with Phase 16's key and terms handling.
+  - Online services that need an account come with Phase 16's key and terms handling. OpenSky Network (free, with rate limits and terms) is one candidate.
+- **airplanes.live**: worldwide live aircraft from the community network [airplanes.live](https://airplanes.live/api-docs/), through its REST API (`https://api.airplanes.live/v2/`):
+  - **Adding it:** an "airplanes.live" entry in the catalogue adds a live aircraft layer with no receiver of your own and no API key.
+  - **Area query:** aircraft are fetched for the area in view through the point query (`/point/{lat}/{lon}/{radius}`, radius up to 250 nautical miles), centred on the view. When the view is larger than the radius, the view's centre is used and the layer says so.
+  - **Single-aircraft lookups:** the followed or selected aircraft is looked up by its ICAO address (the API guide's example uses `/icao/{hex}`), so it stays tracked when it leaves the area. Lookups by callsign, registration or squawk are used too, if the API offers them. Only the point query is formally documented, so the endpoint list is confirmed with airplanes.live before building.
+  - **Rate limit:** at most 1 request per second, enforced by one limiter shared across every airplanes.live layer and lookup. The refresh interval is settable but never faster than that. A `429` or `403` answer backs off and shows the layer's state.
+  - **Response:** readsb-style JSON (an `ac` list with `hex`, `flight`, `lat`, `lon`, `alt_baro`, `alt_geom`, `gs`, `track`, `baro_rate`, `squawk` and `seen`), read by the same reader as dump1090/readsb JSON.
+  - **Trails:** trails build up from the positions received while the layer is on. The session can be recorded to a file for replay, if airplanes.live's terms allow storing its data.
+  - **Terms:**
+    - The API is for non-commercial use, with no SLA or uptime guarantee.
+    - The data is credited as "airplanes.live" in the view's attributions and the About window.
+    - Requests carry a User-Agent naming Terra Soar and its version.
+    - The terms are checked again before release and recorded in the catalogue entry, like WMS terms.
+  - **Access, to settle before building it:** the API currently answers requests from programs with `403` and asks the developer to contact airplanes.live with a description of the project. Terra Soar needs their agreement first (see [Open questions](#open-questions)).
 - **Details on click:** ICAO address, callsign, registration and type (from an optional, downloadable aircraft database pack, if a suitably licensed one exists), altitude (geometric and barometric), ground speed, track, vertical rate, squawk, and the time of the last report.
 - **Follow mode:** the camera follows the selected aircraft.
 - **Filters:** by callsign, ICAO address, altitude band and area.
@@ -579,7 +592,7 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 **Technical documentation**
 
 - `docs/design/adsb.md`: the formats read, the decoder (CPR, CRC), altitude types and datum handling, the track store, interpolation, trail drawing and time filtering, and live connections
-- `docs/user/aircraft.md`: importing data, trails, playback, live receivers
+- `docs/user/aircraft.md`: importing data, trails, playback, live receivers, airplanes.live and its terms
 
 **Regression tests**
 
@@ -596,6 +609,14 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Trails:** off, time span and all-data modes show exactly the reports they should at given clock times, and changing the clock or the span updates them.
 - **Heights:** geometric altitude lands at the right ellipsoidal height, and barometric altitude converts by the standard atmosphere.
 - **Live:** a mock receiver (local `QTcpServer` sending SBS and Beast streams) drives aircraft in real time, including disconnection and reconnection.
+- **airplanes.live:**
+  - **Mock server:** a mock of the v2 API (point and ICAO-address queries, stored real responses) checks:
+    - the request URLs built for a view and for a followed aircraft;
+    - that requests never exceed 1 per second across several layers;
+    - back-off on `429` and `403`;
+    - that responses are read into tracks;
+    - the attribution shown.
+  - **Live check:** an optional test against the real API runs only when asked for, not in CI.
 - **Golden images:** a fixture recording at a fixed clock time, on the globe in 3D with each trail mode, and on the map.
 - **Performance:** the day-long fixture recording loads within the time and memory budgets and plays within the frame budget.
 
@@ -632,3 +653,4 @@ These need a decision before the phases they affect:
 5. **Translations**: which languages first, and who reviews them?
 6. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
 7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
+8. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
