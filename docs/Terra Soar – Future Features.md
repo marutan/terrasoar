@@ -33,8 +33,9 @@ The first roadmap's rules still apply to every phase here:
 | 18 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
 | 19 | KML | 19a: import KML/KMZ and draw it on the globe and map; 19b: create KML, add elements, export |
 | 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
+| 21 | Aircraft from ADS-B | Recorded (and live) ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not.
 
 ## Phase 9 – Road to 1.0
 
@@ -523,6 +524,82 @@ What is new is the capabilities model, tile matrix sets, and fitting their tiles
 - **Dialog:** the UI test adds a layer from a mock service through Add WMTS Layer…
 
 **Exit criteria**: a public WMTS service can be added and browsed smoothly in 3D and 2D, in each supported tile matrix set, and taken offline. All tests run without internet access.
+
+## Phase 21 – Aircraft from ADS-B
+
+Goal: ADS-B data imported from files (and, as a second step, from a live receiver) shows aircraft in 3D at their altitude above the globe, with optional trails behind them: none, over a chosen time span, or the whole of the data.
+
+**Approach (proposed)**: a `core` subsection (`ts/adsb`) with its own unit test project (`tests/adsb`). It has:
+- readers for the common ADS-B formats;
+- our own Mode S/ADS-B message decoder for raw data, including CPR position decoding;
+- a track store holding each aircraft's reports in time order.
+
+Drawing shares Phase 18's machinery for moving objects and tracks, and the program-wide clock. ADS-B's geometric altitude is a height above the WGS 84 ellipsoid, which Terra Soar already uses internally. Barometric altitude is converted through the standard atmosphere and marked as approximate.
+
+**Deliverables**
+
+- **Import**: File → Import ADS-B Data… and drag and drop, in the common formats:
+  - SBS-1/BaseStation CSV (the port 30003 format)
+  - raw Mode S messages (AVR hex, and Beast binary)
+  - dump1090/readsb JSON snapshots and tar1090/readsb trace files
+  - CSV with mappable columns (time, ICAO address, latitude, longitude, altitude, and optional heading, speed and callsign)
+  - Each import becomes an aircraft layer in the layer tree.
+- **Decoder**: CRC checking, aircraft identification (callsign), airborne and surface positions (global and local CPR decoding), barometric and geometric altitude, velocity, vertical rate, squawk and emergency status.
+- **Aircraft in 3D:**
+  - A marker at the aircraft's position and altitude above the globe, oriented by its track (heading).
+  - The marker is a simple aircraft shape scaled to stay visible, or a 3D model if Phase 14's models exist.
+  - A label (callsign, or ICAO address), optionally with altitude and speed.
+  - On the flat map, a rotated aircraft symbol at the point below it.
+  - Optional drop lines from each aircraft to the ground, which make heights readable in 3D.
+- **Trails**, per layer with a per-aircraft override:
+  - **Off.**
+  - **Time span**: the last N minutes (or seconds/hours) before the clock's time.
+  - **All data**: every report the aircraft has up to the clock's time.
+  - Trails are drawn in 3D at the reported altitudes on the globe, and as ground tracks on the map (split at the antimeridian).
+  - Colour by aircraft, by altitude (with a legend) or by vertical rate.
+  - Gaps in reception (no reports for longer than a set time) break the trail rather than drawing a straight line across them.
+- **Time and playback:**
+  - Recordings play on the program-wide clock: play, pause, speed (×1 to ×1000), stepping, and a time slider spanning the recording.
+  - Positions are interpolated between reports.
+  - An aircraft disappears after a set time without reports.
+  - The trail's time span moves with the clock.
+- **Live data (second step):**
+  - a connection to a local receiver (dump1090/readsb: SBS on port 30003, Beast on port 30005, or its JSON over HTTP), drawn in real time;
+  - the session optionally recorded to a file for replay.
+  - Online services such as OpenSky Network (free, with rate limits and terms) and services that need an account come with Phase 16's key and terms handling.
+- **Details on click:** ICAO address, callsign, registration and type (from an optional, downloadable aircraft database pack, if a suitably licensed one exists), altitude (geometric and barometric), ground speed, track, vertical rate, squawk, and the time of the last report.
+- **Follow mode:** the camera follows the selected aircraft.
+- **Filters:** by callsign, ICAO address, altitude band and area.
+- **Export:** a selected aircraft's track exported as KML (`gx:Track`, with Phase 19), GPX or CSV.
+- **Performance:**
+  - A busy live view (1,000 aircraft) and a full day's recording (several million reports) stay within the frame and memory budgets.
+  - Trails are GPU line strips with a time per vertex, so the time span is applied in the shader, and moving the clock rebuilds nothing.
+- **Privacy:** ADS-B is a public broadcast, but some operators ask for their aircraft not to be shown (FAA LADD/PIA). When an online service supplies such a block list, it is honoured. Users' own receiver data is theirs to view.
+
+**Technical documentation**
+
+- `docs/design/adsb.md`: the formats read, the decoder (CPR, CRC), altitude types and datum handling, the track store, interpolation, trail drawing and time filtering, and live connections
+- `docs/user/aircraft.md`: importing data, trails, playback, live receivers
+
+**Regression tests**
+
+- **Decoder:**
+  - Known messages (from published Mode S/ADS-B examples, with their licences checked) decode to the published callsigns, positions, altitudes and velocities.
+  - Corrupt messages fail the CRC.
+- **CPR:**
+  - Global and local decoding at latitude zone boundaries, near the poles and across the antimeridian.
+  - Odd/even pairs too far apart in time are rejected.
+- **Readers:**
+  - fixture files in every supported format give the same tracks;
+  - malformed lines and files are reported with their line, not fatal.
+- **Track store:** reports sorted and deduplicated, interpolation between reports, the stale-aircraft timeout and gap handling.
+- **Trails:** off, time span and all-data modes show exactly the reports they should at given clock times, and changing the clock or the span updates them.
+- **Heights:** geometric altitude lands at the right ellipsoidal height, and barometric altitude converts by the standard atmosphere.
+- **Live:** a mock receiver (local `QTcpServer` sending SBS and Beast streams) drives aircraft in real time, including disconnection and reconnection.
+- **Golden images:** a fixture recording at a fixed clock time, on the globe in 3D with each trail mode, and on the map.
+- **Performance:** the day-long fixture recording loads within the time and memory budgets and plays within the frame budget.
+
+**Exit criteria**: imported recordings in every supported format play back with aircraft at the right positions and altitudes. Each trail mode is correct at any clock time, a local receiver works live, and the budgets hold.
 
 ## Items deferred from 0.0.1
 
