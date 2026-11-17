@@ -23,7 +23,7 @@ The first roadmap's rules still apply to every phase here:
 | --- | --- | --- |
 | 9 | User guide in the program | The `docs/user` guide in a window from the Help menu |
 | 10 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
-| 11 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
+| 11 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
 | 12 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
 | 13 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
 | 14 | Realism | Atmosphere, sun lighting, glTF models |
@@ -34,12 +34,12 @@ The first roadmap's rules still apply to every phase here:
 | 19 | Vector layer colours | Change the colours (and line width) of the graticule and shoreline layers |
 | 20 | On-screen navigation controls | An overlay on the view with rotate, pan, zoom and tilt controls, on the globe and the map |
 | 21 | VMAP0 data pack | NGA's Vector Map Level 0 (1:1,000,000 world vector map) prepared, tested and published as downloadable packs |
-| 22 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
+| 22 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
 | 23 | Commercial sources | API-key services, key storage, terms handling |
 | 24 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
 | 25 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
 
-The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 25 (road to 1.0) comes last: 1.0 is released when the phases before it are done. Phases 11 and 12 share the vector pipeline, so Phase 11 should come before Phase 12's WFS. Phase 14's lighting is built on OpenGL first, and Phase 24's backend (which comes later) carries it over with every other shader. Phase 15 needs a program-wide clock, which Phase 12's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 16 draws through Phase 11's vector pipeline (feature styles, picking, draping), so it comes after Phase 11. KML's time elements use the same clock. Phase 10 (WMTS) reuses the WMS machinery and needs nothing else, so it comes early. Phase 12's XYZ tiles then reuse its Web Mercator reprojection. Phase 17 (aircraft) plays recordings on the program-wide clock and shares Phase 15's way of drawing moving objects and their tracks, so it is easiest after Phase 15. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 18 (ships) is Phase 17 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 19 (vector layer colours) is small and depends on nothing, so it can be done at any time. Phase 11's vector files then reuse its style dialog. Phase 20 (navigation controls) depends on nothing either. Phase 21 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 16, 17 and 18 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
+The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 25 (road to 1.0) comes last: 1.0 is released when the phases before it are done. Phases 12 (WFS), 16 (KML) and 22 (local data files) share a vector feature pipeline: per-feature styles, attributes, picking and draping. Phase 12 now comes first, so it builds the pipeline, and Phases 16 and 22 extend it. Phase 14's lighting is built on OpenGL first, and Phase 24's backend (which comes later) carries it over with every other shader. Phase 15 needs a program-wide clock, which Phase 12's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. KML's time elements use the same clock. Phase 10 (WMTS) reuses the WMS machinery and needs nothing else, so it comes early. Phase 12's XYZ tiles then reuse its Web Mercator reprojection. Phase 17 (aircraft) plays recordings on the program-wide clock and shares Phase 15's way of drawing moving objects and their tracks, so it is easiest after Phase 15. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 18 (ships) is Phase 17 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 19 (vector layer colours) is small and depends on nothing, so it can be done at any time. WFS layers, KML without its own styles, and Phase 22's vector files reuse its style dialog. Phase 20 (navigation controls) depends on nothing either. It makes the flat map turn and tilt in every projection, including Phase 11's. Phase 21 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 16, 17 and 18 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
 
 ## Phase 9 – User guide in the program
 
@@ -149,35 +149,79 @@ What is new is the capabilities model, tile matrix sets, and fitting their tiles
 
 **Exit criteria**: a public WMTS service can be added and browsed smoothly in 3D and 2D, in each supported tile matrix set, and taken offline. All tests run without internet access.
 
-## Phase 11 – Local data files
+## Phase 11 – More projections
 
-Goal: users can open their own vector and imagery files, as they already can DEMs.
+Goal: the flat map in the projections people need for regional, national, navigation and world maps. The first roadmap delivered Mercator, Web Mercator and Miller Cylindrical.
 
 **Deliverables**
 
-- Vector files through GDAL/OGR (already linked):
-  - GeoJSON, ESRI shapefile, GPX and GeoPackage (KML and KMZ have their own phase, 16)
-  - Any CRS, reprojected with PROJ
-  - Drawn with the existing vector renderer, draped on terrain
-- A simple style per layer (line colour and width, fill, point symbol), kept in the project file.
-- Feature picking: clicking a feature shows its attributes.
-- GeoTIFF and other raster imagery through GDAL, tiled on the fly into the EPSG:4326 quadtree, with overviews used as for DEMs.
-- File → Add Data File… with drag and drop onto the globe.
+Projections, grouped by kind. Each is in View → Map Projection, with its parameters (centre, central meridian, standard parallels, zone) in a Map Projection Settings dialog where it has any.
+
+- **Cylindrical:**
+  - **Equidistant Cylindrical**, with a chosen standard parallel. Plate Carrée is its case at the equator.
+  - **Gall Stereographic**: secant at 45° N and S, a compromise for world maps.
+  - **Gall–Peters**: cylindrical equal-area with standard parallels at 45°.
+  - **Gall Orthographic**: Gall's name for the same projection as Gall–Peters, so it is one entry in the menu, named "Gall–Peters (Gall Orthographic)".
+  - **Rotated Mercator**: Mercator about a rotated pole (oblique Mercator), with the centre line chosen by a point and an azimuth, or by two points. It suits long, narrow areas that don't run north–south, such as a coastline or a flight route.
+- **Transverse:**
+  - **Transverse Mercator**, with a chosen central meridian, scale factor and false origin, and UTM zones (chosen, or picked automatically from the view's centre).
+  - **Cassini** (Cassini–Soldner): the transverse equidistant cylindrical, still the basis of many older national and cadastral surveys.
+  - **UK National Grid** (Ordnance Survey National Grid, EPSG:27700): Transverse Mercator on the Airy 1830 ellipsoid with the OSGB36 datum.
+    - **Datum:** positions convert from WGS 84 through PROJ with the OSTN15 grid, accurate to about 0.1 m, falling back to the Helmert transform, accurate to about 5 m, without the grid. OSTN15 can join the existing `geoid-osgm15` pack as a "UK grids" pack.
+    - **Grid:** the 100 km grid squares (e.g. `TQ`) and grid references (`TQ 30080 80729`) in the status bar.
+- **Conic:**
+  - **Lambert Conformal Conic**, with one or two standard parallels, the standard projection for aeronautical charts and many national grids.
+  - **Polyconic** (American Polyconic): a cone per parallel, used for older topographic series.
+- **Azimuthal:**
+  - **Azimuthal Equidistant**, centred on any point. Distances and directions from the centre are true, as on radio and great-circle range maps. The polar case is offered as a preset.
+  - **Gnomonic**, centred on any point: every great circle is a straight line, so routes plan as straight lines. It shows less than a hemisphere, and the map is clipped where the projection runs to infinity.
+  - **Polar Stereographic** (north and south), carried over from this phase's first list.
+- **World maps:**
+  - **Robinson, Mollweide and Winkel Tripel**, carried over from the first list.
+- **Raster Product Format (RPF) Native**:
+  - **What it is:** the ARC (Equal Arc-second Raster Chart) system of the RPF products, CADRG maps and CIB imagery. It has 18 latitude zones, nine per hemisphere. Each zone is equirectangular with its own east–west pixel spacing, and the polar zones are azimuthal equidistant.
+  - **What it gives:** RPF charts shown in it are drawn pixel for pixel, as they were made. The map shows the zone in view and changes zone as the view moves.
+  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`), and this phase is where it fits best. If added here, Phase 22's local imagery reuses it.
+- **Graticule and readout**: a latitude/longitude graticule in every projection, and a grid for projected systems (UTM, UK National Grid, Cassini and Lambert zones). The status bar reads coordinates in the current projection's system (eastings and northings, grid references) beside latitude and longitude.
+- **Everywhere:**
+  - Layers, terrain hillshade, the scale bar, attributions, picking and the 3D/2D morph work in every projection.
+  - Each projection is written so that the flat map can later be turned and tilted in it (Phase 20, navigation controls): forward, inverse and outline don't assume a north-up view.
+  - **Beyond cylindrical:** the renderer and the morph must handle:
+    - curved and interrupted map outlines;
+    - projections that show only part of the Earth (gnomonic, one RPF zone);
+    - parameters that move the map's centre.
+  - The scale bar shows when the scale varies across the view, which most of these projections do.
+- **Projection framework:** the current cylindrical-only `Projection` classes are generalised to any projection with forward, inverse, a valid domain and its outline. The shader reprojection, which draws quadtree tiles, takes per-projection code for each one. PROJ is the reference implementation in the tests, not a run-time dependency of drawing.
 
 **Technical documentation**
 
-- `docs/design/vector-files.md`: reading, tiling and styling local vectors
-- `docs/user/layers.md`: opening files
+- `docs/design/projections.md`:
+  - each projection, with its formulas, parameters, valid domain and distortion
+  - how the morph and clipping handle non-cylindrical outlines
+  - the RPF ARC zone system
+  - the OSGB36 datum conversion
+- `docs/user/getting-around.md`: choosing a projection and its settings
 
 **Regression tests**
 
-- Each format reads a fixture file, and feature counts, geometry and attributes match.
-- Reprojection of a fixture in British National Grid lands on known positions.
-- Golden images of styled fixtures on the globe and the map.
-- Picking returns the right feature at known screen positions.
-- Large-file budget: a 100 MB shapefile opens and draws within the memory budget.
+- **Transforms:**
+  - Forward and inverse at reference points match PROJ (`+proj=tmerc`, `cass`, `aeqd`, `eqc`, `gnom`, `lcc`, `poly`, `omerc`, `gall`, `cea`, `stere`, `robin`, `moll`, `wintri`) to within millimetres, including near each projection's edges and poles.
+  - A forward-then-inverse round trip returns the start point.
+- **UK National Grid:**
+  - the Ordnance Survey's published OSTN15 test points to their stated accuracy;
+  - grid references formatted and parsed for known points;
+  - the Helmert fallback within 5 m.
+- **Gall–Peters/Gall Orthographic:** equal-area: the areas of graticule cells match the ellipsoid's.
+- **Rotated Mercator:** the chosen centre line maps to a straight line, with scale true along it.
+- **Gnomonic:** great circles map to straight lines, and points beyond the horizon are rejected, not drawn.
+- **RPF ARC zones:**
+  - the zone limits and pixel spacings match MIL-PRF-89038 (the RPF specification);
+  - a fixture CADRG frame is drawn without resampling in its own zone.
+- **Golden images:** a world map and a regional map in each projection, with the graticule, and the UK in the National Grid lined up with the shoreline.
+- **Morph:** each projection morphs without frame jumps (continuity at every step).
+- **Settings:** changing parameters (centre, zone, standard parallels) redraws correctly and is saved in the project.
 
-**Exit criteria**: every listed format opens, draws, styles and picks correctly, within the budgets.
+**Exit criteria**: every listed projection draws, morphs, picks and reads coordinates correctly, matches PROJ, and stays within the frame budget.
 
 ## Phase 12 – More web services
 
@@ -187,7 +231,7 @@ Goal: the common web map services beyond WMS.
 
 - XYZ/TMS tile services (`{z}/{x}/{y}` templates), reprojected from Web Mercator onto the quadtree, through `CachedTileFetcher` (disk cache, revalidation, offline regions).
 - (WMTS has its own phase, 10.)
-- WFS 2.0: features in the visible area, with paging, into the Phase 11 vector pipeline.
+- WFS 2.0: features in the visible area, with paging, into the vector feature pipeline (per-feature styles, attributes, picking and draping), which this phase builds and Phases 16 (KML) and 22 (local data files) extend.
 - WMS extras:
   - The TIME dimension, with a time slider and a play button
   - GetFeatureInfo on click
@@ -366,7 +410,7 @@ Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make the
   - Unknown or unsupported elements are skipped and listed (not an error).
   - Malformed files report the line and column.
   - Large files (100,000 placemarks) load off the GUI thread within the memory budget.
-- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through Phase 11's vector pipeline.
+- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through the vector feature pipeline built in Phase 12.
 
 ### Phase 16b – Create, edit and export
 
@@ -630,7 +674,7 @@ Goal: users can change the colours of the graticule and shoreline layers to suit
 - **Saved with the project**: the style is part of the layer definition, so projects keep it, as they already keep terrain exaggeration and hillshade.
 - **New-project default**: "Use as default for new projects", saved in the user's settings, so the user's preferred colours apply without restyling every project.
 - **Undo**: a style change can be undone (Edit → Undo) if the program gains an undo stack by then (Phase 16b brings one), or else through Reset.
-- **For every vector layer**: the dialog works on any vector layer, so Phase 11's files, Phase 16's KML (where a document doesn't set its own styles) and Phase 13's contours reuse it.
+- **For every vector layer**: the dialog works on any vector layer, so Phase 22's files, Phase 16's KML (where a document doesn't set its own styles) and Phase 13's contours reuse it.
 - **Layer list**: a small colour swatch beside each vector layer's name shows its current colours.
 
 **Technical documentation**
@@ -690,6 +734,7 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
   - **Rotation**: the map can be turned away from north-up, as the globe can. The graticule, labels, picking, the scale bar and region drawing follow the rotation.
   - **Tilt**: a perspective view of the flat map, looking towards the horizon. Terrain draws in relief when it is on.
   - Both are smooth through the 3D/2D morph, and "N" or Reset View returns the map to north-up and straight down.
+  - Both work in every map projection: the original three, and all of Phase 11's (azimuthal, conic and others).
   - The right mouse button, and the turn and tilt keys, then work on the map as on the globe.
 - **Sizes and input:**
   - The controls scale with the screen's DPI and the system font size.
@@ -744,7 +789,7 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
 - **Golden images:** the overlay in each corner, at normal and high DPI, over light and dark backgrounds, in high-contrast mode, and a turned and tilted flat map.
 - **Idle:** with the overlay shown and nothing moving, the view stops drawing.
 - **Tile selection by distance (`tests/tiling`):**
-  - for tilted cameras on the globe and the flat map (in each projection), every drawn tile's screen-space error, computed with its distance from the eye, is within the limit;
+  - for tilted cameras on the globe and the flat map (in each projection, Phase 11's included), every drawn tile's screen-space error, computed with its distance from the eye, is within the limit;
   - along a ray from the camera to the horizon, tile levels never get finer with distance;
   - every visible pixel is covered;
   - fixed tilted cameras select fixed tile sets;
@@ -847,79 +892,35 @@ It is a US Government (NGA) product approved for public release. The exact terms
 
 **Exit criteria**: the VMAP0 packs build from the recorded source with every check passing. They are tested, published with approval and installable from the Data Packs window, and draw correctly and within budget on the globe and the map.
 
-## Phase 22 – More projections
+## Phase 22 – Local data files
 
-Goal: the flat map in the projections people need for regional, national, navigation and world maps. The first roadmap delivered Mercator, Web Mercator and Miller Cylindrical.
+Goal: users can open their own vector and imagery files, as they already can DEMs.
 
 **Deliverables**
 
-Projections, grouped by kind. Each is in View → Map Projection, with its parameters (centre, central meridian, standard parallels, zone) in a Map Projection Settings dialog where it has any.
-
-- **Cylindrical:**
-  - **Equidistant Cylindrical**, with a chosen standard parallel. Plate Carrée is its case at the equator.
-  - **Gall Stereographic**: secant at 45° N and S, a compromise for world maps.
-  - **Gall–Peters**: cylindrical equal-area with standard parallels at 45°.
-  - **Gall Orthographic**: Gall's name for the same projection as Gall–Peters, so it is one entry in the menu, named "Gall–Peters (Gall Orthographic)".
-  - **Rotated Mercator**: Mercator about a rotated pole (oblique Mercator), with the centre line chosen by a point and an azimuth, or by two points. It suits long, narrow areas that don't run north–south, such as a coastline or a flight route.
-- **Transverse:**
-  - **Transverse Mercator**, with a chosen central meridian, scale factor and false origin, and UTM zones (chosen, or picked automatically from the view's centre).
-  - **Cassini** (Cassini–Soldner): the transverse equidistant cylindrical, still the basis of many older national and cadastral surveys.
-  - **UK National Grid** (Ordnance Survey National Grid, EPSG:27700): Transverse Mercator on the Airy 1830 ellipsoid with the OSGB36 datum.
-    - **Datum:** positions convert from WGS 84 through PROJ with the OSTN15 grid, accurate to about 0.1 m, falling back to the Helmert transform, accurate to about 5 m, without the grid. OSTN15 can join the existing `geoid-osgm15` pack as a "UK grids" pack.
-    - **Grid:** the 100 km grid squares (e.g. `TQ`) and grid references (`TQ 30080 80729`) in the status bar.
-- **Conic:**
-  - **Lambert Conformal Conic**, with one or two standard parallels, the standard projection for aeronautical charts and many national grids.
-  - **Polyconic** (American Polyconic): a cone per parallel, used for older topographic series.
-- **Azimuthal:**
-  - **Azimuthal Equidistant**, centred on any point. Distances and directions from the centre are true, as on radio and great-circle range maps. The polar case is offered as a preset.
-  - **Gnomonic**, centred on any point: every great circle is a straight line, so routes plan as straight lines. It shows less than a hemisphere, and the map is clipped where the projection runs to infinity.
-  - **Polar Stereographic** (north and south), carried over from this phase's first list.
-- **World maps:**
-  - **Robinson, Mollweide and Winkel Tripel**, carried over from the first list.
-- **Raster Product Format (RPF) Native**:
-  - **What it is:** the ARC (Equal Arc-second Raster Chart) system of the RPF products, CADRG maps and CIB imagery. It has 18 latitude zones, nine per hemisphere. Each zone is equirectangular with its own east–west pixel spacing, and the polar zones are azimuthal equidistant.
-  - **What it gives:** RPF charts shown in it are drawn pixel for pixel, as they were made. The map shows the zone in view and changes zone as the view moves.
-  - **Reading RPF data:** GDAL reads it (NITF and `A.TOC`) and fits this phase best. If added, it joins Phase 11's local imagery.
-- **Graticule and readout**: a latitude/longitude graticule in every projection, and a grid for projected systems (UTM, UK National Grid, Cassini and Lambert zones). The status bar reads coordinates in the current projection's system (eastings and northings, grid references) beside latitude and longitude.
-- **Everywhere:**
-  - Layers, terrain hillshade, the scale bar, attributions, picking and the 3D/2D morph work in every projection.
-  - The flat map's turning and tilting, and its distance-based tile detail, from Phase 20 (navigation controls) work in every projection too.
-  - **Beyond cylindrical:** the renderer and the morph must handle:
-    - curved and interrupted map outlines;
-    - projections that show only part of the Earth (gnomonic, one RPF zone);
-    - parameters that move the map's centre.
-  - The scale bar shows when the scale varies across the view, which most of these projections do.
-- **Projection framework:** the current cylindrical-only `Projection` classes are generalised to any projection with forward, inverse, a valid domain and its outline. The shader reprojection, which draws quadtree tiles, takes per-projection code for each one. PROJ is the reference implementation in the tests, not a run-time dependency of drawing.
+- Vector files through GDAL/OGR (already linked):
+  - GeoJSON, ESRI shapefile, GPX and GeoPackage (KML and KMZ have their own phase, 16)
+  - Any CRS, reprojected with PROJ
+  - Drawn with the existing vector renderer, draped on terrain
+- A simple style per layer (line colour and width, fill, point symbol), kept in the project file.
+- Feature picking: clicking a feature shows its attributes.
+- GeoTIFF and other raster imagery through GDAL, tiled on the fly into the EPSG:4326 quadtree, with overviews used as for DEMs.
+- File → Add Data File… with drag and drop onto the globe.
 
 **Technical documentation**
 
-- `docs/design/projections.md`:
-  - each projection, with its formulas, parameters, valid domain and distortion
-  - how the morph and clipping handle non-cylindrical outlines
-  - the RPF ARC zone system
-  - the OSGB36 datum conversion
-- `docs/user/getting-around.md`: choosing a projection and its settings
+- `docs/design/vector-files.md`: reading, tiling and styling local vectors
+- `docs/user/layers.md`: opening files
 
 **Regression tests**
 
-- **Transforms:**
-  - Forward and inverse at reference points match PROJ (`+proj=tmerc`, `cass`, `aeqd`, `eqc`, `gnom`, `lcc`, `poly`, `omerc`, `gall`, `cea`, `stere`, `robin`, `moll`, `wintri`) to within millimetres, including near each projection's edges and poles.
-  - A forward-then-inverse round trip returns the start point.
-- **UK National Grid:**
-  - the Ordnance Survey's published OSTN15 test points to their stated accuracy;
-  - grid references formatted and parsed for known points;
-  - the Helmert fallback within 5 m.
-- **Gall–Peters/Gall Orthographic:** equal-area: the areas of graticule cells match the ellipsoid's.
-- **Rotated Mercator:** the chosen centre line maps to a straight line, with scale true along it.
-- **Gnomonic:** great circles map to straight lines, and points beyond the horizon are rejected, not drawn.
-- **RPF ARC zones:**
-  - the zone limits and pixel spacings match MIL-PRF-89038 (the RPF specification);
-  - a fixture CADRG frame is drawn without resampling in its own zone.
-- **Golden images:** a world map and a regional map in each projection, with the graticule, and the UK in the National Grid lined up with the shoreline.
-- **Morph:** each projection morphs without frame jumps (continuity at every step).
-- **Settings:** changing parameters (centre, zone, standard parallels) redraws correctly and is saved in the project.
+- Each format reads a fixture file, and feature counts, geometry and attributes match.
+- Reprojection of a fixture in British National Grid lands on known positions.
+- Golden images of styled fixtures on the globe and the map.
+- Picking returns the right feature at known screen positions.
+- Large-file budget: a 100 MB shapefile opens and draws within the memory budget.
 
-**Exit criteria**: every listed projection draws, morphs, picks and reads coordinates correctly, matches PROJ, and stays within the frame budget.
+**Exit criteria**: every listed format opens, draws, styles and picks correctly, within the budgets.
 
 ## Phase 23 – Commercial sources
 
