@@ -285,13 +285,15 @@ Goal: the user guide in `docs/user/` can be read inside Terra Soar, offline, fro
 
 Goal: satellites shown where they are, where they have been and where they are going, computed from two-line element sets (TLEs).
 
+**Decisions (2026-11-17)**: SGP4/SDP4 is Terra Soar's own code, written from the published reference (Spacetrack Report #3 as revised by Vallado et al., 2006), not a linked library. This keeps the licence GPL-2.0-or-later. The code has a full test suite of its own (see Regression tests).
+
 **Deliverables**
 
 - **TLE sources:**
   - A `.tle`/`.txt` file, or text pasted in (two-line and three-line forms, with checksums checked)
   - CelesTrak's published groups (stations, GPS, weather, Starlink and so on), and its OMM/JSON form, fetched over HTTP. Fetches go through the disk cache, so the last download works offline.
   - Space-Track, which needs an account, comes with Phase 16's key storage.
-- **Orbit propagation with SGP4/SDP4**, the model TLEs are made for:
+- **Orbit propagation with SGP4/SDP4**, the model TLEs are made for. It is our own implementation, in `core/` as its own subsection (`ts/orbits`) with its own unit test project (`tests/orbits`):
   - Positions in TEME, converted to Earth-fixed WGS 84 through sidereal time (polar motion is negligible at this scale)
   - Computed off the GUI thread
 - **A satellite layer** in the layer tree for each source, holding a list of satellites.
@@ -322,7 +324,13 @@ Goal: satellites shown where they are, where they have been and where they are g
 
 **Regression tests**
 
-- **Propagation**: SGP4/SDP4 matches the published verification cases (Vallado et al., "Revisiting Spacetrack Report #3", the SGP4-VER test set) to their stated tolerance, including deep-space and decaying orbits.
+- **SGP4/SDP4 test suite** (`tests/orbits`, written with the code):
+  - **Verification set**: every case in the published SGP4-VER test set (Vallado et al., "Revisiting Spacetrack Report #3"). Positions and velocities are checked at every listed time against the reference output, to the published tolerance (millimetres in position).
+  - **Coverage**: near-Earth (SGP4) and deep-space (SDP4) orbits, 12-hour resonant (GPS, Molniya) and 24-hour geosynchronous orbits, high eccentricity, low perigee, and negative inclination handling.
+  - **Errors**: the reference error codes (eccentricity out of range, mean motion negative, satellite decayed), each reported, not returned as a position.
+  - **Edge cases**: propagating to the epoch itself, far before and after it, and across year boundaries in the epoch.
+  - **Constants**: WGS 72 (the constants TLEs are fitted with) by default, as in the reference.
+  - **Independence**: the test data files are stored in `tests/orbits/data`, with their source and licence noted, so the suite needs no network.
 - **Frames**: the TEME to Earth-fixed conversion matches reference values at known epochs.
 - **Parsing**: valid and invalid TLEs (bad checksum, wrong columns, three-line names), OMM JSON, and a whole CelesTrak group file.
 - **Network**: CelesTrak fetches against a mock server, with caching and offline reuse of the last download.
@@ -362,4 +370,4 @@ These need a decision before the phases they affect:
 4. **macOS**: the first roadmap targets Windows and Linux only. Is macOS wanted? If so, it needs its own packaging phase (and OpenGL is deprecated there, which points to Phase 15's backend).
 5. **Translations**: which languages first, and who reviews them?
 6. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
-7. **SGP4 implementation** (Phase 18): write our own from the published reference (Vallado's code, freely usable), or link a library? The common C++ one, `libsgp4`, is Apache-2.0. That is compatible with GPL-3.0 but not GPL-2.0-only, so linking it would make the combined program effectively GPL-3.0. Writing our own keeps the licence as it is, and the verification test set checks it either way.
+7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
