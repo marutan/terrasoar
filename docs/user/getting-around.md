@@ -59,5 +59,8 @@ At the bottom right:
 
 ## Credits on screen
 
-The bottom left corner of the view names the sources of the layers drawn,
+The bottom right corner of the view names the sources of the layers drawn,
 as their providers ask. They change as layers are switched on and off.
+**View → Attributions** hides them and shows them again; they are shown
+when the program starts. Many providers' terms ask for this credit
+wherever their data is shown, so leave them on in images you publish.

@@ -572,6 +572,39 @@ private slots:
     QCOMPARE(pointer->text(), QStringLiteral("Pointer not on the globe"));
   }
 
+  void attributionsToggle()
+  {
+    // View → Attributions, next to Scale Bar, is on by default and hides
+    // and shows the credits in the corner of the view.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QAction* attributions =
+        window.findChild<QAction*>(QStringLiteral("attributionsAction"));
+    QAction* scaleBar =
+        window.findChild<QAction*>(QStringLiteral("scaleBarAction"));
+    QMenu* view = window.findChild<QMenu*>(QStringLiteral("viewMenu"));
+    if (attributions == nullptr || scaleBar == nullptr || view == nullptr) {
+      QFAIL("view actions missing");
+    }
+    const QList<QAction*> actions = view->actions();
+    QCOMPARE(actions.indexOf(attributions), actions.indexOf(scaleBar) + 1);
+    QVERIFY(attributions->isCheckable() && attributions->isChecked());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QVERIFY(globe->isAttributionsVisible());
+    attributions->trigger();
+    QVERIFY(!attributions->isChecked());
+    QVERIFY(!globe->isAttributionsVisible());
+    const int frames = globe->framesRendered();
+    QVERIFY(QTest::qWaitFor([&]() { return globe->framesRendered() > frames; },
+                            5000));
+    attributions->trigger();
+    QVERIFY(globe->isAttributionsVisible());
+  }
+
   void overlayAndResetView()
   {
     ts::MainWindow window;

@@ -427,6 +427,10 @@ void MainWindow::createActions()
   m_scaleBarAction->setObjectName(QStringLiteral("scaleBarAction"));
   m_scaleBarAction->setCheckable(true);
   m_scaleBarAction->setChecked(true);
+  m_attributionsAction = new QAction(this);
+  m_attributionsAction->setObjectName(QStringLiteral("attributionsAction"));
+  m_attributionsAction->setCheckable(true);
+  m_attributionsAction->setChecked(true);
   m_projectionGroup = new QActionGroup(this);
   for (const Projection* projection : projections()) {
     QAction* action = new QAction(this);
@@ -444,6 +448,8 @@ void MainWindow::createActions()
             });
     connect(m_scaleBarAction, &QAction::toggled, m_globeView,
             &GlobeView::setScaleBarVisible);
+    connect(m_attributionsAction, &QAction::toggled, m_globeView,
+            &GlobeView::setAttributionsVisible);
     connect(m_projectionGroup, &QActionGroup::triggered, m_globeView,
             [this](const QAction* action) {
               m_globeView->setMapProjection(
@@ -456,6 +462,7 @@ void MainWindow::createActions()
   } else {
     m_mapViewAction->setEnabled(false);
     m_scaleBarAction->setEnabled(false);
+    m_attributionsAction->setEnabled(false);
     m_projectionGroup->setEnabled(false);
   }
   syncViewActions();
@@ -711,6 +718,7 @@ void MainWindow::createMenus()
   m_projectionMenu->setObjectName(QStringLiteral("projectionMenu"));
   m_projectionMenu->addActions(m_projectionGroup->actions());
   m_viewMenu->addAction(m_scaleBarAction);
+  m_viewMenu->addAction(m_attributionsAction);
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
@@ -769,6 +777,9 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_attributionsAction->setText(tr("&Attributions"));
+  m_attributionsAction->setStatusTip(
+      tr("Show the sources of the layers drawn in the corner of the view"));
   m_addWebTerrainAction->setText(tr("Add Web &Terrain…"));
   m_addWebTerrainAction->setStatusTip(
       tr("Add elevation from a web terrain tile service or a Cloud "

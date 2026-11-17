@@ -264,6 +264,7 @@ private:
   QAction* m_resetViewAction = nullptr;
   QAction* m_mapViewAction = nullptr;
   QAction* m_scaleBarAction = nullptr;
+  QAction* m_attributionsAction = nullptr;
   QAction* m_ellipsoidalHeightsAction = nullptr;
   QAction* m_hillshadeAction = nullptr;
   QAction* m_profileAction = nullptr;
