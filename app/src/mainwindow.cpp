@@ -1,4 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
+/*
+  Terra Soar - A virtual globe
+
+  Copyright (C) 2026 Peter Howkins
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, see <https://www.gnu.org/licenses/>.
+ */
+
 #include "mainwindow.h"
 
 #include <algorithm>
@@ -529,11 +548,6 @@ void MainWindow::createActions()
   m_aboutAction->setObjectName(QStringLiteral("aboutAction"));
   m_aboutAction->setMenuRole(QAction::AboutRole);
   connect(m_aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
-
-  m_aboutQtAction = new QAction(this);
-  m_aboutQtAction->setObjectName(QStringLiteral("aboutQtAction"));
-  m_aboutQtAction->setMenuRole(QAction::AboutQtRole);
-  connect(m_aboutQtAction, &QAction::triggered, qApp, &QApplication::aboutQt);
 }
 
 void MainWindow::addElevationFile()
@@ -714,7 +728,6 @@ void MainWindow::createMenus()
   m_helpMenu = menuBar()->addMenu(QString());
   m_helpMenu->setObjectName(QStringLiteral("helpMenu"));
   m_helpMenu->addAction(m_aboutAction);
-  m_helpMenu->addAction(m_aboutQtAction);
 }
 
 void MainWindow::retranslateUi()
@@ -790,8 +803,6 @@ void MainWindow::retranslateUi()
       tr("Show frame times and the camera position over the globe"));
   m_aboutAction->setText(tr("&About %1").arg(programName()));
   m_aboutAction->setStatusTip(tr("Show the program version and licence"));
-  m_aboutQtAction->setText(tr("About &Qt"));
-  m_aboutQtAction->setStatusTip(tr("Show the Qt version in use"));
   switch (m_basePackState) {
   case BasePackState::Missing:
     m_statusLabel->setText(
