@@ -26,6 +26,7 @@
 #ifndef TS_APP_ELEVATIONPROFILEDIALOG_H
 #define TS_APP_ELEVATIONPROFILEDIALOG_H
 
+#include <cstdint>
 #include <optional>
 
 #include <QDialog>
@@ -74,7 +75,7 @@ public:
 
 signals:
   /** The pointer is over point @p index of the profile (or left it: −1). */
-  void hovered(int index);
+  void hovered(int32_t index);
 
 protected:
   /** Draws the chart. */
@@ -89,7 +90,7 @@ private:
   QRectF plotArea() const;
 
   std::optional<ElevationProfile> m_profile;
-  int m_hovered = -1;
+  int32_t m_hovered = -1;
 };
 
 /**

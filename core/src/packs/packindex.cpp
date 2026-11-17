@@ -21,6 +21,7 @@
 #include "ts/packs/packindex.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include <QHostAddress>
 #include <QJsonArray>
@@ -181,7 +182,7 @@ std::optional<PackIndex> PackIndex::fromJson(const QByteArray& json,
     return std::nullopt;
   }
   const QJsonObject root = document.object();
-  const int format = root.value(QStringLiteral("format")).toInt(0);
+  const int32_t format = root.value(QStringLiteral("format")).toInt(0);
   if (format < 1 || format > currentFormat) {
     if (errorString) {
       *errorString =
@@ -193,7 +194,7 @@ std::optional<PackIndex> PackIndex::fromJson(const QByteArray& json,
   const QJsonArray packs = root.value(QStringLiteral("packs")).toArray();
   // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < packs.size(); ++i) {
+  for (int32_t i = 0; i < packs.size(); ++i) {
     QString problem;
     std::optional<PackIndexEntry> entry = PackIndexEntry::fromJson(
         packs.at(i).toObject(), allowLocalHttp, &problem);

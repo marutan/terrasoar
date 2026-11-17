@@ -25,6 +25,7 @@
 #ifndef TS_PACKAGER_IMAGERYTILER_H
 #define TS_PACKAGER_IMAGERYTILER_H
 
+#include <cstdint>
 #include <functional>
 
 #include <QImage>
@@ -41,11 +42,11 @@ namespace ts::packager
 /** What to build. */
 struct ImageryTilerOptions {
   /** Deepest level written; levels 0 to it are complete. */
-  int maxLevel = 4;
+  int32_t maxLevel = 4;
   /** Tile width and height, pixels. */
-  int tileSizePx = 256;
+  int32_t tileSizePx = 256;
   /** JPEG quality, 0 to 100. */
-  int jpegQuality = 85;
+  int32_t jpegQuality = 85;
   /** Called with progress messages (English); may be empty. */
   std::function<void(const QString&)> progress;
 };
@@ -53,9 +54,9 @@ struct ImageryTilerOptions {
 /** Results of a run. */
 struct ImageryTilerStats {
   /** Tiles written. */
-  int tiles = 0;
+  int32_t tiles = 0;
   /** Encoded bytes written. */
-  long long bytes = 0;
+  int64_t bytes = 0;
 };
 
 /**
@@ -63,8 +64,8 @@ struct ImageryTilerStats {
  * three 8-bit bands covering −180° to 180°, 90° to −90°, pixel corners on
  * the edges) into the mosaic of the deepest level with area averaging.
  */
-QImage readEquirectangular(const QString& sourcePath, int widthPx, int heightPx,
-                           QString* errorString);
+QImage readEquirectangular(const QString& sourcePath, int32_t widthPx,
+                           int32_t heightPx, QString* errorString);
 
 /**
  * Cuts @p mosaic (2:1, the whole world, at least the deepest level's size)

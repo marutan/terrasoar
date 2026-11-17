@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -62,7 +63,8 @@ class HeightTileLoader
 {
 public:
   /** Starts @p threads workers loading from @p provider. */
-  HeightTileLoader(std::shared_ptr<ElevationProvider> provider, int threads);
+  HeightTileLoader(std::shared_ptr<ElevationProvider> provider,
+                   int32_t threads);
   /** Cancels what is loading and joins the workers. */
   ~HeightTileLoader();
 
@@ -81,10 +83,10 @@ public:
   void setRequests(const std::vector<TileKey>& keys);
 
   /** Takes up to @p maximum loaded tiles. */
-  std::vector<LoadedHeights> takeLoaded(int maximum);
+  std::vector<LoadedHeights> takeLoaded(int32_t maximum);
 
   /** Returns how many keys are queued, loading or waiting to be taken. */
-  int outstanding() const;
+  int32_t outstanding() const;
 
   /** Sets the function called (on a worker) each time a tile has loaded. */
   void setTilesReadyCallback(std::function<void()> callback);

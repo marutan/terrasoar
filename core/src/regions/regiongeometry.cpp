@@ -171,9 +171,9 @@ bool allData(const GeoRect& rect, const std::optional<GeoRect>& dataBounds)
   return !dataBounds || within(rect, *dataBounds);
 }
 
-long long pow4(int exponent)
+int64_t pow4(int32_t exponent)
 {
-  return 1LL << (2 * exponent);
+  return int64_t{1} << (2 * exponent);
 }
 
 } // namespace
@@ -371,7 +371,7 @@ std::optional<std::vector<LonLat>> ringFromJson(const QJsonArray& array,
 {
   std::vector<LonLat> vertices;
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < array.size(); ++i) {
+  for (int32_t i = 0; i < array.size(); ++i) {
     const QJsonArray pair = array.at(i).toArray();
     if (pair.size() != 2 || !pair.at(0).isDouble() || !pair.at(1).isDouble()) {
       fail(errorString, translated("A point of the region is not a pair "
@@ -674,7 +674,7 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
     if (json.contains(QStringLiteral("rings"))) {
       const QJsonArray array = json.value(QStringLiteral("rings")).toArray();
       // NOLINTNEXTLINE(modernize-loop-convert)
-      for (int i = 0; i < array.size(); ++i) {
+      for (int32_t i = 0; i < array.size(); ++i) {
         std::optional<std::vector<LonLat>> ring =
             ringFromJson(array.at(i).toArray(), errorString);
         if (!ring) {
@@ -718,23 +718,23 @@ bool RegionGeometry::operator==(const RegionGeometry& other) const
 
 // --- Tiles ------------------------------------------------------------------
 
-long long RegionTileCount::total() const
+int64_t RegionTileCount::total() const
 {
-  long long sum = 0;
-  for (const long long count : perLevel) {
+  int64_t sum = 0;
+  for (const int64_t count : perLevel) {
     sum += count;
   }
   return sum;
 }
 
-RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
-                                 int maximumLevel,
+RegionTileCount countRegionTiles(const RegionGeometry& region,
+                                 int32_t minimumLevel, int32_t maximumLevel,
                                  const std::optional<GeoRect>& dataBounds,
-                                 std::optional<long long> stopAbove)
+                                 std::optional<int64_t> stopAbove)
 {
   RegionTileCount counts;
-  const int first = std::clamp(minimumLevel, 0, TileKey::maximumLevel);
-  const int last = std::clamp(maximumLevel, 0, TileKey::maximumLevel);
+  const int32_t first = std::clamp(minimumLevel, 0, TileKey::maximumLevel);
+  const int32_t last = std::clamp(maximumLevel, 0, TileKey::maximumLevel);
   counts.minimumLevel = first;
   if (last < first || !region.isValid()) {
     return counts;
@@ -744,7 +744,7 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
   for (const TileKey root : TileKey::roots()) {
     stack.push_back(root);
   }
-  long long total = 0;
+  int64_t total = 0;
   while (!stack.empty()) {
     if (stopAbove && total > *stopAbove) {
       counts.complete = false;
@@ -758,7 +758,7 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
     }
     if (allData(rect, dataBounds) && region.covers(rect)) {
       // Every descendant is in: count them without visiting them.
-      for (int level = std::max(key.level, first); level <= last; ++level) {
+      for (int32_t level = std::max(key.level, first); level <= last; ++level) {
         counts.perLevel[static_cast<std::size_t>(level - first)] +=
             pow4(level - key.level);
         total += pow4(level - key.level);
@@ -770,7 +770,7 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
       ++total;
     }
     if (key.level < last) {
-      for (int child = 0; child < 4; ++child) {
+      for (int32_t child = 0; child < 4; ++child) {
         stack.push_back(key.child(child));
       }
     }
@@ -778,8 +778,9 @@ RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
   return counts;
 }
 
-RegionTileIterator::RegionTileIterator(RegionGeometry region, int minimumLevel,
-                                       int maximumLevel,
+RegionTileIterator::RegionTileIterator(RegionGeometry region,
+                                       int32_t minimumLevel,
+                                       int32_t maximumLevel,
                                        const std::optional<GeoRect>& dataBounds)
     : m_region(std::move(region)),
       m_maximumLevel(std::clamp(maximumLevel, 0, TileKey::maximumLevel)),
@@ -815,7 +816,7 @@ std::optional<TileKey> RegionTileIterator::next()
       if (key.level == m_level) {
         return key;
       }
-      for (int child = 3; child >= 0; --child) {
+      for (int32_t child = 3; child >= 0; --child) {
         m_stack.push_back(key.child(child));
       }
     }
@@ -830,7 +831,7 @@ std::optional<TileKey> RegionTileIterator::next()
 std::vector<TileKey> sampleRegionTiles(const RegionGeometry& region,
                                        const RegionTileCount& counts,
                                        const std::optional<GeoRect>& dataBounds,
-                                       int count, std::mt19937_64& random)
+                                       int32_t count, std::mt19937_64& random)
 {
   std::vector<TileKey> samples;
   if (count <= 0 || counts.total() <= 0 || !region.isValid()) {
@@ -838,21 +839,21 @@ std::vector<TileKey> sampleRegionTiles(const RegionGeometry& region,
   }
   std::vector<double> weights;
   weights.reserve(counts.perLevel.size());
-  for (const long long levelCount : counts.perLevel) {
+  for (const int64_t levelCount : counts.perLevel) {
     weights.push_back(static_cast<double>(levelCount));
   }
-  std::discrete_distribution<int> pickLevel(weights.begin(), weights.end());
+  std::discrete_distribution<int32_t> pickLevel(weights.begin(), weights.end());
   const GeoRect& extent = region.extent();
   std::uniform_real_distribution<double> pickLon(extent.westDeg,
                                                  extent.eastDeg);
   std::uniform_real_distribution<double> pickLat(extent.southDeg,
                                                  extent.northDeg);
   std::unordered_set<TileKey, TileKeyHash> seen;
-  const long long wanted = std::min<long long>(count, counts.total());
-  for (long long attempt = 0; attempt < 200LL * count &&
-                              static_cast<long long>(samples.size()) < wanted;
+  const int64_t wanted = std::min<int64_t>(count, counts.total());
+  for (int64_t attempt = 0; attempt < int64_t{200} * count &&
+                            static_cast<int64_t>(samples.size()) < wanted;
        ++attempt) {
-    const int level = counts.minimumLevel + pickLevel(random);
+    const int32_t level = counts.minimumLevel + pickLevel(random);
     const double lon = pickLon(random);
     const double lat = pickLat(random);
     if (!region.contains(lat, lon)) {

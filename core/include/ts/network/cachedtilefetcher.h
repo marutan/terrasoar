@@ -28,6 +28,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -55,39 +56,39 @@ struct WebTileSettings {
    */
   QString cacheDirectory;
   /** Size limit of this source's disk cache, bytes. */
-  long long cacheBytes = 256LL * 1024 * 1024;
+  int64_t cacheBytes = int64_t{256} * 1024 * 1024;
   /** Freshness of tiles whose server says nothing about it, seconds. */
-  long long defaultLifetimeS = 7LL * 24 * 3600;
+  int64_t defaultLifetimeS = int64_t{7} * 24 * 3600;
   /**
    * After this many requests in a row that can't reach the server, it is
    * left alone for offlineRetry: tiles come from the disk cache only.
    */
-  int failuresBeforeOffline = 3;
+  int32_t failuresBeforeOffline = 3;
   /** How long the server is left alone, see failuresBeforeOffline. */
   std::chrono::seconds offlineRetry{30};
   /** Loader threads, so several requests are in flight. */
-  int loaderThreads = 6;
+  int32_t loaderThreads = 6;
   /**
    * Seconds since 1970, UTC (for tests); null for the system clock.
    * Called on loader threads.
    */
-  std::function<long long()> clock;
+  std::function<int64_t()> clock;
 };
 
 /** What a web tile source has done, for tests and the debug overlay. */
 struct WebTileStatistics {
   /** Requests made (each may have been retried). */
-  int requests = 0;
+  int32_t requests = 0;
   /** Tiles served fresh from the disk cache. */
-  int cacheHits = 0;
+  int32_t cacheHits = 0;
   /** Stale tiles the server confirmed with 304 Not Modified. */
-  int revalidated = 0;
+  int32_t revalidated = 0;
   /** Stale tiles shown because the server couldn't be reached. */
-  int servedStale = 0;
+  int32_t servedStale = 0;
   /** Tiles that failed (to be retried later). */
-  int failures = 0;
+  int32_t failures = 0;
   /** Requests skipped while the server is left alone. */
-  int skippedOffline = 0;
+  int32_t skippedOffline = 0;
 };
 
 /** What became of a request for one tile (CachedTileFetcher::fetch()). */
@@ -180,7 +181,7 @@ public:
   void countRequest();
 
   /** Returns the time now, seconds since 1970 (WebTileSettings::clock). */
-  long long now() const;
+  int64_t now() const;
 
 private:
   FetchOutcome fromCache(TileKey key, bool stale,
@@ -191,9 +192,9 @@ private:
   bool leftAlone();
   FetchOutcome
   revalidated(TileKey key, const CachedTile& cached,
-              const HttpResponse& response, long long nowS,
+              const HttpResponse& response, int64_t nowS,
               const std::function<bool(const QByteArray&)>& accept);
-  void store(TileKey key, const HttpResponse& response, long long nowS);
+  void store(TileKey key, const HttpResponse& response, int64_t nowS);
   void noteSuccess();
   void noteUnreachable(const QString& detail);
   void noteServerError(const QString& message);
@@ -205,7 +206,7 @@ private:
   const std::function<void(const ProviderStatus&)> m_report;
   const std::unique_ptr<TileDiskCache> m_cache;
   mutable std::mutex m_mutex;
-  int m_unreachableInARow = 0;
+  int32_t m_unreachableInARow = 0;
   std::chrono::steady_clock::time_point m_leftAloneUntil;
   WebTileStatistics m_statistics;
 };

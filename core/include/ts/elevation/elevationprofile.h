@@ -26,6 +26,7 @@
 #define TS_ELEVATION_ELEVATIONPROFILE_H
 
 #include <atomic>
+#include <cstdint>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -56,7 +57,7 @@ struct ElevationProfile {
   /** The path's length, metres. */
   double lengthM = 0.0;
   /** The level of the height tiles sampled. */
-  int level = 0;
+  int32_t level = 0;
   /** Lowest height above sea level, metres. */
   double minimumM = 0.0;
   /** Highest height above sea level, metres. */
@@ -74,7 +75,7 @@ struct ElevationProfile {
  * among them. Empty for fewer than two vertices or @p count < 2.
  */
 std::vector<std::pair<double, GeoPoint>>
-samplePath(const std::vector<GeoPoint>& vertices, int count);
+samplePath(const std::vector<GeoPoint>& vertices, int32_t count);
 
 /**
  * Returns the level of height tiles whose samples are about @p spacingM
@@ -82,7 +83,7 @@ samplePath(const std::vector<GeoPoint>& vertices, int count);
  */
 // A spacing, then a level cap: different things, different types.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-int profileLevel(double spacingM, int maximumLevel);
+int32_t profileLevel(double spacingM, int32_t maximumLevel);
 
 /**
  * Samples @p provider at @p count points along @p vertices (see
@@ -93,7 +94,7 @@ int profileLevel(double spacingM, int maximumLevel);
  */
 std::optional<ElevationProfile>
 computeElevationProfile(ElevationProvider& provider,
-                        const std::vector<GeoPoint>& vertices, int count,
+                        const std::vector<GeoPoint>& vertices, int32_t count,
                         const std::atomic<bool>& cancelled);
 
 } // namespace ts

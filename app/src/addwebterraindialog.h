@@ -26,6 +26,7 @@
 #ifndef TS_APP_ADDWEBTERRAINDIALOG_H
 #define TS_APP_ADDWEBTERRAINDIALOG_H
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -90,7 +91,7 @@ public:
    */
   // The form's fields, in its order.
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  void setSource(Kind kind, const QString& address, int maximumZoom,
+  void setSource(Kind kind, const QString& address, int32_t maximumZoom,
                  const QString& datum, const QString& name,
                  const QString& attribution);
 
@@ -115,7 +116,7 @@ protected:
 
 private:
   void retranslateUi();
-  void applyPreset(int index);
+  void applyPreset(int32_t index);
   void updateControls();
   void accept() override;
 

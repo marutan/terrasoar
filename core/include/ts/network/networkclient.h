@@ -28,6 +28,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -67,7 +68,7 @@ struct HttpResponse {
   /** NetworkError::None if a response arrived. */
   NetworkError error = NetworkError::Other;
   /** HTTP status (200, 304, 404, …); 0 without a response. */
-  int status = 0;
+  int32_t status = 0;
   /** The body. */
   QByteArray body;
   /** Response headers; names in lower case. */
@@ -75,7 +76,7 @@ struct HttpResponse {
   /** What went wrong, for logs and the user (not translated). */
   QString errorString;
   /** How many attempts were made. */
-  int attempts = 0;
+  int32_t attempts = 0;
   /** The URL that answered, after redirects. */
   QUrl finalUrl;
 
@@ -96,14 +97,14 @@ struct NetworkSettings {
    * Most requests on the wire at once, all hosts together; the rest
    * wait in order. The roadmap's "network requests in flight" budget.
    */
-  int maximumInFlight = 6;
+  int32_t maximumInFlight = 6;
   /** A request that receives nothing for this long fails (Timeout). */
   std::chrono::milliseconds timeout{15000};
   /**
    * Attempts per request. Timeouts, connection failures, HTTP 408, 429
    * and 5xx are retried; other answers are final.
    */
-  int attempts = 3;
+  int32_t attempts = 3;
   /** Wait before the first retry; it doubles for each further one. */
   std::chrono::milliseconds retryDelay{500};
   /** Longest wait before a retry, also when a server asks for more. */
@@ -222,16 +223,16 @@ public:
    * Returns how many requests hold a slot now: on the wire, or waiting
    * to retry.
    */
-  int inFlight() const;
+  int32_t inFlight() const;
 
   /** Returns how many attempts were sent (retries included). */
-  int attemptsSent() const;
+  int32_t attemptsSent() const;
 
   /**
    * Returns the most requests that held a slot at once since the client
    * was created (for tests of the limit).
    */
-  int peakInFlight() const;
+  int32_t peakInFlight() const;
 
 private:
   class Thread;

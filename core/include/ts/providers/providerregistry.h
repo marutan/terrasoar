@@ -25,6 +25,7 @@
 #ifndef TS_PROVIDERS_PROVIDERREGISTRY_H
 #define TS_PROVIDERS_PROVIDERREGISTRY_H
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -85,7 +86,7 @@ public:
                                            QString* errorString);
 
   /** Returns the number of providers still in use. */
-  int liveImageryProviders() const;
+  int32_t liveImageryProviders() const;
 
   /**
    * Returns the feature provider for @p source (`{"kind": "basepack",

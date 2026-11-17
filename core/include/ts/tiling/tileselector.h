@@ -25,6 +25,7 @@
 #ifndef TS_TILING_TILESELECTOR_H
 #define TS_TILING_TILESELECTOR_H
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -44,15 +45,15 @@ struct TileSelectionSettings {
    */
   double maximumScreenSpaceErrorPx = 1.5;
   /** Texels along a tile's side (the imagery tile size). */
-  int tileSizePx = 256;
+  int32_t tileSizePx = 256;
   /** Deepest level to select. */
-  int maximumLevel = 18;
+  int32_t maximumLevel = 18;
   /**
    * Coarsest level to select while the view is the flat map or changing
    * to it (the camera's morph factor is above 0), whatever maximumLevel
    * says: the geometry of the unrolling globe needs it.
    */
-  int minimumMapLevel = 0;
+  int32_t minimumMapLevel = 0;
   /**
    * Largest error of a tile's geometry on the flat map, in pixels. A
    * tile's mesh is straight between its grid lines, where the projection
@@ -69,7 +70,7 @@ struct TileSelectionSettings {
    */
   double terrainHeightM = 0.0;
   /** Grid segments per side of the tile meshes (TileMesh::segments). */
-  int meshSegments = 16;
+  int32_t meshSegments = 16;
 };
 
 /** A tile that should be loaded, with what makes it urgent. */
@@ -90,7 +91,7 @@ struct TileSelection {
   /** Tiles wanted but not renderable yet, coarsest and nearest first. */
   std::vector<TileLoadRequest> load;
   /** Tiles looked at during the traversal (for statistics and tests). */
-  int visited = 0;
+  int32_t visited = 0;
 };
 
 /**

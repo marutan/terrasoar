@@ -27,6 +27,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 #include "ts/maths/vec3.h"
 #include "ts/maths/vec4.h"
@@ -85,7 +86,7 @@ public:
   }
 
   /** Returns element (@p row, @p column), both in [0, 3]. */
-  constexpr double at(int row, int column) const
+  constexpr double at(int32_t row, int32_t column) const
   {
     // Row and column are in [0, 3] by contract; a bounds check on every
     // element access would cost too much in the maths hot paths.
@@ -94,7 +95,7 @@ public:
   }
 
   /** Sets element (@p row, @p column), both in [0, 3], to @p value. */
-  constexpr void set(int row, int column, double value)
+  constexpr void set(int32_t row, int32_t column, double value)
   {
     // See at().
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index)
@@ -121,10 +122,10 @@ public:
   constexpr Mat4 operator*(const Mat4& other) const
   {
     Mat4 result;
-    for (int row = 0; row < 4; ++row) {
-      for (int column = 0; column < 4; ++column) {
+    for (int32_t row = 0; row < 4; ++row) {
+      for (int32_t column = 0; column < 4; ++column) {
         double sum = 0.0;
-        for (int k = 0; k < 4; ++k) {
+        for (int32_t k = 0; k < 4; ++k) {
           sum += at(row, k) * other.at(k, column);
         }
         result.set(row, column, sum);
@@ -155,8 +156,8 @@ public:
   {
     // Element (i, j) of the result is element (j, i) of this matrix.
     Mat4 result;
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    for (int32_t i = 0; i < 4; ++i) {
+      for (int32_t j = 0; j < 4; ++j) {
         result.set(i, j, at(j, i));
       }
     }
@@ -184,7 +185,7 @@ public:
   bool operator!=(const Mat4& other) const { return !(*this == other); }
 
 private:
-  static constexpr std::size_t index(int row, int column)
+  static constexpr std::size_t index(int32_t row, int32_t column)
   {
     return static_cast<std::size_t>(column) * 4U +
            static_cast<std::size_t>(row);

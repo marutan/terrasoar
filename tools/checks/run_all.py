@@ -37,6 +37,7 @@ def main(argv):
         [sys.executable, os.path.join(HERE, "check_format.py")],
         [sys.executable, os.path.join(HERE, "check_include_order.py")],
         [sys.executable, os.path.join(HERE, "check_no_auto.py")],
+        [sys.executable, os.path.join(HERE, "check_int_types.py")],
         [sys.executable, os.path.join(HERE, "check_translatable.py")],
         [sys.executable, os.path.join(HERE, "check_notices.py")],
     ]

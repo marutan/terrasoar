@@ -18,6 +18,7 @@
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <cstdint>
 #include <functional>
 
 #include <QAction>
@@ -194,7 +195,7 @@ ts::GlobeView* globeOf(ts::MainWindow& window)
  */
 bool waitUntilQuiet(const ts::GlobeView* globe)
 {
-  int frames = globe->framesRendered();
+  int32_t frames = globe->framesRendered();
   QElapsedTimer quiet;
   quiet.start();
   return QTest::qWaitFor(
@@ -253,12 +254,12 @@ private slots:
                                     QStringLiteral("builtin:shoreline"),
                                     QStringLiteral("builtin:bluemarble"),
                                     QStringLiteral("builtin:terrain")};
-      for (int row = 0; row < 4; ++row) {
+      for (int32_t row = 0; row < 4; ++row) {
         QCOMPARE(model->layerDefinition(model->index(row, 0)).id,
                  expected.at(row));
       }
       QCOMPARE(model->data(model->index(3, 0), Qt::CheckStateRole).toInt(),
-               static_cast<int>(Qt::Unchecked));
+               static_cast<int32_t>(Qt::Unchecked));
       ts::GlobeView* globe = globeOf(window);
       if (globe != nullptr) {
         QCOMPARE(globe->imageryLayerCount(), 1);
@@ -317,7 +318,7 @@ private slots:
   void closeDuringBasePackCheck()
   {
     // Closing at once while the check runs: the thread stops and is joined.
-    for (int i = 0; i < 20; ++i) {
+    for (int32_t i = 0; i < 20; ++i) {
       const ts::MainWindow window;
     }
   }
@@ -381,7 +382,7 @@ private slots:
     }
     QVERIFY(label->text().contains(QStringLiteral(TS_VERSION_STRING)));
     QVERIFY(label->text().contains(ts::AboutDialog::homePage()));
-    QCOMPARE(tree->topLevelItemCount(), static_cast<int>(data.size()));
+    QCOMPARE(tree->topLevelItemCount(), static_cast<int32_t>(data.size()));
     const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
     if (!shots.isEmpty()) {
       dialog.show();
@@ -455,7 +456,7 @@ private slots:
       const QString shown = label->buddy() != nullptr
                                 ? withoutMnemonic(label->text())
                                 : label->text();
-      const int needed = label->fontMetrics().horizontalAdvance(shown);
+      const int32_t needed = label->fontMetrics().horizontalAdvance(shown);
       QVERIFY2(label->contentsRect().width() >= needed,
                qPrintable(QStringLiteral("%1 is %2 px wide, needs %3")
                               .arg(label->objectName())
@@ -467,7 +468,7 @@ private slots:
     const QList<QAction*> barActions = bar->actions();
     for (QAction* action : barActions) {
       const QRect geometry = bar->actionGeometry(action);
-      const int needed =
+      const int32_t needed =
           bar->fontMetrics().horizontalAdvance(withoutMnemonic(action->text()));
       QVERIFY2(geometry.width() >= needed && bar->rect().contains(geometry),
                qPrintable(action->text()));
@@ -477,7 +478,7 @@ private slots:
       }
       const QList<QAction*> items = menu->actions();
       for (QAction* item : items) {
-        const int itemNeeded = menu->fontMetrics().horizontalAdvance(
+        const int32_t itemNeeded = menu->fontMetrics().horizontalAdvance(
             withoutMnemonic(item->text()));
         QVERIFY2(menu->sizeHint().width() >= itemNeeded,
                  qPrintable(item->text()));
@@ -598,7 +599,7 @@ private slots:
     attributions->trigger();
     QVERIFY(!attributions->isChecked());
     QVERIFY(!globe->isAttributionsVisible());
-    const int frames = globe->framesRendered();
+    const int32_t frames = globe->framesRendered();
     QVERIFY(QTest::qWaitFor([&]() { return globe->framesRendered() > frames; },
                             5000));
     attributions->trigger();
@@ -624,7 +625,7 @@ private slots:
     QVERIFY(!globe->isDebugOverlayVisible());
     overlay->trigger();
     QVERIFY(globe->isDebugOverlayVisible());
-    const int frames = globe->framesRendered();
+    const int32_t frames = globe->framesRendered();
     QVERIFY(QTest::qWaitFor([&]() { return globe->framesRendered() > frames; },
                             5000));
 
@@ -749,7 +750,7 @@ private slots:
     hillshade->trigger();
     QVERIFY(ts::terrainHillshade(model->layerDefinition(terrain)));
     // Without an elevation layer the menu is off.
-    const int rows = model->rowCount();
+    const int32_t rows = model->rowCount();
     QVERIFY(model->removeNode(terrain));
     QCOMPARE(model->rowCount(), rows - 1);
     QVERIFY(!triple->isEnabled() && !hillshade->isEnabled());
@@ -779,7 +780,7 @@ private slots:
     QVERIFY(!ellipsoidal->isChecked());
 
     ts::LayerTreeModel* model = window.layerModel();
-    const int rows = model->rowCount();
+    const int32_t rows = model->rowCount();
     window.addElevationLayer(dem, QStringLiteral("ellipsoid"));
     QCOMPARE(model->rowCount(), rows + 1);
     // Above the terrain (at the bottom), so it takes priority.
@@ -790,7 +791,7 @@ private slots:
     QCOMPARE(definition.source.value(QStringLiteral("kind")).toString(),
              QStringLiteral("file"));
     QCOMPARE(model->data(added, Qt::CheckStateRole).toInt(),
-             static_cast<int>(Qt::Checked));
+             static_cast<int32_t>(Qt::Checked));
     QCOMPARE(model->layerDefinition(model->index(rows, 0)).id,
              QStringLiteral("builtin:terrain"));
 
@@ -1052,7 +1053,7 @@ private slots:
     QCOMPARE(globe->viewMode(), ts::ViewMode::Globe);
     QSignalSpy modeChanges(globe, &ts::GlobeView::viewModeChanged);
 
-    const int framesBefore = globe->framesRendered();
+    const int32_t framesBefore = globe->framesRendered();
     mapView->trigger();
     QVERIFY(mapView->isChecked());
     QCOMPARE(globe->viewMode(), ts::ViewMode::Map);
@@ -1106,7 +1107,7 @@ private slots:
     QVERIFY(window.stateReport()
                 .value(QStringLiteral("imagery_tiles_drawn"))
                 .toInt() > 0);
-    const int idleFrames = globe->framesRendered();
+    const int32_t idleFrames = globe->framesRendered();
     QTest::qWait(400);
     QCOMPARE(globe->framesRendered(), idleFrames);
     const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
@@ -1225,7 +1226,8 @@ private slots:
     QCOMPARE(services->count(), 1);
     QCOMPARE(services->itemText(0), QStringLiteral("Mock service"));
     services->setCurrentIndex(0);
-    QMetaObject::invokeMethod(services, "activated", Q_ARG(int, 0));
+    // As if the user picked it (signals are public).
+    emit services->activated(0);
     QCOMPARE(services->currentText(), serviceUrl.toString());
     QLabel* about = dialog.findChild<QLabel*>(QStringLiteral("wmsAboutLabel"));
     QVERIFY(about->text().contains(QStringLiteral("Mock Agency")));
@@ -1260,7 +1262,7 @@ private slots:
                 ->text()
                 .contains(QStringLiteral("EPSG:4326")));
     add->click();
-    QCOMPARE(dialog.result(), static_cast<int>(QDialog::Accepted));
+    QCOMPARE(dialog.result(), static_cast<int32_t>(QDialog::Accepted));
     QVERIFY(dialog.layerDefinition().has_value());
     const ts::LayerDefinition definition =
         dialog.layerDefinition().value_or(ts::LayerDefinition{});
@@ -1361,7 +1363,7 @@ private slots:
     definition.source = badSource;
     const QModelIndex brokenIndex = model->addLayer(definition);
     QCOMPARE(model->data(brokenIndex, ts::LayerTreeModel::StatusRole).toInt(),
-             static_cast<int>(ts::ProviderStatus::State::Error));
+             static_cast<int32_t>(ts::ProviderStatus::State::Error));
     QVERIFY(model->data(brokenIndex, Qt::ToolTipRole)
                 .toString()
                 .contains(QStringLiteral("EPSG:2056")));
@@ -1374,14 +1376,14 @@ private slots:
     definition.source = broken.toJson();
     const QModelIndex offline = model->addLayer(definition);
     QCOMPARE(model->data(offline, ts::LayerTreeModel::StatusRole).toInt(),
-             static_cast<int>(ts::ProviderStatus::State::Ok));
+             static_cast<int32_t>(ts::ProviderStatus::State::Ok));
     if (globeOf(window) == nullptr) {
       QSKIP("No OpenGL view: no tiles are asked for.");
     }
     QVERIFY(QTest::qWaitFor(
         [&]() {
           return model->data(offline, ts::LayerTreeModel::StatusRole).toInt() ==
-                 static_cast<int>(ts::ProviderStatus::State::Offline);
+                 static_cast<int32_t>(ts::ProviderStatus::State::Offline);
         },
         15000));
     QVERIFY(model->data(offline, Qt::ToolTipRole)
@@ -1393,7 +1395,7 @@ private slots:
     QVERIFY2(waitUntilQuiet(globeOf(window)), "the view kept drawing");
     // As in idleViewStopsDrawing: a late repaint or two from the window
     // system is not drawing continuously.
-    const int frames = globeOf(window)->framesRendered();
+    const int32_t frames = globeOf(window)->framesRendered();
     QTest::qWait(1000);
     QVERIFY2(globeOf(window)->framesRendered() <= frames + 2,
              qPrintable(QStringLiteral("%1 frames drawn while idle")
@@ -1535,7 +1537,7 @@ private slots:
         ->click();
     QVERIFY(QTest::qWaitFor([&]() { return dialog.isNull(); }, 5000));
     QCOMPARE(regions.regions().size(), std::size_t{1});
-    const long long id = regions.regions().front().id;
+    const int64_t id = regions.regions().front().id;
     ts::OfflineRegionsDialog* list =
         window.findChild<ts::OfflineRegionsDialog*>();
     QVERIFY(list && list->isVisible());
@@ -1543,7 +1545,7 @@ private slots:
     QVERIFY(QTest::qWaitFor([&]() { return !regions.progress(id); }, 60000));
     const ts::OfflineRegion* region = regions.region(id);
     QVERIFY(region->complete);
-    QCOMPARE(region->failedTiles, 0LL);
+    QCOMPARE(region->failedTiles, int64_t{0});
     QCOMPARE(region->tiles,
              ts::countRegionTiles(uk, 0, 6, std::nullopt).total());
     QVERIFY(region->bytes > 0);
@@ -1618,7 +1620,7 @@ private slots:
     // Deleting unpins its tiles.
     regions.remove(id);
     QVERIFY(regions.regions().empty());
-    QCOMPARE(provider->diskCache()->regionUsage(id).tiles, 0LL);
+    QCOMPARE(provider->diskCache()->regionUsage(id).tiles, int64_t{0});
     QCOMPARE(list->list()->topLevelItemCount(), 0);
   }
 
@@ -1839,7 +1841,7 @@ private slots:
     // Drawing continuously would be dozens of frames a second; a late
     // repaint or two (the window system exposing it again, a status bar
     // change resizing it, both seen on slow Windows runners) is not that.
-    const int frames = globe->framesRendered();
+    const int32_t frames = globe->framesRendered();
     QTest::qWait(1000);
     QVERIFY2(globe->framesRendered() <= frames + 2,
              qPrintable(QStringLiteral("%1 frames drawn while idle")

@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -64,7 +65,7 @@ struct RegionTileResult {
   /** What happened. */
   Outcome outcome = Outcome::Failed;
   /** The tile's size on disk, when stored. */
-  long long bytes = 0;
+  int64_t bytes = 0;
   /** True if it failed because the server couldn't be reached. */
   bool unreachable = false;
   /** Why it failed (translated), or empty. */
@@ -114,11 +115,11 @@ public:
   /** Returns the source's title, or its layers' names. */
   QString name() const override;
   /** Returns the source's deepest level. */
-  int maximumLevel() const override;
+  int32_t maximumLevel() const override;
   /** Returns the source's tile size. */
-  int tileSizePx() const override;
+  int32_t tileSizePx() const override;
   /** Returns the loader threads from the settings. */
-  int preferredLoaderThreads() const override;
+  int32_t preferredLoaderThreads() const override;
   /** Returns Web Mercator for Web Mercator sources. */
   TileImageProjection imageProjection() const override;
   /** Returns the image, or a null image whatever went wrong. */
@@ -145,7 +146,7 @@ public:
    * to its caller. Fails without a disk cache, and for responses the
    * server forbids storing (no-store). Called on download threads.
    */
-  RegionTileResult fetchForRegion(TileKey key, long long region,
+  RegionTileResult fetchForRegion(TileKey key, int64_t region,
                                   const std::atomic<bool>& cancelled);
 
   /** Returns the disk cache, or null without one. */

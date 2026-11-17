@@ -20,6 +20,7 @@
 
 #include "ts/deps/gdaldataset.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <QByteArray>
@@ -87,19 +88,19 @@ QString GdalDataset::driverShortName() const
   return driver ? QString::fromUtf8(GDALGetDriverShortName(driver)) : QString();
 }
 
-int GdalDataset::layerCount() const
+int32_t GdalDataset::layerCount() const
 {
   return m_handle
              ? GDALDatasetGetLayerCount(static_cast<GDALDatasetH>(m_handle))
              : 0;
 }
 
-int GdalDataset::rasterBandCount() const
+int32_t GdalDataset::rasterBandCount() const
 {
   return m_handle ? GDALGetRasterCount(static_cast<GDALDatasetH>(m_handle)) : 0;
 }
 
-long long GdalDataset::featureCount(int layerIndex) const
+int64_t GdalDataset::featureCount(int32_t layerIndex) const
 {
   if (m_handle == nullptr) {
     return -1;
@@ -109,7 +110,7 @@ long long GdalDataset::featureCount(int layerIndex) const
   if (layer == nullptr) {
     return -1;
   }
-  return static_cast<long long>(OGR_L_GetFeatureCount(layer, TRUE));
+  return static_cast<int64_t>(OGR_L_GetFeatureCount(layer, TRUE));
 }
 
 } // namespace ts

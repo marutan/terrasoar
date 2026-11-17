@@ -25,6 +25,7 @@
 #ifndef TS_ELEVATION_GDALELEVATIONPROVIDER_H
 #define TS_ELEVATION_GDALELEVATIONPROVIDER_H
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -123,12 +124,12 @@ public:
   const GeoRect& bounds() const { return m_bounds; }
 
   /** Samples along a tile's side. */
-  static constexpr int samples = 65;
+  static constexpr int32_t samples = 65;
 
   QString id() const override;
   QString name() const override;
   /** The level whose sample spacing matches the raster's pixels. */
-  int maximumLevel() const override { return m_maximumLevel; }
+  int32_t maximumLevel() const override { return m_maximumLevel; }
 
   std::optional<HeightTile>
   loadHeights(TileKey key, const std::atomic<bool>& cancelled) override;
@@ -151,7 +152,7 @@ private:
   std::shared_ptr<const GeoidModel> m_seaLevelGeoid;
   QString m_error;
   GeoRect m_bounds;
-  int m_maximumLevel = 0;
+  int32_t m_maximumLevel = 0;
   /** True if the band has overviews. */
   bool m_hasOverviews = false;
   std::mutex m_mutex;

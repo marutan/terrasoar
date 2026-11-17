@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <map>
@@ -53,7 +54,7 @@ constexpr double pi = 3.14159265358979323846;
 /** Index of (@p row, @p column) in a grid @p width wide. */
 // Row then column, as everywhere in a grid.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::size_t gridIndex(int row, int column, int width)
+std::size_t gridIndex(int32_t row, int32_t column, int32_t width)
 {
   return static_cast<std::size_t>(row) * static_cast<std::size_t>(width) +
          static_cast<std::size_t>(column);
@@ -87,14 +88,14 @@ QString notATile(const HttpResponse& response)
  */
 // The pixel's corner, then the fractions: as the position reads.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
-double bilinear(const std::function<float(int, int)>& pixel, int x0, int y0,
-                double fx, double fy)
+double bilinear(const std::function<float(int32_t, int32_t)>& pixel, int32_t x0,
+                int32_t y0, double fx, double fy)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
   double sum = 0.0;
   double weights = 0.0;
-  for (int dy = 0; dy <= 1; ++dy) {
-    for (int dx = 0; dx <= 1; ++dx) {
+  for (int32_t dy = 0; dy <= 1; ++dy) {
+    for (int32_t dx = 0; dx <= 1; ++dx) {
       const double weight =
           (dx == 1 ? fx : 1.0 - fx) * (dy == 1 ? fy : 1.0 - fy);
       const float value = weight > 0.0
@@ -201,7 +202,7 @@ QString WebTerrainSource::id() const
       .arg(verticalDatum);
 }
 
-QUrl WebTerrainSource::tileUrl(int zoom, int x, int y) const
+QUrl WebTerrainSource::tileUrl(int32_t zoom, int32_t x, int32_t y) const
 {
   QString url = urlTemplate;
   url.replace(QLatin1String("{z}"), QString::number(zoom));
@@ -240,27 +241,27 @@ QString WebTerrainProvider::name() const
                                  : m_source.name;
 }
 
-int WebTerrainProvider::zoomForLevel(int level) const
+int32_t WebTerrainProvider::zoomForLevel(int32_t level) const
 {
   // Pixels as far apart as the samples at the equator: zoom z has
   // 360° / (size · 2^z) per pixel, level L 180° / (64 · 2^L) per sample.
-  const int sizeSteps = m_source.tileSizePx == 512 ? 1 : 0;
+  const int32_t sizeSteps = m_source.tileSizePx == 512 ? 1 : 0;
   return std::clamp(level - 1 - sizeSteps, 0, m_source.maximumZoom);
 }
 
-int WebTerrainProvider::maximumLevel() const
+int32_t WebTerrainProvider::maximumLevel() const
 {
-  const int sizeSteps = m_source.tileSizePx == 512 ? 1 : 0;
+  const int32_t sizeSteps = m_source.tileSizePx == 512 ? 1 : 0;
   return std::min(m_source.maximumZoom + 1 + sizeSteps, TileKey::maximumLevel);
 }
 
-int WebTerrainProvider::preferredLoaderThreads() const
+int32_t WebTerrainProvider::preferredLoaderThreads() const
 {
   return m_fetcher->settings().loaderThreads;
 }
 
 WebTerrainProvider::Fetched
-WebTerrainProvider::webTile(int zoom, int x, int y,
+WebTerrainProvider::webTile(int32_t zoom, int32_t x, int32_t y,
                             const std::atomic<bool>& cancelled)
 {
   // A TileKey stands for the web tile in the caches.
@@ -269,7 +270,7 @@ WebTerrainProvider::webTile(int zoom, int x, int y,
           m_tiles.find(key)) {
     return Fetched{FetchOutcome::Data, *kept};
   }
-  const int size = m_source.tileSizePx;
+  const int32_t size = m_source.tileSizePx;
   std::shared_ptr<Heights> heights;
   const FetchOutcome outcome = m_fetcher->fetch(
       key, m_source.tileUrl(zoom, x, y),
@@ -281,10 +282,10 @@ WebTerrainProvider::webTile(int zoom, int x, int y,
         }
         image = image.convertToFormat(QImage::Format_ARGB32);
         heights = std::make_shared<Heights>(gridIndex(size, 0, size));
-        for (int row = 0; row < size; ++row) {
+        for (int32_t row = 0; row < size; ++row) {
           const QRgb* line =
               reinterpret_cast<const QRgb*>(image.constScanLine(row));
-          for (int column = 0; column < size; ++column) {
+          for (int32_t column = 0; column < size; ++column) {
             (*heights)[gridIndex(row, column, size)] = static_cast<float>(
                 decodeTerrainPixel(line[column], m_source.encoding));
           }
@@ -305,9 +306,9 @@ WebTerrainProvider::loadHeights(TileKey key, const std::atomic<bool>& cancelled)
   if (!key.isValid()) {
     return std::nullopt;
   }
-  const int zoom = zoomForLevel(key.level);
-  const int size = m_source.tileSizePx;
-  const int tiles = 1 << zoom;
+  const int32_t zoom = zoomForLevel(key.level);
+  const int32_t size = m_source.tileSizePx;
+  const int32_t tiles = 1 << zoom;
   const double world = static_cast<double>(size) * tiles;
 
   HeightTile tile;
@@ -317,12 +318,15 @@ WebTerrainProvider::loadHeights(TileKey key, const std::atomic<bool>& cancelled)
   tile.heightsM.assign(count, static_cast<float>(noData));
   std::vector<GeoPoint> points(count);
   // The web tiles this tile needs, fetched once each.
-  std::map<std::pair<int, int>, Fetched> fetched;
-  const std::function<float(int, int)> pixel = [&](int gx, int gy) -> float {
-    const int wrapped = ((gx % (tiles * size)) + tiles * size) % (tiles * size);
-    const int clamped = std::clamp(gy, 0, tiles * size - 1);
-    const std::pair<int, int> at{wrapped / size, clamped / size};
-    std::map<std::pair<int, int>, Fetched>::iterator it = fetched.find(at);
+  std::map<std::pair<int32_t, int32_t>, Fetched> fetched;
+  const std::function<float(int32_t, int32_t)> pixel =
+      [&](int32_t gx, int32_t gy) -> float {
+    const int32_t wrapped =
+        ((gx % (tiles * size)) + tiles * size) % (tiles * size);
+    const int32_t clamped = std::clamp(gy, 0, tiles * size - 1);
+    const std::pair<int32_t, int32_t> at{wrapped / size, clamped / size};
+    std::map<std::pair<int32_t, int32_t>, Fetched>::iterator it =
+        fetched.find(at);
     if (it == fetched.end()) {
       it = fetched.emplace(at, webTile(zoom, at.first, at.second, cancelled))
                .first;
@@ -338,8 +342,8 @@ WebTerrainProvider::loadHeights(TileKey key, const std::atomic<bool>& cancelled)
   };
 
   bool found = false;
-  for (int row = 0; row < samples; ++row) {
-    for (int column = 0; column < samples; ++column) {
+  for (int32_t row = 0; row < samples; ++row) {
+    for (int32_t column = 0; column < samples; ++column) {
       const std::size_t i = gridIndex(row, column, samples);
       points[i] = heightSamplePoint(key, samples, row, column);
       const double lat = points[i].latDeg;
@@ -351,8 +355,8 @@ WebTerrainProvider::loadHeights(TileKey key, const std::atomic<bool>& cancelled)
       const double u = (points[i].lonDeg + 180.0) / 360.0 * world - 0.5;
       const double v =
           (1.0 - std::asinh(std::tan(latRad)) / pi) / 2.0 * world - 0.5;
-      const int x0 = static_cast<int>(std::floor(u));
-      const int y0 = static_cast<int>(std::floor(v));
+      const int32_t x0 = static_cast<int32_t>(std::floor(u));
+      const int32_t y0 = static_cast<int32_t>(std::floor(v));
       const double height = bilinear(pixel, x0, y0, u - x0, v - y0);
       if (!std::isnan(height)) {
         tile.heightsM[i] = static_cast<float>(height);
@@ -361,10 +365,11 @@ WebTerrainProvider::loadHeights(TileKey key, const std::atomic<bool>& cancelled)
     }
   }
   if (cancelled.load() ||
-      std::any_of(fetched.begin(), fetched.end(),
-                  [](const std::pair<const std::pair<int, int>, Fetched>& web) {
-                    return web.second.outcome == FetchOutcome::Cancelled;
-                  })) {
+      std::any_of(
+          fetched.begin(), fetched.end(),
+          [](const std::pair<const std::pair<int32_t, int32_t>, Fetched>& web) {
+            return web.second.outcome == FetchOutcome::Cancelled;
+          })) {
     return std::nullopt;
   }
   if (!found && !tile.incomplete) {

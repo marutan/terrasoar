@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include <QCoreApplication>
 
@@ -54,7 +55,7 @@ double unitLatitude(const CylindricalProjection::Parameters& p, double psi)
   // precision near the poles.
   const double e = p.eccentricity;
   double theta = std::atan(std::sinh(psi / p.scale));
-  for (int i = 0; i < 30 && e > 0.0; ++i) {
+  for (int32_t i = 0; i < 30 && e > 0.0; ++i) {
     const double next = std::atan(
         std::sinh((psi + e * std::atanh(e * std::sin(theta))) / p.scale));
     const bool converged = std::abs(next - theta) < 1e-16;

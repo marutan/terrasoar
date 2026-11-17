@@ -19,6 +19,7 @@
  */
 
 #include <array>
+#include <cstdint>
 
 #include <QDir>
 #include <QJsonArray>
@@ -44,7 +45,7 @@ namespace
 struct Run {
   bool finished = false;
   QProcess::ExitStatus status = QProcess::CrashExit;
-  int exitCode = -1;
+  int32_t exitCode = -1;
   QByteArray out;
   QByteArray err;
 };
@@ -54,7 +55,7 @@ struct Run {
  * With @p headless the offscreen platform is used, so no display is needed.
  */
 Run runApp(const QStringList& arguments, bool headless = true,
-           int timeoutMs = 60000,
+           int32_t timeoutMs = 60000,
            const QProcessEnvironment& extra = QProcessEnvironment())
 {
   QProcess process;

@@ -25,6 +25,7 @@
 #ifndef TS_CAMERA_CAMERACONTROLLER_H
 #define TS_CAMERA_CAMERACONTROLLER_H
 
+#include <cstdint>
 #include <deque>
 #include <optional>
 
@@ -39,7 +40,7 @@ namespace ts
 /**
  * Continuous motions driven by held keys. Combine with `|`.
  */
-enum CameraMotion : unsigned int {
+enum CameraMotion : uint32_t {
   /** No key held. */
   NoMotion = 0,
   /** Move the target forward (in the heading direction). */
@@ -179,10 +180,10 @@ public:
   void zoomAt(QPointF positionPx, double steps);
 
   /** Sets the held-key motions, a combination of CameraMotion flags. */
-  void setMotion(unsigned int motion);
+  void setMotion(uint32_t motion);
 
   /** Returns the held-key motions. */
-  unsigned int motion() const { return m_motion; }
+  uint32_t motion() const { return m_motion; }
 
   /**
    * Starts an animated flight to @p pose. @p durationS ≤ 0 picks a
@@ -273,7 +274,7 @@ private:
   std::optional<Flight> m_flight;
   std::optional<Morph> m_morph;
   ViewMode m_viewMode = ViewMode::Globe;
-  unsigned int m_motion = NoMotion;
+  uint32_t m_motion = NoMotion;
 };
 
 } // namespace ts

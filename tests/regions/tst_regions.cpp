@@ -21,7 +21,9 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -76,7 +78,7 @@ ts::WmsSource mockSource(const QUrl& url)
 
 // Size, then the byte to fill with, as QByteArray(int, char).
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-ts::CachedTile tileOf(int bytes, char fill, long long expiresS = 0)
+ts::CachedTile tileOf(int32_t bytes, char fill, int64_t expiresS = 0)
 {
   ts::CachedTile tile;
   tile.data = QByteArray(bytes, fill);
@@ -86,12 +88,13 @@ ts::CachedTile tileOf(int bytes, char fill, long long expiresS = 0)
 }
 
 /** Every tile at @p level that the region intersects, by brute force. */
-std::set<ts::TileKey> bruteForce(const ts::RegionGeometry& region, int level,
+std::set<ts::TileKey> bruteForce(const ts::RegionGeometry& region,
+                                 int32_t level,
                                  const std::optional<ts::GeoRect>& data = {})
 {
   std::set<ts::TileKey> keys;
-  for (int y = 0; y < ts::TileKey::rows(level); ++y) {
-    for (int x = 0; x < ts::TileKey::columns(level); ++x) {
+  for (int32_t y = 0; y < ts::TileKey::rows(level); ++y) {
+    for (int32_t x = 0; x < ts::TileKey::columns(level); ++x) {
       const ts::TileKey key{level, x, y};
       const ts::GeoRect rect = key.bounds();
       ts::GeoRect clipped = rect;
@@ -366,8 +369,8 @@ private slots:
         ts::RegionGeometry::rectangle(0.0, 0.0, 90.0, 90.0);
     const ts::RegionTileCount counts =
         ts::countRegionTiles(quarter, 0, 3, std::nullopt);
-    QCOMPARE(counts.perLevel, (std::vector<long long>{1, 1, 4, 16}));
-    QCOMPARE(counts.total(), 22LL);
+    QCOMPARE(counts.perLevel, (std::vector<int64_t>{1, 1, 4, 16}));
+    QCOMPARE(counts.total(), int64_t{22});
     const std::vector<ts::TileKey> keys =
         iterate(ts::RegionTileIterator(quarter, 0, 3, std::nullopt));
     QCOMPARE(keys.size(), std::size_t{22});
@@ -388,7 +391,8 @@ private slots:
                                            pacificKeys.end());
     QCOMPARE(pacificSet, (std::set<ts::TileKey>{
                              {3, 0, 3}, {3, 15, 3}, {3, 0, 4}, {3, 15, 4}}));
-    QCOMPARE(ts::countRegionTiles(pacific, 3, 3, std::nullopt).total(), 4LL);
+    QCOMPARE(ts::countRegionTiles(pacific, 3, 3, std::nullopt).total(),
+             int64_t{4});
 
     // A rectangle reaching the north pole takes the whole top row there.
     const ts::RegionGeometry arctic =
@@ -397,14 +401,15 @@ private slots:
              ts::TileKey::columns(4));
 
     // Levels the wrong way round, or an empty area: nothing.
-    QCOMPARE(ts::countRegionTiles(quarter, 3, 2, std::nullopt).total(), 0LL);
+    QCOMPARE(ts::countRegionTiles(quarter, 3, 2, std::nullopt).total(),
+             int64_t{0});
     QVERIFY(!ts::RegionTileIterator(ts::RegionGeometry(), 0, 3, std::nullopt)
                  .next());
   }
 
   void tileSetsMatchBruteForce_data()
   {
-    QTest::addColumn<int>("which");
+    QTest::addColumn<int32_t>("which");
     QTest::newRow("British Isles") << 0;
     QTest::newRow("Fiji across the antimeridian") << 1;
     QTest::newRow("Bering Strait polygon") << 2;
@@ -419,7 +424,7 @@ private slots:
   {
     // countRegionTiles() (with its shortcut for covered tiles) and the
     // iterator give exactly the tiles a test of every tile gives.
-    QFETCH(int, which);
+    QFETCH(int32_t, which);
     ts::RegionGeometry region;
     std::optional<ts::GeoRect> data;
     switch (which) {
@@ -453,13 +458,13 @@ private slots:
       break;
     }
     QVERIFY(region.isValid());
-    const int maxLevel = 7;
+    const int32_t maxLevel = 7;
     const ts::RegionTileCount counts =
         ts::countRegionTiles(region, 0, maxLevel, data);
     const std::vector<ts::TileKey> keys =
         iterate(ts::RegionTileIterator(region, 0, maxLevel, data));
-    QCOMPARE(static_cast<long long>(keys.size()), counts.total());
-    for (int level = 0; level <= maxLevel; ++level) {
+    QCOMPARE(static_cast<int64_t>(keys.size()), counts.total());
+    for (int32_t level = 0; level <= maxLevel; ++level) {
       std::set<ts::TileKey> fromIterator;
       for (const ts::TileKey key : keys) {
         if (key.level == level) {
@@ -469,7 +474,7 @@ private slots:
       const std::set<ts::TileKey> expected = bruteForce(region, level, data);
       QCOMPARE(fromIterator, expected);
       QCOMPARE(counts.perLevel.at(static_cast<std::size_t>(level)),
-               static_cast<long long>(expected.size()));
+               static_cast<int64_t>(expected.size()));
     }
   }
 
@@ -531,7 +536,7 @@ private slots:
     QCOMPARE(samples.size(), std::size_t{40});
     std::set<ts::TileKey> distinct(samples.begin(), samples.end());
     QCOMPARE(distinct.size(), samples.size());
-    int deepest = 0;
+    int32_t deepest = 0;
     for (const ts::TileKey key : samples) {
       QVERIFY(key.level >= 2 && key.level <= 9);
       QVERIFY(isles.intersects(key.bounds()));
@@ -573,12 +578,12 @@ private slots:
     QVERIFY(uk.created.isValid());
     uk.tiles = 12345;
     uk.bytes = 678901234;
-    const long long first = store.add(uk);
+    const int64_t first = store.add(uk);
     ts::OfflineRegion pacific = uk;
     pacific.name = QStringLiteral("Pacific");
     pacific.geometry =
         ts::RegionGeometry::rectangle(170.0, -10.0, -170.0, 10.0);
-    const long long second = store.add(pacific);
+    const int64_t second = store.add(pacific);
     QVERIFY(first > 0 && second > first);
     QVERIFY(store.save(&error));
 
@@ -595,8 +600,8 @@ private slots:
     QCOMPARE(back->maximumLevel, 11);
     QCOMPARE(back->created, uk.created);
     QVERIFY(!back->downloaded.isValid());
-    QCOMPARE(back->tiles, 12345LL);
-    QCOMPARE(back->bytes, 678901234LL);
+    QCOMPARE(back->tiles, int64_t{12345});
+    QCOMPARE(back->bytes, int64_t{678901234});
     QVERIFY(again.find(second)->geometry == pacific.geometry);
     // Ids are never reused, even after the newest is removed.
     QVERIFY(again.remove(second));
@@ -632,13 +637,13 @@ private slots:
     // pinned tiles don't count against the limit.
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            50LL * 1000);
-    for (int i = 0; i < 3; ++i) {
+                            int64_t{50} * 1000);
+    for (int32_t i = 0; i < 3; ++i) {
       QVERIFY(cache.store(ts::TileKey{5, i, 0}, tileOf(10000, 'p'), 7));
     }
     QVERIFY(cache.isPinned(ts::TileKey{5, 0, 0}));
-    QCOMPARE(cache.pinnedBytes(), 30000LL);
-    for (int i = 0; i < 5; ++i) {
+    QCOMPARE(cache.pinnedBytes(), int64_t{30000});
+    for (int32_t i = 0; i < 5; ++i) {
       QVERIFY(cache.store(ts::TileKey{6, i, 0}, tileOf(10000, 'u')));
     }
     QCOMPARE(cache.count(), 8); // 30 KB pinned + 50 KB unpinned: no eviction
@@ -647,22 +652,22 @@ private slots:
     QVERIFY(!cache.find(ts::TileKey{6, 0, 0}));
     QVERIFY(!cache.find(ts::TileKey{6, 1, 0}));
     QVERIFY(cache.find(ts::TileKey{6, 2, 0}));
-    for (int i = 0; i < 3; ++i) {
+    for (int32_t i = 0; i < 3; ++i) {
       QVERIFY(cache.find(ts::TileKey{5, i, 0}));
     }
-    QCOMPARE(cache.sizeBytes(), 70000LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{70000});
     // Much more pressure: the pinned tiles stay.
-    for (int i = 0; i < 50; ++i) {
+    for (int32_t i = 0; i < 50; ++i) {
       QVERIFY(cache.store(ts::TileKey{8, i, 1}, tileOf(10000, 'v')));
     }
-    for (int i = 0; i < 3; ++i) {
+    for (int32_t i = 0; i < 3; ++i) {
       QVERIFY(cache.find(ts::TileKey{5, i, 0}));
     }
     QVERIFY(cache.sizeBytes() - cache.pinnedBytes() <= cache.maximumBytes());
     const ts::RegionUsage usage = cache.regionUsage(7);
-    QCOMPARE(usage.tiles, 3LL);
-    QCOMPARE(usage.bytes, 30000LL);
-    QCOMPARE(cache.pinnedRegions(), std::vector<long long>{7});
+    QCOMPARE(usage.tiles, int64_t{3});
+    QCOMPARE(usage.bytes, int64_t{30000});
+    QCOMPARE(cache.pinnedRegions(), std::vector<int64_t>{7});
   }
 
   void unpinningReturnsTilesToTheCache()
@@ -670,40 +675,40 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 50LL * 1000);
+      ts::TileDiskCache cache(path, int64_t{50} * 1000);
       // Two regions share tile 4/0/0.
       QVERIFY(cache.store(ts::TileKey{4, 0, 0}, tileOf(10000, 'a'), 1));
       QVERIFY(cache.pin(2, ts::TileKey{4, 0, 0}));
       QVERIFY(cache.store(ts::TileKey{4, 1, 0}, tileOf(10000, 'b'), 2));
       QVERIFY(!cache.pin(2, ts::TileKey{4, 9, 0})); // not stored
-      QCOMPARE(cache.pinnedBytes(), 20000LL);
+      QCOMPARE(cache.pinnedBytes(), int64_t{20000});
       // Replacing a pinned tile keeps it pinned, with its new size.
       QVERIFY(cache.store(ts::TileKey{4, 1, 0}, tileOf(12000, 'c')));
       QVERIFY(cache.isPinned(ts::TileKey{4, 1, 0}));
-      QCOMPARE(cache.pinnedBytes(), 22000LL);
-      for (int i = 0; i < 4; ++i) {
+      QCOMPARE(cache.pinnedBytes(), int64_t{22000});
+      for (int32_t i = 0; i < 4; ++i) {
         QVERIFY(cache.store(ts::TileKey{7, i, 0}, tileOf(10000, 'u')));
       }
     }
     // After a restart the pins and the sums are still there.
-    ts::TileDiskCache cache(path, 50LL * 1000);
-    QCOMPARE(cache.pinnedBytes(), 22000LL);
-    QCOMPARE(cache.pinnedRegions(), (std::vector<long long>{1, 2}));
+    ts::TileDiskCache cache(path, int64_t{50} * 1000);
+    QCOMPARE(cache.pinnedBytes(), int64_t{22000});
+    QCOMPARE(cache.pinnedRegions(), (std::vector<int64_t>{1, 2}));
     cache.unpinRegion(1);
     QVERIFY(cache.isPinned(ts::TileKey{4, 0, 0})); // region 2 still has it
     cache.unpinRegion(2);
     QVERIFY(!cache.isPinned(ts::TileKey{4, 0, 0}));
-    QCOMPARE(cache.pinnedBytes(), 0LL);
+    QCOMPARE(cache.pinnedBytes(), int64_t{0});
     // Now 62 KB unpinned in a 50 KB cache: evicted at once, oldest first
     // (the formerly pinned tiles are the oldest).
-    QVERIFY(cache.sizeBytes() <= 45000LL);
+    QVERIFY(cache.sizeBytes() <= int64_t{45000});
     QVERIFY(!cache.find(ts::TileKey{4, 0, 0}));
     QVERIFY(cache.find(ts::TileKey{7, 3, 0}));
     QVERIFY(cache.pinnedRegions().empty());
     // Removing a pinned tile removes its pins.
     QVERIFY(cache.store(ts::TileKey{2, 0, 0}, tileOf(100, 'x'), 3));
     cache.remove(ts::TileKey{2, 0, 0});
-    QCOMPARE(cache.pinnedBytes(), 0LL);
+    QCOMPARE(cache.pinnedBytes(), int64_t{0});
     QVERIFY(cache.pinnedRegions().empty());
   }
 
@@ -713,7 +718,7 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 50LL * 1000);
+      ts::TileDiskCache cache(path, int64_t{50} * 1000);
       QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(1000, 'a')));
     }
     {
@@ -722,11 +727,11 @@ private slots:
       QVERIFY(connection.execute(
           QStringLiteral("DROP TABLE pins; PRAGMA user_version=1")));
     }
-    ts::TileDiskCache cache(path, 50LL * 1000);
+    ts::TileDiskCache cache(path, int64_t{50} * 1000);
     QCOMPARE(cache.count(), 1);
     QCOMPARE(cache.recoveries(), 0);
     QVERIFY(cache.pin(5, ts::TileKey{1, 0, 0}));
-    QCOMPARE(cache.regionUsage(5).tiles, 1LL);
+    QCOMPARE(cache.regionUsage(5).tiles, int64_t{1});
   }
 
   // --- The bulk-download flag
@@ -858,14 +863,14 @@ private slots:
     QVERIFY(download.waitUntilSettled(std::chrono::seconds(60)));
     const ts::RegionDownloadProgress progress = download.progress();
     QCOMPARE(progress.state, State::Finished);
-    const long long expected =
+    const int64_t expected =
         ts::countRegionTiles(isles, 0, 6, std::nullopt).total();
     QCOMPARE(progress.totalTiles, expected);
     QCOMPARE(progress.doneTiles, expected);
     QCOMPARE(progress.downloadedTiles, expected);
-    QCOMPARE(progress.failedTiles, 0LL);
+    QCOMPARE(progress.failedTiles, int64_t{0});
     QCOMPARE(progress.fraction(), 1.0);
-    QCOMPARE(ts::test::mockGetMapCount(server), static_cast<int>(expected));
+    QCOMPARE(ts::test::mockGetMapCount(server), static_cast<int32_t>(expected));
     // Every tile is stored and pinned, though the cache's limit is far
     // smaller.
     ts::TileDiskCache* cache = provider->diskCache();
@@ -882,8 +887,8 @@ private slots:
     QVERIFY(again.start({}, &error));
     QVERIFY(again.waitUntilSettled(std::chrono::seconds(60)));
     QCOMPARE(again.progress().cachedTiles, expected);
-    QCOMPARE(again.progress().downloadedTiles, 0LL);
-    QCOMPARE(ts::test::mockGetMapCount(server), static_cast<int>(expected));
+    QCOMPARE(again.progress().downloadedTiles, int64_t{0});
+    QCOMPARE(ts::test::mockGetMapCount(server), static_cast<int32_t>(expected));
 
     // Data bounds: tiles outside the source's bounds aren't requested.
     ts::WmsSource bounded = mockSource(server.url(QStringLiteral("/wms")));
@@ -914,7 +919,7 @@ private slots:
         ts::RegionGeometry::rectangle(-20.0, 30.0, 20.0, 60.0);
     QString error;
     ts::RegionDownload download(provider, 1, area, 0, 6);
-    const long long total = download.progress().totalTiles;
+    const int64_t total = download.progress().totalTiles;
     QVERIFY(total > 60);
     QVERIFY(download.start({}, &error));
     QVERIFY(QTest::qWaitFor(
@@ -924,7 +929,7 @@ private slots:
     const ts::RegionDownloadProgress paused = download.progress();
     QCOMPARE(paused.state, State::Paused);
     QVERIFY(paused.doneTiles < total);
-    const int requests = ts::test::mockGetMapCount(server);
+    const int32_t requests = ts::test::mockGetMapCount(server);
     QTest::qWait(300);
     QCOMPARE(download.progress().doneTiles, paused.doneTiles);
     QCOMPARE(ts::test::mockGetMapCount(server), requests);
@@ -933,7 +938,7 @@ private slots:
     QCOMPARE(download.progress().state, State::Finished);
     QCOMPARE(download.progress().doneTiles, total);
     // Every tile requested once.
-    QCOMPARE(ts::test::mockGetMapCount(server), static_cast<int>(total));
+    QCOMPARE(ts::test::mockGetMapCount(server), static_cast<int32_t>(total));
 
     // Cancel: stops at once; what was stored stays pinned until the
     // region is unpinned.
@@ -949,7 +954,7 @@ private slots:
     QCOMPARE(cancelled.progress().state, State::Cancelled);
     QVERIFY(provider->diskCache()->regionUsage(2).tiles >= 2);
     provider->diskCache()->unpinRegion(2);
-    QCOMPARE(provider->diskCache()->regionUsage(2).tiles, 0LL);
+    QCOMPARE(provider->diskCache()->regionUsage(2).tiles, int64_t{0});
     QVERIFY(provider->diskCache()->regionUsage(1).tiles == total);
   }
 
@@ -1013,9 +1018,9 @@ private slots:
     const ts::RegionGeometry isles = polygonOf(britishIsles());
     const ts::RegionGeometry wide =
         ts::RegionGeometry::rectangle(10.0, 20.0, 50.0, 50.0);
-    int which = 0;
+    int32_t which = 0;
     for (const ts::RegionGeometry& area : {isles, wide}) {
-      const int maxLevel = which == 0 ? 7 : 6;
+      const int32_t maxLevel = which == 0 ? 7 : 6;
       const ts::RegionEstimate estimate = ts::estimateRegionSize(
           *provider, area, 0, maxLevel, 32, notCancelled, 11);
       QCOMPARE(estimate.sampledTiles, 32);
@@ -1029,8 +1034,8 @@ private slots:
       QVERIFY(progress.cachedTiles >= 32);
       const double ratio = static_cast<double>(estimate.bytes) /
                            static_cast<double>(progress.bytes);
-      qInfo("estimate %lld bytes, download %lld bytes (%.2f)", estimate.bytes,
-            progress.bytes, ratio);
+      qInfo("estimate %" PRId64 " bytes, download %" PRId64 " bytes (%.2f)",
+            estimate.bytes, progress.bytes, ratio);
       QVERIFY2(ratio > 0.7 && ratio < 1.3, qPrintable(QString::number(ratio)));
       ++which;
     }
@@ -1063,7 +1068,7 @@ private slots:
     // Beyond Web Mercator's limit there are no tiles.
     const ts::RegionGeometry arctic =
         ts::RegionGeometry::rectangle(-180.0, 86.0, 180.0, 90.0);
-    QCOMPARE(ts::countRegionTiles(arctic, 0, 8, bounds).total(), 0LL);
+    QCOMPARE(ts::countRegionTiles(arctic, 0, 8, bounds).total(), int64_t{0});
     // No disk cache: a region can't be kept.
     const ts::RegionTileResult result =
         provider.fetchForRegion(ts::TileKey{2, 3, 1}, 1, notCancelled);

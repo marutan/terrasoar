@@ -21,6 +21,7 @@
 #include "ts/network/networkclient.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <unordered_map>
@@ -81,7 +82,7 @@ NetworkError classify(QNetworkReply::NetworkError error)
  */
 bool isAnswer(const QNetworkReply& reply)
 {
-  const int status =
+  const int32_t status =
       reply.attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
   const bool cutShort =
       status >= 300 && status < 400 && reply.error() != QNetworkReply::NoError;
@@ -100,10 +101,10 @@ bool isRetryable(const HttpResponse& response)
 }
 
 /** Seconds of a Retry-After header (delta-seconds form only), or -1. */
-long long retryAfterS(const HttpResponse& response)
+int64_t retryAfterS(const HttpResponse& response)
 {
   bool ok = false;
-  const long long seconds =
+  const int64_t seconds =
       response.header("retry-after").trimmed().toLongLong(&ok);
   return ok && seconds >= 0 ? seconds : -1;
 }
@@ -134,9 +135,9 @@ public:
   /** Under mutex. */
   bool stopping = false;
   std::atomic<bool> wakePending{false};
-  std::atomic<int> inFlight{0};
-  std::atomic<int> attemptsSent{0};
-  std::atomic<int> peakInFlight{0};
+  std::atomic<int32_t> inFlight{0};
+  std::atomic<int32_t> attemptsSent{0};
+  std::atomic<int32_t> peakInFlight{0};
 };
 
 /**
@@ -162,12 +163,13 @@ public:
 private:
   struct Active {
     std::shared_ptr<NetworkTicket> ticket;
-    int attempt = 1;
+    int32_t attempt = 1;
     bool tooLarge = false;
     bool cancelled = false;
   };
 
-  void startAttempt(const std::shared_ptr<NetworkTicket>& ticket, int attempt);
+  void startAttempt(const std::shared_ptr<NetworkTicket>& ticket,
+                    int32_t attempt);
   void onFinished(QNetworkReply* reply);
   void checkSize(QNetworkReply* reply, qint64 received, qint64 total);
   void complete(const std::shared_ptr<NetworkTicket>& ticket,
@@ -250,8 +252,8 @@ void NetworkDispatcher::drain()
       next = m_core.pending.front();
       m_core.pending.pop_front();
     }
-    const int now = m_core.inFlight.fetch_add(1) + 1;
-    int peak = m_core.peakInFlight.load();
+    const int32_t now = m_core.inFlight.fetch_add(1) + 1;
+    int32_t peak = m_core.peakInFlight.load();
     while (now > peak &&
            !m_core.peakInFlight.compare_exchange_weak(peak, now)) {
     }
@@ -277,7 +279,7 @@ void NetworkDispatcher::abortAll()
 }
 
 void NetworkDispatcher::startAttempt(
-    const std::shared_ptr<NetworkTicket>& ticket, int attempt)
+    const std::shared_ptr<NetworkTicket>& ticket, int32_t attempt)
 {
   const HttpRequest& request = ticket->request();
   QNetworkRequest networkRequest(request.url);
@@ -286,7 +288,7 @@ void NetworkDispatcher::startAttempt(
     networkRequest.setRawHeader(header.first, header.second);
   }
   networkRequest.setTransferTimeout(
-      static_cast<int>(m_core.settings.timeout.count()));
+      static_cast<int32_t>(m_core.settings.timeout.count()));
   networkRequest.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
                               QNetworkRequest::AlwaysNetwork);
   networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
@@ -380,29 +382,30 @@ void NetworkDispatcher::onFinished(QNetworkReply* reply)
   if (isRetryable(response) && active.attempt < m_core.settings.attempts &&
       !stopping) {
     // Wait, holding the slot, then try again.
-    long long delayMs = m_core.settings.retryDelay.count();
-    for (int i = 1; i < active.attempt; ++i) {
+    int64_t delayMs = m_core.settings.retryDelay.count();
+    for (int32_t i = 1; i < active.attempt; ++i) {
       delayMs *= 2;
     }
-    const long long askedS = retryAfterS(response);
+    const int64_t askedS = retryAfterS(response);
     if (askedS >= 0) {
       delayMs = std::max(delayMs, askedS * 1000);
     }
     delayMs =
-        std::min<long long>(delayMs, m_core.settings.maximumRetryDelay.count());
+        std::min<int64_t>(delayMs, m_core.settings.maximumRetryDelay.count());
     const std::shared_ptr<NetworkTicket> ticket = active.ticket;
-    const int next = active.attempt + 1;
+    const int32_t next = active.attempt + 1;
     m_retrying.insert(ticket);
-    QTimer::singleShot(static_cast<int>(delayMs), this, [this, ticket, next]() {
-      if (m_retrying.erase(ticket) == 0) {
-        return; // cancelled meanwhile
-      }
-      if (ticket->isCancelled()) {
-        complete(ticket, cancelledResponse());
-        return;
-      }
-      startAttempt(ticket, next);
-    });
+    QTimer::singleShot(static_cast<int32_t>(delayMs), this,
+                       [this, ticket, next]() {
+                         if (m_retrying.erase(ticket) == 0) {
+                           return; // cancelled meanwhile
+                         }
+                         if (ticket->isCancelled()) {
+                           complete(ticket, cancelledResponse());
+                           return;
+                         }
+                         startAttempt(ticket, next);
+                       });
     return;
   }
   complete(active.ticket, response);
@@ -584,17 +587,17 @@ HttpResponse NetworkClient::fetch(const HttpRequest& request,
   return ticket->response();
 }
 
-int NetworkClient::inFlight() const
+int32_t NetworkClient::inFlight() const
 {
   return m_core->inFlight.load();
 }
 
-int NetworkClient::attemptsSent() const
+int32_t NetworkClient::attemptsSent() const
 {
   return m_core->attemptsSent.load();
 }
 
-int NetworkClient::peakInFlight() const
+int32_t NetworkClient::peakInFlight() const
 {
   return m_core->peakInFlight.load();
 }

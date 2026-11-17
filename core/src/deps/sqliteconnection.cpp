@@ -20,6 +20,7 @@
 
 #include "ts/deps/sqliteconnection.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <QByteArray>
@@ -31,7 +32,7 @@ namespace ts
 
 SqliteConnection::SqliteConnection(const QString& path, OpenMode mode)
 {
-  int flags = SQLITE_OPEN_NOMUTEX;
+  int32_t flags = SQLITE_OPEN_NOMUTEX;
   switch (mode) {
   case OpenMode::ReadOnly:
     flags |= SQLITE_OPEN_READONLY;
@@ -45,7 +46,7 @@ SqliteConnection::SqliteConnection(const QString& path, OpenMode mode)
   }
   const QByteArray encoded = path.toUtf8();
   sqlite3* db = nullptr;
-  const int rc = sqlite3_open_v2(encoded.constData(), &db, flags, nullptr);
+  const int32_t rc = sqlite3_open_v2(encoded.constData(), &db, flags, nullptr);
   if (rc != SQLITE_OK) {
     m_error = db ? QString::fromUtf8(sqlite3_errmsg(db))
                  : QString::fromUtf8(sqlite3_errstr(rc));
@@ -91,7 +92,7 @@ bool SqliteConnection::execute(const QString& sql)
   }
   const QByteArray encoded = sql.toUtf8();
   char* message = nullptr;
-  const int rc =
+  const int32_t rc =
       sqlite3_exec(m_db, encoded.constData(), nullptr, nullptr, &message);
   if (rc != SQLITE_OK) {
     m_error = QString::fromUtf8(message ? message : sqlite3_errmsg(m_db));
@@ -101,7 +102,7 @@ bool SqliteConnection::execute(const QString& sql)
   return true;
 }
 
-long long SqliteConnection::queryInteger(const QString& sql, bool* ok)
+int64_t SqliteConnection::queryInteger(const QString& sql, bool* ok)
 {
   if (ok != nullptr) {
     *ok = false;
@@ -116,8 +117,8 @@ long long SqliteConnection::queryInteger(const QString& sql, bool* ok)
     m_error = QString::fromUtf8(sqlite3_errmsg(m_db));
     return 0;
   }
-  long long value = 0;
-  const int rc = sqlite3_step(statement);
+  int64_t value = 0;
+  const int32_t rc = sqlite3_step(statement);
   if (rc == SQLITE_ROW) {
     value = sqlite3_column_int64(statement, 0);
     if (ok != nullptr) {

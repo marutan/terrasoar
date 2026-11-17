@@ -21,6 +21,7 @@
 #include "ts/i18n/pseudotranslator.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <string_view>
 
 #include <QChar>
@@ -56,13 +57,13 @@ bool isDigit(QChar c)
  * Length of the Qt placeholder (%1..%99, %L1, %n, %Ln) starting at
  * @p i in @p source, or 0 if there is none.
  */
-int placeholderLength(const QString& source, int i)
+int32_t placeholderLength(const QString& source, int32_t i)
 {
-  const int size = static_cast<int>(source.size());
+  const int32_t size = static_cast<int32_t>(source.size());
   if (source.at(i) != QLatin1Char('%') || i + 1 >= size) {
     return 0;
   }
-  int j = i + 1;
+  int32_t j = i + 1;
   if (source.at(j) == QLatin1Char('L')) {
     ++j;
   }
@@ -87,7 +88,7 @@ PseudoTranslator::PseudoTranslator(QObject* parent) : QTranslator(parent) {}
 QString PseudoTranslator::translate(const char* /*context*/,
                                     const char* sourceText,
                                     const char* /*disambiguation*/,
-                                    int /*n*/) const
+                                    int32_t /*n*/) const
 {
   if (sourceText == nullptr || *sourceText == '\0') {
     return QString();
@@ -105,13 +106,13 @@ QString PseudoTranslator::pseudoTranslate(const QString& source)
   QString out;
   out.reserve(source.size() * 2 + 2);
   out += QLatin1Char('[');
-  int visible = 0;
-  int i = 0;
-  const int size = static_cast<int>(source.size());
+  int32_t visible = 0;
+  int32_t i = 0;
+  const int32_t size = static_cast<int32_t>(source.size());
   while (i < size) {
     const QChar c = source.at(i);
     // Placeholders are copied untouched.
-    const int placeholder = placeholderLength(source, i);
+    const int32_t placeholder = placeholderLength(source, i);
     if (placeholder > 0) {
       out += source.mid(i, placeholder);
       visible += 2;
@@ -132,7 +133,8 @@ QString PseudoTranslator::pseudoTranslate(const QString& source)
     }
     if (c == QLatin1Char('<')) {
       // Keep HTML tags as they are.
-      const int end = static_cast<int>(source.indexOf(QLatin1Char('>'), i));
+      const int32_t end =
+          static_cast<int32_t>(source.indexOf(QLatin1Char('>'), i));
       if (end > i) {
         out += source.mid(i, end - i + 1);
         i = end + 1;
@@ -144,7 +146,7 @@ QString PseudoTranslator::pseudoTranslate(const QString& source)
     ++i;
   }
   // Integer maths so the rounding is exact.
-  const int padding = (visible * expansionPercent + 99) / 100;
+  const int32_t padding = (visible * expansionPercent + 99) / 100;
   out += QString(padding, QLatin1Char('~'));
   out += QLatin1Char(']');
   return out;

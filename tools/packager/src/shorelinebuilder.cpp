@@ -22,6 +22,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <set>
@@ -88,7 +89,7 @@ Box boxOf(TileKey key)
 /** A polygon with the GSHHG level it came from. */
 struct Piece {
   GeomPtr geometry;
-  int level = 0;
+  int32_t level = 0;
   Box box;
 };
 
@@ -136,7 +137,7 @@ public:
       return QByteArray();
     }
     QByteArray bytes(reinterpret_cast<const char*>(data),
-                     static_cast<int>(size));
+                     static_cast<int32_t>(size));
     GEOSFree_r(m_context, data);
     return bytes;
   }
@@ -160,7 +161,7 @@ public:
   void collectPolygons(const GEOSGeometry* geometry,
                        std::vector<GEOSGeometry*>* parts) const
   {
-    const int type = GEOSGeomTypeId_r(m_context, geometry);
+    const int32_t type = GEOSGeomTypeId_r(m_context, geometry);
     if (type == GEOS_POLYGON) {
       if (!isEmpty(geometry)) {
         parts->push_back(GEOSGeom_clone_r(m_context, geometry));
@@ -168,8 +169,8 @@ public:
       return;
     }
     if (type == GEOS_MULTIPOLYGON || type == GEOS_GEOMETRYCOLLECTION) {
-      const int count = GEOSGetNumGeometries_r(m_context, geometry);
-      for (int i = 0; i < count; ++i) {
+      const int32_t count = GEOSGetNumGeometries_r(m_context, geometry);
+      for (int32_t i = 0; i < count; ++i) {
         collectPolygons(GEOSGetGeometryN_r(m_context, geometry, i), parts);
       }
     }
@@ -183,7 +184,7 @@ public:
     }
     GeomPtr result = wrap(
         GEOSGeom_createCollection_r(m_context, GEOS_MULTIPOLYGON, parts->data(),
-                                    static_cast<unsigned int>(parts->size())));
+                                    static_cast<uint32_t>(parts->size())));
     parts->clear();
     return result;
   }
@@ -194,7 +195,7 @@ public:
     if (geometry == nullptr || isEmpty(geometry.get())) {
       return GeomPtr(nullptr, GeomDeleter{m_context});
     }
-    const int type = GEOSGeomTypeId_r(m_context, geometry.get());
+    const int32_t type = GEOSGeomTypeId_r(m_context, geometry.get());
     if (type == GEOS_POLYGON || type == GEOS_MULTIPOLYGON) {
       return geometry;
     }
@@ -225,12 +226,12 @@ public:
     }
     const GeomPtr collection = wrap(GEOSGeom_createCollection_r(
         m_context, GEOS_GEOMETRYCOLLECTION, parts.data(),
-        static_cast<unsigned int>(parts.size())));
+        static_cast<uint32_t>(parts.size())));
     return keep(wrap(GEOSUnaryUnion_r(m_context, collection.get())));
   }
 
   /** Makes @p geometry valid if it is not; counts repairs. */
-  GeomPtr repair(GeomPtr geometry, int* repaired) const
+  GeomPtr repair(GeomPtr geometry, int32_t* repaired) const
   {
     if (geometry == nullptr || GEOSisValid_r(m_context, geometry.get()) == 1) {
       return geometry;
@@ -252,13 +253,13 @@ std::vector<double> coordinates(const Geos& geos, const GEOSGeometry* line)
   std::vector<double> lonLat;
   const GEOSCoordSequence* sequence =
       GEOSGeom_getCoordSeq_r(geos.context(), line);
-  unsigned int size = 0;
+  uint32_t size = 0;
   if (sequence == nullptr ||
       GEOSCoordSeq_getSize_r(geos.context(), sequence, &size) == 0) {
     return lonLat;
   }
   lonLat.reserve(static_cast<std::size_t>(size) * 2);
-  for (unsigned int i = 0; i < size; ++i) {
+  for (uint32_t i = 0; i < size; ++i) {
     double x = 0.0;
     double y = 0.0;
     GEOSCoordSeq_getXY_r(geos.context(), sequence, i, &x, &y);
@@ -273,16 +274,16 @@ void forEachRing(const Geos& geos, const GEOSGeometry* geometry,
                  const std::function<void(const GEOSGeometry*, bool)>& visit)
 {
   GEOSContextHandle_t context = geos.context();
-  const int type = GEOSGeomTypeId_r(context, geometry);
+  const int32_t type = GEOSGeomTypeId_r(context, geometry);
   if (type == GEOS_POLYGON) {
     visit(GEOSGetExteriorRing_r(context, geometry), true);
-    const int holes = GEOSGetNumInteriorRings_r(context, geometry);
-    for (int i = 0; i < holes; ++i) {
+    const int32_t holes = GEOSGetNumInteriorRings_r(context, geometry);
+    for (int32_t i = 0; i < holes; ++i) {
       visit(GEOSGetInteriorRingN_r(context, geometry, i), false);
     }
   } else if (type == GEOS_MULTIPOLYGON || type == GEOS_GEOMETRYCOLLECTION) {
-    const int count = GEOSGetNumGeometries_r(context, geometry);
-    for (int i = 0; i < count; ++i) {
+    const int32_t count = GEOSGetNumGeometries_r(context, geometry);
+    for (int32_t i = 0; i < count; ++i) {
       forEachRing(geos, GEOSGetGeometryN_r(context, geometry, i), visit);
     }
   }
@@ -337,10 +338,10 @@ OGRGeometryH closedAtPole(OGRGeometryH geometry)
     return nullptr;
   }
   OGRGeometryH ring = OGR_G_GetGeometryRef(geometry, 0);
-  const int count = OGR_G_GetPointCount(ring);
+  const int32_t count = OGR_G_GetPointCount(ring);
   std::vector<double> lonLat;
   lonLat.reserve(static_cast<std::size_t>(count) * 2);
-  for (int i = 0; i < count; ++i) {
+  for (int32_t i = 0; i < count; ++i) {
     lonLat.push_back(OGR_G_GetX(ring, i));
     lonLat.push_back(OGR_G_GetY(ring, i));
   }
@@ -355,7 +356,7 @@ OGRGeometryH closedAtPole(OGRGeometryH geometry)
   return polygon;
 }
 
-bool readLevel(const Geos& geos, const QString& path, int level,
+bool readLevel(const Geos& geos, const QString& path, int32_t level,
                const ShorelineOptions& options, std::vector<Piece>* polygons,
                ShorelineLodStats* stats, QString* errorString)
 {
@@ -368,8 +369,9 @@ bool readLevel(const Geos& geos, const QString& path, int level,
   OGRLayerH layer =
       GDALDatasetGetLayer(static_cast<GDALDatasetH>(dataset.handle()), 0);
   OGR_L_ResetReading(layer);
-  const int areaField = OGR_FD_GetFieldIndex(OGR_L_GetLayerDefn(layer), "area");
-  const int idField = OGR_FD_GetFieldIndex(OGR_L_GetLayerDefn(layer), "id");
+  const int32_t areaField =
+      OGR_FD_GetFieldIndex(OGR_L_GetLayerDefn(layer), "area");
+  const int32_t idField = OGR_FD_GetFieldIndex(OGR_L_GetLayerDefn(layer), "id");
   // GSHHG gives both halves of a polygon split at the antimeridian
   // (Eurasia, Antarctica) the whole polygon's area: count it once.
   std::set<QString> counted;
@@ -451,7 +453,7 @@ public:
     if (key.level == m_lod.storageLevel) {
       return writeTile(key, inside);
     }
-    for (int i = 0; i < 4; ++i) {
+    for (int32_t i = 0; i < 4; ++i) {
       if (!cut(key.child(i), inside)) {
         return false;
       }
@@ -465,7 +467,7 @@ private:
   {
     std::array<std::vector<const GEOSGeometry*>, 4> byRole;
     for (const Piece& piece : pieces) {
-      const int role = piece.level == 5 ? 0 : piece.level - 1;
+      const int32_t role = piece.level == 5 ? 0 : piece.level - 1;
       if (role >= 0 && role < 4) {
         byRole.at(static_cast<std::size_t>(role))
             .push_back(piece.geometry.get());
@@ -622,8 +624,9 @@ double rhumbRingAreaKm2(const std::vector<double>& lonLatDeg)
     const std::size_t next = (i + 1) % points;
     const double lonStep = lonLatDeg[2 * next] - lon;
     const double latStep = lonLatDeg[2 * next + 1] - lat;
-    const int steps = static_cast<int>(std::ceil(std::abs(lonStep) / 90.0));
-    for (int step = 1; step < steps; ++step) {
+    const int32_t steps =
+        static_cast<int32_t>(std::ceil(std::abs(lonStep) / 90.0));
+    for (int32_t step = 1; step < steps; ++step) {
       const double t = static_cast<double>(step) / steps;
       polygon.AddPoint(lat + t * latStep, lon + t * lonStep);
     }
@@ -673,7 +676,7 @@ bool buildShoreline(const ShorelineOptions& options,
     ShorelineLodStats lodStats;
     lodStats.resolution = lod.resolution;
     std::vector<Piece> polygons;
-    for (int level = 1; level <= 5; ++level) {
+    for (int32_t level = 1; level <= 5; ++level) {
       const QString path =
           options.shapefileDirectory +
           QStringLiteral("/%1/GSHHS_%1_L%2.shp").arg(lod.resolution).arg(level);

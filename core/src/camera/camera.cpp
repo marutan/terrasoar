@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "ts/geo/ellipsoid.h"
 #include "ts/geo/wgs84.h"
@@ -88,7 +89,7 @@ double rangeForEyeHeight(CameraPose pose, double heightM)
     high *= 2.0;
     pose.rangeM = high;
   }
-  for (int i = 0; i < 64; ++i) {
+  for (int32_t i = 0; i < 64; ++i) {
     pose.rangeM = 0.5 * (low + high);
     if (eyeHeightM(pose) < heightM) {
       low = pose.rangeM;
@@ -369,12 +370,12 @@ std::optional<Geodetic> Camera::pickSurface(const Ray& ray) const
   double previous = 0.0;
   double t = 0.0;
   double height = above(t);
-  for (int i = 0; i < 4000 && t < m_farM; ++i) {
+  for (int32_t i = 0; i < 4000 && t < m_farM; ++i) {
     if (height <= 0.0) {
       // Bisect between the last point above and the first below.
       double low = previous;
       double high = t;
-      for (int j = 0; j < 40; ++j) {
+      for (int32_t j = 0; j < 40; ++j) {
         const double mid = 0.5 * (low + high);
         (above(mid) > 0.0 ? low : high) = mid;
       }

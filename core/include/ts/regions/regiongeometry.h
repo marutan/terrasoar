@@ -25,6 +25,7 @@
 #ifndef TS_REGIONS_REGIONGEOMETRY_H
 #define TS_REGIONS_REGIONGEOMETRY_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <random>
@@ -183,9 +184,9 @@ private:
 /** Tiles of a region per level, as countRegionTiles() returns them. */
 struct RegionTileCount {
   /** The first level counted. */
-  int minimumLevel = 0;
+  int32_t minimumLevel = 0;
   /** Tiles at minimumLevel, minimumLevel + 1, … */
-  std::vector<long long> perLevel;
+  std::vector<int64_t> perLevel;
   /**
    * False if counting stopped early, past the limit given: then the
    * counts are only a lower bound.
@@ -193,7 +194,7 @@ struct RegionTileCount {
   bool complete = true;
 
   /** Returns the total over all levels. */
-  long long total() const;
+  int64_t total() const;
 };
 
 /**
@@ -207,10 +208,10 @@ struct RegionTileCount {
  *
  * @reentrant
  */
-RegionTileCount countRegionTiles(const RegionGeometry& region, int minimumLevel,
-                                 int maximumLevel,
+RegionTileCount countRegionTiles(const RegionGeometry& region,
+                                 int32_t minimumLevel, int32_t maximumLevel,
                                  const std::optional<GeoRect>& dataBounds,
-                                 std::optional<long long> stopAbove = {});
+                                 std::optional<int64_t> stopAbove = {});
 
 /**
  * Hands out the tiles of a region one by one, level by level from the
@@ -224,7 +225,8 @@ class RegionTileIterator
 {
 public:
   /** Iterates the tiles of @p region, see countRegionTiles(). */
-  RegionTileIterator(RegionGeometry region, int minimumLevel, int maximumLevel,
+  RegionTileIterator(RegionGeometry region, int32_t minimumLevel,
+                     int32_t maximumLevel,
                      const std::optional<GeoRect>& dataBounds);
 
   /** Returns the next tile, or nothing at the end. */
@@ -235,9 +237,9 @@ private:
   void startLevel();
 
   RegionGeometry m_region;
-  int m_maximumLevel;
+  int32_t m_maximumLevel;
   std::optional<GeoRect> m_dataBounds;
-  int m_level;
+  int32_t m_level;
   std::vector<TileKey> m_stack;
 };
 
@@ -252,7 +254,7 @@ private:
 std::vector<TileKey> sampleRegionTiles(const RegionGeometry& region,
                                        const RegionTileCount& counts,
                                        const std::optional<GeoRect>& dataBounds,
-                                       int count, std::mt19937_64& random);
+                                       int32_t count, std::mt19937_64& random);
 
 } // namespace ts
 

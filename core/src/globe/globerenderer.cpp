@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "ts/camera/camera.h"
 #include "ts/geo/geodetic.h"
@@ -256,8 +257,8 @@ std::array<float, 16> floatMatrix(const Mat4& m)
 {
   std::array<float, 16> result{};
   std::size_t index = 0;
-  for (int column = 0; column < 4; ++column) {
-    for (int row = 0; row < 4; ++row) {
+  for (int32_t column = 0; column < 4; ++column) {
+    for (int32_t row = 0; row < 4; ++row) {
       result.at(index++) = static_cast<float>(m.at(row, column));
     }
   }
@@ -297,7 +298,7 @@ struct GlobeRenderer::Resources {
   std::unique_ptr<GpuBuffer> markerInstances;
   std::size_t globeOffset = 0;
   std::size_t markerCapacity = 0;
-  int markerCount = 0;
+  int32_t markerCount = 0;
 };
 
 GlobeRenderer::GlobeRenderer(RenderDevice& device)
@@ -529,7 +530,7 @@ void GlobeRenderer::uploadMarkers(const Camera& camera)
     r.markerInstances->update(0, instances.data(),
                               instances.size() * sizeof(MarkerInstance));
   }
-  r.markerCount = static_cast<int>(instances.size());
+  r.markerCount = static_cast<int32_t>(instances.size());
   m_markersDirty = false;
 }
 

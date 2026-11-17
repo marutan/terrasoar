@@ -21,6 +21,7 @@
 #include "offlineregionmanager.h"
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 #include <QDateTime>
@@ -38,7 +39,7 @@ namespace
 {
 
 /** How often running downloads are looked at, ms. */
-constexpr int pollIntervalMs = 250;
+constexpr int32_t pollIntervalMs = 250;
 
 } // namespace
 
@@ -59,14 +60,14 @@ OfflineRegionManager::OfflineRegionManager(ProviderRegistry& registry,
 OfflineRegionManager::~OfflineRegionManager()
 {
   // Cancel them all before waiting for any.
-  for (const std::pair<const long long, std::unique_ptr<RegionDownload>>&
+  for (const std::pair<const int64_t, std::unique_ptr<RegionDownload>>&
            download : m_downloads) {
     download.second->cancel();
   }
   m_downloads.clear();
 }
 
-const OfflineRegion* OfflineRegionManager::region(long long id) const
+const OfflineRegion* OfflineRegionManager::region(int64_t id) const
 {
   return m_store.find(id);
 }
@@ -125,13 +126,13 @@ bool OfflineRegionManager::startDownload(OfflineRegion& region,
   return true;
 }
 
-long long OfflineRegionManager::addRegion(OfflineRegion region,
-                                          QString* errorString)
+int64_t OfflineRegionManager::addRegion(OfflineRegion region,
+                                        QString* errorString)
 {
   if (!region.created.isValid()) {
     region.created = QDateTime::currentDateTimeUtc();
   }
-  const long long id = m_store.add(std::move(region));
+  const int64_t id = m_store.add(std::move(region));
   OfflineRegion* added = m_store.find(id);
   if (!startDownload(*added, errorString)) {
     m_store.remove(id);
@@ -142,13 +143,13 @@ long long OfflineRegionManager::addRegion(OfflineRegion region,
   return id;
 }
 
-bool OfflineRegionManager::resume(long long id, QString* errorString)
+bool OfflineRegionManager::resume(int64_t id, QString* errorString)
 {
   OfflineRegion* region = m_store.find(id);
   if (!region) {
     return false;
   }
-  const std::map<long long, std::unique_ptr<RegionDownload>>::iterator running =
+  const std::map<int64_t, std::unique_ptr<RegionDownload>>::iterator running =
       m_downloads.find(id);
   if (running != m_downloads.end()) {
     running->second->resume();
@@ -162,9 +163,9 @@ bool OfflineRegionManager::resume(long long id, QString* errorString)
   return true;
 }
 
-void OfflineRegionManager::pause(long long id)
+void OfflineRegionManager::pause(int64_t id)
 {
-  const std::map<long long, std::unique_ptr<RegionDownload>>::iterator running =
+  const std::map<int64_t, std::unique_ptr<RegionDownload>>::iterator running =
       m_downloads.find(id);
   if (running != m_downloads.end()) {
     running->second->pause();
@@ -172,7 +173,7 @@ void OfflineRegionManager::pause(long long id)
   }
 }
 
-void OfflineRegionManager::remove(long long id)
+void OfflineRegionManager::remove(int64_t id)
 {
   OfflineRegion* region = m_store.find(id);
   if (!region) {
@@ -191,9 +192,9 @@ void OfflineRegionManager::remove(long long id)
 }
 
 std::optional<RegionDownloadProgress>
-OfflineRegionManager::progress(long long id) const
+OfflineRegionManager::progress(int64_t id) const
 {
-  const std::map<long long, std::unique_ptr<RegionDownload>>::const_iterator
+  const std::map<int64_t, std::unique_ptr<RegionDownload>>::const_iterator
       running = m_downloads.find(id);
   if (running == m_downloads.end()) {
     return std::nullopt;
@@ -204,17 +205,17 @@ OfflineRegionManager::progress(long long id) const
 QString OfflineRegionManager::statusText() const
 {
   QStringList parts;
-  for (const std::pair<const long long, std::unique_ptr<RegionDownload>>&
+  for (const std::pair<const int64_t, std::unique_ptr<RegionDownload>>&
            download : m_downloads) {
     const RegionDownloadProgress progress = download.second->progress();
     if (progress.state != RegionDownloadProgress::State::Running) {
       continue;
     }
     const OfflineRegion* region = m_store.find(download.first);
-    parts.append(
-        tr("Downloading “%1”: %2 %")
-            .arg(region ? region->name : QString())
-            .arg(static_cast<int>(std::floor(progress.fraction() * 100.0))));
+    parts.append(tr("Downloading “%1”: %2 %")
+                     .arg(region ? region->name : QString())
+                     .arg(static_cast<int32_t>(
+                         std::floor(progress.fraction() * 100.0))));
   }
   return parts.join(QStringLiteral(" · "));
 }
@@ -222,7 +223,7 @@ QString OfflineRegionManager::statusText() const
 void OfflineRegionManager::poll()
 {
   bool finished = false;
-  std::map<long long, std::unique_ptr<RegionDownload>>::iterator download =
+  std::map<int64_t, std::unique_ptr<RegionDownload>>::iterator download =
       m_downloads.begin();
   while (download != m_downloads.end()) {
     const RegionDownloadProgress progress = download->second->progress();

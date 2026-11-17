@@ -26,6 +26,7 @@
 #define TS_APP_MAINWINDOW_H
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -164,7 +165,7 @@ public:
   void profileLine(const std::vector<LonLat>& points);
 
   /** Points of an elevation profile. */
-  static constexpr int profileSamples = 512;
+  static constexpr int32_t profileSamples = 512;
 
   /**
    * Shows the Offline Regions window (not modal) and returns it.

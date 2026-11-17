@@ -25,6 +25,8 @@
 #ifndef TS_DEPS_GDALDATASET_H
 #define TS_DEPS_GDALDATASET_H
 
+#include <cstdint>
+
 #include <QString>
 
 namespace ts
@@ -75,16 +77,16 @@ public:
   QString driverShortName() const;
 
   /** Returns the number of vector layers (0 for a pure raster). */
-  int layerCount() const;
+  int32_t layerCount() const;
 
   /** Returns the number of raster bands (0 for a pure vector dataset). */
-  int rasterBandCount() const;
+  int32_t rasterBandCount() const;
 
   /**
    * Returns the number of features in vector layer @p layerIndex, or -1 if
    * the layer does not exist.
    */
-  long long featureCount(int layerIndex) const;
+  int64_t featureCount(int32_t layerIndex) const;
 
   /** Returns the raw GDALDatasetH, or nullptr. Ownership stays here. */
   void* handle() const { return m_handle; }

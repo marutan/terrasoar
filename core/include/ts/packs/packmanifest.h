@@ -27,6 +27,7 @@
 #define TS_PACKS_PACKMANIFEST_H
 
 #include <atomic>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -149,7 +150,7 @@ public:
   static QString fileName();
 
   /** The highest format version this code reads and writes. */
-  static constexpr int currentFormat = 1;
+  static constexpr int32_t currentFormat = 1;
 
   /**
    * Reads the manifest of the pack in @p directory. Returns nothing and

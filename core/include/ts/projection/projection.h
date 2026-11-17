@@ -27,6 +27,7 @@
 #define TS_PROJECTION_PROJECTION_H
 
 #include <array>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -209,7 +210,7 @@ const Projection* projectionById(const QString& id);
  *
  * @threadsafe
  */
-int projectionIndex(const Projection* projection);
+int32_t projectionIndex(const Projection* projection);
 
 /**
  * Returns the GLSL source of every projection in projections(), their

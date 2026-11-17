@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <mutex>
 
@@ -79,7 +80,7 @@ GeoidModel::GeoidModel(const QString& directory, const QString& gridFile)
     pointers.push_back(encoded.back().constData());
   }
   proj_context_set_search_paths(
-      d->context.get(), static_cast<int>(pointers.size()), pointers.data());
+      d->context.get(), static_cast<int32_t>(pointers.size()), pointers.data());
   // Only plain file names: PROJ strings split on spaces.
   if (gridFile.isEmpty() || gridFile.contains(QLatin1Char(' ')) ||
       gridFile.contains(QLatin1Char('/')) ||

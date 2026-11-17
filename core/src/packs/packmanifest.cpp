@@ -21,6 +21,7 @@
 #include "ts/packs/packmanifest.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include <QCryptographicHash>
 #include <QDir>
@@ -111,7 +112,7 @@ std::optional<PackManifest> PackManifest::read(const QString& directory,
 std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
                                                    QString* errorString)
 {
-  const int format = json.value(QStringLiteral("format")).toInt(0);
+  const int32_t format = json.value(QStringLiteral("format")).toInt(0);
   if (format < 1 || format > currentFormat) {
     fail(errorString,
          QStringLiteral("Unsupported pack manifest format %1").arg(format));
@@ -128,7 +129,7 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
   const QJsonArray files = json.value(QStringLiteral("files")).toArray();
   // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < files.size(); ++i) {
+  for (int32_t i = 0; i < files.size(); ++i) {
     const QJsonObject entry = files.at(i).toObject();
     PackFile packFile;
     packFile.path = text(entry, "path");
@@ -146,7 +147,7 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
 
   const QJsonArray datasets = json.value(QStringLiteral("datasets")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < datasets.size(); ++i) {
+  for (int32_t i = 0; i < datasets.size(); ++i) {
     const QJsonObject entry = datasets.at(i).toObject();
     PackDataset dataset;
     dataset.id = text(entry, "id");
@@ -193,7 +194,7 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
 
   const QJsonArray notices = json.value(QStringLiteral("notices")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < notices.size(); ++i) {
+  for (int32_t i = 0; i < notices.size(); ++i) {
     const QString path = notices.at(i).toString();
     if (!isSafeRelativePath(path)) {
       fail(errorString,

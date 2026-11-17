@@ -14,6 +14,7 @@ python3 tools/checks/check_format.py --fix # reformat in place
 | Formatting | `check_format.py` | Any difference from `clang-format` 18 output |
 | Include order | `check_include_order.py` | Includes out of group order, or groups not separated |
 | No `auto` | `check_no_auto.py` | The `auto` keyword anywhere |
+| Fixed-width integers | `check_int_types.py` | `short`, `int`, `long`, `long long` (signed or unsigned), or an `L`/`LL` literal |
 | Translatable strings | `check_translatable.py` | A literal passed to a user-visible API without `tr()` |
 | Licence audit | `check_notices.py` | A Qt module, linked library or data source missing from `THIRD_PARTY_NOTICES` |
 | Translations up to date | `tools/i18n/update_translations.py --check` | `terrasoar_en.ts` out of step with the code |
@@ -27,6 +28,36 @@ Static analysis (clang-tidy, clazy, cppcheck) runs separately with
 - C++17. Qt 5.15 and Qt 6 both supported from the same code.
 - **No `auto`**: write the type. This includes range-for loops, lambdas
   stored in variables (use `std::function` or a named type) and iterators.
+- **Fixed-width integers only**: no `short`, `int`, `long` or
+  `long long`, and no `unsigned`/`signed` forms of them. Their sizes are
+  the platform's choice (`long` is 32 bits on Windows and 64 on Linux).
+  Use the `<cstdint>` types instead:
+
+  | Instead of | Write |
+  | --- | --- |
+  | `short`, `unsigned short` | `int16_t`, `uint16_t` |
+  | `int`, `unsigned`, `unsigned int` | `int32_t`, `uint32_t` |
+  | `long long`, `unsigned long long` | `int64_t`, `uint64_t` |
+  | `long` | `int32_t` or `int64_t`, whichever range is meant |
+  | an integer that holds a pointer or a pointer difference | `intptr_t`, `uintptr_t` |
+  | `0LL`, `1ULL` | `int64_t{0}`, `uint64_t{1}` |
+
+  `#include <cstdint>` where you use them, and write them without `std::`.
+  `int32_t` is `int` on every platform we build for, so it overrides Qt's
+  `int` virtuals (`rowCount()` and so on) and matches its signals. `int64_t`
+  is `long` on Linux but `long long` on Windows, so:
+  - `std::max(x, int64_t{0})`, not `std::max(x, 0LL)`;
+  - pass `QVariant::fromValue<qint64>(x)` or `static_cast<qint64>(x)` to
+    APIs overloaded for `int` and `qint64` (`QVariant`, `QJsonValue`), where
+    a `long` is ambiguous;
+  - format with `PRId64`/`PRIu64` from `<cinttypes>`, not `%lld`.
+
+  Qt's and the libraries' own aliases (`qint64`, `qsizetype`, `GLint`,
+  `sqlite3_int64`) are allowed where their APIs use them; `char` and
+  `std::size_t` stay as they are. `int main(...)` is written
+  `int32_t main(int32_t argc, char* argv[])`.
+  `check_int_types.py --fix` rewrites everything but plain `long` and `L`
+  literals, which need a choice.
 - Deprecated Qt APIs are compile errors (`QT_DISABLE_DEPRECATED_BEFORE`).
   Use the API that exists in both Qt 5.15 and Qt 6. When the two differ,
   branch on `QT_VERSION` in one place and add a comment.

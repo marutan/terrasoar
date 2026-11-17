@@ -25,6 +25,7 @@
 #ifndef TS_WMS_WMSCAPABILITIES_H
 #define TS_WMS_WMSCAPABILITIES_H
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -92,9 +93,9 @@ struct WmsLayer {
   /** True if the server can't draw part of it (whole extent only). */
   bool noSubsets = false;
   /** Fixed image width the server requires, or 0. */
-  int fixedWidth = 0;
+  int32_t fixedWidth = 0;
   /** Fixed image height the server requires, or 0. */
-  int fixedHeight = 0;
+  int32_t fixedHeight = 0;
   /** Drawn only at scales coarser than 1 : this (0: no limit). */
   double minScaleDenominator = 0.0;
   /** Drawn only at scales finer than 1 : this (0: no limit). */
@@ -130,11 +131,11 @@ struct WmsCapabilities {
   /** Access constraints, as the server states them. */
   QString accessConstraints;
   /** Largest image width the server draws, or 0 if not stated. */
-  int maxWidth = 0;
+  int32_t maxWidth = 0;
   /** Largest image height the server draws, or 0 if not stated. */
-  int maxHeight = 0;
+  int32_t maxHeight = 0;
   /** Most layers in one GetMap, or 0 if not stated. */
-  int layerLimit = 0;
+  int32_t layerLimit = 0;
   /** Where GetMap requests go (HTTP GET). */
   QUrl getMapUrl;
   /** Image formats GetMap can return. */

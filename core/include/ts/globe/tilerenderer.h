@@ -63,7 +63,7 @@ struct TileRendererSettings {
   /** Budget of the terrain's height tiles in memory (64 MB). */
   std::size_t heightCacheBytes = std::size_t{64} * 1024 * 1024;
   /** Threads loading height tiles. */
-  int heightThreads = 2;
+  int32_t heightThreads = 2;
   /**
    * After a web elevation source failed to deliver (part of) a tile, it is
    * asked for again when still wanted this long after.
@@ -72,9 +72,9 @@ struct TileRendererSettings {
   /** Budget of tile textures and meshes on the GPU (common use: 96 MB). */
   std::size_t gpuBytes = std::size_t{96} * 1024 * 1024;
   /** Most imagery tiles uploaded to the GPU per frame, all sources. */
-  int uploadsPerFrame = 8;
+  int32_t uploadsPerFrame = 8;
   /** Most tile meshes built per frame. */
-  int meshBuildsPerFrame = 32;
+  int32_t meshBuildsPerFrame = 32;
   /**
    * Draw composite groups offscreen and fade them as one image. When
    * false (the software quality tier), a group's opacity multiplies into
@@ -88,7 +88,7 @@ struct TileRendererSettings {
    * Where the finished map needs finer geometry the selection refines by
    * TileSelectionSettings::maximumMapGeometryErrorPx.
    */
-  int minimumMapLevel = 2;
+  int32_t minimumMapLevel = 2;
 };
 
 /** One imagery layer to draw, bottom to top. */
@@ -98,7 +98,7 @@ struct ImageryLayerDraw {
   /** Opacity within its group (or overall without one). */
   double alpha = 1.0;
   /** Index into the group opacities, or −1. Group members are contiguous. */
-  int group = -1;
+  int32_t group = -1;
 };
 
 /** The ground's height at a point (TileRenderer::groundHeight()). */
@@ -110,29 +110,29 @@ struct GroundHeight {
   /** Returns the height above sea level, metres. */
   double aboveSeaLevelM() const { return ellipsoidalM - seaLevelM; }
   /** The level of the heights it came from (finer is more exact). */
-  int level = 0;
+  int32_t level = 0;
 };
 
 /** What the last frame did, for the debug overlay and tests. */
 struct TileStatistics {
   /** Tiles drawn (geometry). */
-  int rendered = 0;
+  int32_t rendered = 0;
   /** Tiles the selection visited. */
-  int visited = 0;
+  int32_t visited = 0;
   /** Imagery tiles requested from the loaders. */
-  int requested = 0;
+  int32_t requested = 0;
   /** Imagery tiles uploaded this frame. */
-  int uploaded = 0;
+  int32_t uploaded = 0;
   /** Imagery tiles on the GPU. */
-  int resident = 0;
+  int32_t resident = 0;
   /** Bytes on the GPU (textures and meshes). */
   std::size_t gpuBytes = 0;
   /** Deepest level drawn. */
-  int deepestLevel = -1;
+  int32_t deepestLevel = -1;
   /** Draw calls for tiles (a tile is drawn once per batch of 8 layers). */
-  int drawCalls = 0;
+  int32_t drawCalls = 0;
   /** Composite groups drawn offscreen. */
-  int groupsComposited = 0;
+  int32_t groupsComposited = 0;
 };
 
 /**
@@ -295,7 +295,7 @@ public:
   const TileStatistics& statistics() const { return m_statistics; }
 
   /** Returns the number of distinct imagery sources (shared providers). */
-  int sourceCount() const { return static_cast<int>(m_sources.size()); }
+  int32_t sourceCount() const { return static_cast<int32_t>(m_sources.size()); }
 
 private:
   struct GpuMesh;
@@ -304,7 +304,7 @@ private:
   struct Layer {
     Source* source = nullptr;
     double alpha = 1.0;
-    int group = -1;
+    int32_t group = -1;
   };
   struct DrawTile;
   struct LayerImage;
@@ -344,12 +344,12 @@ private:
   std::unique_ptr<ShaderProgram> m_compositeShader;
   std::unique_ptr<Pipeline> m_compositePipeline;
   std::unique_ptr<GpuBuffer> m_indices;
-  int m_indexCount = 0;
+  int32_t m_indexCount = 0;
   std::unique_ptr<GpuBuffer> m_stripIndices;
-  int m_stripIndexCount = 0;
+  int32_t m_stripIndexCount = 0;
   bool m_drawStrips = false;
   void setTileIndexBuffer();
-  int tileIndexCount() const;
+  int32_t tileIndexCount() const;
   std::unique_ptr<GpuTexture> m_emptyTexture;
   std::unique_ptr<GpuBuffer> m_tileUniforms;
   std::size_t m_tileUniformStride = 0;
@@ -369,10 +369,10 @@ private:
   std::unordered_set<TileKey, TileKeyHash> m_noHeights;
   bool m_terrainVisible = false;
   /** Deepest level of the heights in m_heights (where lookups start). */
-  int m_deepestHeights = 0;
+  int32_t m_deepestHeights = 0;
   double m_exaggeration = 1.0;
-  int m_imageryDeepestLevel = 0;
-  int m_imageryTileSizePx = 256;
+  int32_t m_imageryDeepestLevel = 0;
+  int32_t m_imageryTileSizePx = 256;
   std::vector<std::unique_ptr<Source>> m_sources;
   std::vector<Layer> m_layers;
   std::vector<double> m_groupAlphas;

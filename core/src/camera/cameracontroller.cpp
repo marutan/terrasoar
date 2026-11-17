@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 #include "ts/geo/geodesic.h"
 #include "ts/geo/geodetic.h"
@@ -63,12 +64,12 @@ constexpr double releaseStillS = 0.05;
 constexpr double inertiaStopRangeFractionPerS = 0.01;
 
 // Pan iteration.
-constexpr int placeIterations = 12;
+constexpr int32_t placeIterations = 12;
 /** Converged when the cursor point is this close in degrees (≈ 0.1 µm). */
 constexpr double placeToleranceDeg = 1e-12;
 
 /** Returns 1 if @p flag is set in @p motion, else 0. */
-double held(unsigned int motion, unsigned int flag)
+double held(uint32_t motion, uint32_t flag)
 {
   return (motion & flag) != 0U ? 1.0 : 0.0;
 }
@@ -319,7 +320,7 @@ bool CameraController::placeUnderCursor(const Geodetic& grabbed,
   // Move the target by the lat/lon difference between the grabbed point
   // and the point now under the cursor until they agree. The heading stays
   // fixed, so north keeps its direction on screen.
-  for (int i = 0; i < placeIterations; ++i) {
+  for (int32_t i = 0; i < placeIterations; ++i) {
     const std::optional<Geodetic> hit =
         m_camera.pickGeodetic(positionPx.x(), positionPx.y());
     if (!hit) {
@@ -357,7 +358,7 @@ void CameraController::zoomAt(QPointF positionPx, double steps)
   }
 }
 
-void CameraController::setMotion(unsigned int motion)
+void CameraController::setMotion(uint32_t motion)
 {
   if (motion != NoMotion) {
     m_flight.reset();
@@ -520,7 +521,7 @@ void CameraController::advanceInertia(double elapsedS)
 
 void CameraController::advanceMotion(double elapsedS)
 {
-  const unsigned int m = m_motion;
+  const uint32_t m = m_motion;
   CameraPose pose = m_camera.pose();
 
   // The range changes as exp(λ t); the pan speed is proportional to it, so

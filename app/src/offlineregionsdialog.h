@@ -25,6 +25,8 @@
 #ifndef TS_APP_OFFLINEREGIONSDIALOG_H
 #define TS_APP_OFFLINEREGIONSDIALOG_H
 
+#include <cstdint>
+
 #include <QDialog>
 #include <QPointer>
 
@@ -71,10 +73,10 @@ public:
   QTreeWidget* list() const { return m_list; }
 
   /** Returns the id of the selected region, or 0. */
-  long long selectedRegion() const;
+  int64_t selectedRegion() const;
 
   /** Selects the region @p id. */
-  void selectRegion(long long id);
+  void selectRegion(int64_t id);
 
 signals:
   /** The user asked for a new region. */
@@ -85,7 +87,7 @@ protected:
   void changeEvent(QEvent* event) override;
 
   /** Hides the outline on the globe. */
-  void done(int result) override;
+  void done(int32_t result) override;
 
 private:
   void retranslateUi();

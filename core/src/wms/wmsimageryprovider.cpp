@@ -20,6 +20,8 @@
 
 #include "ts/wms/wmsimageryprovider.h"
 
+#include <cstdint>
+
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -144,17 +146,17 @@ QString WmsImageryProvider::name() const
                                   : m_source.title;
 }
 
-int WmsImageryProvider::maximumLevel() const
+int32_t WmsImageryProvider::maximumLevel() const
 {
   return m_source.maximumLevel;
 }
 
-int WmsImageryProvider::tileSizePx() const
+int32_t WmsImageryProvider::tileSizePx() const
 {
   return m_source.tileSizePx;
 }
 
-int WmsImageryProvider::preferredLoaderThreads() const
+int32_t WmsImageryProvider::preferredLoaderThreads() const
 {
   return m_fetcher->settings().loaderThreads;
 }
@@ -219,7 +221,7 @@ std::optional<GeoRect> WmsImageryProvider::dataBounds() const
 }
 
 RegionTileResult
-WmsImageryProvider::fetchForRegion(TileKey key, long long region,
+WmsImageryProvider::fetchForRegion(TileKey key, int64_t region,
                                    const std::atomic<bool>& cancelled)
 {
   using Outcome = RegionTileResult::Outcome;
@@ -235,7 +237,7 @@ WmsImageryProvider::fetchForRegion(TileKey key, long long region,
         "ts::WmsImageryProvider", "There is no disk cache to keep tiles in.");
     return result;
   }
-  const long long nowS = m_fetcher->now();
+  const int64_t nowS = m_fetcher->now();
   const std::optional<CachedTile> cached = cache->find(key);
   if (cached && nowS < cached->expiresS &&
       (region == 0 || cache->pin(region, key))) {

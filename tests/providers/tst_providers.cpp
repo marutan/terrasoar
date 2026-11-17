@@ -43,11 +43,11 @@ namespace
 const std::atomic<bool> notCancelled{false};
 
 /** Number of pixels of @p image that are exactly @p color. */
-int countColor(const QImage& image, QRgb color)
+int32_t countColor(const QImage& image, QRgb color)
 {
-  int count = 0;
-  for (int y = 0; y < image.height(); ++y) {
-    for (int x = 0; x < image.width(); ++x) {
+  int32_t count = 0;
+  for (int32_t y = 0; y < image.height(); ++y) {
+    for (int32_t x = 0; x < image.width(); ++x) {
       count += image.pixel(x, y) == color ? 1 : 0;
     }
   }
@@ -64,7 +64,7 @@ QByteArray encodePng(const QImage& image)
 }
 
 /** A tile whose colour encodes its key, for checking what comes back. */
-QImage keyedTile(ts::TileKey key, int size)
+QImage keyedTile(ts::TileKey key, int32_t size)
 {
   QImage image(size, size, QImage::Format_RGB32);
   image.fill(QColor(key.level * 20, key.x * 10, key.y * 10));
@@ -82,8 +82,8 @@ public:
   }
   Wkb& uint32(std::uint32_t value)
   {
-    for (int i = 0; i < 4; ++i) {
-      byte(static_cast<std::uint8_t>(value >> (8U * static_cast<unsigned>(i))));
+    for (int32_t i = 0; i < 4; ++i) {
+      byte(static_cast<std::uint8_t>(value >> (8U * static_cast<uint32_t>(i))));
     }
     return *this;
   }
@@ -91,8 +91,8 @@ public:
   {
     std::uint64_t bits = 0;
     std::memcpy(&bits, &value, sizeof bits);
-    for (int i = 0; i < 8; ++i) {
-      byte(static_cast<std::uint8_t>(bits >> (8U * static_cast<unsigned>(i))));
+    for (int32_t i = 0; i < 8; ++i) {
+      byte(static_cast<std::uint8_t>(bits >> (8U * static_cast<uint32_t>(i))));
     }
     return *this;
   }
@@ -226,9 +226,10 @@ private slots:
     ts::CheckerboardImageryProvider provider(64);
     const QImage expected =
         provider.loadImage(ts::TileKey{7, 100, 50}, notCancelled);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&provider, &expected](int thread) {
-          for (int i = 0; i < 50; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount,
+        [&provider, &expected](int32_t thread) {
+          for (int32_t i = 0; i < 50; ++i) {
             const QImage other = provider.loadImage(
                 ts::TileKey{7, 100 + thread, 50 + i}, notCancelled);
             if (other.isNull()) {
@@ -255,9 +256,9 @@ private slots:
       ts::SqliteTileStoreWriter writer(path, info);
       QVERIFY2(writer.errorString().isEmpty(),
                qPrintable(writer.errorString()));
-      for (int level = 0; level <= 2; ++level) {
-        for (int y = 0; y < ts::TileKey::rows(level); ++y) {
-          for (int x = 0; x < ts::TileKey::columns(level); ++x) {
+      for (int32_t level = 0; level <= 2; ++level) {
+        for (int32_t y = 0; y < ts::TileKey::rows(level); ++y) {
+          for (int32_t x = 0; x < ts::TileKey::columns(level); ++x) {
             const ts::TileKey key{level, x, y};
             QVERIFY(writer.putTile(key, encodePng(keyedTile(key, 16))));
           }
@@ -271,9 +272,9 @@ private slots:
     QVERIFY(QFile::remove(path));
     {
       ts::SqliteTileStoreWriter writer(path, info);
-      for (int level = 0; level <= 2; ++level) {
-        for (int y = 0; y < ts::TileKey::rows(level); ++y) {
-          for (int x = 0; x < ts::TileKey::columns(level); ++x) {
+      for (int32_t level = 0; level <= 2; ++level) {
+        for (int32_t y = 0; y < ts::TileKey::rows(level); ++y) {
+          for (int32_t x = 0; x < ts::TileKey::columns(level); ++x) {
             const ts::TileKey key{level, x, y};
             QVERIFY(writer.putTile(key, encodePng(keyedTile(key, 16))));
           }
@@ -351,8 +352,8 @@ private slots:
     info.maxLevel = 3;
     {
       ts::SqliteTileStoreWriter writer(path, info);
-      for (int y = 0; y < ts::TileKey::rows(3); ++y) {
-        for (int x = 0; x < ts::TileKey::columns(3); ++x) {
+      for (int32_t y = 0; y < ts::TileKey::rows(3); ++y) {
+        for (int32_t x = 0; x < ts::TileKey::columns(3); ++x) {
           QVERIFY(
               writer.putTile(ts::TileKey{3, x, y},
                              encodePng(keyedTile(ts::TileKey{3, x, y}, 16))));
@@ -361,9 +362,9 @@ private slots:
       QVERIFY(writer.finish());
     }
     ts::SqliteTileImageryProvider provider(path);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&provider](int thread) {
-          for (int i = 0; i < 64; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&provider](int32_t thread) {
+          for (int32_t i = 0; i < 64; ++i) {
             const ts::TileKey key{3, (thread * 3 + i) % 16, i % 8};
             const QImage image = provider.loadImage(key, notCancelled);
             if (image.isNull() || QColor(image.pixel(1, 1)) !=
@@ -414,7 +415,7 @@ private slots:
     }
     QVERIFY(tile.value().key == (ts::TileKey{3, 9, 1}));
     QCOMPARE(tile.value().features.size(), std::size_t{3});
-    int polygons = 0;
+    int32_t polygons = 0;
     for (const ts::Feature& feature : tile.value().features) {
       if (feature.type == ts::Feature::Type::LineStrings) {
         QCOMPARE(feature.attributes.value(QStringLiteral("rank")).toInt(), 4);
@@ -511,7 +512,7 @@ private slots:
                                          .polygon({5, 5, 6, 5, 6, 6, 5, 6})
                                          .bytes());
     std::vector<ts::Feature> features;
-    for (int size = 0; size < blob.size(); ++size) {
+    for (int32_t size = 0; size < blob.size(); ++size) {
       const QByteArray part = blob.left(size);
       features.clear();
       QVERIFY(!ts::decodeGeoPackageGeometry(
@@ -519,8 +520,8 @@ private slots:
           static_cast<std::size_t>(part.size()), &features));
       QVERIFY(features.empty());
     }
-    for (int i = 0; i < blob.size(); ++i) {
-      for (const int value : {0x00, 0x7f, 0xff}) {
+    for (int32_t i = 0; i < blob.size(); ++i) {
+      for (const int32_t value : {0x00, 0x7f, 0xff}) {
         QByteArray changed = blob;
         changed[i] = static_cast<char>(value);
         features.clear();
@@ -538,9 +539,9 @@ private slots:
     const QString path = dir.filePath(QStringLiteral("features.gpkg"));
     QVERIFY(writeFeaturePackage(path));
     ts::GeoPackageFeatureProvider provider(path);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&provider](int thread) {
-          for (int i = 0; i < 100; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&provider](int32_t thread) {
+          for (int32_t i = 0; i < 100; ++i) {
             const ts::TileKey key = (i + thread) % 2 == 0
                                         ? ts::TileKey{5, 37, 5}
                                         : ts::TileKey{2, 2, 1};

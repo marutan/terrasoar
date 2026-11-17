@@ -19,6 +19,7 @@
  */
 
 #include <cmath>
+#include <cstdint>
 
 #include <QtTest>
 
@@ -40,8 +41,8 @@ bool nearlyEqual(const ts::Vec3& a, const ts::Vec3& b, double tolerance)
 
 bool nearlyEqual(const ts::Mat4& a, const ts::Mat4& b, double tolerance)
 {
-  for (int row = 0; row < 4; ++row) {
-    for (int column = 0; column < 4; ++column) {
+  for (int32_t row = 0; row < 4; ++row) {
+    for (int32_t column = 0; column < 4; ++column) {
       if (std::abs(a.at(row, column) - b.at(row, column)) > tolerance) {
         return false;
       }
@@ -173,8 +174,8 @@ private slots:
   {
     const ts::Mat4 identity;
     QVERIFY(identity == ts::Mat4::identity());
-    for (int i = 0; i < 4; ++i) {
-      for (int j = 0; j < 4; ++j) {
+    for (int32_t i = 0; i < 4; ++i) {
+      for (int32_t j = 0; j < 4; ++j) {
         QCOMPARE(identity.at(i, j), i == j ? 1.0 : 0.0);
       }
     }
@@ -249,12 +250,12 @@ private slots:
 
   void concurrentOwnInstances()
   {
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [](int32_t thread) {
           const ts::Mat4 transform =
               ts::Mat4::translation(ts::Vec3{1.0 * thread, 2.0, 3.0}) *
               rotationZ(0.1 * thread);
-          for (int i = 0; i < 1000; ++i) {
+          for (int32_t i = 0; i < 1000; ++i) {
             const ts::Mat4 product = transform * transform.inverted();
             if (!nearlyEqual(product, ts::Mat4(), 1e-12)) {
               return false;

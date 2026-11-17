@@ -21,6 +21,7 @@
 #include "ts/elevation/sqliteelevationprovider.h"
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -61,7 +62,7 @@ SqliteElevationProvider::loadStoredHeights(TileKey key)
   if (!isValid()) {
     return std::nullopt;
   }
-  const int samples = m_store.info().tileSizePx;
+  const int32_t samples = m_store.info().tileSizePx;
   std::optional<std::vector<float>> heights =
       decodeHeightGrid(m_store.loadEncoded(key), samples);
   if (!heights) {
@@ -93,11 +94,11 @@ SqliteElevationProvider::loadHeights(TileKey key,
                         ? std::move(*found)
                         : resampleHeightTile(*found, key, found->samples);
   if (m_geoid) {
-    const int samples = tile.samples;
+    const int32_t samples = tile.samples;
     std::vector<GeoPoint> points;
     points.reserve(tile.heightsM.size());
-    for (int row = 0; row < samples; ++row) {
-      for (int column = 0; column < samples; ++column) {
+    for (int32_t row = 0; row < samples; ++row) {
+      for (int32_t column = 0; column < samples; ++column) {
         points.push_back(heightSamplePoint(key, samples, row, column));
       }
     }

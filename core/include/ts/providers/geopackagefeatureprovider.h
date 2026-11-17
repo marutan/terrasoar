@@ -26,6 +26,7 @@
 #ifndef TS_PROVIDERS_GEOPACKAGEFEATUREPROVIDER_H
 #define TS_PROVIDERS_GEOPACKAGEFEATUREPROVIDER_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -64,11 +65,11 @@ struct FeatureTableSpec {
   /** Kind of geometry. */
   Geometry geometry = Geometry::Polygons;
   /** Quadtree level the features are cut to. */
-  int storageLevel = 0;
+  int32_t storageLevel = 0;
   /** Shallowest display level served (at least storageLevel). */
-  int minLevel = 0;
+  int32_t minLevel = 0;
   /** Deepest display level served, or -1 for every deeper level. */
-  int maxLevel = -1;
+  int32_t maxLevel = -1;
   /** Names of the integer attribute columns. */
   std::vector<QString> attributes;
 };
@@ -102,7 +103,7 @@ public:
    * @p attributes values for the table's attribute columns in order.
    */
   bool putFeature(const QString& table, TileKey tile, const QByteArray& wkb,
-                  const std::vector<long long>& attributes = {});
+                  const std::vector<int64_t>& attributes = {});
 
   /** Writes the table list and indexes, commits and closes. */
   bool finish();
@@ -160,7 +161,7 @@ public:
   QString name() const override;
 
   /** The deepest storage level; deeper keys get that level's features. */
-  int maximumLevel() const override { return m_maximumLevel; }
+  int32_t maximumLevel() const override { return m_maximumLevel; }
 
   std::optional<FeatureTile>
   loadFeatures(TileKey key, const std::atomic<bool>& cancelled) override;
@@ -173,7 +174,7 @@ private:
   QString m_path;
   QString m_error;
   bool m_valid = false;
-  int m_maximumLevel = 0;
+  int32_t m_maximumLevel = 0;
   std::vector<std::unique_ptr<Table>> m_tables;
 };
 

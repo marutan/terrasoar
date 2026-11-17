@@ -25,6 +25,7 @@
 #ifndef TS_APP_ADDWMSDIALOG_H
 #define TS_APP_ADDWMSDIALOG_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -131,7 +132,7 @@ private:
   void retranslateUi();
   void loadCatalogue();
   void fillCatalogueBox();
-  void serviceChosen(int index);
+  void serviceChosen(int32_t index);
   void startConnect();
   void requestCapabilities(const QString& version);
   void poll();

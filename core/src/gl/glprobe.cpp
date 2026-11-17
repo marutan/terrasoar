@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 
 #include <QCoreApplication>
 #include <QOffscreenSurface>
@@ -57,7 +58,7 @@ bool isSoftwareRenderer(const QString& renderer)
       });
 }
 
-GlProbeResult probeOpenGl(int major, int minor)
+GlProbeResult probeOpenGl(int32_t major, int32_t minor)
 {
   GlProbeResult result;
 

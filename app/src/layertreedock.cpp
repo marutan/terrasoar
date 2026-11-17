@@ -21,6 +21,7 @@
 #include "layertreedock.h"
 
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 #include <QAction>
@@ -204,7 +205,7 @@ void LayerTreeDock::updateControls()
   const double opacity =
       selected ? m_model->data(current, LayerTreeModel::OpacityRole).toDouble()
                : 1.0;
-  const int percent = static_cast<int>(std::lround(opacity * 100.0));
+  const int32_t percent = static_cast<int32_t>(std::lround(opacity * 100.0));
   {
     const QSignalBlocker blocker(m_opacitySlider);
     m_opacitySlider->setValue(percent);
@@ -228,7 +229,7 @@ namespace
 /** Where a new entry goes: into a selected collection at its top, else
  *  just above the selected entry, else at the top of the tree. */
 void insertionPoint(const LayerTreeModel& model, const QModelIndex& current,
-                    QModelIndex* parent, int* row)
+                    QModelIndex* parent, int32_t* row)
 {
   if (!current.isValid()) {
     *parent = QModelIndex();
@@ -247,7 +248,7 @@ void insertionPoint(const LayerTreeModel& model, const QModelIndex& current,
 void LayerTreeDock::addLayer(const LayerDefinition& definition)
 {
   QModelIndex parent;
-  int row = 0;
+  int32_t row = 0;
   insertionPoint(*m_model, m_view->currentIndex(), &parent, &row);
   const QModelIndex added = m_model->addLayer(definition, parent, row);
   m_view->setCurrentIndex(added);
@@ -278,7 +279,7 @@ void LayerTreeDock::addSolidColorLayer()
 void LayerTreeDock::addCollection()
 {
   QModelIndex parent;
-  int row = 0;
+  int32_t row = 0;
   insertionPoint(*m_model, m_view->currentIndex(), &parent, &row);
   const QModelIndex added =
       m_model->addCollection(tr("New Collection"), parent, row);
@@ -292,7 +293,7 @@ void LayerTreeDock::removeCurrent()
   updateControls();
 }
 
-void LayerTreeDock::setOpacityPercent(int percent)
+void LayerTreeDock::setOpacityPercent(int32_t percent)
 {
   const QModelIndex current = m_view->currentIndex();
   if (current.isValid()) {

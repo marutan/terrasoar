@@ -21,6 +21,7 @@
 #include "ts/render/glrenderdevice.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <utility>
 
@@ -216,7 +217,7 @@ public:
     const bool rgba = d.format == TextureFormat::Rgba8;
     const QImage pixels = image.convertToFormat(
         rgba ? QImage::Format_RGBA8888 : QImage::Format_Grayscale8);
-    const int bytesPerPixel = rgba ? 4 : 1;
+    const int32_t bytesPerPixel = rgba ? 4 : 1;
     m_gl.glBindTexture(GL_TEXTURE_2D, m_id);
     m_gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     m_gl.glPixelStorei(GL_UNPACK_ROW_LENGTH,
@@ -285,7 +286,7 @@ private:
 class GlRenderTarget : public RenderTarget
 {
 public:
-  GlRenderTarget(GlFunctions& gl, int width, int height)
+  GlRenderTarget(GlFunctions& gl, int32_t width, int32_t height)
       : RenderTarget(QSize(width, height)), m_gl(gl)
   {
     // Colour in a texture, so it can be drawn from (layer groups).
@@ -478,8 +479,7 @@ GlRenderDevice::GlRenderDevice(std::unique_ptr<GlFunctions> functions,
 
 GlRenderDevice::~GlRenderDevice() = default;
 
-void GlRenderDevice::setDefaultFramebuffer(unsigned int framebufferId,
-                                           QSize sizePx)
+void GlRenderDevice::setDefaultFramebuffer(uint32_t framebufferId, QSize sizePx)
 {
   m_state->defaultFramebuffer = framebufferId;
   m_state->defaultSizePx = sizePx;
@@ -587,8 +587,8 @@ GlRenderDevice::createPipeline(const PipelineDesc& desc)
   return std::make_unique<GlPipeline>(*m_gl, desc);
 }
 
-std::unique_ptr<RenderTarget> GlRenderDevice::createRenderTarget(int width,
-                                                                 int height)
+std::unique_ptr<RenderTarget> GlRenderDevice::createRenderTarget(int32_t width,
+                                                                 int32_t height)
 {
   if (width <= 0 || height <= 0) {
     return nullptr;
@@ -607,7 +607,7 @@ void GlRenderDevice::beginPass(const PassDesc& pass)
       dynamic_cast<const GlRenderTarget*>(pass.target);
   const GLuint framebuffer =
       target ? target->framebuffer() : m_state->defaultFramebuffer;
-  const int heightPx =
+  const int32_t heightPx =
       target ? target->height() : m_state->defaultSizePx.height();
   m_gl->glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
   // QRect has its origin at the top left, OpenGL at the bottom left.
@@ -672,7 +672,7 @@ void GlRenderDevice::setPipeline(const Pipeline& pipeline)
   m_state->vertexInputsDirty = true;
 }
 
-void GlRenderDevice::setVertexBuffer(int slot, const GpuBuffer& buffer,
+void GlRenderDevice::setVertexBuffer(int32_t slot, const GpuBuffer& buffer,
                                      std::size_t offsetBytes)
 {
   if (slot < 0) {
@@ -694,7 +694,7 @@ void GlRenderDevice::setIndexBuffer(const GpuBuffer& buffer, IndexFormat format)
   m_state->vertexInputsDirty = true;
 }
 
-void GlRenderDevice::setUniformBuffer(int binding, const GpuBuffer& buffer,
+void GlRenderDevice::setUniformBuffer(int32_t binding, const GpuBuffer& buffer,
                                       std::size_t offsetBytes,
                                       std::size_t sizeBytes)
 {
@@ -707,7 +707,7 @@ void GlRenderDevice::setUniformBuffer(int binding, const GpuBuffer& buffer,
                           static_cast<GLsizeiptr>(sizeBytes));
 }
 
-void GlRenderDevice::setTexture(int unit, const GpuTexture& texture)
+void GlRenderDevice::setTexture(int32_t unit, const GpuTexture& texture)
 {
   const GlTexture* gl = dynamic_cast<const GlTexture*>(&texture);
   if (!gl || unit < 0) {
@@ -718,7 +718,7 @@ void GlRenderDevice::setTexture(int unit, const GpuTexture& texture)
   m_gl->glActiveTexture(GL_TEXTURE0);
 }
 
-void GlRenderDevice::setRenderTargetTexture(int unit,
+void GlRenderDevice::setRenderTargetTexture(int32_t unit,
                                             const RenderTarget& target)
 {
   const GlRenderTarget* gl = dynamic_cast<const GlRenderTarget*>(&target);
@@ -763,7 +763,8 @@ void GlRenderDevice::bindVertexInputs()
   m_state->vertexInputsDirty = false;
 }
 
-void GlRenderDevice::draw(int vertexCount, int firstVertex, int instances)
+void GlRenderDevice::draw(int32_t vertexCount, int32_t firstVertex,
+                          int32_t instances)
 {
   if (!m_state->pipeline || vertexCount <= 0 || instances <= 0) {
     return;
@@ -773,7 +774,8 @@ void GlRenderDevice::draw(int vertexCount, int firstVertex, int instances)
                               firstVertex, vertexCount, instances);
 }
 
-void GlRenderDevice::drawIndexed(int indexCount, int firstIndex, int instances)
+void GlRenderDevice::drawIndexed(int32_t indexCount, int32_t firstIndex,
+                                 int32_t instances)
 {
   if (!m_state->pipeline || !m_state->indexBuffer || indexCount <= 0 ||
       instances <= 0) {
@@ -809,8 +811,8 @@ QImage GlRenderDevice::readPixels(const RenderTarget& target)
   if (!gl) {
     return QImage();
   }
-  const int width = gl->width();
-  const int height = gl->height();
+  const int32_t width = gl->width();
+  const int32_t height = gl->height();
   QImage bottomUp(width, height, QImage::Format_RGBA8888);
   m_gl->glBindFramebuffer(GL_READ_FRAMEBUFFER, gl->framebuffer());
   m_gl->glPixelStorei(GL_PACK_ALIGNMENT, 4);
@@ -823,7 +825,7 @@ QImage GlRenderDevice::readPixels(const RenderTarget& target)
   // OpenGL's first row is the bottom one.
   QImage image(width, height, QImage::Format_RGBA8888);
   const std::size_t rowBytes = static_cast<std::size_t>(width) * 4;
-  for (int y = 0; y < height; ++y) {
+  for (int32_t y = 0; y < height; ++y) {
     std::memcpy(image.scanLine(y), bottomUp.constScanLine(height - 1 - y),
                 rowBytes);
   }
@@ -835,7 +837,7 @@ QString GlRenderDevice::takeErrors()
   QString errors;
   // glGetError returns one flag per call until all are cleared; stop after
   // a few in case a broken context keeps reporting.
-  for (int i = 0; i < 16; ++i) {
+  for (int32_t i = 0; i < 16; ++i) {
     const GLenum error = m_gl->glGetError();
     if (error == GL_NO_ERROR) {
       break;

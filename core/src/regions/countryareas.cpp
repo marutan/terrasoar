@@ -21,6 +21,7 @@
 #include "ts/regions/countryareas.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 #include <QCoreApplication>
@@ -38,7 +39,7 @@ namespace ts
 namespace
 {
 
-QString columnText(sqlite3_stmt* statement, int column)
+QString columnText(sqlite3_stmt* statement, int32_t column)
 {
   const unsigned char* text = sqlite3_column_text(statement, column);
   return text == nullptr
@@ -133,13 +134,13 @@ std::optional<RegionGeometry> CountryAreas::area(const QString& id,
   }
   const QByteArray key = id.toUtf8();
   sqlite3_bind_text(statement.handle, 1, key.constData(),
-                    static_cast<int>(key.size()), SQLITE_TRANSIENT);
+                    static_cast<int32_t>(key.size()), SQLITE_TRANSIENT);
   if (sqlite3_step(statement.handle) != SQLITE_ROW) {
     return unreadable(errorString);
   }
   const unsigned char* blob = static_cast<const unsigned char*>(
       sqlite3_column_blob(statement.handle, 0));
-  const int bytes = sqlite3_column_bytes(statement.handle, 0);
+  const int32_t bytes = sqlite3_column_bytes(statement.handle, 0);
   std::vector<Feature> features;
   if (blob == nullptr || bytes <= 0 ||
       !decodeGeoPackageGeometry(blob, static_cast<std::size_t>(bytes),

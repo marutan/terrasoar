@@ -20,6 +20,7 @@
 
 #include "aboutdialog.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <QDialogButtonBox>
@@ -90,7 +91,7 @@ AboutDialog::AboutDialog(QWidget* parent, std::vector<AboutDataRow> rows)
   }
   // Wide enough for their headers and contents; the attribution takes the
   // rest.
-  for (int column = 0; column < 4; ++column) {
+  for (int32_t column = 0; column < 4; ++column) {
     m_dataTree->header()->setSectionResizeMode(column,
                                                QHeaderView::ResizeToContents);
   }

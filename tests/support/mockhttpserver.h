@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -71,13 +72,13 @@ struct MockHttpRequest {
 /** What to answer. */
 struct MockHttpResponse {
   /** Status code. */
-  int status = 200;
+  int32_t status = 200;
   /** Headers besides Content-Length and Connection. */
   std::vector<std::pair<QByteArray, QByteArray>> headers;
   /** Body. */
   QByteArray body;
   /** Wait this long before answering. */
-  int delayMs = 0;
+  int32_t delayMs = 0;
   /** Close the connection without answering. */
   bool hangUp = false;
   /** Never answer (until the client gives up). */
@@ -152,17 +153,17 @@ public:
   }
 
   /** Returns how many requests arrived. */
-  int requestCount() const
+  int32_t requestCount() const
   {
     const std::lock_guard<std::mutex> lock(m_mutex);
-    return static_cast<int>(m_requests.size());
+    return static_cast<int32_t>(m_requests.size());
   }
 
   /** Returns how many clients hung up before their answer was sent. */
-  int abandonedCount() const { return m_abandoned.load(); }
+  int32_t abandonedCount() const { return m_abandoned.load(); }
 
   /** Returns the most requests that waited for an answer at once. */
-  int peakWaiting() const { return m_peakWaiting.load(); }
+  int32_t peakWaiting() const { return m_peakWaiting.load(); }
 
   /** Forgets the requests and counters. */
   void resetLog()
@@ -208,15 +209,16 @@ private:
       std::shared_ptr<QByteArray> buffer = std::make_shared<QByteArray>();
       QObject::connect(socket, &QTcpSocket::disconnected, socket,
                        &QObject::deleteLater);
-      QObject::connect(
-          socket, &QTcpSocket::readyRead, socket, [this, socket, buffer]() {
-            buffer->append(socket->readAll());
-            const int end = static_cast<int>(buffer->indexOf("\r\n\r\n"));
-            if (end >= 0 && !socket->property("tsSeen").toBool()) {
-              socket->setProperty("tsSeen", true);
-              handle(socket, buffer->left(end));
-            }
-          });
+      QObject::connect(socket, &QTcpSocket::readyRead, socket,
+                       [this, socket, buffer]() {
+                         buffer->append(socket->readAll());
+                         const int32_t end =
+                             static_cast<int32_t>(buffer->indexOf("\r\n\r\n"));
+                         if (end >= 0 && !socket->property("tsSeen").toBool()) {
+                           socket->setProperty("tsSeen", true);
+                           handle(socket, buffer->left(end));
+                         }
+                       });
     }
 
     void handle(QTcpSocket* socket, const QByteArray& head)
@@ -227,9 +229,9 @@ private:
       request.method = requestLine.value(0);
       request.target = requestLine.value(1);
       request.url = QUrl::fromEncoded(request.target);
-      for (int i = 1; i < lines.size(); ++i) {
+      for (int32_t i = 1; i < lines.size(); ++i) {
         const QByteArray& line = lines.at(i);
-        const int colon = static_cast<int>(line.indexOf(':'));
+        const int32_t colon = static_cast<int32_t>(line.indexOf(':'));
         if (colon > 0) {
           request.headers[line.left(colon).trimmed().toLower()] =
               line.mid(colon + 1).trimmed();
@@ -244,8 +246,8 @@ private:
       const MockHttpResponse response =
           handler ? handler(request)
                   : MockHttpResponse{404, {}, {}, 0, false, false};
-      const int waiting = m_owner.m_waiting.fetch_add(1) + 1;
-      int peak = m_owner.m_peakWaiting.load();
+      const int32_t waiting = m_owner.m_waiting.fetch_add(1) + 1;
+      int32_t peak = m_owner.m_peakWaiting.load();
       while (waiting > peak &&
              !m_owner.m_peakWaiting.compare_exchange_weak(peak, waiting)) {
       }
@@ -299,9 +301,9 @@ private:
   bool m_listening = false;
   quint16 m_port = 0;
   std::vector<MockHttpRequest> m_requests;
-  std::atomic<int> m_waiting{0};
-  std::atomic<int> m_peakWaiting{0};
-  std::atomic<int> m_abandoned{0};
+  std::atomic<int32_t> m_waiting{0};
+  std::atomic<int32_t> m_peakWaiting{0};
+  std::atomic<int32_t> m_abandoned{0};
   std::unique_ptr<Thread> m_thread;
 };
 
@@ -309,7 +311,7 @@ private:
 // The body, then its type, as in the response itself.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 inline MockHttpResponse
-mockResponse(int status, const QByteArray& body,
+mockResponse(int32_t status, const QByteArray& body,
              const QByteArray& contentType = QByteArrayLiteral("text/plain"))
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {

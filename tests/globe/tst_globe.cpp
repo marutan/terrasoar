@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -65,8 +66,8 @@
 namespace
 {
 
-constexpr int imageWidthPx = 320;
-constexpr int imageHeightPx = 240;
+constexpr int32_t imageWidthPx = 320;
+constexpr int32_t imageHeightPx = 240;
 
 /**
  * Golden images are compared only on Mesa llvmpipe, whose output is the
@@ -78,9 +79,9 @@ constexpr ts::test::GoldenTolerance goldenTolerance{12, 0.005};
 
 void appendUint32(QByteArray* wkb, std::uint32_t value)
 {
-  for (int i = 0; i < 4; ++i) {
+  for (int32_t i = 0; i < 4; ++i) {
     wkb->append(
-        static_cast<char>((value >> (8U * static_cast<unsigned>(i))) & 0xffU));
+        static_cast<char>((value >> (8U * static_cast<uint32_t>(i))) & 0xffU));
   }
 }
 
@@ -88,9 +89,9 @@ void appendDouble(QByteArray* wkb, double value)
 {
   std::uint64_t bits = 0;
   std::memcpy(&bits, &value, sizeof bits);
-  for (int i = 0; i < 8; ++i) {
+  for (int32_t i = 0; i < 8; ++i) {
     wkb->append(
-        static_cast<char>((bits >> (8U * static_cast<unsigned>(i))) & 0xffU));
+        static_cast<char>((bits >> (8U * static_cast<uint32_t>(i))) & 0xffU));
   }
 }
 
@@ -159,8 +160,8 @@ std::optional<QPointF> redCentroid(const QImage& image)
   double sum = 0.0;
   double sumX = 0.0;
   double sumY = 0.0;
-  for (int y = 0; y < image.height(); ++y) {
-    for (int x = 0; x < image.width(); ++x) {
+  for (int32_t y = 0; y < image.height(); ++y) {
+    for (int32_t x = 0; x < image.width(); ++x) {
       const QColor c = image.pixelColor(x, y);
       const double weight = std::max(0, c.red() - c.blue());
       sum += weight;
@@ -174,13 +175,13 @@ std::optional<QPointF> redCentroid(const QImage& image)
   return QPointF(sumX / sum, sumY / sum);
 }
 
-int to8Bit(float value)
+int32_t to8Bit(float value)
 {
   return qRound(value * 255.0F);
 }
 
 /** True if (x, y) shows the globe rather than the background colour. */
-bool isGlobe(const QImage& image, int x, int y)
+bool isGlobe(const QImage& image, int32_t x, int32_t y)
 {
   const QColor c = image.pixelColor(x, y);
   const ts::GlobeStyle style;
@@ -201,7 +202,7 @@ class SineElevation : public ts::ElevationProvider
 public:
   QString id() const override { return QStringLiteral("test:sine"); }
   QString name() const override { return QStringLiteral("Sine"); }
-  int maximumLevel() const override { return 8; }
+  int32_t maximumLevel() const override { return 8; }
 
   static double heightM(double latDeg, double lonDeg)
   {
@@ -220,8 +221,8 @@ public:
     ts::HeightTile tile;
     tile.key = stored;
     tile.samples = 17;
-    for (int row = 0; row < 17; ++row) {
-      for (int column = 0; column < 17; ++column) {
+    for (int32_t row = 0; row < 17; ++row) {
+      for (int32_t column = 0; column < 17; ++column) {
         const ts::GeoPoint point =
             ts::heightSamplePoint(stored, 17, row, column);
         tile.heightsM.push_back(
@@ -262,7 +263,7 @@ public:
   }
 
   /** Tiles asked for again after an incomplete answer. */
-  int retries() const
+  int32_t retries() const
   {
     const std::lock_guard<std::mutex> lock(m_mutex);
     return m_retries;
@@ -271,7 +272,7 @@ public:
 private:
   mutable std::mutex m_mutex;
   std::unordered_set<ts::TileKey, ts::TileKeyHash> m_asked;
-  int m_retries = 0;
+  int32_t m_retries = 0;
 };
 
 } // namespace
@@ -470,7 +471,7 @@ private slots:
 
   void layerCompositing_data()
   {
-    QTest::addColumn<int>("scene");
+    QTest::addColumn<int32_t>("scene");
     QTest::newRow("two-layers-50") << 0;
     QTest::newRow("group-composite") << 1;
     QTest::newRow("group-multiply") << 2;
@@ -483,7 +484,7 @@ private slots:
     //    one composite image (1) the checkerboard doesn't show through, with
     //    multiplied opacity (2) it does.
     TS_TEST_REQUIRE_GL(*m_gl);
-    QFETCH(int, scene);
+    QFETCH(int32_t, scene);
     const std::shared_ptr<ts::ImageryProvider> checkerboard =
         std::make_shared<ts::CheckerboardImageryProvider>();
     const std::shared_ptr<ts::ImageryProvider> red =
@@ -565,7 +566,7 @@ private slots:
 
   void vectorGolden_data()
   {
-    QTest::addColumn<int>("scene");
+    QTest::addColumn<int32_t>("scene");
     QTest::addColumn<double>("latDeg");
     QTest::addColumn<double>("lonDeg");
     QTest::addColumn<double>("rangeM");
@@ -583,7 +584,7 @@ private slots:
   void vectorGolden()
   {
     TS_TEST_REQUIRE_GL(*m_gl);
-    QFETCH(int, scene);
+    QFETCH(int32_t, scene);
     QFETCH(double, latDeg);
     QFETCH(double, lonDeg);
     QFETCH(double, rangeM);
@@ -782,7 +783,7 @@ private slots:
       ts::Camera camera = makeCamera(pose);
       camera.setMapProjection(ts::projectionById(QLatin1String(id)));
       std::optional<QPointF> previous;
-      for (int step = 0; step <= 10; ++step) {
+      for (int32_t step = 0; step <= 10; ++step) {
         camera.setMorph(0.1 * step);
         const std::optional<QPointF> atCentre =
             redCentroid(render(camera, {centre}));
@@ -848,7 +849,7 @@ private slots:
     const QColor background(image.pixel(2, 2));
     const QColor sea(image.pixel(imageWidthPx / 2, imageHeightPx / 2));
     QVERIFY(sea.blue() > background.blue() + 40);
-    for (int x = 0; x < imageWidthPx; ++x) {
+    for (int32_t x = 0; x < imageWidthPx; ++x) {
       const QColor pixel(image.pixel(x, imageHeightPx / 2));
       QVERIFY2(std::abs(pixel.blue() - sea.blue()) <= 2,
                qPrintable(QStringLiteral("column %1").arg(x)));
@@ -887,9 +888,9 @@ private slots:
       camera.setMorph(morph);
       QVERIFY(!renderSettled(camera).isNull());
     }
-    constexpr int frames = 30;
+    constexpr int32_t frames = 30;
     std::vector<double> timesS;
-    for (int frame = 0; frame <= frames; ++frame) {
+    for (int32_t frame = 0; frame <= frames; ++frame) {
       const double u = static_cast<double>(frame) / frames;
       camera.setMorph(u * u * (3.0 - 2.0 * u));
       QElapsedTimer one;
@@ -1054,9 +1055,9 @@ private slots:
     qInfo("%.2f %% of pixels differ by more than 40",
           100.0 * difference.differingFraction);
     // Something is drawn at all: the pattern covers part of the view.
-    int coloured = 0;
-    for (int y = 0; y < images[0].height(); y += 4) {
-      for (int x = 0; x < images[0].width(); x += 4) {
+    int32_t coloured = 0;
+    for (int32_t y = 0; y < images[0].height(); y += 4) {
+      for (int32_t x = 0; x < images[0].width(); x += 4) {
         const QColor c(images[0].pixel(x, y));
         coloured += c.red() > c.blue() + 60 ? 1 : 0;
       }
@@ -1102,7 +1103,7 @@ private slots:
       QVERIFY(download.waitUntilSettled(std::chrono::seconds(120)));
       QCOMPARE(download.progress().state,
                ts::RegionDownloadProgress::State::Finished);
-      QCOMPARE(download.progress().failedTiles, 0LL);
+      QCOMPARE(download.progress().failedTiles, int64_t{0});
       m_gl->makeCurrent();
       ts::GlobeStyle style;
       style.graticule = false;
@@ -1382,7 +1383,8 @@ private slots:
     }
     const QImage image = renderSettled(camera);
     const ts::VectorStatistics drawn = m_renderer->vectorStatistics();
-    qInfo("vectors: %d tiles, %lld triangles, %lld segments, %d draw calls",
+    qInfo("vectors: %d tiles, %" PRId64 " triangles, %" PRId64
+          " segments, %d draw calls",
           drawn.tilesDrawn, drawn.triangles, drawn.segments, drawn.drawCalls);
     m_gl->makeCurrent();
     m_renderer->setVectorLayers({});
@@ -1431,14 +1433,15 @@ private slots:
     if (!output.isEmpty()) {
       image.save(QDir(output).filePath(QStringLiteral("terrain-cracks.png")));
     }
-    const std::function<bool(int, int)> sky = [&image](int x, int y) {
+    const std::function<bool(int32_t, int32_t)> sky = [&image](int32_t x,
+                                                               int32_t y) {
       const QColor c = image.pixelColor(x, y);
       return c.red() > 240 && c.green() < 15 && c.blue() > 240;
     };
-    int ground = 0;
-    int cracks = 0;
-    for (int x = 0; x < image.width(); ++x) {
-      int y = 0;
+    int32_t ground = 0;
+    int32_t cracks = 0;
+    for (int32_t x = 0; x < image.width(); ++x) {
+      int32_t y = 0;
       while (y < image.height() && sky(x, y)) {
         ++y;
       }
@@ -1474,10 +1477,10 @@ private slots:
     m_renderer->setTerrain(false, 1.0);
     m_renderer->setImageryProvider(nullptr);
     QVERIFY(!plain.isNull() && !off.isNull() && !on.isNull());
-    int differing = 0;
-    int changed = 0;
-    for (int y = 0; y < plain.height(); ++y) {
-      for (int x = 0; x < plain.width(); ++x) {
+    int32_t differing = 0;
+    int32_t changed = 0;
+    for (int32_t y = 0; y < plain.height(); ++y) {
+      for (int32_t x = 0; x < plain.width(); ++x) {
         const QColor a = plain.pixelColor(x, y);
         const QColor b = off.pixelColor(x, y);
         const QColor c = on.pixelColor(x, y);
@@ -1525,19 +1528,19 @@ private slots:
     m_renderer->setImageryProvider(nullptr);
     QVERIFY(!plain.isNull() && !off.isNull() && !on.isNull() &&
             !hidden.isNull());
-    int darker = 0;
-    int lighter = 0;
-    for (int y = 0; y < plain.height(); ++y) {
-      for (int x = 0; x < plain.width(); ++x) {
-        const int base = qGray(plain.pixel(x, y));
+    int32_t darker = 0;
+    int32_t lighter = 0;
+    for (int32_t y = 0; y < plain.height(); ++y) {
+      for (int32_t x = 0; x < plain.width(); ++x) {
+        const int32_t base = qGray(plain.pixel(x, y));
         QVERIFY(std::abs(qGray(off.pixel(x, y)) - base) <= 2);
         QVERIFY(std::abs(qGray(hidden.pixel(x, y)) - base) <= 2);
-        const int shaded = qGray(on.pixel(x, y));
+        const int32_t shaded = qGray(on.pixel(x, y));
         darker += shaded < base - 8 ? 1 : 0;
         lighter += shaded > base + 8 ? 1 : 0;
       }
     }
-    const int pixels = plain.width() * plain.height();
+    const int32_t pixels = plain.width() * plain.height();
     QVERIFY2(darker > pixels / 20 && lighter > pixels / 20,
              qPrintable(QStringLiteral("%1 darker, %2 lighter of %3")
                             .arg(darker)
@@ -1617,9 +1620,9 @@ private slots:
     const ts::Camera camera =
         makeCamera(ts::CameraPose{10.0, 20.0, 1.6e7, 0.0, 0.0});
     const QImage image = render(camera);
-    int mismatches = 0;
-    for (int y = 0; y < imageHeightPx; ++y) {
-      for (int x = 0; x < imageWidthPx; ++x) {
+    int32_t mismatches = 0;
+    for (int32_t y = 0; y < imageHeightPx; ++y) {
+      for (int32_t x = 0; x < imageWidthPx; ++x) {
         // A pixel is decided if its centre and all four neighbours'
         // centres agree.
         const bool hit = camera.pickGeodetic(x + 0.5, y + 0.5).has_value();
@@ -1649,10 +1652,10 @@ private slots:
     camera.setPose(ts::CameraPose{51.4769, -0.0005, 1.0, 0.0, 85.0});
     QVERIFY(std::abs(camera.eyeGeodetic().heightM - 1.0) < 0.01);
     const QImage image = render(camera);
-    const int x = imageWidthPx / 2;
-    int cpuRow = -1;
-    int gpuRow = -1;
-    for (int y = 0; y < imageHeightPx; ++y) {
+    const int32_t x = imageWidthPx / 2;
+    int32_t cpuRow = -1;
+    int32_t gpuRow = -1;
+    for (int32_t y = 0; y < imageHeightPx; ++y) {
       if (cpuRow < 0 && camera.pickGeodetic(x + 0.5, y + 0.5)) {
         cpuRow = y;
       }
@@ -1684,7 +1687,7 @@ private slots:
     const ts::LocalFrame frame =
         ts::localFrame(start.targetLatDeg, start.targetLonDeg);
     double worstPx = 0.0;
-    for (int step = 0; step <= 40; ++step) {
+    for (int32_t step = 0; step <= 40; ++step) {
       // Move the camera, not the marker: shift the target east.
       const ts::Geodetic moved = ts::ecefToGeodetic(
           marker.positionEcef + frame.eastEcef * (0.001 * step));
@@ -1730,9 +1733,9 @@ private slots:
     pass.viewportPx = QRect(0, 0, 2 * imageWidthPx, 2 * imageHeightPx);
     m_renderer->render(camera, pass, 2.0);
     const QImage image = m_gl->device().readPixels(*large);
-    int redPixels = 0;
-    for (int y = 0; y < image.height(); ++y) {
-      for (int x = 0; x < image.width(); ++x) {
+    int32_t redPixels = 0;
+    for (int32_t y = 0; y < image.height(); ++y) {
+      for (int32_t x = 0; x < image.width(); ++x) {
         const QColor c = image.pixelColor(x, y);
         redPixels += c.red() > 200 && c.blue() < 100 ? 1 : 0;
       }

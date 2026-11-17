@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 #include <QStringList>
@@ -37,14 +38,14 @@ namespace
 /** Index of (@p row, @p column) in a grid @p width wide. */
 // Row then column, as everywhere in a grid.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::size_t gridIndex(int row, int column, int width)
+std::size_t gridIndex(int32_t row, int32_t column, int32_t width)
 {
   return static_cast<std::size_t>(row) * static_cast<std::size_t>(width) +
          static_cast<std::size_t>(column);
 }
 
 /** Returns @p tile with @p samples² samples on its key's grid. */
-HeightTile withSamples(const HeightTile& tile, int samples)
+HeightTile withSamples(const HeightTile& tile, int32_t samples)
 {
   if (tile.samples == samples) {
     return tile;
@@ -57,8 +58,8 @@ HeightTile withSamples(const HeightTile& tile, int samples)
   if (!tile.seaLevelM.empty()) {
     resampled.seaLevelM.resize(count);
   }
-  for (int row = 0; row < samples; ++row) {
-    for (int column = 0; column < samples; ++column) {
+  for (int32_t row = 0; row < samples; ++row) {
+    for (int32_t column = 0; column < samples; ++column) {
       const std::size_t i = gridIndex(row, column, samples);
       const GeoPoint point = heightSamplePoint(tile.key, samples, row, column);
       // NaN (no data) in any of the four neighbours makes the sample NaN.
@@ -116,18 +117,18 @@ QString CompositeElevationProvider::name() const
   return m_sources.empty() ? QString() : m_sources.front()->name();
 }
 
-int CompositeElevationProvider::maximumLevel() const
+int32_t CompositeElevationProvider::maximumLevel() const
 {
-  int level = 0;
+  int32_t level = 0;
   for (const std::shared_ptr<ElevationProvider>& source : m_sources) {
     level = std::max(level, source->maximumLevel());
   }
   return level;
 }
 
-int CompositeElevationProvider::preferredLoaderThreads() const
+int32_t CompositeElevationProvider::preferredLoaderThreads() const
 {
-  int threads = 0;
+  int32_t threads = 0;
   for (const std::shared_ptr<ElevationProvider>& source : m_sources) {
     threads = std::max(threads, source->preferredLoaderThreads());
   }

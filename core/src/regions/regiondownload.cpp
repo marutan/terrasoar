@@ -21,6 +21,7 @@
 #include "ts/regions/regiondownload.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <random>
 
 #include <QCoreApplication>
@@ -34,13 +35,13 @@ namespace
 {
 
 /** Attempts per tile when the server can't be reached. */
-constexpr int unreachableAttempts = 2;
+constexpr int32_t unreachableAttempts = 2;
 
 } // namespace
 
 RegionDownload::RegionDownload(std::shared_ptr<WmsImageryProvider> provider,
-                               long long region, const RegionGeometry& geometry,
-                               int minimumLevel, int maximumLevel,
+                               int64_t region, const RegionGeometry& geometry,
+                               int32_t minimumLevel, int32_t maximumLevel,
                                RegionDownloadSettings settings)
     : m_provider(std::move(provider)), m_region(region), m_settings(settings),
       m_tiles(geometry, minimumLevel, maximumLevel, m_provider->dataBounds())
@@ -82,8 +83,8 @@ bool RegionDownload::start(const std::vector<WmsCatalogueEntry>& catalogue,
     return false;
   }
   m_progress.state = RegionDownloadProgress::State::Running;
-  const int threads = std::max(1, m_settings.threads);
-  for (int i = 0; i < threads; ++i) {
+  const int32_t threads = std::max(1, m_settings.threads);
+  for (int32_t i = 0; i < threads; ++i) {
     m_threads.emplace_back([this]() { work(); });
   }
   return true;
@@ -137,7 +138,7 @@ bool RegionDownload::waitUntilSettled(std::chrono::milliseconds timeout) const
 }
 
 bool RegionDownload::takeTile(std::unique_lock<std::mutex>& lock, TileKey& key,
-                              int& attempts)
+                              int32_t& attempts)
 {
   for (;;) {
     if (m_cancelled.load() || m_progress.isOver()) {
@@ -178,7 +179,7 @@ void RegionDownload::work()
   using Outcome = RegionTileResult::Outcome;
   std::unique_lock<std::mutex> lock(m_mutex);
   TileKey key;
-  int attempts = 0;
+  int32_t attempts = 0;
   while (takeTile(lock, key, attempts)) {
     ++m_working;
     lock.unlock();
@@ -234,7 +235,7 @@ void RegionDownload::work()
   m_changed.notify_all();
 }
 
-long long typicalTileBytes(const WmsImageryProvider& provider)
+int64_t typicalTileBytes(const WmsImageryProvider& provider)
 {
   // Rough sizes of 256-pixel map tiles: JPEG photographs about 20 KB,
   // PNG maps about 25 KB; scaled by area for other tile sizes.
@@ -245,13 +246,13 @@ long long typicalTileBytes(const WmsImageryProvider& provider)
           : 25000.0 / 65536.0;
   const double pixels =
       static_cast<double>(source.tileSizePx) * source.tileSizePx;
-  return static_cast<long long>(perPixel * pixels);
+  return static_cast<int64_t>(perPixel * pixels);
 }
 
 // NOLINTBEGIN(bugprone-easily-swappable-parameters): as in the header.
 RegionEstimate
 estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
-                   int minimumLevel, int maximumLevel, int samples,
+                   int32_t minimumLevel, int32_t maximumLevel, int32_t samples,
                    const std::atomic<bool>& cancelled, std::uint64_t seed)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
@@ -266,12 +267,13 @@ estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
 
   std::mutex mutex;
   std::size_t nextKey = 0;
-  long long sampledBytes = 0;
-  int sampled = 0;
+  int64_t sampledBytes = 0;
+  int32_t sampled = 0;
   std::vector<std::thread> threads;
-  const int threadCount = std::min<int>(4, static_cast<int>(keys.size()));
+  const int32_t threadCount =
+      std::min<int32_t>(4, static_cast<int32_t>(keys.size()));
   threads.reserve(static_cast<std::size_t>(threadCount));
-  for (int i = 0; i < threadCount; ++i) {
+  for (int32_t i = 0; i < threadCount; ++i) {
     threads.emplace_back([&]() {
       for (;;) {
         TileKey key;
@@ -304,7 +306,7 @@ estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
                              ? static_cast<double>(sampledBytes) / sampled
                              : static_cast<double>(typicalTileBytes(provider));
   estimate.bytes =
-      static_cast<long long>(perTile * static_cast<double>(estimate.tiles));
+      static_cast<int64_t>(perTile * static_cast<double>(estimate.tiles));
   return estimate;
 }
 

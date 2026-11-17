@@ -20,6 +20,7 @@
 
 #include "ts/network/tilediskcache.h"
 
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -41,7 +42,7 @@ namespace
  * Format of the cache file. Version 1 (without pins) is upgraded in
  * place; a file of any other version starts over.
  */
-constexpr int formatVersion = 2;
+constexpr int32_t formatVersion = 2;
 
 /** Evict down to this fraction of the limit, so not every store evicts. */
 constexpr double evictTarget = 0.9;
@@ -78,47 +79,47 @@ public:
   Statement& operator=(Statement&&) = delete;
 
   /** SQLITE_OK if prepared, else the error. */
-  int code() const { return m_code; }
+  int32_t code() const { return m_code; }
 
-  void bind(int index, long long value)
+  void bind(int32_t index, int64_t value)
   {
     sqlite3_bind_int64(m_statement, index, value);
   }
-  void bind(int index, const QByteArray& value)
+  void bind(int32_t index, const QByteArray& value)
   {
     sqlite3_bind_blob(m_statement, index, value.constData(),
-                      static_cast<int>(value.size()), SQLITE_TRANSIENT);
+                      static_cast<int32_t>(value.size()), SQLITE_TRANSIENT);
   }
 
   /** SQLITE_ROW, SQLITE_DONE or an error. */
-  int step() { return sqlite3_step(m_statement); }
+  int32_t step() { return sqlite3_step(m_statement); }
 
-  long long integer(int column) const
+  int64_t integer(int32_t column) const
   {
     return sqlite3_column_int64(m_statement, column);
   }
-  QByteArray blob(int column) const
+  QByteArray blob(int32_t column) const
   {
     const void* data = sqlite3_column_blob(m_statement, column);
-    const int size = sqlite3_column_bytes(m_statement, column);
+    const int32_t size = sqlite3_column_bytes(m_statement, column);
     return data == nullptr ? QByteArray()
                            : QByteArray(static_cast<const char*>(data), size);
   }
 
 private:
   sqlite3_stmt* m_statement = nullptr;
-  int m_code = SQLITE_OK;
+  int32_t m_code = SQLITE_OK;
 };
 
 /** The key as SQLite's signed 64-bit integer. */
-long long rowId(TileKey key)
+int64_t rowId(TileKey key)
 {
-  return static_cast<long long>(key.packed());
+  return static_cast<int64_t>(key.packed());
 }
 
-bool isCorruption(int code)
+bool isCorruption(int32_t code)
 {
-  const int primary = code & 0xff;
+  const int32_t primary = code & 0xff;
   return primary == SQLITE_CORRUPT || primary == SQLITE_NOTADB;
 }
 
@@ -126,14 +127,14 @@ bool isCorruption(int code)
  * Sets @p bytes to the size of the stored tile @p tile, or nothing if it
  * isn't stored. Returns SQLITE_DONE, or the error.
  */
-int storedBytes(sqlite3* db, long long tile, std::optional<long long>& bytes)
+int32_t storedBytes(sqlite3* db, int64_t tile, std::optional<int64_t>& bytes)
 {
   Statement size(db, "SELECT bytes FROM tiles WHERE tile = ?1");
   if (size.code() != SQLITE_OK) {
     return size.code();
   }
   size.bind(1, tile);
-  const int code = size.step();
+  const int32_t code = size.step();
   if (code == SQLITE_ROW) {
     bytes = size.integer(0);
     return SQLITE_DONE;
@@ -143,8 +144,8 @@ int storedBytes(sqlite3* db, long long tile, std::optional<long long>& bytes)
 }
 
 /** Writes @p tile as @p key, used at @p clock. SQLITE_DONE or the error. */
-int insertTile(sqlite3* db, long long key, const CachedTile& tile,
-               long long clock)
+int32_t insertTile(sqlite3* db, int64_t key, const CachedTile& tile,
+                   int64_t clock)
 {
   Statement insert(db, "INSERT OR REPLACE INTO tiles (tile, data, "
                        "content_type, expires, etag, last_modified, "
@@ -160,12 +161,12 @@ int insertTile(sqlite3* db, long long key, const CachedTile& tile,
   insert.bind(5, tile.etag);
   insert.bind(6, tile.lastModified);
   insert.bind(7, clock);
-  insert.bind(8, static_cast<long long>(tile.data.size()));
+  insert.bind(8, static_cast<int64_t>(tile.data.size()));
   return insert.step();
 }
 
 /** Pins @p tile for @p region. SQLITE_DONE or the error. */
-int insertPin(sqlite3* db, long long region, long long tile)
+int32_t insertPin(sqlite3* db, int64_t region, int64_t tile)
 {
   Statement pin(db, "INSERT OR IGNORE INTO pins (region, tile) VALUES "
                     "(?1, ?2)");
@@ -183,7 +184,7 @@ struct TileDiskCache::Database {
   SqliteConnection connection;
 };
 
-TileDiskCache::TileDiskCache(QString path, long long maximumBytes)
+TileDiskCache::TileDiskCache(QString path, int64_t maximumBytes)
     : m_path(std::move(path)), m_maximumBytes(maximumBytes)
 {
 }
@@ -232,12 +233,12 @@ TileDiskCache::SetUp TileDiskCache::setUp(SqliteConnection& connection)
   // The first statement reads the header: a foreign or damaged file fails
   // here (SQLITE_NOTADB, SQLITE_CORRUPT).
   bool ok = false;
-  const long long version =
+  const int64_t version =
       connection.queryInteger(QStringLiteral("PRAGMA user_version"), &ok);
   if (!ok) {
     return SetUp::Damaged;
   }
-  const long long tables = connection.queryInteger(
+  const int64_t tables = connection.queryInteger(
       QStringLiteral("SELECT count(*) FROM sqlite_master"), &ok);
   if (!ok) {
     return SetUp::Damaged;
@@ -276,7 +277,7 @@ bool TileDiskCache::ensureOpen()
   return m_db != nullptr || openFresh(false);
 }
 
-bool TileDiskCache::handleFailure(int code)
+bool TileDiskCache::handleFailure(int32_t code)
 {
   // A damaged file found in use: start over with an empty one.
   if (isCorruption(code)) {
@@ -295,9 +296,9 @@ bool TileDiskCache::handleFailure(int code)
 std::optional<CachedTile> TileDiskCache::find(TileKey key)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  for (int attempt = 0; attempt < 2 && ensureOpen(); ++attempt) {
+  for (int32_t attempt = 0; attempt < 2 && ensureOpen(); ++attempt) {
     sqlite3* db = m_db->connection.get();
-    int code = SQLITE_OK;
+    int32_t code = SQLITE_OK;
     {
       Statement select(db, "SELECT data, content_type, expires, etag, "
                            "last_modified FROM tiles WHERE tile = ?1");
@@ -332,13 +333,13 @@ std::optional<CachedTile> TileDiskCache::find(TileKey key)
 }
 
 bool TileDiskCache::store(TileKey key, const CachedTile& tile,
-                          long long pinRegion)
+                          int64_t pinRegion)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  for (int attempt = 0; attempt < 2 && ensureOpen(); ++attempt) {
+  for (int32_t attempt = 0; attempt < 2 && ensureOpen(); ++attempt) {
     sqlite3* db = m_db->connection.get();
-    std::optional<long long> previous;
-    int code = storedBytes(db, rowId(key), previous);
+    std::optional<int64_t> previous;
+    int32_t code = storedBytes(db, rowId(key), previous);
     const bool wasPinned = previous && isPinnedLocked(rowId(key));
     if (code == SQLITE_DONE) {
       code = insertTile(db, rowId(key), tile, ++m_clock);
@@ -347,8 +348,8 @@ bool TileDiskCache::store(TileKey key, const CachedTile& tile,
       code = insertPin(db, pinRegion, rowId(key));
     }
     if (code == SQLITE_DONE) {
-      const long long bytes = static_cast<long long>(tile.data.size());
-      const long long previousBytes = previous.value_or(0);
+      const int64_t bytes = static_cast<int64_t>(tile.data.size());
+      const int64_t previousBytes = previous.value_or(0);
       m_bytes += bytes - previousBytes;
       if (wasPinned) {
         m_pinnedBytes += bytes - previousBytes;
@@ -367,7 +368,7 @@ bool TileDiskCache::store(TileKey key, const CachedTile& tile,
   return false;
 }
 
-bool TileDiskCache::refresh(TileKey key, long long expiresS,
+bool TileDiskCache::refresh(TileKey key, int64_t expiresS,
                             const QByteArray& etag,
                             const QByteArray& lastModified)
 {
@@ -387,7 +388,7 @@ bool TileDiskCache::refresh(TileKey key, long long expiresS,
   update.bind(3, lastModified);
   update.bind(4, ++m_clock);
   update.bind(5, rowId(key));
-  const int code = update.step();
+  const int32_t code = update.step();
   if (code != SQLITE_DONE) {
     handleFailure(code);
     return false;
@@ -402,7 +403,7 @@ void TileDiskCache::remove(TileKey key)
     return;
   }
   sqlite3* db = m_db->connection.get();
-  long long bytes = 0;
+  int64_t bytes = 0;
   {
     Statement size(db, "SELECT bytes FROM tiles WHERE tile = ?1");
     size.bind(1, rowId(key));
@@ -439,11 +440,11 @@ void TileDiskCache::evict()
 {
   // Under m_mutex, open. Least recently used first, in batches.
   sqlite3* db = m_db->connection.get();
-  const long long target =
-      static_cast<long long>(evictTarget * static_cast<double>(m_maximumBytes));
+  const int64_t target =
+      static_cast<int64_t>(evictTarget * static_cast<double>(m_maximumBytes));
   // Pinned tiles are neither counted nor evicted.
   while (m_bytes - m_pinnedBytes > target) {
-    std::vector<std::pair<long long, long long>> victims;
+    std::vector<std::pair<int64_t, int64_t>> victims;
     {
       Statement oldest(db, "SELECT tile, bytes FROM tiles WHERE tile NOT IN "
                            "(SELECT tile FROM pins) ORDER BY last_used "
@@ -457,7 +458,7 @@ void TileDiskCache::evict()
       return;
     }
     m_db->connection.execute(QStringLiteral("BEGIN"));
-    for (const std::pair<long long, long long>& victim : victims) {
+    for (const std::pair<int64_t, int64_t>& victim : victims) {
       if (m_bytes - m_pinnedBytes <= target) {
         break;
       }
@@ -471,19 +472,19 @@ void TileDiskCache::evict()
   }
 }
 
-long long TileDiskCache::sizeBytes()
+int64_t TileDiskCache::sizeBytes()
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   return ensureOpen() ? m_bytes : 0;
 }
 
-long long TileDiskCache::pinnedBytes()
+int64_t TileDiskCache::pinnedBytes()
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   return ensureOpen() ? m_pinnedBytes : 0;
 }
 
-bool TileDiskCache::isPinnedLocked(long long tile)
+bool TileDiskCache::isPinnedLocked(int64_t tile)
 {
   Statement select(m_db->connection.get(),
                    "SELECT 1 FROM pins WHERE tile = ?1 LIMIT 1");
@@ -494,7 +495,7 @@ bool TileDiskCache::isPinnedLocked(long long tile)
 void TileDiskCache::recountPinned()
 {
   bool ok = false;
-  const long long pinned = m_db->connection.queryInteger(
+  const int64_t pinned = m_db->connection.queryInteger(
       QStringLiteral("SELECT coalesce(sum(bytes), 0) FROM tiles WHERE tile "
                      "IN (SELECT tile FROM pins)"),
       &ok);
@@ -503,18 +504,18 @@ void TileDiskCache::recountPinned()
   }
 }
 
-bool TileDiskCache::pin(long long region, TileKey key)
+bool TileDiskCache::pin(int64_t region, TileKey key)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   if (region == 0 || !ensureOpen()) {
     return false;
   }
   sqlite3* db = m_db->connection.get();
-  long long bytes = 0;
+  int64_t bytes = 0;
   {
     Statement size(db, "SELECT bytes FROM tiles WHERE tile = ?1");
     size.bind(1, rowId(key));
-    const int code = size.step();
+    const int32_t code = size.step();
     if (code != SQLITE_ROW) {
       handleFailure(code);
       return false;
@@ -522,7 +523,7 @@ bool TileDiskCache::pin(long long region, TileKey key)
     bytes = size.integer(0);
   }
   const bool wasPinned = isPinnedLocked(rowId(key));
-  const int code = insertPin(db, region, rowId(key));
+  const int32_t code = insertPin(db, region, rowId(key));
   if (code != SQLITE_DONE) {
     handleFailure(code);
     return false;
@@ -533,7 +534,7 @@ bool TileDiskCache::pin(long long region, TileKey key)
   return true;
 }
 
-void TileDiskCache::unpinRegion(long long region)
+void TileDiskCache::unpinRegion(int64_t region)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   if (!ensureOpen()) {
@@ -541,7 +542,7 @@ void TileDiskCache::unpinRegion(long long region)
   }
   Statement erase(m_db->connection.get(), "DELETE FROM pins WHERE region = ?1");
   erase.bind(1, region);
-  const int code = erase.step();
+  const int32_t code = erase.step();
   if (code != SQLITE_DONE) {
     handleFailure(code);
     return;
@@ -558,7 +559,7 @@ bool TileDiskCache::isPinned(TileKey key)
   return ensureOpen() && isPinnedLocked(rowId(key));
 }
 
-RegionUsage TileDiskCache::regionUsage(long long region)
+RegionUsage TileDiskCache::regionUsage(int64_t region)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   RegionUsage usage;
@@ -577,10 +578,10 @@ RegionUsage TileDiskCache::regionUsage(long long region)
   return usage;
 }
 
-std::vector<long long> TileDiskCache::pinnedRegions()
+std::vector<int64_t> TileDiskCache::pinnedRegions()
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  std::vector<long long> regions;
+  std::vector<int64_t> regions;
   if (!ensureOpen()) {
     return regions;
   }
@@ -592,17 +593,17 @@ std::vector<long long> TileDiskCache::pinnedRegions()
   return regions;
 }
 
-int TileDiskCache::count()
+int32_t TileDiskCache::count()
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   if (!ensureOpen()) {
     return 0;
   }
-  return static_cast<int>(m_db->connection.queryInteger(
+  return static_cast<int32_t>(m_db->connection.queryInteger(
       QStringLiteral("SELECT count(*) FROM tiles")));
 }
 
-int TileDiskCache::recoveries() const
+int32_t TileDiskCache::recoveries() const
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   return m_recoveries;

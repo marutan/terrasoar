@@ -22,15 +22,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace ts
 {
 
-TileKey TileKey::containing(int level, const Geodetic& position)
+TileKey TileKey::containing(int32_t level, const Geodetic& position)
 {
   const double latDeg = position.latDeg;
   const double lonDeg = position.lonDeg;
-  const int clampedLevel = std::clamp(level, 0, maximumLevel);
+  const int32_t clampedLevel = std::clamp(level, 0, maximumLevel);
   const double size = sizeDeg(clampedLevel);
   double lon = normaliseLonDeg(lonDeg);
   // normaliseLonDeg maps 180° E to −180°; keep it in the last column.
@@ -44,7 +45,8 @@ TileKey TileKey::containing(int level, const Geodetic& position)
   const std::int64_t row = std::clamp<std::int64_t>(
       static_cast<std::int64_t>(std::floor((90.0 - lat) / size)), 0,
       rows(clampedLevel) - 1);
-  return TileKey{clampedLevel, static_cast<int>(column), static_cast<int>(row)};
+  return TileKey{clampedLevel, static_cast<int32_t>(column),
+                 static_cast<int32_t>(row)};
 }
 
 GeoRect TileKey::bounds() const
@@ -63,7 +65,7 @@ TileKey TileKey::parent() const
   return TileKey{level - 1, x / 2, y / 2};
 }
 
-TileKey TileKey::child(int index) const
+TileKey TileKey::child(int32_t index) const
 {
   return TileKey{level + 1, 2 * x + (index & 1), 2 * y + ((index >> 1) & 1)};
 }
@@ -73,7 +75,7 @@ bool TileKey::contains(TileKey other) const
   if (other.level < level) {
     return false;
   }
-  const int shift = other.level - level;
+  const int32_t shift = other.level - level;
   return (other.x >> shift) == x && (other.y >> shift) == y;
 }
 

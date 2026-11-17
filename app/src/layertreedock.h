@@ -26,6 +26,8 @@
 #ifndef TS_APP_LAYERTREEDOCK_H
 #define TS_APP_LAYERTREEDOCK_H
 
+#include <cstdint>
+
 #include <QDockWidget>
 
 class QCheckBox;
@@ -104,7 +106,7 @@ private:
   void addSolidColorLayer();
   void addCollection();
   void removeCurrent();
-  void setOpacityPercent(int percent);
+  void setOpacityPercent(int32_t percent);
   void setCompositeAsGroup(bool composite);
 
   LayerTreeModel* m_model;

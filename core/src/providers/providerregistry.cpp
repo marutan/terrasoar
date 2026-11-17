@@ -21,6 +21,7 @@
 #include "ts/providers/providerregistry.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include <QColor>
 #include <QCoreApplication>
@@ -56,7 +57,7 @@ QString canonical(const QJsonObject& source)
       QJsonDocument(source).toJson(QJsonDocument::Compact));
 }
 
-int intMember(const QJsonObject& source, const char* name, int fallback)
+int32_t intMember(const QJsonObject& source, const char* name, int32_t fallback)
 {
   return source.value(QLatin1String(name)).toInt(fallback);
 }
@@ -67,7 +68,7 @@ std::shared_ptr<ImageryProvider>
 createImageryProvider(const QJsonObject& source, QString* errorString)
 {
   const QString kind = source.value(QStringLiteral("kind")).toString();
-  const int maximumLevel =
+  const int32_t maximumLevel =
       intMember(source, "maximumLevel", TileKey::maximumLevel);
   if (kind == QLatin1String("checkerboard")) {
     return std::make_shared<CheckerboardImageryProvider>(
@@ -647,10 +648,10 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   return provider;
 }
 
-int ProviderRegistry::liveImageryProviders() const
+int32_t ProviderRegistry::liveImageryProviders() const
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  int count = 0;
+  int32_t count = 0;
   for (const std::pair<const QString, std::weak_ptr<ImageryProvider>>& entry :
        m_imagery) {
     count += entry.second.expired() ? 0 : 1;

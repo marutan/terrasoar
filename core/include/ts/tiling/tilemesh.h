@@ -78,7 +78,7 @@ struct TileVertex {
  */
 struct TileMesh {
   /** Default grid segments per side. */
-  static constexpr int defaultSegments = 16;
+  static constexpr int32_t defaultSegments = 16;
 
   /** The tile this mesh is for. */
   TileKey key;
@@ -87,7 +87,7 @@ struct TileMesh {
   /** Distance from the centre to the farthest vertex, metres. */
   double radiusM = 0.0;
   /** Grid segments per side. */
-  int segments = defaultSegments;
+  int32_t segments = defaultSegments;
   /** (segments + 1)² grid vertices row by row from the north-west, then
    *  4 × segments skirt vertices. */
   std::vector<TileVertex> vertices;
@@ -105,7 +105,8 @@ struct HeightTile;
  *
  * @threadsafe
  */
-TileMesh buildTileMesh(TileKey key, int segments = TileMesh::defaultSegments,
+TileMesh buildTileMesh(TileKey key,
+                       int32_t segments = TileMesh::defaultSegments,
                        const HeightTile* heights = nullptr);
 
 /**
@@ -115,7 +116,7 @@ TileMesh buildTileMesh(TileKey key, int segments = TileMesh::defaultSegments,
  *
  * @threadsafe
  */
-std::vector<std::uint16_t> tileMeshIndices(int segments);
+std::vector<std::uint16_t> tileMeshIndices(int32_t segments);
 
 /**
  * Returns triangle indices that draw a mesh with @p segments segments as
@@ -128,7 +129,7 @@ std::vector<std::uint16_t> tileMeshIndices(int segments);
  *
  * @threadsafe
  */
-std::vector<std::uint16_t> tileMeshStripIndices(int segments);
+std::vector<std::uint16_t> tileMeshStripIndices(int32_t segments);
 
 /**
  * Returns the skirt depth in metres for a tile at @p level with
@@ -137,7 +138,7 @@ std::vector<std::uint16_t> tileMeshStripIndices(int segments);
  *
  * @threadsafe
  */
-double tileSkirtDepthM(int level, int segments);
+double tileSkirtDepthM(int32_t level, int32_t segments);
 
 } // namespace ts
 

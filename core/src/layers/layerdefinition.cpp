@@ -21,6 +21,7 @@
 #include "ts/layers/layerdefinition.h"
 
 #include <array>
+#include <cstdint>
 #include <utility>
 
 #include <QCoreApplication>
@@ -201,7 +202,7 @@ std::vector<LayerDefinition> builtinLayerDefinitions()
   // Qt 6 and QJsonValue on Qt 5, so no range-for spelling suits both
   // (clang-tidy wants no conversion, clazy a reference).
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < array.size(); ++i) {
+  for (int32_t i = 0; i < array.size(); ++i) {
     std::optional<LayerDefinition> definition =
         LayerDefinition::fromJson(array.at(i).toObject(), nullptr);
     if (definition) {

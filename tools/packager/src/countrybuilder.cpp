@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -118,7 +119,7 @@ public:
     }
     OGRGeometryH result = nullptr;
     const OGRErr error =
-        OGR_G_CreateFromWkb(data, nullptr, &result, static_cast<int>(size));
+        OGR_G_CreateFromWkb(data, nullptr, &result, static_cast<int32_t>(size));
     GEOSFree_r(m_handle, data);
     if (error != OGRERR_NONE || result == nullptr) {
       return nullptr;
@@ -147,17 +148,17 @@ void joinAcrossAntimeridian(OGRGeometryH geometry)
   }
   const bool multi =
       wkbFlatten(OGR_G_GetGeometryType(geometry)) == wkbMultiPolygon;
-  const int parts = multi ? OGR_G_GetGeometryCount(geometry) : 1;
-  for (int p = 0; p < parts; ++p) {
+  const int32_t parts = multi ? OGR_G_GetGeometryCount(geometry) : 1;
+  for (int32_t p = 0; p < parts; ++p) {
     OGRGeometryH part = multi ? OGR_G_GetGeometryRef(geometry, p) : geometry;
     OGREnvelope partEnvelope{};
     OGR_G_GetEnvelope(part, &partEnvelope);
     if (partEnvelope.MinX + partEnvelope.MaxX >= 0.0) {
       continue;
     }
-    for (int r = 0; r < OGR_G_GetGeometryCount(part); ++r) {
+    for (int32_t r = 0; r < OGR_G_GetGeometryCount(part); ++r) {
       OGRGeometryH ring = OGR_G_GetGeometryRef(part, r);
-      for (int i = 0; i < OGR_G_GetPointCount(ring); ++i) {
+      for (int32_t i = 0; i < OGR_G_GetPointCount(ring); ++i) {
         OGR_G_SetPoint_2D(ring, i, OGR_G_GetX(ring, i) + 360.0,
                           OGR_G_GetY(ring, i));
       }
@@ -165,11 +166,11 @@ void joinAcrossAntimeridian(OGRGeometryH geometry)
   }
 }
 
-long long ringCount(GEOSContextHandle_t context, const GEOSGeometry* geometry)
+int64_t ringCount(GEOSContextHandle_t context, const GEOSGeometry* geometry)
 {
-  long long rings = 0;
-  const int count = GEOSGetNumGeometries_r(context, geometry);
-  for (int i = 0; i < count; ++i) {
+  int64_t rings = 0;
+  const int32_t count = GEOSGetNumGeometries_r(context, geometry);
+  for (int32_t i = 0; i < count; ++i) {
     rings += 1 + GEOSGetNumInteriorRings_r(
                      context, GEOSGetGeometryN_r(context, geometry, i));
   }
@@ -177,7 +178,7 @@ long long ringCount(GEOSContextHandle_t context, const GEOSGeometry* geometry)
 }
 
 /** The text of field @p index, empty for Natural Earth's "-99". */
-QString field(OGRFeatureH feature, int index)
+QString field(OGRFeatureH feature, int32_t index)
 {
   const QString value =
       QString::fromUtf8(OGR_F_GetFieldAsString(feature, index)).trimmed();
@@ -248,7 +249,7 @@ public:
     OGRFeatureH feature = OGR_F_Create(OGR_L_GetLayerDefn(m_layer));
     for (std::size_t i = 0; i < fields.size(); ++i) {
       const QByteArray value = fields.at(i).toUtf8();
-      OGR_F_SetFieldString(feature, static_cast<int>(i), value.constData());
+      OGR_F_SetFieldString(feature, static_cast<int32_t>(i), value.constData());
     }
     OGR_F_SetGeometryDirectly(feature, geometry);
     const bool ok = OGR_L_CreateFeature(m_layer, feature) == OGRERR_NONE;
@@ -351,7 +352,7 @@ bool buildCountries(const CountryOptions& options, CountryStats* stats,
   OGRLayerH layer =
       GDALDatasetGetLayer(static_cast<GDALDatasetH>(source.handle()), 0);
   OGRFeatureDefnH definition = OGR_L_GetLayerDefn(layer);
-  std::array<int, 4> fields{};
+  std::array<int32_t, 4> fields{};
   const std::array<const char*, 4> names{"ADM0_A3", "ADMIN", "ISO_A2_EH",
                                          "ISO_A3_EH"};
   for (std::size_t i = 0; i < names.size(); ++i) {

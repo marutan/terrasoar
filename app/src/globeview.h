@@ -25,6 +25,7 @@
 #ifndef TS_APP_GLOBEVIEW_H
 #define TS_APP_GLOBEVIEW_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -127,9 +128,9 @@ public:
   void setImageryDraws(const ImageryDraws& draws);
 
   /** Returns the number of imagery layers drawn. */
-  int imageryLayerCount() const
+  int32_t imageryLayerCount() const
   {
-    return static_cast<int>(m_draws.layers.size());
+    return static_cast<int32_t>(m_draws.layers.size());
   }
 
   /** Sets the vector layers (and the graticule), bottom to top. */
@@ -142,9 +143,9 @@ public:
   bool terrainShown() const;
 
   /** Returns the number of vector layers drawn (the graticule included). */
-  int vectorLayerCount() const
+  int32_t vectorLayerCount() const
   {
-    return static_cast<int>(m_vectorDraws.size());
+    return static_cast<int32_t>(m_vectorDraws.size());
   }
 
   /**
@@ -229,7 +230,7 @@ public:
   const RenderDeviceInfo& deviceInfo() const { return m_deviceInfo; }
 
   /** Returns the number of frames drawn so far. */
-  int framesRendered() const { return m_framesRendered; }
+  int32_t framesRendered() const { return m_framesRendered; }
 
   /** How the user draws a region, see startRegionDrawing(). */
   enum class RegionDrawing {
@@ -311,7 +312,7 @@ protected:
   /** Creates the renderer. */
   void initializeGL() override;
   /** Updates the camera's viewport. */
-  void resizeGL(int widthPx, int heightPx) override;
+  void resizeGL(int32_t widthPx, int32_t heightPx) override;
   /** Draws the globe and, if shown, the debug overlay. */
   void paintGL() override;
   /** Starts a pan or rotate drag. */
@@ -373,7 +374,7 @@ private:
   FramePacer m_pacer;
   double m_lastAdvanceS = 0.0;
   bool m_animationClockRunning = false;
-  unsigned int m_heldKeys = NoMotion;
+  uint32_t m_heldKeys = NoMotion;
 
   bool m_pointerInside = false;
   QPointF m_pointerPx;
@@ -385,7 +386,7 @@ private:
   FrameTimeStats m_cpuFrameStats;
   FrameTimeStats m_intervalStats;
   double m_lastFrameStartS = -1.0;
-  int m_framesRendered = 0;
+  int32_t m_framesRendered = 0;
 
   RegionDrawing m_drawing = RegionDrawing::None;
   std::vector<LonLat> m_profileLine;

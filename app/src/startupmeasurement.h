@@ -26,6 +26,7 @@
 #ifndef TS_APP_STARTUPMEASUREMENT_H
 #define TS_APP_STARTUPMEASUREMENT_H
 
+#include <cstdint>
 #include <functional>
 
 #include <QElapsedTimer>
@@ -62,7 +63,7 @@ public:
    *        finish straight after the first paint.
    * @param parent Usual QObject parent.
    */
-  StartupMeasurement(QElapsedTimer sinceMain, QWidget* window, int idleS,
+  StartupMeasurement(QElapsedTimer sinceMain, QWidget* window, int32_t idleS,
                      QObject* parent = nullptr);
 
   /** Starts watching the window. Call before the window is shown. */
@@ -104,7 +105,7 @@ private:
 
   QElapsedTimer m_sinceMain;
   QPointer<QWidget> m_window;
-  int m_idleS = 0;
+  int32_t m_idleS = 0;
   std::function<bool()> m_backgroundBusy;
   std::function<QJsonObject()> m_stateReport;
   bool m_painted = false;

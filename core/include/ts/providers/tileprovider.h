@@ -26,6 +26,7 @@
 #define TS_PROVIDERS_TILEPROVIDER_H
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -102,14 +103,14 @@ public:
   virtual QString name() const = 0;
 
   /** Returns the deepest level the source has data for. */
-  virtual int maximumLevel() const = 0;
+  virtual int32_t maximumLevel() const = 0;
 
   /**
    * Returns how many loader threads the source wants: 0 for the loader's
    * default. Sources that wait on a network rather than a disk or the CPU
    * ask for more, so that several requests are in flight at once.
    */
-  virtual int preferredLoaderThreads() const { return 0; }
+  virtual int32_t preferredLoaderThreads() const { return 0; }
 
   /** Returns how the source is doing (Ok until it says otherwise). */
   ProviderStatus status() const;
@@ -175,7 +176,7 @@ class ImageryProvider : public TileProvider
 {
 public:
   /** Returns the width and height of the tiles in pixels. */
-  virtual int tileSizePx() const = 0;
+  virtual int32_t tileSizePx() const = 0;
 
   /** Returns how the images map to their tiles (Geographic by default). */
   virtual TileImageProjection imageProjection() const
@@ -211,7 +212,7 @@ struct HeightTile {
   /** The tile. */
   TileKey key;
   /** Samples along each side (at least 2). */
-  int samples = 0;
+  int32_t samples = 0;
   /**
    * samples² heights above the WGS 84 ellipsoid, metres, row by row; NaN
    * where the source has no data (CompositeElevationProvider fills those

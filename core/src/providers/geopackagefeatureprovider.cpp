@@ -101,7 +101,7 @@ public:
       return 0;
     }
     std::uint32_t value = 0;
-    for (int i = 0; i < 4; ++i) {
+    for (int32_t i = 0; i < 4; ++i) {
       const std::size_t index =
           m_pos + static_cast<std::size_t>(littleEndian ? 3 - i : i);
       value = (value << 8U) | m_data[index];
@@ -116,7 +116,7 @@ public:
       return 0.0;
     }
     std::uint64_t bits = 0;
-    for (int i = 0; i < 8; ++i) {
+    for (int32_t i = 0; i < 8; ++i) {
       const std::size_t index =
           m_pos + static_cast<std::size_t>(littleEndian ? 7 - i : i);
       bits = (bits << 8U) | m_data[index];
@@ -211,13 +211,13 @@ bool readPolygonBody(WkbReader& reader, bool little, std::size_t dimensions,
   return reader.ok();
 }
 
-bool readGeometry(WkbReader& reader, int depth, std::vector<Feature>* out);
+bool readGeometry(WkbReader& reader, int32_t depth, std::vector<Feature>* out);
 
 /**
  * Reads the members of a multi line string (@p type 5) or multipolygon
  * (6): one feature with every line, or one feature per polygon.
  */
-bool readMulti(WkbReader& reader, bool little, WkbType type, int depth,
+bool readMulti(WkbReader& reader, bool little, WkbType type, int32_t depth,
                std::vector<Feature>* out)
 {
   const std::uint32_t count = reader.uint32(little);
@@ -253,7 +253,7 @@ bool readMulti(WkbReader& reader, bool little, WkbType type, int depth,
 }
 
 /** Reads one WKB geometry (its byte order and type first). */
-bool readGeometry(WkbReader& reader, int depth, std::vector<Feature>* out)
+bool readGeometry(WkbReader& reader, int32_t depth, std::vector<Feature>* out)
 {
   const bool little = reader.byte() == 1;
   const WkbType type = splitType(reader.uint32(little));
@@ -443,9 +443,9 @@ bool GeoPackageFeatureWriter::addTable(const FeatureTableSpec& spec)
   return true;
 }
 
-bool GeoPackageFeatureWriter::putFeature(
-    const QString& table, TileKey tile, const QByteArray& wkb,
-    const std::vector<long long>& attributes)
+bool GeoPackageFeatureWriter::putFeature(const QString& table, TileKey tile,
+                                         const QByteArray& wkb,
+                                         const std::vector<int64_t>& attributes)
 {
   if (!m_error.isEmpty() || d->dataset == nullptr) {
     return false;
@@ -469,7 +469,7 @@ bool GeoPackageFeatureWriter::putFeature(
   }
   OGRGeometryH geometry = nullptr;
   if (OGR_G_CreateFromWkb(wkb.constData(), nullptr, &geometry,
-                          static_cast<int>(wkb.size())) != OGRERR_NONE) {
+                          static_cast<int32_t>(wkb.size())) != OGRERR_NONE) {
     m_error = QStringLiteral("Bad WKB for table %1").arg(table);
     return false;
   }
@@ -482,7 +482,8 @@ bool GeoPackageFeatureWriter::putFeature(
   OGR_F_SetFieldInteger64(feature, 1, tile.x);
   OGR_F_SetFieldInteger64(feature, 2, tile.y);
   for (std::size_t i = 0; i < attributes.size(); ++i) {
-    OGR_F_SetFieldInteger64(feature, static_cast<int>(i) + 3, attributes[i]);
+    OGR_F_SetFieldInteger64(feature, static_cast<int32_t>(i) + 3,
+                            attributes[i]);
   }
   const OGRErr result = OGR_L_CreateFeature(layer, feature);
   OGR_F_Destroy(feature);
@@ -584,7 +585,7 @@ struct GeoPackageFeatureProvider::Table {
 namespace
 {
 
-QString columnText(sqlite3_stmt* statement, int column)
+QString columnText(sqlite3_stmt* statement, int32_t column)
 {
   const unsigned char* text = sqlite3_column_text(statement, column);
   return text ? QString::fromUtf8(reinterpret_cast<const char*>(text))
@@ -602,7 +603,7 @@ QString geometryColumn(const SqliteConnection& connection, const QString& table)
                          -1, &statement, nullptr) == SQLITE_OK) {
     const QByteArray name = table.toUtf8();
     sqlite3_bind_text(statement, 1, name.constData(),
-                      static_cast<int>(name.size()), SQLITE_TRANSIENT);
+                      static_cast<int32_t>(name.size()), SQLITE_TRANSIENT);
     if (sqlite3_step(statement) == SQLITE_ROW) {
       column = columnText(statement, 0);
     }
@@ -653,7 +654,7 @@ bool readRows(sqlite3_stmt* statement, const FeatureTableSpec& spec,
     std::vector<Feature> decoded;
     const unsigned char* blob =
         static_cast<const unsigned char*>(sqlite3_column_blob(statement, 0));
-    const int bytes = sqlite3_column_bytes(statement, 0);
+    const int32_t bytes = sqlite3_column_bytes(statement, 0);
     if (!decodeGeoPackageGeometry(blob, static_cast<std::size_t>(bytes),
                                   &decoded)) {
       continue; // Damaged geometry: skip the feature.
@@ -663,7 +664,7 @@ bool readRows(sqlite3_stmt* statement, const FeatureTableSpec& spec,
     for (std::size_t i = 0; i < spec.attributes.size(); ++i) {
       attributes.insert(spec.attributes[i],
                         static_cast<qlonglong>(sqlite3_column_int64(
-                            statement, static_cast<int>(i) + 1)));
+                            statement, static_cast<int32_t>(i) + 1)));
     }
     for (Feature& feature : decoded) {
       feature.attributes = attributes;

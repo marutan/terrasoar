@@ -26,6 +26,7 @@
 #define TS_GLOBE_GLOBEUNIFORMS_H
 
 #include <array>
+#include <cstdint>
 
 namespace ts::globe_detail
 {
@@ -96,15 +97,15 @@ static_assert(sizeof(FrameBlock) == 208, "std140 layout of Frame");
 static_assert(sizeof(GlobeBlock) == 160, "std140 layout of Globe");
 
 /** Binding of the "Frame" block. */
-inline constexpr int frameBinding = 0;
+inline constexpr int32_t frameBinding = 0;
 /** Binding of the "Globe" block. */
-inline constexpr int globeBinding = 1;
+inline constexpr int32_t globeBinding = 1;
 /** Binding of the tile renderer's per-tile "Tile" block. */
-inline constexpr int tileBinding = 2;
+inline constexpr int32_t tileBinding = 2;
 /** Binding of the vector renderer's per-draw "Vector" block. */
-inline constexpr int vectorBinding = 4;
+inline constexpr int32_t vectorBinding = 4;
 /** Binding of the graticule pass's "Graticule" block. */
-inline constexpr int graticuleBinding = 5;
+inline constexpr int32_t graticuleBinding = 5;
 
 inline const char* const frameBlockGlsl = R"(
 layout(std140) uniform Frame {

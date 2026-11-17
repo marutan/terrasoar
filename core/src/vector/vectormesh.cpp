@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 #define GEOS_USE_ONLY_R_API
@@ -148,9 +149,9 @@ struct VectorMesher::Private {
         continue;
       }
       GEOSCoordSequence* sequence =
-          GEOSCoordSeq_create_r(c, static_cast<unsigned int>(part.size()), 2);
+          GEOSCoordSeq_create_r(c, static_cast<uint32_t>(part.size()), 2);
       for (std::size_t i = 0; i < part.size(); ++i) {
-        GEOSCoordSeq_setXY_r(c, sequence, static_cast<unsigned int>(i),
+        GEOSCoordSeq_setXY_r(c, sequence, static_cast<uint32_t>(i),
                              part[i].lonDeg, part[i].latDeg);
       }
       GEOSGeometry* ring = GEOSGeom_createLinearRing_r(c, sequence);
@@ -161,9 +162,9 @@ struct VectorMesher::Private {
     if (rings.empty()) {
       return wrap(nullptr);
     }
-    GeomPtr result = wrap(
-        GEOSGeom_createPolygon_r(c, rings.front(), rings.data() + 1,
-                                 static_cast<unsigned int>(rings.size() - 1)));
+    GeomPtr result =
+        wrap(GEOSGeom_createPolygon_r(c, rings.front(), rings.data() + 1,
+                                      static_cast<uint32_t>(rings.size() - 1)));
     if (result && GEOSisValid_r(c, result.get()) != 1) {
       result = wrap(GEOSMakeValid_r(c, result.get()));
     }
@@ -180,18 +181,18 @@ struct VectorMesher::Private {
     if (!result) {
       return;
     }
-    const int count = GEOSGetNumGeometries_r(c, result.get());
-    for (int i = 0; i < count; ++i) {
+    const int32_t count = GEOSGetNumGeometries_r(c, result.get());
+    for (int32_t i = 0; i < count; ++i) {
       const GEOSGeometry* triangle = GEOSGetGeometryN_r(c, result.get(), i);
       const GEOSGeometry* ring = GEOSGetExteriorRing_r(c, triangle);
       const GEOSCoordSequence* sequence =
           ring ? GEOSGeom_getCoordSeq_r(c, ring) : nullptr;
-      unsigned int size = 0;
+      uint32_t size = 0;
       if (sequence == nullptr ||
           GEOSCoordSeq_getSize_r(c, sequence, &size) == 0 || size < 3) {
         continue;
       }
-      for (unsigned int k = 0; k < 3; ++k) {
+      for (uint32_t k = 0; k < 3; ++k) {
         double x = 0.0;
         double y = 0.0;
         GEOSCoordSeq_getXY_r(c, sequence, k, &x, &y);
@@ -248,10 +249,10 @@ struct VectorMesher::Private {
   {
     const double span =
         std::max(std::abs(b.lonDeg - a.lonDeg), std::abs(b.latDeg - a.latDeg));
-    const int pieces =
-        std::max(1, static_cast<int>(std::ceil(span / maximumDeg)));
+    const int32_t pieces =
+        std::max(1, static_cast<int32_t>(std::ceil(span / maximumDeg)));
     VectorVertex previous = vertex(a.lonDeg, a.latDeg, centre);
-    for (int i = 1; i <= pieces; ++i) {
+    for (int32_t i = 1; i <= pieces; ++i) {
       const double t = static_cast<double>(i) / pieces;
       const VectorVertex next =
           vertex(a.lonDeg + t * (b.lonDeg - a.lonDeg),
@@ -273,7 +274,7 @@ VectorMesher::~VectorMesher() = default;
 VectorMesher::VectorMesher(VectorMesher&&) noexcept = default;
 VectorMesher& VectorMesher::operator=(VectorMesher&&) noexcept = default;
 
-double VectorMesher::cellSizeDeg(int level) const
+double VectorMesher::cellSizeDeg(int32_t level) const
 {
   // A power-of-two division of the tile, at most maximumCellDeg.
   double cell = TileKey::sizeDeg(level) / d->settings.cellsPerSide;
@@ -305,9 +306,9 @@ std::vector<GeoPoint> densified(const std::vector<GeoPoint>& ring,
       const GeoPoint b = ring[i];
       const double span = std::max(std::abs(b.lonDeg - a.lonDeg),
                                    std::abs(b.latDeg - a.latDeg));
-      const int pieces =
-          std::max(1, static_cast<int>(std::ceil(span / maximumDeg)));
-      for (int k = 1; k < pieces; ++k) {
+      const int32_t pieces =
+          std::max(1, static_cast<int32_t>(std::ceil(span / maximumDeg)));
+      for (int32_t k = 1; k < pieces; ++k) {
         const double t = static_cast<double>(k) / pieces;
         result.push_back(GeoPoint{a.latDeg + t * (b.latDeg - a.latDeg),
                                   a.lonDeg + t * (b.lonDeg - a.lonDeg)});

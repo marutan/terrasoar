@@ -26,6 +26,7 @@
 #define TS_TESTS_GOLDENIMAGE_H
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 
 #include <QColor>
@@ -43,9 +44,9 @@ struct ImageDifference {
   /** False if the sizes differ (the counts are then meaningless). */
   bool sameSize = false;
   /** Pixels where some channel differs by more than the tolerance. */
-  int differingPixels = 0;
+  int32_t differingPixels = 0;
   /** Largest difference of any channel, 0–255. */
-  int maxChannelDifference = 0;
+  int32_t maxChannelDifference = 0;
   /** differingPixels as a fraction of all pixels. */
   double differingFraction = 0.0;
   /** Per-pixel difference, scaled up so small differences show. */
@@ -58,7 +59,7 @@ struct ImageDifference {
  */
 inline ImageDifference compareImages(const QImage& actual,
                                      const QImage& expected,
-                                     int channelTolerance)
+                                     int32_t channelTolerance)
 {
   ImageDifference result;
   if (actual.size() != expected.size()) {
@@ -68,18 +69,18 @@ inline ImageDifference compareImages(const QImage& actual,
   const QImage a = actual.convertToFormat(QImage::Format_RGBA8888);
   const QImage b = expected.convertToFormat(QImage::Format_RGBA8888);
   result.diffImage = QImage(a.size(), QImage::Format_RGB32);
-  for (int y = 0; y < a.height(); ++y) {
-    for (int x = 0; x < a.width(); ++x) {
+  for (int32_t y = 0; y < a.height(); ++y) {
+    for (int32_t x = 0; x < a.width(); ++x) {
       const QColor pa = a.pixelColor(x, y);
       const QColor pb = b.pixelColor(x, y);
-      const int d = std::max(
+      const int32_t d = std::max(
           {std::abs(pa.red() - pb.red()), std::abs(pa.green() - pb.green()),
            std::abs(pa.blue() - pb.blue()), std::abs(pa.alpha() - pb.alpha())});
       result.maxChannelDifference = std::max(result.maxChannelDifference, d);
       if (d > channelTolerance) {
         ++result.differingPixels;
       }
-      const int shown = std::min(255, d * 8);
+      const int32_t shown = std::min(255, d * 8);
       result.diffImage.setPixel(x, y, qRgb(shown, shown, shown));
     }
   }
@@ -92,7 +93,7 @@ inline ImageDifference compareImages(const QImage& actual,
 /** How far an image may be from its golden image. */
 struct GoldenTolerance {
   /** A pixel differs if any channel is off by more than this (0–255). */
-  int channel = 0;
+  int32_t channel = 0;
   /** At most this fraction of the pixels may differ. */
   double maxDifferingFraction = 0.0;
 };

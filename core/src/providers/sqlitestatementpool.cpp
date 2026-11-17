@@ -20,6 +20,7 @@
 
 #include "sqlitestatementpool.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <sqlite3.h>
@@ -83,7 +84,7 @@ SqliteStatementPool::Lease SqliteStatementPool::acquire()
       SqliteConnection(m_path, SqliteConnection::OpenMode::ReadOnly);
   if (!entry->connection.isOpen() ||
       sqlite3_prepare_v2(entry->connection.get(), m_sql.constData(),
-                         static_cast<int>(m_sql.size()), &entry->statement,
+                         static_cast<int32_t>(m_sql.size()), &entry->statement,
                          nullptr) != SQLITE_OK) {
     return Lease(nullptr, nullptr);
   }

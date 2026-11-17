@@ -20,6 +20,8 @@
 
 #include "ts/wms/wmscatalogue.h"
 
+#include <cstdint>
+
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -56,7 +58,7 @@ parseWmsCatalogue(const QByteArray& json, QString* errorString)
   std::vector<WmsCatalogueEntry> entries;
   const QJsonArray services = root.value(QStringLiteral("services")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < services.size(); ++i) {
+  for (int32_t i = 0; i < services.size(); ++i) {
     const QJsonObject service = services.at(i).toObject();
     WmsCatalogueEntry entry;
     entry.title = service.value(QStringLiteral("title")).toString().trimmed();

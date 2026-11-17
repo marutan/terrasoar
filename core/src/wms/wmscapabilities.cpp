@@ -21,6 +21,7 @@
 #include "ts/wms/wmscapabilities.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 
 #include <QCoreApplication>
@@ -38,8 +39,8 @@ struct RawLayer {
   std::optional<bool> opaque;
   std::optional<bool> queryable;
   std::optional<bool> noSubsets;
-  std::optional<int> fixedWidth;
-  std::optional<int> fixedHeight;
+  std::optional<int32_t> fixedWidth;
+  std::optional<int32_t> fixedHeight;
   bool hasScale = false;
   std::vector<RawLayer> children;
 };
@@ -67,12 +68,12 @@ std::optional<bool> boolAttribute(const QXmlStreamReader& reader,
          value.compare(QLatin1String("true"), Qt::CaseInsensitive) == 0;
 }
 
-std::optional<int> intAttribute(const QXmlStreamReader& reader,
-                                QLatin1String name)
+std::optional<int32_t> intAttribute(const QXmlStreamReader& reader,
+                                    QLatin1String name)
 {
   bool ok = false;
-  const int value = attribute(reader, name).trimmed().toInt(&ok);
-  return ok ? std::optional<int>(value) : std::nullopt;
+  const int32_t value = attribute(reader, name).trimmed().toInt(&ok);
+  return ok ? std::optional<int32_t>(value) : std::nullopt;
 }
 
 double number(const QString& text, bool* ok)
@@ -145,7 +146,7 @@ std::optional<GeoRect> parseGeographicBox(QXmlStreamReader& reader)
   double east = 0.0;
   double south = 0.0;
   double north = 0.0;
-  int found = 0;
+  int32_t found = 0;
   while (reader.readNextStartElement()) {
     bool ok = false;
     const QString side = reader.name().toString();

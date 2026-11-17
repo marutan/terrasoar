@@ -23,6 +23,7 @@
 // sources. A build-time tool, not part of the application; see
 // docs/tools/packager.md.
 
+#include <cstdint>
 #include <optional>
 
 #include <QCommandLineParser>
@@ -48,7 +49,7 @@ void print(const QString& line)
 
 } // namespace
 
-int main(int argc, char* argv[])
+int32_t main(int32_t argc, char* argv[])
 {
   // QCoreApplication finds Qt's image plugins (JPEG).
   const QCoreApplication application(argc, argv);

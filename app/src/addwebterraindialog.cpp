@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <initializer_list>
 #include <utility>
 
@@ -53,7 +54,7 @@ namespace
 struct Preset {
   AddWebTerrainDialog::Kind kind;
   const char* address;
-  int maximumZoom;
+  int32_t maximumZoom;
   const char* datum;
   const char* name;
   const char* attribution;
@@ -68,7 +69,7 @@ constexpr std::array<Preset, 1> presets = {{
      "and others"},
 }};
 
-constexpr int presetCount = static_cast<int>(presets.size());
+constexpr int32_t presetCount = static_cast<int32_t>(presets.size());
 
 } // namespace
 
@@ -98,7 +99,7 @@ AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent,
   for (const Preset& preset : presets) {
     m_presetBox->addItem(QString::fromUtf8(preset.name));
   }
-  for (int i = 0; i < 3; ++i) {
+  for (int32_t i = 0; i < 3; ++i) {
     m_kindBox->addItem(QString());
   }
   m_zoomBox->setRange(0, 22);
@@ -134,9 +135,9 @@ AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent,
   layout->addWidget(m_errorLabel);
   layout->addWidget(m_buttons);
 
-  connect(m_presetBox, qOverload<int>(&QComboBox::activated), this,
+  connect(m_presetBox, qOverload<int32_t>(&QComboBox::activated), this,
           &AddWebTerrainDialog::applyPreset);
-  connect(m_kindBox, qOverload<int>(&QComboBox::currentIndexChanged), this,
+  connect(m_kindBox, qOverload<int32_t>(&QComboBox::currentIndexChanged), this,
           &AddWebTerrainDialog::updateControls);
   connect(m_buttons, &QDialogButtonBox::accepted, this,
           &AddWebTerrainDialog::accept);
@@ -181,12 +182,12 @@ bool AddWebTerrainDialog::canReadRemoteFiles()
 // The form's fields, in its order.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 void AddWebTerrainDialog::setSource(Kind kind, const QString& address,
-                                    int maximumZoom, const QString& datum,
+                                    int32_t maximumZoom, const QString& datum,
                                     const QString& name,
                                     const QString& attribution)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
-  m_kindBox->setCurrentIndex(static_cast<int>(kind));
+  m_kindBox->setCurrentIndex(static_cast<int32_t>(kind));
   m_addressEdit->setText(address);
   m_zoomBox->setValue(maximumZoom);
   m_datumBox->setCurrentIndex(std::max(m_datumBox->findData(datum), 0));
@@ -195,7 +196,7 @@ void AddWebTerrainDialog::setSource(Kind kind, const QString& address,
   updateControls();
 }
 
-void AddWebTerrainDialog::applyPreset(int index)
+void AddWebTerrainDialog::applyPreset(int32_t index)
 {
   if (index < 1 || index > presetCount) {
     return;
@@ -210,7 +211,7 @@ void AddWebTerrainDialog::applyPreset(int index)
 void AddWebTerrainDialog::updateControls()
 {
   const bool tiles =
-      m_kindBox->currentIndex() != static_cast<int>(Kind::CloudGeoTiff);
+      m_kindBox->currentIndex() != static_cast<int32_t>(Kind::CloudGeoTiff);
   m_zoomBox->setEnabled(tiles);
   m_tileSizeBox->setEnabled(tiles);
   if (tiles) {
@@ -309,21 +310,21 @@ void AddWebTerrainDialog::retranslateUi()
 {
   setWindowTitle(tr("Add Web Terrain"));
   m_presetBox->setItemText(0, tr("Custom"));
-  m_kindBox->setItemText(static_cast<int>(Kind::Terrarium),
+  m_kindBox->setItemText(static_cast<int32_t>(Kind::Terrarium),
                          tr("Terrain tiles, Terrarium encoding"));
-  m_kindBox->setItemText(static_cast<int>(Kind::TerrainRgb),
+  m_kindBox->setItemText(static_cast<int32_t>(Kind::TerrainRgb),
                          tr("Terrain tiles, Terrain-RGB encoding"));
-  m_kindBox->setItemText(static_cast<int>(Kind::CloudGeoTiff),
+  m_kindBox->setItemText(static_cast<int32_t>(Kind::CloudGeoTiff),
                          tr("Cloud Optimized GeoTIFF"));
   for (std::size_t i = 0; i < m_datums.size(); ++i) {
-    m_datumBox->setItemText(static_cast<int>(i), datumLabel(m_datums[i]));
+    m_datumBox->setItemText(static_cast<int32_t>(i), datumLabel(m_datums[i]));
   }
   const QStringList labels = {tr("&Source:"),    tr("&Kind:"),
                               tr("&Address:"),   tr("Deepest &zoom:"),
                               tr("&Tile size:"), tr("&Heights above:"),
                               tr("&Name:"),      tr("Attri&bution:")};
   for (std::size_t i = 0; i < m_labels.size(); ++i) {
-    m_labels[i]->setText(labels.value(static_cast<int>(i)));
+    m_labels[i]->setText(labels.value(static_cast<int32_t>(i)));
   }
   m_nameEdit->setPlaceholderText(tr("The server's name"));
   m_attributionEdit->setPlaceholderText(

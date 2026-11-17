@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -45,9 +46,9 @@ namespace ts::test
 /** What the mock WMS does; change it from the test at any time. */
 struct MockWmsBehaviour {
   /** Delay before each GetMap answer, ms. */
-  std::atomic<int> delayMs{0};
+  std::atomic<int32_t> delayMs{0};
   /** Answer GetMap with this HTTP status instead (0: normally). */
-  std::atomic<int> failStatus{0};
+  std::atomic<int32_t> failStatus{0};
   /** Answer GetMap with a ServiceExceptionReport (status 200). */
   std::atomic<bool> serviceException{false};
   /** Answer GetMap with an HTML page (status 200). */
@@ -55,7 +56,7 @@ struct MockWmsBehaviour {
   /** Answer GetMap with 3 MB of bytes. */
   std::atomic<bool> oversized{false};
   /** Send Cache-Control: max-age=N (−1: no header). */
-  std::atomic<int> maxAgeS{-1};
+  std::atomic<int32_t> maxAgeS{-1};
   /** Send Cache-Control: no-store. */
   std::atomic<bool> noStore{false};
   /** Send an ETag and answer If-None-Match with 304. */
@@ -99,8 +100,8 @@ inline QImage mockWmsImage(const QUrlQuery& query)
   }
   const QStringList bbox =
       query.queryItemValue(QStringLiteral("BBOX")).split(QLatin1Char(','));
-  const int width = query.queryItemValue(QStringLiteral("WIDTH")).toInt();
-  const int height = query.queryItemValue(QStringLiteral("HEIGHT")).toInt();
+  const int32_t width = query.queryItemValue(QStringLiteral("WIDTH")).toInt();
+  const int32_t height = query.queryItemValue(QStringLiteral("HEIGHT")).toInt();
   const bool transparent =
       query.queryItemValue(QStringLiteral("TRANSPARENT")).toUpper() ==
       QLatin1String("TRUE");
@@ -122,10 +123,10 @@ inline QImage mockWmsImage(const QUrlQuery& query)
   QImage image(width, height, QImage::Format_ARGB32);
   const double a = 6378137.0;
   const double degrees = 180.0 / 3.14159265358979323846;
-  for (int row = 0; row < height; ++row) {
+  for (int32_t row = 0; row < height; ++row) {
     const double y = maxY - (row + 0.5) * (maxY - minY) / height;
     const double lat = mercator ? std::atan(std::sinh(y / a)) * degrees : y;
-    for (int column = 0; column < width; ++column) {
+    for (int32_t column = 0; column < width; ++column) {
       const double x = minX + (column + 0.5) * (maxX - minX) / width;
       const double lon = mercator ? x / a * degrees : x;
       image.setPixel(column, row, mockWmsColour(lon, lat, transparent));
@@ -202,7 +203,7 @@ inline MockHttpResponse mockWmsCapabilitiesResponse(
 inline std::optional<MockHttpResponse>
 mockWmsFailure(const MockWmsBehaviour& behaviour)
 {
-  constexpr int threeMiB = 3 * 1024 * 1024;
+  constexpr int32_t threeMiB = 3 * 1024 * 1024;
   MockHttpResponse response;
   response.delayMs = behaviour.delayMs.load();
   if (behaviour.failStatus.load() != 0) {
@@ -303,10 +304,10 @@ mockWmsHandler(const std::shared_ptr<MockWmsBehaviour>& behaviour,
 }
 
 /** Returns how many GetMap requests @p server received. */
-inline int mockGetMapCount(const MockHttpServer& server)
+inline int32_t mockGetMapCount(const MockHttpServer& server)
 {
   const std::vector<MockHttpRequest> requests = server.requests();
-  return static_cast<int>(std::count_if(
+  return static_cast<int32_t>(std::count_if(
       requests.begin(), requests.end(), [](const MockHttpRequest& request) {
         return QUrlQuery(request.url)
                    .queryItemValue(QStringLiteral("REQUEST")) ==

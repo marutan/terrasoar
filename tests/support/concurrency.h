@@ -26,6 +26,7 @@
 #define TS_TESTS_CONCURRENCY_H
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <thread>
 #include <vector>
@@ -34,7 +35,7 @@ namespace ts::test
 {
 
 /** Number of threads the concurrent tests start (more than CPU cores). */
-inline constexpr int concurrentThreadCount = 8;
+inline constexpr int32_t concurrentThreadCount = 8;
 
 /**
  * Runs @p work on @p threadCount threads at once and waits for all of them.
@@ -45,15 +46,15 @@ inline constexpr int concurrentThreadCount = 8;
  * @param work Called with the thread index; returns false on failure.
  * @return The number of threads whose work returned false.
  */
-inline int runConcurrently(int threadCount,
-                           const std::function<bool(int)>& work)
+inline int32_t runConcurrently(int32_t threadCount,
+                               const std::function<bool(int32_t)>& work)
 {
-  std::atomic<int> ready{0};
+  std::atomic<int32_t> ready{0};
   std::atomic<bool> go{false};
-  std::atomic<int> failures{0};
+  std::atomic<int32_t> failures{0};
   std::vector<std::thread> threads;
   threads.reserve(static_cast<std::size_t>(threadCount));
-  for (int i = 0; i < threadCount; ++i) {
+  for (int32_t i = 0; i < threadCount; ++i) {
     threads.emplace_back([&, i]() {
       ready.fetch_add(1);
       while (!go.load()) {

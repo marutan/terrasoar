@@ -20,6 +20,8 @@
 
 #include "ts/vector/vectorstyle.h"
 
+#include <cstdint>
+
 #include <QJsonValue>
 #include <QString>
 
@@ -38,14 +40,14 @@ QColor colorFromRgbaHex(const QString& text)
     return QColor();
   }
   if (text.size() == 7) {
-    return QColor(static_cast<int>((value >> 16U) & 0xffU),
-                  static_cast<int>((value >> 8U) & 0xffU),
-                  static_cast<int>(value & 0xffU));
+    return QColor(static_cast<int32_t>((value >> 16U) & 0xffU),
+                  static_cast<int32_t>((value >> 8U) & 0xffU),
+                  static_cast<int32_t>(value & 0xffU));
   }
-  return QColor(static_cast<int>((value >> 24U) & 0xffU),
-                static_cast<int>((value >> 16U) & 0xffU),
-                static_cast<int>((value >> 8U) & 0xffU),
-                static_cast<int>(value & 0xffU));
+  return QColor(static_cast<int32_t>((value >> 24U) & 0xffU),
+                static_cast<int32_t>((value >> 16U) & 0xffU),
+                static_cast<int32_t>((value >> 8U) & 0xffU),
+                static_cast<int32_t>(value & 0xffU));
 }
 
 QString colorToRgbaHex(const QColor& color)

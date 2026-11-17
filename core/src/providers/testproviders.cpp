@@ -53,36 +53,36 @@ constexpr std::array<Glyph, 11> glyphs = {{
 void fillRect(QImage& image, QRect rect, QRgb color)
 {
   const QRect clipped = rect.intersected(image.rect());
-  const int x0 = clipped.left();
-  const int y0 = clipped.top();
-  const int x1 = clipped.left() + clipped.width();
-  const int y1 = clipped.top() + clipped.height();
-  for (int y = y0; y < y1; ++y) {
-    for (int x = x0; x < x1; ++x) {
+  const int32_t x0 = clipped.left();
+  const int32_t y0 = clipped.top();
+  const int32_t x1 = clipped.left() + clipped.width();
+  const int32_t y1 = clipped.top() + clipped.height();
+  for (int32_t y = y0; y < y1; ++y) {
+    for (int32_t x = x0; x < x1; ++x) {
       image.setPixel(x, y, color);
     }
   }
 }
 
 /** Draws @p text (digits and '/') centred, each font pixel @p scale wide. */
-void drawLabel(QImage& image, const QString& text, int scale)
+void drawLabel(QImage& image, const QString& text, int32_t scale)
 {
-  const int advance = 4 * scale;
-  const int width = static_cast<int>(text.size()) * advance - scale;
-  const int height = 5 * scale;
-  const int left = (image.width() - width) / 2;
-  const int top = (image.height() - height) / 2;
+  const int32_t advance = 4 * scale;
+  const int32_t width = static_cast<int32_t>(text.size()) * advance - scale;
+  const int32_t height = 5 * scale;
+  const int32_t left = (image.width() - width) / 2;
+  const int32_t top = (image.height() - height) / 2;
   fillRect(image,
            QRect(left - 2 * scale, top - 2 * scale, width + 4 * scale,
                  height + 4 * scale),
            qRgba(0, 0, 0, 255));
-  int x = left;
+  int32_t x = left;
   for (const QChar c : text) {
-    const int index = c == QLatin1Char('/') ? 10 : c.digitValue();
-    if (index >= 0 && index < static_cast<int>(glyphs.size())) {
+    const int32_t index = c == QLatin1Char('/') ? 10 : c.digitValue();
+    if (index >= 0 && index < static_cast<int32_t>(glyphs.size())) {
       const Glyph& glyph = glyphs.at(static_cast<std::size_t>(index));
-      for (int row = 0; row < 5; ++row) {
-        for (int column = 0; column < 3; ++column) {
+      for (int32_t row = 0; row < 5; ++row) {
+        for (int32_t column = 0; column < 3; ++column) {
           if ((glyph.at(static_cast<std::size_t>(row)) >> (2 - column) & 1U) !=
               0U) {
             fillRect(image,
@@ -97,7 +97,7 @@ void drawLabel(QImage& image, const QString& text, int scale)
 }
 
 /** Light and dark squares; the hue changes with the level. */
-std::array<QRgb, 2> checkerColors(int level)
+std::array<QRgb, 2> checkerColors(int32_t level)
 {
   static constexpr std::array<std::array<QRgb, 2>, 4> palette = {{
       {qRgba(214, 226, 240, 255), qRgba(96, 128, 168, 255)},
@@ -113,8 +113,8 @@ std::array<QRgb, 2> checkerColors(int level)
 // --- SolidColorImageryProvider -----------------------------------------------
 
 SolidColorImageryProvider::SolidColorImageryProvider(const QColor& color,
-                                                     int tileSizePx,
-                                                     int maximumLevel)
+                                                     int32_t tileSizePx,
+                                                     int32_t maximumLevel)
     : m_color(color), m_tileSizePx(std::clamp(tileSizePx, 1, 4096)),
       m_maximumLevel(std::clamp(maximumLevel, 0, TileKey::maximumLevel))
 {
@@ -145,8 +145,8 @@ QImage SolidColorImageryProvider::loadImage(TileKey key,
 
 // --- CheckerboardImageryProvider ---------------------------------------------
 
-CheckerboardImageryProvider::CheckerboardImageryProvider(int tileSizePx,
-                                                         int maximumLevel)
+CheckerboardImageryProvider::CheckerboardImageryProvider(int32_t tileSizePx,
+                                                         int32_t maximumLevel)
     : m_tileSizePx(std::clamp(tileSizePx, 16, 4096)),
       m_maximumLevel(std::clamp(maximumLevel, 0, TileKey::maximumLevel))
 {
@@ -171,14 +171,14 @@ CheckerboardImageryProvider::loadImage(TileKey key,
   if (!key.isValid() || key.level > m_maximumLevel || cancelled.load()) {
     return QImage();
   }
-  const int size = m_tileSizePx;
+  const int32_t size = m_tileSizePx;
   QImage image(size, size, QImage::Format_RGBA8888);
   const std::array<QRgb, 2> colors = checkerColors(key.level);
-  const int squares = 8;
-  for (int y = 0; y < size; ++y) {
-    const int row = y * squares / size;
-    for (int x = 0; x < size; ++x) {
-      const int column = x * squares / size;
+  const int32_t squares = 8;
+  for (int32_t y = 0; y < size; ++y) {
+    const int32_t row = y * squares / size;
+    for (int32_t x = 0; x < size; ++x) {
+      const int32_t column = x * squares / size;
       image.setPixel(x, y,
                      colors.at(static_cast<std::size_t>((row + column) % 2)));
     }

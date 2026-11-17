@@ -26,6 +26,7 @@
 #ifndef TS_ELEVATION_WEBTERRAINPROVIDER_H
 #define TS_ELEVATION_WEBTERRAINPROVIDER_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -69,9 +70,9 @@ struct WebTerrainSource {
   /** How heights are encoded. */
   TerrainEncoding encoding = TerrainEncoding::Terrarium;
   /** Deepest zoom level the server has. */
-  int maximumZoom = 15;
+  int32_t maximumZoom = 15;
   /** Pixels along a tile's side (256 or 512). */
-  int tileSizePx = 256;
+  int32_t tileSizePx = 256;
   /** What the heights are measured from: "egm2008", "egm96", "ellipsoid". */
   QString verticalDatum = QStringLiteral("egm96");
   /** Name for the user; empty for the server's host. */
@@ -92,7 +93,7 @@ struct WebTerrainSource {
   /** Identifies the tile set (URL, encoding, size and datum). */
   QString id() const;
   /** Returns the URL of tile (@p zoom, @p x, @p y). */
-  QUrl tileUrl(int zoom, int x, int y) const;
+  QUrl tileUrl(int32_t zoom, int32_t x, int32_t y) const;
 };
 
 /**
@@ -133,19 +134,19 @@ public:
   WebTerrainProvider& operator=(WebTerrainProvider&&) = delete;
 
   /** Samples along a tile's side. */
-  static constexpr int samples = 65;
+  static constexpr int32_t samples = 65;
 
   /** Returns the source. */
   const WebTerrainSource& source() const { return m_source; }
 
   /** Returns the web zoom level quadtree tiles of @p level are read from. */
-  int zoomForLevel(int level) const;
+  int32_t zoomForLevel(int32_t level) const;
 
   QString id() const override;
   QString name() const override;
   /** The level whose web zoom is the source's deepest. */
-  int maximumLevel() const override;
-  int preferredLoaderThreads() const override;
+  int32_t maximumLevel() const override;
+  int32_t preferredLoaderThreads() const override;
 
   std::optional<HeightTile>
   loadHeights(TileKey key, const std::atomic<bool>& cancelled) override;
@@ -161,7 +162,8 @@ private:
     FetchOutcome outcome = FetchOutcome::Failed;
     std::shared_ptr<const Heights> heights;
   };
-  Fetched webTile(int zoom, int x, int y, const std::atomic<bool>& cancelled);
+  Fetched webTile(int32_t zoom, int32_t x, int32_t y,
+                  const std::atomic<bool>& cancelled);
 
   const WebTerrainSource m_source;
   const std::shared_ptr<const GeoidModel> m_datumGeoid;

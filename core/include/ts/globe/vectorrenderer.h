@@ -67,19 +67,19 @@ struct VectorLayerDraw {
 /** Counters for the debug overlay and tests. */
 struct VectorStatistics {
   /** Stored feature tiles drawn (once per layer and tile, or per piece). */
-  int tilesDrawn = 0;
+  int32_t tilesDrawn = 0;
   /** Draw calls. */
-  int drawCalls = 0;
+  int32_t drawCalls = 0;
   /** Meshes on the GPU. */
-  int resident = 0;
+  int32_t resident = 0;
   /** Meshes uploaded this frame. */
-  int uploaded = 0;
+  int32_t uploaded = 0;
   /** Bytes on the GPU. */
   std::size_t gpuBytes = 0;
   /** Triangles drawn. */
-  long long triangles = 0;
+  int64_t triangles = 0;
   /** Outline segments drawn. */
-  long long segments = 0;
+  int64_t segments = 0;
 };
 
 /**
@@ -103,7 +103,7 @@ struct VectorRendererSettings {
   /** Loading and meshing. */
   VectorTileLoaderSettings loader;
   /** Meshes uploaded per frame, all sources. */
-  int uploadsPerFrame = 8;
+  int32_t uploadsPerFrame = 8;
   /** GPU memory for meshes before the least recently used go. */
   std::size_t gpuBytes = std::size_t{64} * 1024 * 1024;
 };

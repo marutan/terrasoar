@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 
 #include "ts/camera/camera.h"
 #include "ts/geo/geodetic.h"
@@ -45,9 +46,9 @@ TileSamples tileSamples(TileKey key)
   const GeoRect rect = key.bounds();
   TileSamples samples;
   std::size_t i = 0;
-  for (int row = 0; row < 3; ++row) {
+  for (int32_t row = 0; row < 3; ++row) {
     const double lat = rect.northDeg - 0.5 * row * rect.heightDeg();
-    for (int column = 0; column < 3; ++column) {
+    for (int32_t column = 0; column < 3; ++column) {
       const double lon = rect.westDeg + 0.5 * column * rect.widthDeg();
       samples.at(i++) = geodeticToEcef(Geodetic{lat, lon, 0.0});
     }
@@ -374,7 +375,7 @@ bool TileSelector::refine(
     TileSelection& selection) const
 {
   std::vector<TileKey> children;
-  for (int i = 0; i < 4; ++i) {
+  for (int32_t i = 0; i < 4; ++i) {
     const TileKey child = key.child(i);
     if (view.isVisible(child)) {
       children.push_back(child);

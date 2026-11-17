@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -345,11 +346,11 @@ QJsonObject MainWindow::stateReport() const
   QJsonObject problems;
   for (const ImageryStackEntry& entry : stack.imagery) {
     const QModelIndex index = m_layers->indexOfId(entry.nodeId);
-    const int status =
+    const int32_t status =
         m_layers->data(index, LayerTreeModel::StatusRole).toInt();
-    if (status == static_cast<int>(ProviderStatus::State::Offline)) {
+    if (status == static_cast<int32_t>(ProviderStatus::State::Offline)) {
       problems.insert(entry.definition.name, QStringLiteral("offline"));
-    } else if (status == static_cast<int>(ProviderStatus::State::Error)) {
+    } else if (status == static_cast<int32_t>(ProviderStatus::State::Error)) {
       problems.insert(entry.definition.name, QStringLiteral("error"));
     }
   }
@@ -421,8 +422,8 @@ void MainWindow::createActions()
   m_mapViewAction->setCheckable(true);
   // As integers: Qt 5 has no operator for a modifier and a key, and
   // Clang rejects the plain enums' bitwise or.
-  m_mapViewAction->setShortcut(
-      QKeySequence(static_cast<int>(Qt::CTRL) | static_cast<int>(Qt::Key_M)));
+  m_mapViewAction->setShortcut(QKeySequence(static_cast<int32_t>(Qt::CTRL) |
+                                            static_cast<int32_t>(Qt::Key_M)));
   m_scaleBarAction = new QAction(this);
   m_scaleBarAction->setObjectName(QStringLiteral("scaleBarAction"));
   m_scaleBarAction->setCheckable(true);
@@ -584,7 +585,8 @@ void MainWindow::addElevationFile()
     ids << datum.id;
     choices << AddWebTerrainDialog::datumLabel(datum);
   }
-  int current = static_cast<int>(ids.indexOf(demVerticalDatumId(detected)));
+  int32_t current =
+      static_cast<int32_t>(ids.indexOf(demVerticalDatumId(detected)));
   const QString file = QFileInfo(path).fileName();
   QString label;
   if (detected == DemVerticalDatum::Unknown) {
@@ -606,7 +608,8 @@ void MainWindow::addElevationFile()
   if (!ok) {
     return;
   }
-  addElevationLayer(path, ids.value(static_cast<int>(choices.indexOf(chosen))));
+  addElevationLayer(path,
+                    ids.value(static_cast<int32_t>(choices.indexOf(chosen))));
 }
 
 // The file, then its datum.
@@ -660,14 +663,14 @@ QModelIndex MainWindow::topmostElevationLayer() const
 {
   // Depth first from the top row: the first elevation layer met.
   std::vector<QModelIndex> pending;
-  for (int row = m_layers->rowCount() - 1; row >= 0; --row) {
+  for (int32_t row = m_layers->rowCount() - 1; row >= 0; --row) {
     pending.push_back(m_layers->index(row, 0));
   }
   while (!pending.empty()) {
     const QModelIndex index = pending.back();
     pending.pop_back();
     if (m_layers->data(index, LayerTreeModel::IsCollectionRole).toBool()) {
-      for (int row = m_layers->rowCount(index) - 1; row >= 0; --row) {
+      for (int32_t row = m_layers->rowCount(index) - 1; row >= 0; --row) {
         pending.push_back(m_layers->index(row, 0, index));
       }
     } else if (m_layers->layerDefinition(index).type == LayerType::Elevation) {
@@ -940,11 +943,11 @@ void MainWindow::updateLayerStatus()
        m_layerProviders) {
     const ProviderStatus status = layer.second->status();
     const QModelIndex index = m_layers->indexOfId(layer.first);
-    const int before =
+    const int32_t before =
         m_layers->data(index, LayerTreeModel::StatusRole).toInt();
     m_layers->setLayerStatus(layer.first, status);
     if (status.state == ProviderStatus::State::Error &&
-        before != static_cast<int>(ProviderStatus::State::Error)) {
+        before != static_cast<int32_t>(ProviderStatus::State::Error)) {
       statusBar()->showMessage(
           tr("%1: %2").arg(m_layers->data(index).toString(), status.message),
           10000);
@@ -1143,7 +1146,7 @@ NewRegionDialog* MainWindow::newOfflineRegion()
   m_newRegionDialog->setAttribute(Qt::WA_DeleteOnClose);
   connect(m_newRegionDialog, &QDialog::accepted, this, [this]() {
     QString error;
-    const long long id =
+    const int64_t id =
         m_offlineRegions->addRegion(m_newRegionDialog->region(), &error);
     if (id == 0) {
       QMessageBox::warning(this, tr("New Offline Region"), error);

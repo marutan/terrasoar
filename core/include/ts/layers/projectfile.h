@@ -25,6 +25,7 @@
 #ifndef TS_LAYERS_PROJECTFILE_H
 #define TS_LAYERS_PROJECTFILE_H
 
+#include <cstdint>
 #include <optional>
 
 #include <QByteArray>
@@ -57,7 +58,7 @@ inline constexpr const char* projectFormatName = "terrasoar-project";
  * Version of the project file format this build writes. Files of this
  * and every earlier version load; earlier ones are migrated on load.
  */
-inline constexpr int projectFormatVersion = 2;
+inline constexpr int32_t projectFormatVersion = 2;
 
 /**
  * Returns @p project as an indented JSON document. The output is

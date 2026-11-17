@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cinttypes>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -73,7 +74,7 @@ std::vector<double> box(double west, double south, double east, double north)
 }
 
 /** Writes GSHHS_<resolution>_L<level>.shp with GSHHG's fields. */
-bool writeShapefile(const QString& path, int level,
+bool writeShapefile(const QString& path, int32_t level,
                     const std::vector<FixturePolygon>& polygons)
 {
   ts::initialiseGdal();
@@ -182,7 +183,8 @@ bool inRing(const std::vector<ts::GeoPoint>& ring, double lon, double lat)
   return inside;
 }
 
-bool isLand(ts::FeatureProvider& provider, int level, double lon, double lat)
+bool isLand(ts::FeatureProvider& provider, int32_t level, double lon,
+            double lat)
 {
   const ts::TileKey key =
       ts::TileKey::containing(level, ts::Geodetic{lat, lon, 0.0});
@@ -226,17 +228,17 @@ bool isValidPolygon(GEOSContextHandle_t context, const ts::Feature& feature)
 {
   std::vector<GEOSGeometry*> rings;
   for (const std::vector<ts::GeoPoint>& ring : feature.parts) {
-    GEOSCoordSequence* sequence = GEOSCoordSeq_create_r(
-        context, static_cast<unsigned int>(ring.size()), 2);
+    GEOSCoordSequence* sequence =
+        GEOSCoordSeq_create_r(context, static_cast<uint32_t>(ring.size()), 2);
     for (std::size_t i = 0; i < ring.size(); ++i) {
-      GEOSCoordSeq_setXY_r(context, sequence, static_cast<unsigned int>(i),
+      GEOSCoordSeq_setXY_r(context, sequence, static_cast<uint32_t>(i),
                            ring[i].lonDeg, ring[i].latDeg);
     }
     rings.push_back(GEOSGeom_createLinearRing_r(context, sequence));
   }
   GEOSGeometry* polygon =
       GEOSGeom_createPolygon_r(context, rings.front(), rings.data() + 1,
-                               static_cast<unsigned int>(rings.size() - 1));
+                               static_cast<uint32_t>(rings.size() - 1));
   const bool valid = GEOSisValid_r(context, polygon) == 1;
   GEOSGeom_destroy_r(context, polygon);
   return valid;
@@ -246,15 +248,15 @@ bool isValidPolygon(GEOSContextHandle_t context, const ts::Feature& feature)
  * Checks every polygon of every stored tile of @p table: closed rings,
  * inside the tile, valid for GEOS. Returns the number of polygons, or −1.
  */
-int checkPolygons(const QString& path, const ts::FeatureTableSpec& table)
+int32_t checkPolygons(const QString& path, const ts::FeatureTableSpec& table)
 {
   ts::GeoPackageFeatureProvider provider(path);
   const ts::GeosContext geos;
   GEOSContextHandle_t context = static_cast<GEOSContextHandle_t>(geos.get());
-  int polygons = 0;
-  const int level = table.storageLevel;
-  for (int y = 0; y < ts::TileKey::rows(level); ++y) {
-    for (int x = 0; x < ts::TileKey::columns(level); ++x) {
+  int32_t polygons = 0;
+  const int32_t level = table.storageLevel;
+  for (int32_t y = 0; y < ts::TileKey::rows(level); ++y) {
+    for (int32_t x = 0; x < ts::TileKey::columns(level); ++x) {
       const ts::TileKey key{level, x, y};
       const std::optional<ts::FeatureTile> tile =
           provider.loadFeatures(key, notCancelled);
@@ -280,12 +282,12 @@ int checkPolygons(const QString& path, const ts::FeatureTableSpec& table)
  * A smooth test world that wraps around like a real one: red rises from
  * 180°W to 0° and falls back to 180°E, green follows latitude.
  */
-QImage gradientWorld(int width, int height)
+QImage gradientWorld(int32_t width, int32_t height)
 {
   QImage image(width, height, QImage::Format_RGB888);
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
-      const int fromEdge = std::min(x, width - 1 - x);
+  for (int32_t y = 0; y < height; ++y) {
+    for (int32_t x = 0; x < width; ++x) {
+      const int32_t fromEdge = std::min(x, width - 1 - x);
       image.setPixelColor(
           x, y,
           QColor(fromEdge * 255 / (width / 2), y * 255 / (height - 1), 128));
@@ -298,11 +300,11 @@ QImage gradientWorld(int width, int height)
  * A world with steep detail in red: a triangle wave rising and falling 8
  * per pixel across longitude, so a misplaced pixel shows.
  */
-QImage waveWorld(int width, int height)
+QImage waveWorld(int32_t width, int32_t height)
 {
   QImage image(width, height, QImage::Format_RGB888);
-  for (int y = 0; y < height; ++y) {
-    for (int x = 0; x < width; ++x) {
+  for (int32_t y = 0; y < height; ++y) {
+    for (int32_t x = 0; x < width; ++x) {
       image.setPixelColor(x, y, QColor(std::abs(x % 64 - 32) * 7, y, 64));
     }
   }
@@ -313,11 +315,11 @@ QImage waveWorld(int width, int height)
 QImage halved(const QImage& image)
 {
   QImage result(image.width() / 2, image.height() / 2, QImage::Format_RGB888);
-  for (int y = 0; y < result.height(); ++y) {
-    for (int x = 0; x < result.width(); ++x) {
-      std::array<int, 3> sums = {0, 0, 0};
-      for (int dy = 0; dy < 2; ++dy) {
-        for (int dx = 0; dx < 2; ++dx) {
+  for (int32_t y = 0; y < result.height(); ++y) {
+    for (int32_t x = 0; x < result.width(); ++x) {
+      std::array<int32_t, 3> sums = {0, 0, 0};
+      for (int32_t dy = 0; dy < 2; ++dy) {
+        for (int32_t dx = 0; dx < 2; ++dx) {
           const QColor color = image.pixelColor(2 * x + dx, 2 * y + dy);
           sums.at(0) += color.red();
           sums.at(1) += color.green();
@@ -336,8 +338,8 @@ QImage halved(const QImage& image)
 double redDifference(const QImage& a, const QImage& b)
 {
   double sum = 0.0;
-  for (int y = 0; y < a.height(); ++y) {
-    for (int x = 0; x < a.width(); ++x) {
+  for (int32_t y = 0; y < a.height(); ++y) {
+    for (int32_t x = 0; x < a.width(); ++x) {
       sum += std::abs(a.pixelColor(x, y).red() - b.pixelColor(x, y).red());
     }
   }
@@ -345,10 +347,11 @@ double redDifference(const QImage& a, const QImage& b)
 }
 
 /** Mean absolute difference of column @p a of @p left and @p b of @p right. */
-double columnDifference(const QImage& left, int a, const QImage& right, int b)
+double columnDifference(const QImage& left, int32_t a, const QImage& right,
+                        int32_t b)
 {
   double sum = 0.0;
-  for (int y = 0; y < left.height(); ++y) {
+  for (int32_t y = 0; y < left.height(); ++y) {
     const QColor p = left.pixelColor(a, y);
     const QColor q = right.pixelColor(b, y);
     sum += std::abs(p.red() - q.red()) + std::abs(p.green() - q.green()) +
@@ -358,10 +361,11 @@ double columnDifference(const QImage& left, int a, const QImage& right, int b)
 }
 
 /** Mean absolute difference of row @p a of @p top and @p b of @p bottom. */
-double rowDifference(const QImage& top, int a, const QImage& bottom, int b)
+double rowDifference(const QImage& top, int32_t a, const QImage& bottom,
+                     int32_t b)
 {
   double sum = 0.0;
-  for (int x = 0; x < top.width(); ++x) {
+  for (int32_t x = 0; x < top.width(); ++x) {
     const QColor p = top.pixelColor(x, a);
     const QColor q = bottom.pixelColor(x, b);
     sum += std::abs(p.red() - q.red()) + std::abs(p.green() - q.green()) +
@@ -371,7 +375,7 @@ double rowDifference(const QImage& top, int a, const QImage& bottom, int b)
 }
 
 /** Index of tile (@p x, @p y) in a row-major list @p columns wide. */
-std::size_t tileIndex(int x, int y, int columns)
+std::size_t tileIndex(int32_t x, int32_t y, int32_t columns)
 {
   return static_cast<std::size_t>(y) * static_cast<std::size_t>(columns) +
          static_cast<std::size_t>(x);
@@ -383,15 +387,15 @@ std::size_t tileIndex(int x, int y, int columns)
  * across the antimeridian too): the step across a tile edge is no larger
  * than the steps inside tiles next to it, on average.
  */
-bool checkPyramid(ts::SqliteTileImageryProvider& provider, int maxLevel)
+bool checkPyramid(ts::SqliteTileImageryProvider& provider, int32_t maxLevel)
 {
-  const int size = provider.tileSizePx();
-  for (int level = 0; level <= maxLevel; ++level) {
-    const int columns = static_cast<int>(ts::TileKey::columns(level));
-    const int rows = static_cast<int>(ts::TileKey::rows(level));
+  const int32_t size = provider.tileSizePx();
+  for (int32_t level = 0; level <= maxLevel; ++level) {
+    const int32_t columns = static_cast<int32_t>(ts::TileKey::columns(level));
+    const int32_t rows = static_cast<int32_t>(ts::TileKey::rows(level));
     std::vector<QImage> tiles;
-    for (int y = 0; y < rows; ++y) {
-      for (int x = 0; x < columns; ++x) {
+    for (int32_t y = 0; y < rows; ++y) {
+      for (int32_t x = 0; x < columns; ++x) {
         const QImage tile =
             provider.loadImage(ts::TileKey{level, x, y}, notCancelled);
         if (tile.isNull() || tile.width() != size || tile.height() != size) {
@@ -403,8 +407,8 @@ bool checkPyramid(ts::SqliteTileImageryProvider& provider, int maxLevel)
     }
     double across = 0.0;
     double inside = 0.0;
-    for (int y = 0; y < rows; ++y) {
-      for (int x = 0; x < columns; ++x) {
+    for (int32_t y = 0; y < rows; ++y) {
+      for (int32_t x = 0; x < columns; ++x) {
         const QImage& tile = tiles.at(tileIndex(x, y, columns));
         const QImage& east = tiles.at(tileIndex((x + 1) % columns, y, columns));
         across += columnDifference(tile, size - 1, east, 0);
@@ -489,13 +493,13 @@ void checkCountries(const QString& path)
     // Region dialog counts.
     QElapsedTimer timer;
     timer.start();
-    const long long tiles =
+    const int64_t tiles =
         ts::countRegionTiles(*area, 0, 12, std::nullopt).total();
     const qint64 fullMs = timer.restart();
     const ts::RegionTileCount capped =
         ts::countRegionTiles(*area, 0, 16, std::nullopt, 1000000);
-    qInfo("%s: %zu rings; levels 0-12: %lld tiles in %lld ms; 0-16 up to a "
-          "million: %lld tiles%s in %lld ms",
+    qInfo("%s: %zu rings; levels 0-12: %" PRId64 " tiles in %lld ms; 0-16 "
+          "up to a million: %" PRId64 " tiles%s in %lld ms",
           id, area->rings().size(), tiles, fullMs, capped.total(),
           capped.complete ? "" : " (stopped)", timer.elapsed());
   }
@@ -600,10 +604,12 @@ void checkElevation(const QString& directory,
   QVERIFY2(provider.isValid(), qPrintable(provider.errorString()));
   QCOMPARE(provider.maximumLevel(), spec.maxLevel);
   QCOMPARE(provider.samples(), spec.samples);
-  const int n = spec.samples;
-  for (int level = 0; level <= spec.maxLevel; ++level) {
-    for (int y = 0; y < static_cast<int>(ts::TileKey::rows(level)); ++y) {
-      for (int x = 0; x < static_cast<int>(ts::TileKey::columns(level)); ++x) {
+  const int32_t n = spec.samples;
+  for (int32_t level = 0; level <= spec.maxLevel; ++level) {
+    for (int32_t y = 0; y < static_cast<int32_t>(ts::TileKey::rows(level));
+         ++y) {
+      for (int32_t x = 0; x < static_cast<int32_t>(ts::TileKey::columns(level));
+           ++x) {
         const std::optional<ts::HeightTile> tile =
             provider.loadStoredHeights(ts::TileKey{level, x, y});
         if (!tile) {
@@ -614,8 +620,8 @@ void checkElevation(const QString& directory,
         }
         // The eastern neighbour (across the antimeridian too) has the
         // same samples along the shared edge.
-        const int east =
-            (x + 1) % static_cast<int>(ts::TileKey::columns(level));
+        const int32_t east =
+            (x + 1) % static_cast<int32_t>(ts::TileKey::columns(level));
         const std::optional<ts::HeightTile> next =
             provider.loadStoredHeights(ts::TileKey{level, east, y});
         if (!next) {
@@ -769,7 +775,7 @@ private slots:
     for (const ts::FeatureTableSpec& table : provider.tables()) {
       QVERIFY(checkPolygons(path, table) > 0);
     }
-    for (const int level : {0, 2, 3, 5}) {
+    for (const int32_t level : {0, 2, 3, 5}) {
       QVERIFY(isLand(provider, level, -20.0, 30.0));  // the island
       QVERIFY(!isLand(provider, level, 3.0, 2.0));    // its lake
       QVERIFY(isLand(provider, level, 0.5, 5.0));     // the islet
@@ -844,9 +850,9 @@ private slots:
     // Every tile is its exact square of the mosaic (halved per level): a
     // tile one pixel off would differ by the wave's 7 per pixel.
     QImage level = waveWorld(256, 128);
-    for (int depth = 2; depth >= 0; --depth) {
-      for (int y = 0; y < ts::TileKey::rows(depth); ++y) {
-        for (int x = 0; x < ts::TileKey::columns(depth); ++x) {
+    for (int32_t depth = 2; depth >= 0; --depth) {
+      for (int32_t y = 0; y < ts::TileKey::rows(depth); ++y) {
+        for (int32_t x = 0; x < ts::TileKey::columns(depth); ++x) {
           const QImage tile =
               provider.loadImage(ts::TileKey{depth, x, y}, notCancelled);
           QVERIFY(!tile.isNull());
@@ -867,8 +873,8 @@ private slots:
     const QTemporaryDir dir;
     QImage world(400, 200, QImage::Format_RGB888);
     world.fill(Qt::red);
-    for (int y = 0; y < 200; ++y) {
-      for (int x = 200; x < 400; ++x) {
+    for (int32_t y = 0; y < 200; ++y) {
+      for (int32_t x = 200; x < 400; ++x) {
         world.setPixelColor(x, y, Qt::blue);
       }
     }
@@ -1038,7 +1044,7 @@ private slots:
              qPrintable(error));
     QCOMPARE(stats.countries, 3);
     QCOMPARE(stats.excluded, 1);
-    QCOMPARE(stats.rings, 4LL); // Splitland's halves joined; the lake
+    QCOMPARE(stats.rings, int64_t{4}); // Splitland's halves joined; the lake
 
     const ts::CountryAreas areas(options.outputPath);
     QVERIFY2(areas.isValid(), qPrintable(areas.errorString()));
@@ -1236,13 +1242,13 @@ private slots:
     QCOMPARE(features.tables().size(),
              config.value().shoreline.value().lods.size());
     for (const ts::FeatureTableSpec& table : features.tables()) {
-      const int polygons = checkPolygons(shoreline, table);
+      const int32_t polygons = checkPolygons(shoreline, table);
       QVERIFY2(polygons > 0, qPrintable(table.name));
     }
     // Spot checks at every level: London is land, the North Sea and the
     // middle of the Pacific are not, the Caspian Sea is a lake, the South
     // Pole is land (ice), Wrangel Island sits on the antimeridian.
-    for (int level = 0; level <= 10; ++level) {
+    for (int32_t level = 0; level <= 10; ++level) {
       QVERIFY(isLand(features, level, -0.1, 51.5));
       QVERIFY(!isLand(features, level, 3.0, 56.0));
       QVERIFY(!isLand(features, level, -150.0, 0.0));

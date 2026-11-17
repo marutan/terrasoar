@@ -25,6 +25,7 @@
 #ifndef TS_WMS_WMSCATALOGUE_H
 #define TS_WMS_WMSCATALOGUE_H
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -66,7 +67,7 @@ enum class BulkDownloadPolicy {
 inline constexpr const char* wmsCatalogueFormatName = "terrasoar-wms-catalogue";
 
 /** Version of the catalogue format this build reads. */
-inline constexpr int wmsCatalogueFormatVersion = 1;
+inline constexpr int32_t wmsCatalogueFormatVersion = 1;
 
 /**
  * Where the application fetches the current catalogue: the file

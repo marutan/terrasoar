@@ -25,6 +25,7 @@
 #ifndef TS_APP_OFFLINEREGIONMANAGER_H
 #define TS_APP_OFFLINEREGIONMANAGER_H
 
+#include <cstdint>
 #include <functional>
 #include <map>
 #include <memory>
@@ -84,7 +85,7 @@ public:
   }
 
   /** Returns the region @p id, or null. */
-  const OfflineRegion* region(long long id) const;
+  const OfflineRegion* region(int64_t id) const;
 
   /** Returns why the list couldn't be read, or an empty string. */
   const QString& loadError() const { return m_loadError; }
@@ -103,23 +104,23 @@ public:
    * Returns the new id, or 0 and @p errorString if its source can't be
    * opened or its terms forbid it (then nothing is added).
    */
-  long long addRegion(OfflineRegion region, QString* errorString);
+  int64_t addRegion(OfflineRegion region, QString* errorString);
 
   /**
    * Starts or carries on downloading the region @p id: after a pause, or
    * to finish or refresh it (only missing and stale tiles are fetched).
    * Returns false and @p errorString if it can't.
    */
-  bool resume(long long id, QString* errorString);
+  bool resume(int64_t id, QString* errorString);
 
   /** Pauses the download of the region @p id, if running. */
-  void pause(long long id);
+  void pause(int64_t id);
 
   /** Cancels the region's download, unpins its tiles and removes it. */
-  void remove(long long id);
+  void remove(int64_t id);
 
   /** Returns the region's download progress, if it has one now. */
-  std::optional<RegionDownloadProgress> progress(long long id) const;
+  std::optional<RegionDownloadProgress> progress(int64_t id) const;
 
   /**
    * Returns a line for the status bar about the downloads running (empty
@@ -147,7 +148,7 @@ private:
   OfflineRegionStore m_store;
   QString m_loadError;
   std::function<std::vector<WmsCatalogueEntry>()> m_catalogue;
-  std::map<long long, std::unique_ptr<RegionDownload>> m_downloads;
+  std::map<int64_t, std::unique_ptr<RegionDownload>> m_downloads;
   QTimer m_poll;
 };
 

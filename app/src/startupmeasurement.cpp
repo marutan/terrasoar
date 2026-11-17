@@ -20,6 +20,7 @@
 
 #include "startupmeasurement.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <QEvent>
@@ -34,7 +35,7 @@ namespace ts
 {
 
 StartupMeasurement::StartupMeasurement(QElapsedTimer sinceMain, QWidget* window,
-                                       int idleS, QObject* parent)
+                                       int32_t idleS, QObject* parent)
     : QObject(parent), m_sinceMain(sinceMain), m_window(window),
       m_idleS(idleS > 0 ? idleS : 0)
 {

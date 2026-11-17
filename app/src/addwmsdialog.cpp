@@ -21,6 +21,7 @@
 #include "addwmsdialog.h"
 
 #include <algorithm>
+#include <cstdint>
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -52,10 +53,10 @@ namespace
 {
 
 /** How often running requests are looked at, ms. */
-constexpr int pollIntervalMs = 50;
+constexpr int32_t pollIntervalMs = 50;
 
 /** Item data: the server's layer name (empty for groups). */
-constexpr int layerNameRole = Qt::UserRole + 1;
+constexpr int32_t layerNameRole = Qt::UserRole + 1;
 
 QUrl catalogueSourceUrl()
 {
@@ -162,14 +163,14 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
           &AddWmsDialog::startConnect);
   connect(m_serviceBox->lineEdit(), &QLineEdit::returnPressed, this,
           &AddWmsDialog::startConnect);
-  connect(m_serviceBox, qOverload<int>(&QComboBox::activated), this,
+  connect(m_serviceBox, qOverload<int32_t>(&QComboBox::activated), this,
           &AddWmsDialog::serviceChosen);
   connect(m_layerTree, &QTreeWidget::currentItemChanged, this,
           &AddWmsDialog::layerChosen);
-  connect(m_styleBox, qOverload<int>(&QComboBox::currentIndexChanged), this,
+  connect(m_styleBox, qOverload<int32_t>(&QComboBox::currentIndexChanged), this,
           &AddWmsDialog::layerChosen);
-  connect(m_formatBox, qOverload<int>(&QComboBox::currentIndexChanged), this,
-          &AddWmsDialog::layerChosen);
+  connect(m_formatBox, qOverload<int32_t>(&QComboBox::currentIndexChanged),
+          this, &AddWmsDialog::layerChosen);
   connect(m_buttons, &QDialogButtonBox::accepted, this, &AddWmsDialog::accept);
   connect(m_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   connect(m_pollTimer, &QTimer::timeout, this, &AddWmsDialog::poll);
@@ -270,9 +271,9 @@ void AddWmsDialog::catalogueArrived()
   emit catalogueUpdated();
 }
 
-void AddWmsDialog::serviceChosen(int index)
+void AddWmsDialog::serviceChosen(int32_t index)
 {
-  if (index < 0 || index >= static_cast<int>(m_catalogue.size())) {
+  if (index < 0 || index >= static_cast<int32_t>(m_catalogue.size())) {
     m_aboutLabel->clear();
     return;
   }
@@ -388,7 +389,7 @@ void AddWmsDialog::capabilitiesArrived()
   m_capabilities = std::move(parsed);
   fillLayers();
   setStatus(tr("%1: %n layer(s).", nullptr,
-               static_cast<int>(m_capabilities->namedLayers().size()))
+               static_cast<int32_t>(m_capabilities->namedLayers().size()))
                 .arg(m_capabilities->title.isEmpty() ? m_serviceUrl.host()
                                                      : m_capabilities->title),
             false);
@@ -453,10 +454,10 @@ void AddWmsDialog::layerChosen()
                             style.name);
       }
       QStringList offered;
-      for (int i = 0; i < m_formatBox->count(); ++i) {
+      for (int32_t i = 0; i < m_formatBox->count(); ++i) {
         offered.append(m_formatBox->itemText(i));
       }
-      const int preferred =
+      const int32_t preferred =
           m_formatBox->findText(chooseFormat(offered, layer->opaque));
       m_formatBox->setCurrentIndex(std::max(preferred, 0));
     }

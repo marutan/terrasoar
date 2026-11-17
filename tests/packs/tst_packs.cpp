@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <optional>
@@ -310,12 +311,12 @@ private slots:
     const ts::PackManifest manifest =
         writePack(dir.path(), QStringLiteral("test-pack"));
     const QString path = dir.path();
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&manifest, &path](int) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&manifest, &path](int32_t) {
           // Each thread its own instance: the reentrancy under test.
           // NOLINTNEXTLINE(performance-unnecessary-copy-initialization)
           const ts::PackManifest copy = manifest;
-          for (int i = 0; i < 20; ++i) {
+          for (int32_t i = 0; i < 20; ++i) {
             if (!copy.verify(path, notCancelled).ok) {
               return false;
             }
@@ -455,7 +456,7 @@ private slots:
     QCOMPARE(progress.totalBytes, pack.entry.sizeBytes);
     QCOMPARE(progress.doneBytes, pack.entry.sizeBytes);
     // 4500 bytes in chunks of 1000: five requests, each a range.
-    int tileRequests = 0;
+    int32_t tileRequests = 0;
     for (const ts::test::MockHttpRequest& request : server.requests()) {
       if (request.url.path().endsWith(QStringLiteral("tiles.sqlite"))) {
         ++tileRequests;
@@ -491,8 +492,8 @@ private slots:
         ts::test::remotePack(server, QStringLiteral("full"),
                              QStringLiteral("1"), QByteArray(4500, 'r'));
     // The connection drops after two chunks of the tile file.
-    std::shared_ptr<std::atomic<int>> chunks =
-        std::make_shared<std::atomic<int>>(0);
+    std::shared_ptr<std::atomic<int32_t>> chunks =
+        std::make_shared<std::atomic<int32_t>>(0);
     server.setHandler(
         [files = pack.files, chunks](const ts::test::MockHttpRequest& r) {
           if (r.url.path().endsWith(QStringLiteral("tiles.sqlite")) &&
@@ -523,7 +524,7 @@ private slots:
     progress = installAndWait(library, pack.entry, network);
     QCOMPARE(progress.state, ts::PackInstallProgress::State::Verified);
     QByteArray firstRange;
-    int manifestRequests = 0;
+    int32_t manifestRequests = 0;
     for (const ts::test::MockHttpRequest& request : server.requests()) {
       if (request.url.path().endsWith(QStringLiteral("tiles.sqlite")) &&
           firstRange.isEmpty()) {
