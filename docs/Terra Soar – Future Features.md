@@ -34,8 +34,9 @@ The first roadmap's rules still apply to every phase here:
 | 19 | KML | 19a: import KML/KMZ and draw it on the globe and map; 19b: create KML, add elements, export |
 | 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
 | 21 | Aircraft from ADS-B | Recorded, live-receiver and airplanes.live ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
+| 22 | Ships from AIS | Recorded, live-receiver and open online AIS data as vessels on the map and globe, with trails like Phase 21's |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships.
 
 ## Phase 9 – Road to 1.0
 
@@ -668,6 +669,89 @@ Drawing shares Phase 18's machinery for moving objects and tracks, and the progr
 - **Performance:** the day-long fixture recording loads within the time and memory budgets and plays within the frame budget.
 
 **Exit criteria**: imported recordings in every supported format play back with aircraft at the right positions and altitudes. Each trail mode is correct at any clock time, a local receiver works live, and the budgets hold.
+
+## Phase 22 – Ships from AIS
+
+Goal: AIS (Automatic Identification System) data, from files, a receiver or open online feeds, shows vessels on the map and the globe, with their names, types, headings and trails.
+
+**Approach (proposed)**: a `core` subsection (`ts/ais`) with its own unit test project (`tests/ais`). It holds our own AIS decoder and readers for the common formats. The track store, trails, playback and live connections are shared with Phase 21 (aircraft) through `ts/tracks`. Vessels are drawn at sea level, so they work the same on the flat map and the globe, and stay on the water surface when terrain is on.
+
+**Deliverables**
+
+- **Import**: File → Import AIS Data… and drag and drop:
+  - **NMEA 0183 logs** (`!AIVDM`/`!AIVDO` sentences): multi-sentence messages reassembled, checksums checked.
+    - Times come from NMEA 4.0 tag blocks (`\c:` and `\s:`) or a timestamp prefix on each line, or else from the file's position order.
+  - **CSV exports**, including NOAA's MarineCadastre AIS data (US public domain, a good source of test and demonstration data), with mappable columns for other CSV.
+  - Each import becomes a vessel layer in the layer tree.
+- **Decoder** (ITU-R M.1371), covering:
+  - Class A position reports (types 1–3), with navigational status, rate of turn, speed and course over ground, and true heading;
+  - base stations (type 4);
+  - static and voyage data (type 5): name, callsign, IMO number, ship type, dimensions, draught, destination and ETA;
+  - Class B positions and static data (types 18, 19 and 24);
+  - search-and-rescue aircraft (type 9, drawn at their altitude);
+  - aids to navigation (type 21);
+  - long-range reports (type 27).
+  - Other messages are counted and listed, not errors.
+- **Vessels on the map and globe:**
+  - **Symbol:** a vessel symbol at its position, pointing along its true heading, or its course when heading is not available. Coloured by ship type with the usual AIS colour scheme, with a legend.
+  - **Hull outline:** at close zoom, the symbol becomes the hull outline drawn to scale from the reported dimensions and the antenna's position on board.
+  - **Course vector:** an optional line showing where the vessel will be in N minutes at its speed and course.
+  - **Label:** name (or MMSI), optionally with speed and destination.
+  - **Status:** moored and anchored vessels are shown differently from those under way.
+  - **Other symbols:** aids to navigation and base stations have their own.
+- **Trails**: the same three modes as Phase 21 (off, a time span before the clock's time, or all data), per layer with a per-vessel override. They are coloured by vessel, speed or type, and broken at gaps in reception.
+- **Time and playback:**
+  - Recordings play on the program-wide clock, with interpolation between reports.
+  - Vessels fade out after a time without reports. Class A and Class B report at different rates, so the timeout depends on the class and the vessel's speed.
+- **Live data:**
+  - **Local receiver:** NMEA sentences over TCP or UDP from AIS-catcher, rtl-ais or a ship's AIS transponder, optionally recorded to a file for replay.
+  - **Open online feeds:**
+    - Fintraffic Digitraffic (Finland, Baltic; CC BY 4.0)
+    - the Norwegian Coastal Administration's open AIS (NLOD licence)
+    - other open national feeds found later
+    - Each is a catalogue entry with its terms and attribution, like WMS services, and the terms are confirmed before release.
+  - **Services that need a key** (e.g. aisstream.io) come with Phase 16.
+- **Details on click:**
+  - MMSI, name, callsign and IMO number;
+  - ship type, dimensions and draught;
+  - destination and ETA;
+  - navigational status;
+  - speed, course, heading and rate of turn;
+  - the time of the last position and static reports.
+- **Follow mode, and filters** by name or MMSI, ship type, navigational status, speed and area.
+- **Export:** a vessel's track as KML (with Phase 19), GPX or CSV.
+- **Performance:**
+  - A live national feed (tens of thousands of vessels) and a day of NOAA data (millions of reports) stay within the frame and memory budgets.
+  - Symbols are instanced, and trails are time-filtered in the shader, as in Phase 21.
+
+**Technical documentation**
+
+- `docs/design/ais.md`: the formats read, the decoder (6-bit payloads, fragments, message types), time sources, symbol orientation and hull outlines, and live connections
+- `docs/user/ships.md`: importing AIS data, symbols and colours, trails, playback, receivers and online feeds
+
+**Regression tests**
+
+- **Decoder:**
+  - every supported message type decodes known sentences to their published values (from ITU-R M.1371's examples and openly licensed AIS test sets, with their licences checked);
+  - "not available" values (heading 511, speed 1023 and so on) are reported as missing, not as numbers.
+- **Sentences:**
+  - multi-sentence reassembly, including interleaved and out-of-order fragments;
+  - checksum failures, truncated payloads, and fill bits.
+- **Readers:**
+  - NMEA logs with tag-block times, prefixed times and no times;
+  - a NOAA MarineCadastre CSV fixture;
+  - malformed lines reported with their line, not fatal.
+- **Tracks and trails:**
+  - interpolation, the timeouts by class and speed, gap handling;
+  - each trail mode at given clock times (shared tests with Phase 21).
+- **Symbols:** heading versus course fallback, and hull outlines placed and sized correctly from the reported dimensions.
+- **Live:**
+  - a mock receiver (local `QTcpServer` and UDP socket sending NMEA) drives vessels in real time, including reconnection;
+  - mock Digitraffic and Norwegian feeds check the request handling, attribution and back-off.
+- **Golden images:** a fixture harbour recording at a fixed clock time, on the map and the globe, with type colours, course vectors, hull outlines and each trail mode.
+- **Performance:** the day-long NOAA fixture loads within the time and memory budgets and plays within the frame budget.
+
+**Exit criteria**: AIS logs and CSV play back with vessels at the right positions, headings and types. Each trail mode is correct at any clock time, a local receiver and at least one open online feed work live, and the budgets hold.
 
 ## Items deferred from 0.0.1
 
