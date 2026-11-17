@@ -37,8 +37,9 @@ The first roadmap's rules still apply to every phase here:
 | 22 | Ships from AIS | Recorded, live-receiver and open online AIS data as vessels on the map and globe, with trails like Phase 21's |
 | 23 | Vector layer colours | Change the colours (and line width) of the graticule and shoreline layers |
 | 24 | On-screen navigation controls | An overlay on the view with rotate, pan, zoom and tilt controls, on the globe and the map |
+| 25 | VMAP0 data pack | NGA's Vector Map Level 0 (1:1,000,000 world vector map) prepared, tested and published as downloadable packs |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 10's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection. Phase 21 (aircraft) plays recordings on the program-wide clock and shares Phase 18's way of drawing moving objects and their tracks, so it is easiest after Phase 18. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 22 (ships) is Phase 21 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 23 (vector layer colours) is small and depends on nothing, so it is a good candidate for before 1.0. Phase 10's vector files then reuse its style dialog. Phase 24 (navigation controls) depends on nothing either, and also suits the time before 1.0. Phase 25 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 19, 21 and 22 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
 
 ## Phase 9 – Road to 1.0
 
@@ -904,6 +905,96 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
 
 **Exit criteria**: every control works by mouse, touch and keyboard on the globe and the flat map, and stays readable (3:1 contrast) on light and dark backgrounds. Tile detail falls off with distance from the camera on both views, and tilted views stay within the frame, tile and memory budgets. View → Navigation Controls shows and hides the overlay and is remembered. The flat map can be turned and tilted, the overlay can be moved, and the idle and frame budgets hold.
 
+## Phase 25 – VMAP0 data pack
+
+Goal: NGA's Vector Map Level 0 (VMAP0), a world vector map at 1:1,000,000, as downloadable data packs. The packs are prepared with the packager, tested like the existing packs, and installed from the Data Packs window.
+
+**About the source**: VMAP0 (edition 5) covers the world in four libraries:
+- `noamer`: North America;
+- `eurnasia`: Europe and North Asia;
+- `soamafr`: South America and Africa;
+- `sasaus`: South Asia and Australia.
+
+They are published in the Vector Product Format (VPF, MIL-STD-2407). Its themes are:
+- boundaries
+- elevation (contours and spot heights)
+- hydrography (rivers, lakes, coastlines)
+- industry
+- physiography
+- population (built-up areas and place names)
+- transportation (roads, railways, airports)
+- utilities
+- vegetation
+- data quality
+
+It is a US Government (NGA) product approved for public release. The exact terms of the edition used are confirmed and recorded before publishing, as they were for every existing pack (see open question 10).
+
+**Approach (proposed)**:
+- **Packager only:** the work is in the packager (`tools/packager`), not the program. The program already installs packs and draws vector layers.
+- **Reading VPF:** the packager reads VPF itself. GDAL's VPF support needs the OGDI library, which isn't in our dependencies, and VPF is fully specified.
+  - It reads the tables, the feature classes, and the primitives (edges, faces and nodes) with their topology, joining features to their attributes.
+  - The reader is a packager subsection with its own unit tests.
+- **Converting:** the packager converts VMAP0 into the packs' existing vector tile format, with simplification per level (as for the GSHHG shoreline), clipping at tile edges and attributes kept for picking.
+
+**Deliverables**
+
+- **Source acquisition, recorded:**
+  - the edition, where it was downloaded from, the size and SHA-256 of every file;
+  - a script that fetches and verifies them, as for the ETOPO and geoid sources;
+  - the source isn't stored in the repository.
+- **VPF reader** in the packager:
+  - the database, library and coverage structure;
+  - the feature and attribute tables, and the thematic indexes;
+  - edge, face and node primitives, with the winged-edge topology turned into polygons with holes;
+  - tiled libraries (VMAP0's 15° tiles) and features crossing tile edges joined;
+  - the library reference coverage (`libref`) and the data quality coverage.
+- **Packs, one per theme group**, so users download only what they want, each with its own layer collection and default styles:
+  - **`vmap0-boundaries`**: international and administrative boundaries, with disputed boundaries styled differently.
+  - **`vmap0-hydrography`**: rivers (perennial and intermittent), lakes, reservoirs, canals and coastlines.
+  - **`vmap0-transportation`**: roads by class, railways, airports and ferry routes.
+  - **`vmap0-population`**: built-up areas, and place names once labels exist.
+  - **`vmap0-elevation`**: contours and spot heights (where Terra Soar's own DEM and Phase 13's contours don't already cover the need).
+  - **`vmap0-physiography`, `vmap0-vegetation`, `vmap0-industry` and `vmap0-utilities`**: smaller packs, or one "other themes" pack, decided by size.
+  - **Pack index:** each has a manifest, licence and attribution ("Vector Map Level 0, NGA"), and a version (`vmap0-<theme>-5.<n>`), in the pack index in `marutan/terrasoar-packs`.
+- **Sizes:** measured per pack and recorded in `docs/data/`, with a target set before building (VMAP0 is about 1 GB as VPF). A pack too big to download comfortably is split by region along VMAP0's libraries.
+- **Styles:**
+  - default styles per feature class, roughly following VMAP0's own symbology and readable over Blue Marble and pale WMS maps;
+  - restyled through Phase 23's dialog if that exists;
+  - zoom ranges per class, so the globe isn't cluttered at a whole-Earth view.
+- **Attributes:** clicking a feature shows its feature class and attributes (names, road class, boundary type and so on), decoded from VMAP0's codes to readable text using its value description tables.
+- **Notices:** VMAP0 added to `THIRD_PARTY_NOTICES`, the About window's data list and `check_notices.py`'s audit.
+- **Publishing:** the packs are built with the packager and checked by its build checks and report. They are published to `marutan/terrasoar-packs` only with the project owner's approval, as for every pack so far. Each is then installed live from the published index and checked.
+
+**Technical documentation**
+
+- `docs/data/vmap0.md`: the source and edition, its terms, the themes included and left out, the conversion, simplification levels, sizes and known data issues (VMAP0's age and known errors)
+- `docs/tools/packager.md`: the VPF reader and the `vmap0-*` pack configurations
+- `docs/user/offline-use.md`: the VMAP0 packs in the Data Packs window
+
+**Regression tests**
+
+- **VPF reader (`tests/packager`):**
+  - Fixtures are a small synthetic VPF database, written for the tests, plus a clipped real VMAP0 tile (public release, stored with its source noted).
+  - Table parsing (all column types, variable-length fields, both byte orders), feature-to-primitive joins, and polygons with holes built from the winged-edge topology.
+  - Tile-crossing features are joined.
+  - Malformed tables are reported with their file and row.
+- **Conversion:**
+  - Feature counts per theme and feature class match the source.
+  - Geometries are valid (no self-intersections after simplification), and simplification stays within its tolerance per level.
+  - Tile clipping leaves no gaps or overlaps.
+  - Attribute codes decode to the right text.
+- **Packs:**
+  - each manifest validates;
+  - the packager's build checks and report pass;
+  - the pack installs, upgrades and uninstalls through the pack manager against the mock pack server (as the existing pack tests do).
+- **Rendering:**
+  - golden images of each theme over Blue Marble, on the globe and the map, at a whole-Earth view and a regional view;
+  - boundaries lined up with the GSHHG shoreline within VMAP0's stated accuracy.
+- **Performance:** all VMAP0 packs shown at once stay within the frame and memory budgets.
+- **Live check, after publishing:** each published pack downloads, verifies its checksum and installs from the real index (a manual step, as for the geoid packs, not in CI).
+
+**Exit criteria**: the VMAP0 packs build from the recorded source with every check passing. They are tested, published with approval and installable from the Data Packs window, and draw correctly and within budget on the globe and the map.
+
 ## Items deferred from 0.0.1
 
 These came up during Phases 6–8 and were left out on purpose. They are small enough to fit into any phase.
@@ -937,3 +1028,4 @@ These need a decision before the phases they affect:
 7. ~~**SGP4 implementation** (Phase 18)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 18's Decisions).
 8. **airplanes.live access** (Phase 21): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
 9. ~~**Turning and tilting the flat map** (Phase 24)~~: decided 2026-11-17. The flat map turns and tilts (see Phase 24's Decisions).
+10. **VMAP0 terms and hosting** (Phase 25): confirm the release terms of the VMAP0 edition used (public release, any NGA disclaimers on boundaries and names), and approve the pack sizes before publishing to `marutan/terrasoar-packs`.
