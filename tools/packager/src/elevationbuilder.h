@@ -25,6 +25,7 @@
 #ifndef TS_PACKAGER_ELEVATIONBUILDER_H
 #define TS_PACKAGER_ELEVATIONBUILDER_H
 
+#include <cstdint>
 #include <functional>
 
 #include <QString>
@@ -42,9 +43,9 @@ struct ElevationOptions {
   /** The tile store to create (format "heights"). */
   QString outputPath;
   /** Deepest quadtree level stored; levels 0 to this are stored. */
-  int maxLevel = 6;
+  int32_t maxLevel = 6;
   /** Samples along a tile's side (edges shared with the neighbours). */
-  int samples = 65;
+  int32_t samples = 65;
   /** The heights' vertical datum, written to the store (e.g. "egm2008"). */
   QString verticalDatum;
   /** The store's name (English). */
@@ -56,7 +57,7 @@ struct ElevationOptions {
 /** What was built. */
 struct ElevationStats {
   /** Tiles written. */
-  int tiles = 0;
+  int32_t tiles = 0;
   /** Lowest and highest height of the deepest level, metres. */
   double minHeightM = 0.0;
   double maxHeightM = 0.0;
@@ -83,14 +84,14 @@ struct GeoidGridOptions {
   /** The GeoTIFF to create. */
   QString outputPath;
   /** Keep every step-th sample in both directions (2: 2.5′ → 5′). */
-  int step = 1;
+  int32_t step = 1;
 };
 
 /** What was built. */
 struct GeoidGridStats {
   /** Samples across and down. */
-  int width = 0;
-  int height = 0;
+  int32_t width = 0;
+  int32_t height = 0;
 };
 
 /**

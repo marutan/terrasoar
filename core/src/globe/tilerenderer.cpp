@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <functional>
 #include <unordered_set>
@@ -58,13 +59,13 @@ using globe_detail::overlayDepthGlsl;
 using globe_detail::tileBinding;
 
 /** Layers blended in one draw (texture units 0 … 7). */
-constexpr int layersPerDraw = 8;
+constexpr int32_t layersPerDraw = 8;
 
 /** Binding of the composite pass's block. */
-constexpr int compositeBinding = 3;
+constexpr int32_t compositeBinding = 3;
 
 /** How many levels above a tile its coarse stand-in is requested. */
-constexpr int coarseLevels = 4;
+constexpr int32_t coarseLevels = 4;
 
 using Float4 = std::array<float, 4>;
 
@@ -175,7 +176,7 @@ void main()
 QByteArray tileFragmentGlsl()
 {
   QByteArray glsl;
-  for (int i = 0; i < layersPerDraw; ++i) {
+  for (int32_t i = 0; i < layersPerDraw; ++i) {
     glsl += "uniform sampler2D layer" + QByteArray::number(i) + ";\n";
   }
   glsl += R"(
@@ -220,7 +221,7 @@ void main()
   vec4 c;
 )";
   const std::array<const char*, 4> lanes = {"x", "y", "z", "w"};
-  for (int i = 0; i < layersPerDraw; ++i) {
+  for (int32_t i = 0; i < layersPerDraw; ++i) {
     const QByteArray n = QByteArray::number(i);
     glsl += "  if (count > " + n + ") {\n    c = layerColor(layer" + n +
             ", uvTransform[" + n + "], layerAlpha[" +
@@ -322,7 +323,7 @@ struct TileRenderer::GpuMesh {
   std::size_t bytes = 0;
   std::uint64_t lastUsedFrame = 0;
   /** Level of the heights it was built with; −1 for none. */
-  int heightsLevel = -1;
+  int32_t heightsLevel = -1;
   /** The heights it was built with (kept, to tell a replacement). */
   std::shared_ptr<const HeightTile> heights;
 };
@@ -400,7 +401,7 @@ bool TileRenderer::initialise(QString* errorString)
   desc.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding},
                         {QByteArrayLiteral("Globe"), globeBinding},
                         {QByteArrayLiteral("Tile"), tileBinding}};
-  for (int i = 0; i < layersPerDraw; ++i) {
+  for (int32_t i = 0; i < layersPerDraw; ++i) {
     desc.samplers.push_back({"layer" + QByteArray::number(i), i});
   }
   m_shader = m_device.createShaderProgram(desc, errorString);
@@ -459,13 +460,13 @@ bool TileRenderer::initialise(QString* errorString)
 
   const std::vector<std::uint16_t> indices =
       tileMeshIndices(m_settings.loader.meshSegments);
-  m_indexCount = static_cast<int>(indices.size());
+  m_indexCount = static_cast<int32_t>(indices.size());
   m_indices = m_device.createBuffer(BufferType::Index, BufferUsage::Static,
                                     indices.size() * sizeof(std::uint16_t),
                                     indices.data());
   const std::vector<std::uint16_t> strips =
       tileMeshStripIndices(m_settings.loader.meshSegments);
-  m_stripIndexCount = static_cast<int>(strips.size());
+  m_stripIndexCount = static_cast<int32_t>(strips.size());
   m_stripIndices = m_device.createBuffer(BufferType::Index, BufferUsage::Static,
                                          strips.size() * sizeof(std::uint16_t),
                                          strips.data());
@@ -543,8 +544,8 @@ void TileRenderer::setLayers(const std::vector<ImageryLayerDraw>& layers,
   m_groupAlphas = groupAlphas;
   m_drawTiles.clear();
 
-  int deepest = 0;
-  int tileSize = 1;
+  int32_t deepest = 0;
+  int32_t tileSize = 1;
   for (const std::unique_ptr<Source>& source : m_sources) {
     deepest = std::max(deepest, source->provider->maximumLevel());
     tileSize = std::max(tileSize, source->provider->tileSizePx());
@@ -559,8 +560,8 @@ void TileRenderer::applySelectionSettings()
   TileSelectionSettings selection = m_settings.selection;
   selection.minimumMapLevel = m_settings.minimumMapLevel;
   selection.meshSegments = m_settings.loader.meshSegments;
-  int deepest = m_imageryDeepestLevel;
-  int tileSize = m_imageryTileSizePx;
+  int32_t deepest = m_imageryDeepestLevel;
+  int32_t tileSize = m_imageryTileSizePx;
   if (terrainShown() && m_layers.empty()) {
     // Terrain alone: as deep as its data, and a little deeper (its tiles
     // are interpolated there) for the shape of the land.
@@ -632,7 +633,7 @@ std::optional<double> TileRenderer::terrainHeightM(double latDeg, double lonDeg)
     return 0.0;
   }
   const Geodetic point{latDeg, lonDeg, 0.0};
-  for (int level = m_deepestHeights; level >= 0; --level) {
+  for (int32_t level = m_deepestHeights; level >= 0; --level) {
     std::optional<std::shared_ptr<const HeightTile>> found =
         m_heights.find(TileKey::containing(level, point));
     if (!found || !*found) {
@@ -653,7 +654,7 @@ std::optional<GroundHeight> TileRenderer::groundHeight(double latDeg,
     return std::nullopt;
   }
   const Geodetic point{latDeg, lonDeg, 0.0};
-  for (int level = m_deepestHeights; level >= 0; --level) {
+  for (int32_t level = m_deepestHeights; level >= 0; --level) {
     std::optional<std::shared_ptr<const HeightTile>> found =
         m_heights.find(TileKey::containing(level, point));
     if (!found || !*found) {
@@ -791,7 +792,7 @@ bool TileRenderer::isBusy() const
 
 void TileRenderer::uploadImages()
 {
-  int budget = m_settings.uploadsPerFrame;
+  int32_t budget = m_settings.uploadsPerFrame;
   bool progress = true;
   // Round robin, so one busy source can't starve the others.
   while (budget > 0 && progress) {
@@ -834,7 +835,7 @@ void TileRenderer::uploadImages()
 void TileRenderer::buildMeshes(const std::vector<TileLoadRequest>& wanted,
                                const std::vector<TileKey>& rebuild)
 {
-  int built = 0;
+  int32_t built = 0;
   // Meshes that now have their own heights, then new ones.
   for (const TileKey& key : rebuild) {
     if (built >= m_settings.meshBuildsPerFrame) {
@@ -899,17 +900,17 @@ void TileRenderer::requestImages()
   std::stable_sort(drawn.begin(), drawn.end(),
                    [](TileKey a, TileKey b) { return a.level < b.level; });
   for (const std::unique_ptr<Source>& source : m_sources) {
-    const int deepest = source->provider->maximumLevel();
+    const int32_t deepest = source->provider->maximumLevel();
     std::vector<TileLoadRequest> requests;
     std::unordered_set<TileKey, TileKeyHash> seen;
-    for (int pass = 0; pass < 2; ++pass) {
+    for (int32_t pass = 0; pass < 2; ++pass) {
       for (const TileKey& key : drawn) {
         TileKey wanted = key;
         while (wanted.level > deepest) {
           wanted = wanted.parent();
         }
         if (pass == 0) {
-          const int coarseLevel = std::max(0, wanted.level - coarseLevels);
+          const int32_t coarseLevel = std::max(0, wanted.level - coarseLevels);
           while (wanted.level > coarseLevel) {
             wanted = wanted.parent();
           }
@@ -919,7 +920,7 @@ void TileRenderer::requestImages()
         }
       }
     }
-    m_statistics.requested += static_cast<int>(requests.size());
+    m_statistics.requested += static_cast<int32_t>(requests.size());
     source->loader->setRequests(requests);
   }
 }
@@ -973,7 +974,7 @@ void TileRenderer::bindImages()
         key = key.parent();
       }
       // The drawn tile is a 2^d × 2^d part of the image's tile.
-      const int levels = tile.key.level - key.level;
+      const int32_t levels = tile.key.level - key.level;
       const float scale = 1.0F / static_cast<float>(1 << levels);
       LayerImage image;
       image.texture = texture;
@@ -1002,7 +1003,7 @@ void TileRenderer::evict()
   // used this frame.
   struct Candidate {
     std::uint64_t lastUsed;
-    int source; // −1 for a mesh
+    int32_t source; // −1 for a mesh
     TileKey key;
   };
   std::vector<Candidate> candidates;
@@ -1017,7 +1018,7 @@ void TileRenderer::evict()
          m_sources[s]->images) {
       if (image.second.lastUsedFrame < m_frame) {
         candidates.push_back(
-            {image.second.lastUsedFrame, static_cast<int>(s), image.first});
+            {image.second.lastUsedFrame, static_cast<int32_t>(s), image.first});
       }
     }
   }
@@ -1123,11 +1124,11 @@ void TileRenderer::prepare(const Camera& camera)
   requestImages();
   evict();
 
-  m_statistics.rendered = static_cast<int>(m_drawTiles.size());
+  m_statistics.rendered = static_cast<int32_t>(m_drawTiles.size());
   m_statistics.visited = selection.visited;
   std::size_t bytes = m_meshBytes;
   for (const std::unique_ptr<Source>& source : m_sources) {
-    m_statistics.resident += static_cast<int>(source->images.size());
+    m_statistics.resident += static_cast<int32_t>(source->images.size());
     bytes += source->bytes;
   }
   m_statistics.gpuBytes = bytes;
@@ -1196,7 +1197,7 @@ void TileRenderer::setTileIndexBuffer()
                           IndexFormat::UInt16);
 }
 
-int TileRenderer::tileIndexCount() const
+int32_t TileRenderer::tileIndexCount() const
 {
   return m_drawStrips ? m_stripIndexCount : m_indexCount;
 }
@@ -1221,7 +1222,7 @@ void TileRenderer::drawLayers(LayerRange layers, bool withBase)
       for (std::size_t slot = 0; slot < perDraw; ++slot) {
         const GpuTexture* texture =
             slot < batchCount ? tile.layers[batch + slot].texture : nullptr;
-        m_device.setTexture(static_cast<int>(slot),
+        m_device.setTexture(static_cast<int32_t>(slot),
                             texture ? *texture : *m_emptyTexture);
       }
       m_device.setVertexBuffer(0, *tile.mesh->vertices, 0);
@@ -1241,7 +1242,7 @@ void TileRenderer::drawPlain(const Pipeline& pipeline)
   m_device.setPipeline(pipeline);
   setTileIndexBuffer();
   const std::vector<bool> visible = writeBatchUniforms(LayerRange{0, 0}, true);
-  for (int slot = 0; slot < layersPerDraw; ++slot) {
+  for (int32_t slot = 0; slot < layersPerDraw; ++slot) {
     m_device.setTexture(slot, *m_emptyTexture);
   }
   for (std::size_t t = 0; t < visible.size(); ++t) {
@@ -1289,7 +1290,7 @@ void TileRenderer::draw(const PassDesc& mainPass,
   // On the globe the ray-cast ellipsoid is the surface under the layers;
   // with terrain the tiles have to be (the ellipsoid is not where they are).
   bool baseWanted = withBase && (m_morph > 0.0 || terrainShown());
-  const int count = static_cast<int>(m_layers.size());
+  const int32_t count = static_cast<int32_t>(m_layers.size());
   const bool groups = m_settings.groupCompositing;
   // A composite group is drawn on its own offscreen, so the surface can't
   // share its draws; nor can it with no layers at all.
@@ -1297,11 +1298,11 @@ void TileRenderer::draw(const PassDesc& mainPass,
     drawBase();
     baseWanted = false;
   }
-  int first = 0;
+  int32_t first = 0;
   while (first < count) {
-    const int group =
+    const int32_t group =
         groups ? m_layers[static_cast<std::size_t>(first)].group : -1;
-    int end = first + 1;
+    int32_t end = first + 1;
     while (end < count &&
            (groups ? m_layers[static_cast<std::size_t>(end)].group : -1) ==
                group) {

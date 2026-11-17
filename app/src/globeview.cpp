@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 
 #include <QFocusEvent>
@@ -106,7 +107,7 @@ QPointF eventPosition(const QMouseEvent* event)
 }
 
 /** Returns the CameraMotion flag a key drives, or NoMotion. */
-unsigned int keyMotion(int key)
+uint32_t keyMotion(int32_t key)
 {
   switch (key) {
   case Qt::Key_Up:
@@ -422,7 +423,7 @@ void GlobeView::releaseGl()
   doneCurrent();
 }
 
-void GlobeView::resizeGL(int widthPx, int heightPx)
+void GlobeView::resizeGL(int32_t widthPx, int32_t heightPx)
 {
   // QOpenGLWidget passes logical (device-independent) pixels.
   m_controller.setViewportSize(std::max(widthPx, 1), std::max(heightPx, 1));
@@ -478,7 +479,7 @@ void GlobeView::requestFrame()
   }
   if (!m_frameTimer.isActive()) {
     m_frameTimer.start(
-        static_cast<int>(std::ceil(m_pacer.delayS(now) * 1000.0)));
+        static_cast<int32_t>(std::ceil(m_pacer.delayS(now) * 1000.0)));
   }
 }
 
@@ -654,7 +655,7 @@ void GlobeView::keyPressEvent(QKeyEvent* event)
       return;
     }
   }
-  const unsigned int motion = keyMotion(event->key());
+  const uint32_t motion = keyMotion(event->key());
   if (motion != NoMotion) {
     if (!event->isAutoRepeat()) {
       m_heldKeys |= motion;
@@ -674,7 +675,7 @@ void GlobeView::keyPressEvent(QKeyEvent* event)
 
 void GlobeView::keyReleaseEvent(QKeyEvent* event)
 {
-  const unsigned int motion = keyMotion(event->key());
+  const uint32_t motion = keyMotion(event->key());
   if (motion != NoMotion) {
     if (!event->isAutoRepeat()) {
       m_heldKeys &= ~motion;
@@ -811,12 +812,12 @@ std::optional<RegionGeometry> GlobeView::visibleArea() const
 {
   // Sample the view on a grid; longitudes relative to the first hit so
   // that a view across the antimeridian stays in one piece.
-  const int steps = 16;
+  const int32_t steps = 16;
   bool any = false;
   double centreLon = 0.0;
   GeoRect box{0.0, 0.0, 0.0, 0.0};
-  for (int row = 0; row <= steps; ++row) {
-    for (int column = 0; column <= steps; ++column) {
+  for (int32_t row = 0; row <= steps; ++row) {
+    for (int32_t column = 0; column <= steps; ++column) {
       const std::optional<LonLat> hit = pickLonLat(QPointF(
           width() * column / double(steps), height() * row / double(steps)));
       if (!hit) {
@@ -861,8 +862,9 @@ GlobeView::outlineOnScreen(const std::vector<LonLat>& points, bool closed) const
     const LonLat b = points[(i + 1) % n];
     const double length =
         std::max(std::abs(b.lonDeg - a.lonDeg), std::abs(b.latDeg - a.latDeg));
-    const int samples = std::max(1, static_cast<int>(std::ceil(length)));
-    for (int step = i == 0 ? 0 : 1; step <= samples; ++step) {
+    const int32_t samples =
+        std::max(1, static_cast<int32_t>(std::ceil(length)));
+    for (int32_t step = i == 0 ? 0 : 1; step <= samples; ++step) {
       const double t = step / static_cast<double>(samples);
       const std::optional<QPointF> here =
           visibleOnScreen(camera, a.latDeg + t * (b.latDeg - a.latDeg),
@@ -960,8 +962,8 @@ void GlobeView::drawRegionHint(QPainter& painter) const
               "to finish. Backspace removes a corner, Esc cancels.");
   }
   const QFontMetrics metrics(painter.font());
-  const int margin = 6;
-  const int textWidth =
+  const int32_t margin = 6;
+  const int32_t textWidth =
       std::min(width() - 4 * margin, metrics.horizontalAdvance(text));
   const QRect box((width() - textWidth) / 2 - margin, margin,
                   textWidth + 2 * margin, metrics.height() + 2 * margin);
@@ -1043,17 +1045,17 @@ void GlobeView::drawOverlay()
   QPainter painter(this);
   painter.setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
   const QFontMetrics metrics = painter.fontMetrics();
-  int textWidth = 0;
+  int32_t textWidth = 0;
   for (const QString& line : lines) {
     textWidth = std::max(textWidth, metrics.horizontalAdvance(line));
   }
-  const int margin = 6;
-  const int lineHeight = metrics.lineSpacing();
+  const int32_t margin = 6;
+  const int32_t lineHeight = metrics.lineSpacing();
   const QRect box(margin, margin, textWidth + 2 * margin,
-                  lineHeight * static_cast<int>(lines.size()) + 2 * margin);
+                  lineHeight * static_cast<int32_t>(lines.size()) + 2 * margin);
   painter.fillRect(box, QColor(0, 0, 0, 160));
   painter.setPen(QColor(230, 235, 245));
-  int y = box.top() + margin + metrics.ascent();
+  int32_t y = box.top() + margin + metrics.ascent();
   for (const QString& line : lines) {
     painter.drawText(box.left() + margin, y, line);
     y += lineHeight;
@@ -1072,19 +1074,19 @@ void GlobeView::drawAttributions()
   font.setPointSizeF(font.pointSizeF() * 0.85);
   painter.setFont(font);
   const QFontMetrics metrics(font);
-  const int margin = 4;
-  int textWidth = 0;
+  const int32_t margin = 4;
+  int32_t textWidth = 0;
   for (const QString& line : m_attributions) {
     textWidth = std::max(textWidth, metrics.horizontalAdvance(line));
   }
-  const int lineHeight = metrics.lineSpacing();
-  const int boxHeight =
-      lineHeight * static_cast<int>(m_attributions.size()) + 2 * margin;
+  const int32_t lineHeight = metrics.lineSpacing();
+  const int32_t boxHeight =
+      lineHeight * static_cast<int32_t>(m_attributions.size()) + 2 * margin;
   const QRect box(width() - textWidth - 2 * margin, height() - boxHeight,
                   textWidth + 2 * margin, boxHeight);
   painter.fillRect(box, QColor(0, 0, 0, 120));
   painter.setPen(QColor(225, 230, 240));
-  int y = box.top() + margin + metrics.ascent();
+  int32_t y = box.top() + margin + metrics.ascent();
   for (const QString& line : m_attributions) {
     painter.drawText(box.right() - margin - metrics.horizontalAdvance(line), y,
                      line);
@@ -1113,20 +1115,20 @@ void GlobeView::drawScaleBar()
   QPainter painter(this);
   painter.setRenderHint(QPainter::Antialiasing, false);
   const QFontMetrics metrics = painter.fontMetrics();
-  const int margin = 6;
-  const int tick = 5;
-  const int barWidth = qRound(bar->widthPx);
-  const int boxWidth =
+  const int32_t margin = 6;
+  const int32_t tick = 5;
+  const int32_t barWidth = qRound(bar->widthPx);
+  const int32_t boxWidth =
       std::max(barWidth, metrics.horizontalAdvance(m_scaleBarText)) +
       2 * margin;
-  const int boxHeight = metrics.lineSpacing() + tick + 2 * margin;
+  const int32_t boxHeight = metrics.lineSpacing() + tick + 2 * margin;
   const QRect box(margin, height() - boxHeight - margin, boxWidth, boxHeight);
   painter.fillRect(box, QColor(0, 0, 0, 120));
   painter.setPen(QColor(235, 238, 245));
   painter.drawText(box.left() + margin, box.top() + margin + metrics.ascent(),
                    m_scaleBarText);
-  const int left = box.left() + margin;
-  const int bottom = box.bottom() - margin;
+  const int32_t left = box.left() + margin;
+  const int32_t bottom = box.bottom() - margin;
   painter.drawLine(left, bottom, left + barWidth, bottom);
   painter.drawLine(left, bottom - tick, left, bottom);
   painter.drawLine(left + barWidth, bottom - tick, left + barWidth, bottom);

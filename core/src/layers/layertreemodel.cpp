@@ -21,6 +21,7 @@
 #include "ts/layers/layertreemodel.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 #include <QCoreApplication>
@@ -45,7 +46,7 @@ struct LayerTreeModel::Node {
   Node* parent = nullptr;
   std::vector<std::unique_ptr<Node>> children;
 
-  int row() const
+  int32_t row() const
   {
     if (!parent) {
       return 0;
@@ -53,7 +54,7 @@ struct LayerTreeModel::Node {
     const std::vector<std::unique_ptr<Node>>& siblings = parent->children;
     for (std::size_t i = 0; i < siblings.size(); ++i) {
       if (siblings[i].get() == this) {
-        return static_cast<int>(i);
+        return static_cast<int32_t>(i);
       }
     }
     return 0;
@@ -126,12 +127,12 @@ QModelIndex LayerTreeModel::indexOf(const Node* node) const
   return createIndex(node->row(), 0, mutableNode);
 }
 
-QModelIndex LayerTreeModel::index(int row, int column,
+QModelIndex LayerTreeModel::index(int32_t row, int32_t column,
                                   const QModelIndex& parent) const
 {
   const Node* parentNode = nodeAt(parent);
   if (column != 0 || row < 0 ||
-      row >= static_cast<int>(parentNode->children.size())) {
+      row >= static_cast<int32_t>(parentNode->children.size())) {
     return QModelIndex();
   }
   return createIndex(row, 0,
@@ -146,20 +147,20 @@ QModelIndex LayerTreeModel::parent(const QModelIndex& child) const
   return indexOf(nodeAt(child)->parent);
 }
 
-int LayerTreeModel::rowCount(const QModelIndex& parent) const
+int32_t LayerTreeModel::rowCount(const QModelIndex& parent) const
 {
   if (parent.column() > 0) {
     return 0;
   }
-  return static_cast<int>(nodeAt(parent)->children.size());
+  return static_cast<int32_t>(nodeAt(parent)->children.size());
 }
 
-int LayerTreeModel::columnCount(const QModelIndex& /*parent*/) const
+int32_t LayerTreeModel::columnCount(const QModelIndex& /*parent*/) const
 {
   return 1;
 }
 
-QVariant LayerTreeModel::data(const QModelIndex& index, int role) const
+QVariant LayerTreeModel::data(const QModelIndex& index, int32_t role) const
 {
   if (!index.isValid()) {
     return QVariant();
@@ -185,7 +186,7 @@ QVariant LayerTreeModel::data(const QModelIndex& index, int role) const
   case EffectivelyVisibleRole:
     return node->effectivelyVisible();
   case LayerTypeRole:
-    return collection ? -1 : static_cast<int>(node->definition.type);
+    return collection ? -1 : static_cast<int32_t>(node->definition.type);
   case StatusRole:
   case StatusMessageRole:
   case Qt::DecorationRole:
@@ -194,7 +195,7 @@ QVariant LayerTreeModel::data(const QModelIndex& index, int role) const
         m_status.find(node->id);
     if (status == m_status.end()) {
       if (role == StatusRole) {
-        return static_cast<int>(ProviderStatus::State::Ok);
+        return static_cast<int32_t>(ProviderStatus::State::Ok);
       }
       if (role == StatusMessageRole) {
         return QString();
@@ -202,7 +203,7 @@ QVariant LayerTreeModel::data(const QModelIndex& index, int role) const
       return QVariant();
     }
     if (role == StatusRole) {
-      return static_cast<int>(status->second.state);
+      return static_cast<int32_t>(status->second.state);
     }
     if (role == Qt::DecorationRole) {
       return status->second.state == ProviderStatus::State::Error
@@ -258,7 +259,7 @@ bool LayerTreeModel::setLayerDefinition(const QModelIndex& index,
 }
 
 bool LayerTreeModel::setData(const QModelIndex& index, const QVariant& value,
-                             int role)
+                             int32_t role)
 {
   if (!index.isValid()) {
     return false;
@@ -293,8 +294,8 @@ void LayerTreeModel::emitDataChangedBelow(const QModelIndex& index)
 {
   // Effective values of every descendant change too.
   emit dataChanged(index, index);
-  const int rows = rowCount(index);
-  for (int row = 0; row < rows; ++row) {
+  const int32_t rows = rowCount(index);
+  for (int32_t row = 0; row < rows; ++row) {
     emitDataChangedBelow(this->index(row, 0, index));
   }
 }
@@ -343,7 +344,7 @@ QMimeData* LayerTreeModel::mimeData(const QModelIndexList& indexes) const
 }
 
 bool LayerTreeModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
-                                  int row, int /*column*/,
+                                  int32_t row, int32_t /*column*/,
                                   const QModelIndex& parent)
 {
   if (action != Qt::MoveAction || data == nullptr ||
@@ -353,7 +354,7 @@ bool LayerTreeModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
   const QStringList ids = QString::fromUtf8(data->data(QLatin1String(mimeType)))
                               .split(QLatin1Char('\n'), Qt::SkipEmptyParts);
   // Dropped on a collection itself (row −1): to its top.
-  int target = row < 0 ? 0 : row;
+  int32_t target = row < 0 ? 0 : row;
   for (const QString& id : ids) {
     const QModelIndex source = indexOfId(id);
     if (!source.isValid()) {
@@ -361,7 +362,7 @@ bool LayerTreeModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
     }
     // The drop row counts the dragged entry if it sits above it in the
     // same collection.
-    int finalRow = target;
+    int32_t finalRow = target;
     if (source.parent() == parent && source.row() < target) {
       --finalRow;
     }
@@ -373,14 +374,14 @@ bool LayerTreeModel::dropMimeData(const QMimeData* data, Qt::DropAction action,
 }
 
 QModelIndex LayerTreeModel::insertNode(std::unique_ptr<Node> node,
-                                       const QModelIndex& parent, int row)
+                                       const QModelIndex& parent, int32_t row)
 {
   Node* parentNode = nodeAt(parent);
   if (parentNode->kind != Node::Kind::Collection) {
     return QModelIndex();
   }
-  const int position =
-      std::clamp(row, 0, static_cast<int>(parentNode->children.size()));
+  const int32_t position =
+      std::clamp(row, 0, static_cast<int32_t>(parentNode->children.size()));
   beginInsertRows(parent, position, position);
   node->parent = parentNode;
   Node* raw = node.get();
@@ -392,7 +393,7 @@ QModelIndex LayerTreeModel::insertNode(std::unique_ptr<Node> node,
 }
 
 QModelIndex LayerTreeModel::addLayer(const LayerDefinition& definition,
-                                     const QModelIndex& parent, int row)
+                                     const QModelIndex& parent, int32_t row)
 {
   std::unique_ptr<Node> node = std::make_unique<Node>();
   node->kind = Node::Kind::Layer;
@@ -402,7 +403,8 @@ QModelIndex LayerTreeModel::addLayer(const LayerDefinition& definition,
 }
 
 QModelIndex LayerTreeModel::addCollection(const QString& name,
-                                          const QModelIndex& parent, int row)
+                                          const QModelIndex& parent,
+                                          int32_t row)
 {
   std::unique_ptr<Node> node = std::make_unique<Node>();
   node->kind = Node::Kind::Collection;
@@ -417,7 +419,7 @@ bool LayerTreeModel::removeNode(const QModelIndex& index)
   }
   Node* node = nodeAt(index);
   Node* parentNode = node->parent;
-  const int row = node->row();
+  const int32_t row = node->row();
   beginRemoveRows(index.parent(), row, row);
   parentNode->children.erase(parentNode->children.begin() + row);
   endRemoveRows();
@@ -426,7 +428,7 @@ bool LayerTreeModel::removeNode(const QModelIndex& index)
 }
 
 bool LayerTreeModel::moveNode(const QModelIndex& index,
-                              const QModelIndex& newParent, int row)
+                              const QModelIndex& newParent, int32_t row)
 {
   if (!index.isValid()) {
     return false;
@@ -438,15 +440,16 @@ bool LayerTreeModel::moveNode(const QModelIndex& index,
     return false;
   }
   Node* source = node->parent;
-  const int sourceRow = node->row();
-  const int destinationSize = static_cast<int>(destination->children.size());
-  const int finalRow = std::clamp(
+  const int32_t sourceRow = node->row();
+  const int32_t destinationSize =
+      static_cast<int32_t>(destination->children.size());
+  const int32_t finalRow = std::clamp(
       row, 0, source == destination ? destinationSize - 1 : destinationSize);
   if (source == destination && finalRow == sourceRow) {
     return true;
   }
   // Qt counts the destination row before the move.
-  const int destinationChild =
+  const int32_t destinationChild =
       source == destination && finalRow > sourceRow ? finalRow + 1 : finalRow;
   if (!beginMoveRows(index.parent(), sourceRow, sourceRow, newParent,
                      destinationChild)) {
@@ -493,7 +496,7 @@ namespace
 /** What a node inherits from its ancestors. */
 struct Inherited {
   double alpha = 1.0;  ///< Product of the ancestors' opacities.
-  int group = -1;      ///< Enclosing composite group, or -1.
+  int32_t group = -1;  ///< Enclosing composite group, or -1.
   bool visible = true; ///< All ancestors checked.
 };
 
@@ -507,7 +510,7 @@ public:
                      Inherited inherited)
   {
     // Row 0 is the top: walk from the last row up.
-    for (int row = model.rowCount(parent) - 1; row >= 0; --row) {
+    for (int32_t row = model.rowCount(parent) - 1; row >= 0; --row) {
       visit(model, model.index(row, 0, parent), inherited);
     }
   }
@@ -529,7 +532,7 @@ private:
       }
       return;
     }
-    const int group = inherited.group;
+    const int32_t group = inherited.group;
     const double alpha =
         inherited.alpha *
         model.data(index, LayerTreeModel::OpacityRole).toDouble();
@@ -540,9 +543,10 @@ private:
         // fades as a whole. Nested groups inside multiply.
         stack.groups.push_back(StackGroup{
             model.data(index, LayerTreeModel::NodeIdRole).toString(), alpha});
-        visitChildren(
-            model, index,
-            Inherited{1.0, static_cast<int>(stack.groups.size()) - 1, true});
+        visitChildren(model, index,
+                      Inherited{1.0,
+                                static_cast<int32_t>(stack.groups.size()) - 1,
+                                true});
       } else {
         visitChildren(model, index, Inherited{alpha, group, true});
       }
@@ -577,17 +581,17 @@ LayerStack LayerTreeModel::layerStack() const
   StackBuilder builder;
   builder.visitChildren(*this, QModelIndex(), Inherited());
   // Drop groups that ended up empty, renumbering the rest.
-  std::vector<int> used(builder.stack.groups.size(), 0);
+  std::vector<int32_t> used(builder.stack.groups.size(), 0);
   for (const ImageryStackEntry& entry : builder.stack.imagery) {
     if (entry.group >= 0) {
       used[static_cast<std::size_t>(entry.group)] = 1;
     }
   }
-  std::vector<int> renumber(used.size(), -1);
+  std::vector<int32_t> renumber(used.size(), -1);
   std::vector<StackGroup> groups;
   for (std::size_t i = 0; i < used.size(); ++i) {
     if (used[i] != 0) {
-      renumber[i] = static_cast<int>(groups.size());
+      renumber[i] = static_cast<int32_t>(groups.size());
       groups.push_back(builder.stack.groups[i]);
     }
   }
@@ -609,7 +613,7 @@ namespace
 QJsonArray nodesToJson(const LayerTreeModel& model, const QModelIndex& parent)
 {
   QJsonArray array;
-  for (int row = 0; row < model.rowCount(parent); ++row) {
+  for (int32_t row = 0; row < model.rowCount(parent); ++row) {
     const QModelIndex index = model.index(row, 0, parent);
     const bool collection =
         model.data(index, LayerTreeModel::IsCollectionRole).toBool();
@@ -653,7 +657,7 @@ bool nodesFromJson(const QJsonArray& array, NodeType& parent, QString* error)
   // An index loop, as in builtinLayerDefinitions(): no range-for spelling
   // suits QJsonArray on both Qt 5 and Qt 6.
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < array.size(); ++i) {
+  for (int32_t i = 0; i < array.size(); ++i) {
     const QJsonObject json = array.at(i).toObject();
     std::unique_ptr<NodeType> node = std::make_unique<NodeType>();
     const QString kind = json.value(QStringLiteral("kind")).toString();

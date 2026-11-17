@@ -29,6 +29,7 @@
 #include <array>
 #include <atomic>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -119,7 +120,7 @@ struct VectorTileMesh {
 /** How finely to cut. */
 struct VectorMeshSettings {
   /** Fill cells per tile side (a power of two). */
-  int cellsPerSide = 16;
+  int32_t cellsPerSide = 16;
   /** Largest cell, degrees: big tiles get more cells. */
   double maximumCellDeg = 5.625;
   /** Longest segment, as a fraction of the cell size. */
@@ -161,7 +162,7 @@ public:
   VectorMesher& operator=(VectorMesher&& other) noexcept;
 
   /** Returns the cell size used for tiles of @p level, degrees. */
-  double cellSizeDeg(int level) const;
+  double cellSizeDeg(int32_t level) const;
 
   /**
    * Builds the mesh of @p tile. Returns nothing if @p cancelled became

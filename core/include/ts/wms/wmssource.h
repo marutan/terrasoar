@@ -25,6 +25,7 @@
 #ifndef TS_WMS_WMSSOURCE_H
 #define TS_WMS_WMSSOURCE_H
 
+#include <cstdint>
 #include <optional>
 
 #include <QJsonObject>
@@ -69,9 +70,9 @@ struct WmsSource {
    */
   QString crs = QStringLiteral("EPSG:4326");
   /** Image size per tile, pixels. */
-  int tileSizePx = 256;
+  int32_t tileSizePx = 256;
   /** Deepest quadtree level to request. */
-  int maximumLevel = 18;
+  int32_t maximumLevel = 18;
   /** Where the layers have data; tiles outside aren't requested. */
   std::optional<GeoRect> bounds;
   /** Name for the user (the layer's title). */

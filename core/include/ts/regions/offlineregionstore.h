@@ -25,6 +25,7 @@
 #ifndef TS_REGIONS_OFFLINEREGIONSTORE_H
 #define TS_REGIONS_OFFLINEREGIONSTORE_H
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -40,7 +41,7 @@ namespace ts
 /** An area of one source kept for offline use. */
 struct OfflineRegion {
   /** Unique among the regions of a store, never 0 (see TileDiskCache pins). */
-  long long id = 0;
+  int64_t id = 0;
   /** Name for the user. */
   QString name;
   /** The layer source whose tiles it keeps (`{"kind": "wms", …}`). */
@@ -50,9 +51,9 @@ struct OfflineRegion {
   /** The area. */
   RegionGeometry geometry;
   /** Coarsest level kept. */
-  int minimumLevel = 0;
+  int32_t minimumLevel = 0;
   /** Deepest level kept. */
-  int maximumLevel = 0;
+  int32_t maximumLevel = 0;
   /** When it was created (UTC). */
   QDateTime created;
   /** When its download last finished (UTC); null if it never did. */
@@ -60,11 +61,11 @@ struct OfflineRegion {
   /** True once a download went through every tile. */
   bool complete = false;
   /** Tiles in the region (when last counted). */
-  long long tiles = 0;
+  int64_t tiles = 0;
   /** Tiles that failed in the last download. */
-  long long failedTiles = 0;
+  int64_t failedTiles = 0;
   /** Bytes stored (when last measured). */
-  long long bytes = 0;
+  int64_t bytes = 0;
 
   /** Returns the object stored in the file. */
   QJsonObject toJson() const;
@@ -77,7 +78,7 @@ inline constexpr const char* offlineRegionsFormatName =
     "terrasoar-offline-regions";
 
 /** Version of the region file format this build writes. */
-inline constexpr int offlineRegionsFormatVersion = 1;
+inline constexpr int32_t offlineRegionsFormatVersion = 1;
 
 /**
  * The offline regions, in a JSON file (normally `regions.json` in the
@@ -116,21 +117,21 @@ public:
   const std::vector<OfflineRegion>& regions() const { return m_regions; }
 
   /** Adds @p region with a new id and returns that id. */
-  long long add(OfflineRegion region);
+  int64_t add(OfflineRegion region);
 
   /** Returns the region @p id, or null. */
-  OfflineRegion* find(long long id);
+  OfflineRegion* find(int64_t id);
 
   /** Returns the region @p id, or null. */
-  const OfflineRegion* find(long long id) const;
+  const OfflineRegion* find(int64_t id) const;
 
   /** Removes the region @p id. Returns false if there is none. */
-  bool remove(long long id);
+  bool remove(int64_t id);
 
 private:
   QString m_path;
   std::vector<OfflineRegion> m_regions;
-  long long m_nextId = 1;
+  int64_t m_nextId = 1;
 };
 
 } // namespace ts

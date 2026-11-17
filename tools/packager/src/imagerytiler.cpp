@@ -43,17 +43,17 @@ namespace
 /** Halves @p image with a 2 × 2 box filter (exact, unlike QImage::scaled). */
 QImage halve(const QImage& image)
 {
-  const int width = image.width() / 2;
-  const int height = image.height() / 2;
+  const int32_t width = image.width() / 2;
+  const int32_t height = image.height() / 2;
   QImage result(width, height, QImage::Format_RGB888);
-  for (int y = 0; y < height; ++y) {
+  for (int32_t y = 0; y < height; ++y) {
     const std::uint8_t* row0 = image.constScanLine(2 * y);
     const std::uint8_t* row1 = image.constScanLine(2 * y + 1);
     std::uint8_t* out = result.scanLine(y);
-    for (int x = 0; x < width; ++x) {
-      for (int channel = 0; channel < 3; ++channel) {
-        const int left = 6 * x + channel;
-        const int sum =
+    for (int32_t x = 0; x < width; ++x) {
+      for (int32_t channel = 0; channel < 3; ++channel) {
+        const int32_t left = 6 * x + channel;
+        const int32_t sum =
             row0[left] + row0[left + 3] + row1[left] + row1[left + 3];
         out[3 * x + channel] = static_cast<std::uint8_t>((sum + 2) / 4);
       }
@@ -62,7 +62,7 @@ QImage halve(const QImage& image)
   return result;
 }
 
-QByteArray encodeJpeg(const QImage& tile, int quality)
+QByteArray encodeJpeg(const QImage& tile, int32_t quality)
 {
   QByteArray bytes;
   QBuffer buffer(&bytes);
@@ -79,8 +79,8 @@ QByteArray encodeJpeg(const QImage& tile, int quality)
 
 } // namespace
 
-QImage readEquirectangular(const QString& sourcePath, int widthPx, int heightPx,
-                           QString* errorString)
+QImage readEquirectangular(const QString& sourcePath, int32_t widthPx,
+                           int32_t heightPx, QString* errorString)
 {
   const GdalDataset dataset(sourcePath);
   if (!dataset.isOpen() || dataset.rasterBandCount() < 3) {
@@ -89,8 +89,8 @@ QImage readEquirectangular(const QString& sourcePath, int widthPx, int heightPx,
     return QImage();
   }
   GDALDatasetH handle = static_cast<GDALDatasetH>(dataset.handle());
-  const int sourceWidth = GDALGetRasterXSize(handle);
-  const int sourceHeight = GDALGetRasterYSize(handle);
+  const int32_t sourceWidth = GDALGetRasterXSize(handle);
+  const int32_t sourceHeight = GDALGetRasterYSize(handle);
   if (sourceWidth != 2 * sourceHeight) {
     *errorString = QStringLiteral("%1 is %2 × %3 pixels, not 2:1")
                        .arg(sourcePath)
@@ -108,7 +108,7 @@ QImage readEquirectangular(const QString& sourcePath, int widthPx, int heightPx,
   GDALRasterIOExtraArg extra;
   INIT_RASTERIO_EXTRA_ARG(extra);
   extra.eResampleAlg = GRIORA_Average;
-  std::array<int, 3> bands = {1, 2, 3};
+  std::array<int32_t, 3> bands = {1, 2, 3};
   CPLErrorReset();
   // Interleaved RGB straight into the QImage rows.
   const CPLErr result = GDALDatasetRasterIOEx(
@@ -129,9 +129,9 @@ bool tileMosaic(const QImage& mosaic, const ImageryTilerOptions& options,
 {
   const std::function<void(const QString&)> progress =
       options.progress ? options.progress : [](const QString&) {};
-  const int size = options.tileSizePx;
-  const long long columns = TileKey::columns(options.maxLevel);
-  const long long rows = TileKey::rows(options.maxLevel);
+  const int32_t size = options.tileSizePx;
+  const int64_t columns = TileKey::columns(options.maxLevel);
+  const int64_t rows = TileKey::rows(options.maxLevel);
   if (mosaic.width() != size * columns || mosaic.height() != size * rows) {
     *errorString = QStringLiteral("The mosaic is %1 × %2, expected %3 × %4")
                        .arg(mosaic.width())
@@ -141,12 +141,12 @@ bool tileMosaic(const QImage& mosaic, const ImageryTilerOptions& options,
     return false;
   }
   QImage level = mosaic.convertToFormat(QImage::Format_RGB888);
-  for (int depth = options.maxLevel; depth >= 0; --depth) {
+  for (int32_t depth = options.maxLevel; depth >= 0; --depth) {
     progress(QStringLiteral("Writing imagery level %1").arg(depth));
-    const int levelColumns = static_cast<int>(TileKey::columns(depth));
-    const int levelRows = static_cast<int>(TileKey::rows(depth));
-    for (int y = 0; y < levelRows; ++y) {
-      for (int x = 0; x < levelColumns; ++x) {
+    const int32_t levelColumns = static_cast<int32_t>(TileKey::columns(depth));
+    const int32_t levelRows = static_cast<int32_t>(TileKey::rows(depth));
+    for (int32_t y = 0; y < levelRows; ++y) {
+      for (int32_t x = 0; x < levelColumns; ++x) {
         const QImage tile = level.copy(x * size, y * size, size, size);
         const QByteArray bytes = encodeJpeg(tile, options.jpegQuality);
         if (bytes.isEmpty() || !writer->putTile(TileKey{depth, x, y}, bytes)) {

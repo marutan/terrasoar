@@ -21,6 +21,7 @@
 #include "ts/packs/packinstall.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 #include <QCoreApplication>
@@ -312,7 +313,7 @@ PackInstall::Chunk PackInstall::takeChunk(const PackFile& file,
       return Chunk::Stop;
     }
     *body = response.body;
-    body->truncate(static_cast<int>(
+    body->truncate(static_cast<int32_t>(
         std::min<qint64>(body->size(), file.sizeBytes - have)));
     return Chunk::Append;
   default: {

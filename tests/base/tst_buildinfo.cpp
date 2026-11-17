@@ -18,6 +18,8 @@
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <cstdint>
+
 #include <QtTest>
 
 #include "concurrency.h"
@@ -58,9 +60,9 @@ private slots:
   void concurrentCalls()
   {
     const ts::BuildInfo expected = ts::buildInfo();
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&expected](int) {
-          for (int i = 0; i < 1000; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&expected](int32_t) {
+          for (int32_t i = 0; i < 1000; ++i) {
             const ts::BuildInfo info = ts::buildInfo();
             if (info.version != expected.version ||
                 info.compiler != expected.compiler) {

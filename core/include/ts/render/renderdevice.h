@@ -198,9 +198,9 @@ private:
 /** Size, format and sampling of a 2D texture. */
 struct TextureDesc {
   /** Width in texels. */
-  int width = 0;
+  int32_t width = 0;
   /** Height in texels. */
-  int height = 0;
+  int32_t height = 0;
   /** Pixel format. */
   TextureFormat format = TextureFormat::Rgba8;
   /** Filtering. */
@@ -250,7 +250,7 @@ struct UniformBlockBinding {
   /** Block name in the GLSL source. */
   QByteArray name;
   /** Binding point, as passed to RenderDevice::setUniformBuffer(). */
-  int binding = 0;
+  int32_t binding = 0;
 };
 
 /** A sampler in a shader and the texture unit it reads from. */
@@ -258,7 +258,7 @@ struct SamplerBinding {
   /** Sampler uniform name in the GLSL source. */
   QByteArray name;
   /** Texture unit, as passed to RenderDevice::setTexture(). */
-  int unit = 0;
+  int32_t unit = 0;
 };
 
 /**
@@ -314,11 +314,11 @@ struct VertexBufferLayout {
 /** One vertex shader input and where it comes from. */
 struct VertexAttribute {
   /** `layout(location = N)` of the input. */
-  int location = 0;
+  int32_t location = 0;
   /** Type in the buffer. */
   VertexFormat format = VertexFormat::Float3;
   /** Index into PipelineDesc::bufferLayouts. */
-  int bufferSlot = 0;
+  int32_t bufferSlot = 0;
   /** Offset from the start of the vertex in bytes. */
   std::uint32_t offsetBytes = 0;
 };
@@ -391,18 +391,18 @@ public:
   RenderTarget& operator=(RenderTarget&&) = delete;
 
   /** Returns the width in pixels. */
-  int width() const { return m_width; }
+  int32_t width() const { return m_width; }
 
   /** Returns the height in pixels. */
-  int height() const { return m_height; }
+  int32_t height() const { return m_height; }
 
 protected:
   /** For backends: a target of @p sizePx pixels. */
   explicit RenderTarget(QSize sizePx);
 
 private:
-  int m_width;
-  int m_height;
+  int32_t m_width;
+  int32_t m_height;
 };
 
 /** Where a render pass draws and what it clears first. */
@@ -434,7 +434,7 @@ struct RenderDeviceInfo {
   /** True if the renderer is a software rasteriser (see isSoftwareRenderer). */
   bool softwareRenderer = false;
   /** Largest texture width or height the device supports. */
-  int maxTextureSize = 0;
+  int32_t maxTextureSize = 0;
 };
 
 /**
@@ -493,8 +493,8 @@ public:
   createPipeline(const PipelineDesc& desc) = 0;
 
   /** Creates an offscreen target; returns null on failure. */
-  virtual std::unique_ptr<RenderTarget> createRenderTarget(int width,
-                                                           int height) = 0;
+  virtual std::unique_ptr<RenderTarget> createRenderTarget(int32_t width,
+                                                           int32_t height) = 0;
 
   /** Starts a pass: binds the target, sets the viewport and clears. */
   virtual void beginPass(const PassDesc& pass) = 0;
@@ -503,7 +503,7 @@ public:
   virtual void setPipeline(const Pipeline& pipeline) = 0;
 
   /** Binds @p buffer (a vertex buffer) to vertex buffer @p slot. */
-  virtual void setVertexBuffer(int slot, const GpuBuffer& buffer,
+  virtual void setVertexBuffer(int32_t slot, const GpuBuffer& buffer,
                                std::size_t offsetBytes) = 0;
 
   /** Binds @p buffer as the index buffer. */
@@ -513,28 +513,31 @@ public:
    * Binds @p sizeBytes bytes of @p buffer (a uniform buffer) from
    * @p offsetBytes to uniform block binding point @p binding.
    */
-  virtual void setUniformBuffer(int binding, const GpuBuffer& buffer,
+  virtual void setUniformBuffer(int32_t binding, const GpuBuffer& buffer,
                                 std::size_t offsetBytes,
                                 std::size_t sizeBytes) = 0;
 
   /** Binds @p texture to texture unit @p unit. */
-  virtual void setTexture(int unit, const GpuTexture& texture) = 0;
+  virtual void setTexture(int32_t unit, const GpuTexture& texture) = 0;
 
   /**
    * Binds the colour of @p target to texture unit @p unit (bilinear,
    * clamped), to draw what was rendered offscreen. The target must not be
    * the one being drawn into.
    */
-  virtual void setRenderTargetTexture(int unit, const RenderTarget& target) = 0;
+  virtual void setRenderTargetTexture(int32_t unit,
+                                      const RenderTarget& target) = 0;
 
   /** Draws @p vertexCount vertices from @p firstVertex, @p instances times. */
-  virtual void draw(int vertexCount, int firstVertex, int instances) = 0;
+  virtual void draw(int32_t vertexCount, int32_t firstVertex,
+                    int32_t instances) = 0;
 
   /**
    * Draws @p indexCount indices from @p firstIndex of the index buffer,
    * @p instances times.
    */
-  virtual void drawIndexed(int indexCount, int firstIndex, int instances) = 0;
+  virtual void drawIndexed(int32_t indexCount, int32_t firstIndex,
+                           int32_t instances) = 0;
 
   /** Ends the pass and leaves the device ready for other code to draw. */
   virtual void endPass() = 0;

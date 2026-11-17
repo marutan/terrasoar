@@ -21,6 +21,7 @@
 #include "ts/projection/projection.h"
 
 #include <cstddef>
+#include <cstdint>
 
 #include "ts/projection/cylindricalprojection.h"
 
@@ -97,12 +98,12 @@ const Projection* projectionById(const QString& id)
   return nullptr;
 }
 
-int projectionIndex(const Projection* projection)
+int32_t projectionIndex(const Projection* projection)
 {
   const std::vector<const Projection*>& all = projections();
   for (std::size_t i = 0; i < all.size(); ++i) {
     if (all[i] == projection) {
-      return static_cast<int>(i);
+      return static_cast<int32_t>(i);
     }
   }
   return -1;
@@ -117,7 +118,7 @@ QByteArray projectionGlsl()
   }
   glsl += "\nvec2 tsProject(int index, vec2 dLonLatRad, vec4 r0, vec4 r1)\n{\n";
   for (std::size_t i = 1; i < all.size(); ++i) {
-    glsl += "  if (index == " + QByteArray::number(static_cast<int>(i)) +
+    glsl += "  if (index == " + QByteArray::number(static_cast<int32_t>(i)) +
             ") {\n    return " + all[i]->glslFunction() +
             "(dLonLatRad, r0, r1);\n  }\n";
   }

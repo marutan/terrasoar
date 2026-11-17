@@ -26,6 +26,7 @@
 #ifndef TS_PACKAGER_COUNTRYBUILDER_H
 #define TS_PACKAGER_COUNTRYBUILDER_H
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -59,15 +60,15 @@ struct CountryOptions {
 /** What was built. */
 struct CountryStats {
   /** Countries written. */
-  int countries = 0;
+  int32_t countries = 0;
   /** Countries left out (CountryOptions::exclude). */
-  int excluded = 0;
+  int32_t excluded = 0;
   /** Vertices read. */
-  long long sourceVertices = 0;
+  int64_t sourceVertices = 0;
   /** Rings written (outer rings and holes). */
-  long long rings = 0;
+  int64_t rings = 0;
   /** Vertices written. */
-  long long vertices = 0;
+  int64_t vertices = 0;
 };
 
 /**

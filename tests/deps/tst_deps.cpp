@@ -19,6 +19,7 @@
  */
 
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 #include <QDir>
@@ -103,7 +104,8 @@ QByteArray wktToWkb(const QByteArray& wkt)
   GEOSWKBWriter* writer = GEOSWKBWriter_create_r(handle);
   std::size_t size = 0;
   unsigned char* bytes = GEOSWKBWriter_write_r(handle, writer, geometry, &size);
-  QByteArray wkb(reinterpret_cast<const char*>(bytes), static_cast<int>(size));
+  QByteArray wkb(reinterpret_cast<const char*>(bytes),
+                 static_cast<int32_t>(size));
   GEOSFree_r(handle, bytes);
   GEOSWKBWriter_destroy_r(handle, writer);
   GEOSGeom_destroy_r(handle, geometry);
@@ -179,8 +181,8 @@ private slots:
     QVERIFY2(dataset.isOpen(), qPrintable(dataset.errorString()));
     QCOMPARE(dataset.driverShortName(), QStringLiteral("GeoJSON"));
     QCOMPARE(dataset.layerCount(), 1);
-    QCOMPARE(dataset.featureCount(0), 2LL);
-    QCOMPARE(dataset.featureCount(1), -1LL);
+    QCOMPARE(dataset.featureCount(0), int64_t{2});
+    QCOMPARE(dataset.featureCount(1), -int64_t{1});
   }
 
   void gdalReportsMissingFile()
@@ -202,7 +204,7 @@ private slots:
     QVERIFY(!first.isOpen());
     ts::GdalDataset third;
     third = std::move(second);
-    QCOMPARE(third.featureCount(0), 2LL);
+    QCOMPARE(third.featureCount(0), int64_t{2});
   }
 
   void projGeodeticToEcef()
@@ -262,7 +264,7 @@ private slots:
     QVERIFY(db.isOpen());
     bool ok = false;
     QCOMPARE(db.queryInteger(QStringLiteral("SELECT SUM(v) FROM t"), &ok),
-             42LL);
+             int64_t{42});
     QVERIFY(ok);
     QVERIFY(!db.execute(QStringLiteral("INSERT INTO t VALUES (1)")));
     QVERIFY(!db.errorString().isEmpty());
@@ -284,8 +286,8 @@ private slots:
     const QByteArray wkb = wktToWkb(readSampleWkt());
     QVERIFY(!wkb.isEmpty());
     const QString geojson = dataFile("sample.geojson");
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&](int32_t thread) {
           const ts::ProjContext proj;
           const ts::GeosContext geos;
           ts::SqliteConnection db(
@@ -295,7 +297,7 @@ private slots:
               !db.execute(QStringLiteral("CREATE TABLE t (v INTEGER)"))) {
             return false;
           }
-          for (int i = 0; i < 20; ++i) {
+          for (int32_t i = 0; i < 20; ++i) {
             PJ_COORD ecef{};
             if (!geodeticToEcef(proj, 0.0, 0.0, 0.0, &ecef) ||
                 std::abs(ecef.xyz.x - 6378137.0) > 1e-3) {

@@ -21,6 +21,7 @@
 #include "offlineregionsdialog.h"
 
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -44,7 +45,7 @@ namespace
 {
 
 /** Item data: the region's id. */
-constexpr int regionIdRole = Qt::UserRole + 1;
+constexpr int32_t regionIdRole = Qt::UserRole + 1;
 
 enum Column {
   NameColumn,
@@ -119,7 +120,7 @@ void OfflineRegionsDialog::changeEvent(QEvent* event)
   QDialog::changeEvent(event);
 }
 
-void OfflineRegionsDialog::done(int result)
+void OfflineRegionsDialog::done(int32_t result)
 {
   if (m_view) {
     m_view->setRegionOutlines({});
@@ -141,15 +142,15 @@ void OfflineRegionsDialog::retranslateUi()
   updateProgress();
 }
 
-long long OfflineRegionsDialog::selectedRegion() const
+int64_t OfflineRegionsDialog::selectedRegion() const
 {
   const QTreeWidgetItem* item = m_list->currentItem();
   return item ? item->data(NameColumn, regionIdRole).toLongLong() : 0;
 }
 
-void OfflineRegionsDialog::selectRegion(long long id)
+void OfflineRegionsDialog::selectRegion(int64_t id)
 {
-  for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
+  for (int32_t i = 0; i < m_list->topLevelItemCount(); ++i) {
     QTreeWidgetItem* item = m_list->topLevelItem(i);
     if (item->data(NameColumn, regionIdRole).toLongLong() == id) {
       m_list->setCurrentItem(item);
@@ -159,11 +160,12 @@ void OfflineRegionsDialog::selectRegion(long long id)
 
 void OfflineRegionsDialog::fill()
 {
-  const long long selected = selectedRegion();
+  const int64_t selected = selectedRegion();
   m_list->clear();
   for (const OfflineRegion& region : m_manager.regions()) {
     QTreeWidgetItem* item = new QTreeWidgetItem(m_list);
-    item->setData(NameColumn, regionIdRole, region.id);
+    item->setData(NameColumn, regionIdRole,
+                  QVariant::fromValue<qint64>(region.id));
     item->setText(NameColumn, region.name);
     item->setText(LayerColumn, region.sourceName);
     item->setText(LevelsColumn, QStringLiteral("%1–%2")
@@ -184,9 +186,9 @@ void OfflineRegionsDialog::updateProgress()
 {
   const QLocale locale;
   using State = RegionDownloadProgress::State;
-  for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
+  for (int32_t i = 0; i < m_list->topLevelItemCount(); ++i) {
     QTreeWidgetItem* item = m_list->topLevelItem(i);
-    const long long id = item->data(NameColumn, regionIdRole).toLongLong();
+    const int64_t id = item->data(NameColumn, regionIdRole).toLongLong();
     const OfflineRegion* region = m_manager.region(id);
     if (!region) {
       continue;
@@ -194,11 +196,11 @@ void OfflineRegionsDialog::updateProgress()
     const std::optional<RegionDownloadProgress> progress =
         m_manager.progress(id);
     QString state;
-    long long bytes = region->bytes;
+    int64_t bytes = region->bytes;
     if (progress) {
       bytes = progress->bytes;
-      const int percent =
-          static_cast<int>(std::floor(progress->fraction() * 100.0));
+      const int32_t percent =
+          static_cast<int32_t>(std::floor(progress->fraction() * 100.0));
       switch (progress->state) {
       case State::Ready:
       case State::Running:
@@ -222,7 +224,7 @@ void OfflineRegionsDialog::updateProgress()
       }
     } else if (region->complete && region->failedTiles > 0) {
       state = tr("%n tile(s) missing; update to try again", "",
-                 static_cast<int>(region->failedTiles));
+                 static_cast<int32_t>(region->failedTiles));
     } else if (region->complete) {
       state = tr("Ready offline (downloaded %1)")
                   .arg(locale.toString(region->downloaded.toLocalTime().date(),
@@ -240,7 +242,7 @@ void OfflineRegionsDialog::updateProgress()
 
 void OfflineRegionsDialog::updateButtons()
 {
-  const long long id = selectedRegion();
+  const int64_t id = selectedRegion();
   const std::optional<RegionDownloadProgress> progress =
       id != 0 ? m_manager.progress(id) : std::nullopt;
   const OfflineRegion* region = id != 0 ? m_manager.region(id) : nullptr;
@@ -270,7 +272,7 @@ void OfflineRegionsDialog::showOutline()
 
 void OfflineRegionsDialog::pauseOrResume()
 {
-  const long long id = selectedRegion();
+  const int64_t id = selectedRegion();
   const std::optional<RegionDownloadProgress> progress = m_manager.progress(id);
   if (progress && progress->state == RegionDownloadProgress::State::Running) {
     m_manager.pause(id);
@@ -285,7 +287,7 @@ void OfflineRegionsDialog::pauseOrResume()
 
 void OfflineRegionsDialog::deleteRegion()
 {
-  const long long id = selectedRegion();
+  const int64_t id = selectedRegion();
   const OfflineRegion* region = m_manager.region(id);
   if (!region) {
     return;

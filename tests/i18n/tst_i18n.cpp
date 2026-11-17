@@ -18,6 +18,8 @@
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <cstdint>
+
 #include <QCoreApplication>
 #include <QLocale>
 #include <QTranslator>
@@ -154,9 +156,9 @@ private slots:
     const ts::PseudoTranslator translator;
     const QString expected =
         ts::PseudoTranslator::pseudoTranslate(QStringLiteral("About %1"));
-    const int failures =
-        ts::test::runConcurrently(ts::test::concurrentThreadCount, [&](int) {
-          for (int i = 0; i < 2000; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&](int32_t) {
+          for (int32_t i = 0; i < 2000; ++i) {
             if (translator.translate("ctx", "About %1") != expected) {
               return false;
             }
@@ -168,9 +170,9 @@ private slots:
 
   void concurrentOwnLoaders()
   {
-    const int failures =
-        ts::test::runConcurrently(ts::test::concurrentThreadCount, [](int) {
-          for (int i = 0; i < 50; ++i) {
+    const int32_t failures =
+        ts::test::runConcurrently(ts::test::concurrentThreadCount, [](int32_t) {
+          for (int32_t i = 0; i < 50; ++i) {
             QTranslator translator;
             if (ts::loadTranslation(translator, QLocale(QLocale::German)) !=
                 QLatin1String("en")) {

@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 
 #include <QAbstractItemModelTester>
@@ -76,7 +77,7 @@ ts::LayerDefinition vector(const QString& id)
   return definition;
 }
 
-QString nameAt(const ts::LayerTreeModel& model, int row,
+QString nameAt(const ts::LayerTreeModel& model, int32_t row,
                const QModelIndex& parent = QModelIndex())
 {
   return model.data(model.index(row, 0, parent)).toString();
@@ -142,9 +143,9 @@ private slots:
     QCOMPARE(nameAt(model, 1), QStringLiteral("bottom"));
     const QModelIndex top = model.index(0, 0);
     QCOMPARE(model.data(top, Qt::CheckStateRole).toInt(),
-             static_cast<int>(Qt::Checked));
+             static_cast<int32_t>(Qt::Checked));
     QCOMPARE(model.data(top, ts::LayerTreeModel::LayerTypeRole).toInt(),
-             static_cast<int>(ts::LayerType::Imagery));
+             static_cast<int32_t>(ts::LayerType::Imagery));
     QVERIFY(!model.data(top, ts::LayerTreeModel::IsCollectionRole).toBool());
     QVERIFY(model.setData(top, QStringLiteral("renamed")));
     QCOMPARE(nameAt(model, 0), QStringLiteral("renamed"));
@@ -265,7 +266,7 @@ private slots:
     // Composite: members at their own alpha, the group fades.
     model.setData(group, true, ts::LayerTreeModel::CompositeAsGroupRole);
     stack = model.layerStack();
-    QCOMPARE(static_cast<int>(stack.groups.size()), 1);
+    QCOMPARE(static_cast<int32_t>(stack.groups.size()), 1);
     QCOMPARE(stack.groups[0].alpha, 0.5);
     QCOMPARE(stack.imagery[0].group, -1);
     QCOMPARE(stack.imagery[1].group, 0);
@@ -278,9 +279,9 @@ private slots:
     QVERIFY(model.moveNode(model.index(0, 0), QModelIndex(), 2));
     QCOMPARE(nameAt(model, 2), QStringLiteral("vec"));
     stack = model.layerStack();
-    QCOMPARE(static_cast<int>(stack.vectors.size()), 1);
+    QCOMPARE(static_cast<int32_t>(stack.vectors.size()), 1);
     QCOMPARE(stack.vectors[0].definition.name, QStringLiteral("vec"));
-    QCOMPARE(static_cast<int>(stack.imagery.size()), 3);
+    QCOMPARE(static_cast<int32_t>(stack.imagery.size()), 3);
   }
 
   void nestedGroupsMultiply()
@@ -300,7 +301,7 @@ private slots:
     model.setData(model.index(0, 0), true,
                   ts::LayerTreeModel::CompositeAsGroupRole);
     const ts::LayerStack stack = model.layerStack();
-    QCOMPARE(static_cast<int>(stack.groups.size()), 1);
+    QCOMPARE(static_cast<int32_t>(stack.groups.size()), 1);
     QCOMPARE(stack.imagery[0].alpha, 0.5);
     QCOMPARE(stack.imagery[0].group, 0);
   }
@@ -380,7 +381,7 @@ private slots:
     const QString id =
         model.data(layer, ts::LayerTreeModel::NodeIdRole).toString();
     QCOMPARE(model.data(layer, ts::LayerTreeModel::StatusRole).toInt(),
-             static_cast<int>(ts::ProviderStatus::State::Ok));
+             static_cast<int32_t>(ts::ProviderStatus::State::Ok));
     QVERIFY(model.data(layer, Qt::DecorationRole).isNull());
     QVERIFY(model.data(layer, Qt::ToolTipRole).isNull());
     const QJsonArray before = model.toJson();
@@ -391,7 +392,7 @@ private slots:
                                             QStringLiteral("Can't reach it")});
     QCOMPARE(changed.size(), 1);
     QCOMPARE(model.data(layer, ts::LayerTreeModel::StatusRole).toInt(),
-             static_cast<int>(ts::ProviderStatus::State::Offline));
+             static_cast<int32_t>(ts::ProviderStatus::State::Offline));
     QCOMPARE(model.data(layer, Qt::ToolTipRole).toString(),
              QStringLiteral("Can't reach it"));
     QCOMPARE(
@@ -702,9 +703,10 @@ private slots:
         imagery(QStringLiteral("a"), QStringLiteral("#ff0000")).source;
     std::shared_ptr<ts::ImageryProvider> expected =
         registry.imagery(source, nullptr);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&registry, &source, &expected](int) {
-          for (int i = 0; i < 200; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount,
+        [&registry, &source, &expected](int32_t) {
+          for (int32_t i = 0; i < 200; ++i) {
             if (registry.imagery(source, nullptr) != expected) {
               return false;
             }
@@ -861,10 +863,10 @@ private slots:
   void benchmarkLayerStack()
   {
     ts::LayerTreeModel model;
-    for (int i = 0; i < 10; ++i) {
+    for (int32_t i = 0; i < 10; ++i) {
       const QModelIndex group =
           model.addCollection(QStringLiteral("group %1").arg(i));
-      for (int j = 0; j < 10; ++j) {
+      for (int32_t j = 0; j < 10; ++j) {
         model.addLayer(imagery(QStringLiteral("l%1-%2").arg(i).arg(j),
                                QStringLiteral("#ff0000")),
                        group);

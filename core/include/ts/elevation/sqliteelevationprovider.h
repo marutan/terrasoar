@@ -25,6 +25,7 @@
 #ifndef TS_ELEVATION_SQLITEELEVATIONPROVIDER_H
 #define TS_ELEVATION_SQLITEELEVATIONPROVIDER_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 
@@ -77,9 +78,9 @@ public:
   QString id() const override;
   QString name() const override { return m_store.name(); }
   /** The deepest level stored (deeper keys are interpolated). */
-  int maximumLevel() const override { return m_store.maximumLevel(); }
+  int32_t maximumLevel() const override { return m_store.maximumLevel(); }
   /** Samples along a tile's side. */
-  int samples() const { return m_store.tileSizePx(); }
+  int32_t samples() const { return m_store.tileSizePx(); }
 
   /** Heights above the WGS 84 ellipsoid. */
   std::optional<HeightTile>

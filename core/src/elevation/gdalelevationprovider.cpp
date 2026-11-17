@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <utility>
 
@@ -57,7 +58,7 @@ using GeoTransform = std::array<double, 6>;
 /** Index of (@p row, @p column) in a grid @p width wide. */
 // Row then column, as everywhere in a grid.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::size_t gridIndex(int row, int column, int width)
+std::size_t gridIndex(int32_t row, int32_t column, int32_t width)
 {
   return static_cast<std::size_t>(row) * static_cast<std::size_t>(width) +
          static_cast<std::size_t>(column);
@@ -69,8 +70,8 @@ struct CancelFlag {
 };
 
 /** GDAL progress callback that stops a read once the load is cancelled. */
-int CPL_STDCALL keepReading(double /*complete*/, const char* /*message*/,
-                            void* data)
+int32_t CPL_STDCALL keepReading(double /*complete*/, const char* /*message*/,
+                                void* data)
 {
   return static_cast<const CancelFlag*>(data)->cancelled->load() ? FALSE : TRUE;
 }
@@ -132,13 +133,13 @@ struct SamplePixels {
 /** Raster values averaged over whole factor² blocks of a fixed grid. */
 struct Blocks {
   /** Pixels along a block's side (a power of two). */
-  int factor = 1;
+  int32_t factor = 1;
   /** The first block's column and row in the raster's block grid. */
-  int x0 = 0;
-  int y0 = 0;
+  int32_t x0 = 0;
+  int32_t y0 = 0;
   /** Blocks across and down. */
-  int width = 0;
-  int height = 0;
+  int32_t width = 0;
+  int32_t height = 0;
   /** The averages, row by row. */
   std::vector<double> values;
 };
@@ -208,8 +209,8 @@ struct GdalElevationProvider::Reader {
   bool geographic = false;
   GeoTransform transform{};
   GeoTransform inverse{};
-  int width = 0;
-  int height = 0;
+  int32_t width = 0;
+  int32_t height = 0;
   double noDataValue = 0.0;
   bool hasNoData = false;
   double scale = 1.0;
@@ -277,13 +278,13 @@ struct GdalElevationProvider::Reader {
           "latitude and longitude.");
       return nullptr;
     }
-    int has = 0;
+    int32_t has = 0;
     reader->noDataValue = GDALGetRasterNoDataValue(reader->band, &has);
     reader->hasNoData = has != 0;
     const double unit = metresPerUnit(GDALGetRasterUnitType(reader->band));
-    int hasScale = 0;
+    int32_t hasScale = 0;
     const double scale = GDALGetRasterScale(reader->band, &hasScale);
-    int hasOffset = 0;
+    int32_t hasOffset = 0;
     const double offset = GDALGetRasterOffset(reader->band, &hasOffset);
     reader->scale = (hasScale != 0 ? scale : 1.0) * unit;
     reader->offset = (hasOffset != 0 ? offset : 0.0) * unit;
@@ -298,8 +299,8 @@ struct GdalElevationProvider::Reader {
   void toPixels(std::vector<double>& x, std::vector<double>& y) const
   {
     const std::size_t count = x.size();
-    std::vector<int> ok(count, 0);
-    OCTTransformEx(toRaster, static_cast<int>(count), x.data(), y.data(),
+    std::vector<int32_t> ok(count, 0);
+    OCTTransformEx(toRaster, static_cast<int32_t>(count), x.data(), y.data(),
                    nullptr, ok.data());
     for (std::size_t i = 0; i < count; ++i) {
       if (ok[i] == 0 || !std::isfinite(x[i]) || !std::isfinite(y[i])) {
@@ -329,13 +330,13 @@ struct GdalElevationProvider::Reader {
   SamplePixels samplePixels(TileKey key) const
   {
     SamplePixels pixels;
-    const int n = GdalElevationProvider::samples;
+    const int32_t n = GdalElevationProvider::samples;
     const std::size_t count = gridIndex(n, 0, n);
     pixels.points.resize(count);
     pixels.x.resize(count);
     pixels.y.resize(count);
-    for (int row = 0; row < n; ++row) {
-      for (int column = 0; column < n; ++column) {
+    for (int32_t row = 0; row < n; ++row) {
+      for (int32_t column = 0; column < n; ++column) {
         const std::size_t i = gridIndex(row, column, n);
         pixels.points[i] = heightSamplePoint(key, n, row, column);
         pixels.x[i] = pixels.points[i].lonDeg;
@@ -384,25 +385,27 @@ struct GdalElevationProvider::Reader {
    * the raster has fewer pixels than a block or the read failed or was
    * cancelled.
    */
-  std::optional<Blocks> readBlocks(const SamplePixels& pixels, int factor,
+  std::optional<Blocks> readBlocks(const SamplePixels& pixels, int32_t factor,
                                    const std::atomic<bool>& cancelled) const
   {
     Blocks blocks;
     blocks.factor = factor;
-    const int columns = width / factor;
-    const int rows = height / factor;
+    const int32_t columns = width / factor;
+    const int32_t rows = height / factor;
     if (columns < 1 || rows < 1) {
       return std::nullopt;
     }
-    blocks.x0 = std::clamp(
-        static_cast<int>(std::floor(pixels.minX / factor)) - 1, 0, columns - 1);
-    blocks.y0 = std::clamp(
-        static_cast<int>(std::floor(pixels.minY / factor)) - 1, 0, rows - 1);
-    const int x1 =
-        std::clamp(static_cast<int>(std::ceil(pixels.maxX / factor)) + 1,
+    blocks.x0 =
+        std::clamp(static_cast<int32_t>(std::floor(pixels.minX / factor)) - 1,
+                   0, columns - 1);
+    blocks.y0 =
+        std::clamp(static_cast<int32_t>(std::floor(pixels.minY / factor)) - 1,
+                   0, rows - 1);
+    const int32_t x1 =
+        std::clamp(static_cast<int32_t>(std::ceil(pixels.maxX / factor)) + 1,
                    blocks.x0 + 1, columns);
-    const int y1 =
-        std::clamp(static_cast<int>(std::ceil(pixels.maxY / factor)) + 1,
+    const int32_t y1 =
+        std::clamp(static_cast<int32_t>(std::ceil(pixels.maxY / factor)) + 1,
                    blocks.y0 + 1, rows);
     blocks.width = x1 - blocks.x0;
     blocks.height = y1 - blocks.y0;
@@ -440,14 +443,14 @@ struct GdalElevationProvider::Reader {
                                 static_cast<double>(blocks.width - 1));
     const double v = std::clamp(py / blocks.factor - blocks.y0 - 0.5, 0.0,
                                 static_cast<double>(blocks.height - 1));
-    const int column = std::min(static_cast<int>(u), blocks.width - 1);
-    const int row = std::min(static_cast<int>(v), blocks.height - 1);
+    const int32_t column = std::min(static_cast<int32_t>(u), blocks.width - 1);
+    const int32_t row = std::min(static_cast<int32_t>(v), blocks.height - 1);
     const double fu = u - column;
     const double fv = v - row;
     double sum = 0.0;
     double weights = 0.0;
-    for (int dy = 0; dy <= 1; ++dy) {
-      for (int dx = 0; dx <= 1; ++dx) {
+    for (int32_t dy = 0; dy <= 1; ++dy) {
+      for (int32_t dx = 0; dx <= 1; ++dx) {
         const double weight =
             (dx == 1 ? fu : 1.0 - fu) * (dy == 1 ? fv : 1.0 - fv);
         const double value = blocks.values[gridIndex(
@@ -492,7 +495,7 @@ GdalElevationProvider::GdalElevationProvider(
       std::max(m_bounds.heightDeg(), 1e-9) / std::max(reader->height, 1);
   const double level = std::log2(TileKey::sizeDeg(0) /
                                  (static_cast<double>(samples - 1) * pixelDeg));
-  m_maximumLevel = std::clamp(static_cast<int>(std::ceil(level - 1e-6)), 0,
+  m_maximumLevel = std::clamp(static_cast<int32_t>(std::ceil(level - 1e-6)), 0,
                               TileKey::maximumLevel);
   m_readers.push_back(std::move(reader));
 }
@@ -511,11 +514,11 @@ std::optional<GeoRect> GdalElevationProvider::extentOf(const Reader& reader)
   if (toWgs84 == nullptr) {
     return std::nullopt;
   }
-  constexpr int steps = 32;
+  constexpr int32_t steps = 32;
   const GeoTransform& t = reader.transform;
   std::vector<double> x;
   std::vector<double> y;
-  for (int i = 0; i <= steps; ++i) {
+  for (int32_t i = 0; i <= steps; ++i) {
     const double f = static_cast<double>(i) / steps;
     const std::array<std::pair<double, double>, 4> edges = {
         {{f * reader.width, 0.0},
@@ -527,8 +530,8 @@ std::optional<GeoRect> GdalElevationProvider::extentOf(const Reader& reader)
       y.push_back(t[3] + t[4] * pixel.first + t[5] * pixel.second);
     }
   }
-  std::vector<int> ok(x.size(), 0);
-  OCTTransformEx(toWgs84, static_cast<int>(x.size()), x.data(), y.data(),
+  std::vector<int32_t> ok(x.size(), 0);
+  OCTTransformEx(toWgs84, static_cast<int32_t>(x.size()), x.data(), y.data(),
                  nullptr, ok.data());
   OCTDestroyCoordinateTransformation(toWgs84);
   GeoRect bounds{180.0, 90.0, -180.0, -90.0};
@@ -623,7 +626,7 @@ GdalElevationProvider::read(const Reader& reader, TileKey key,
   }
   // Whole blocks of factor² pixels from a grid fixed to the raster, so
   // that every tile averages the same blocks.
-  int factor = 1;
+  int32_t factor = 1;
   while (factor * 2 <= spacing && factor < (1 << 20)) {
     factor *= 2;
   }

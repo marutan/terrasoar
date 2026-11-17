@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <unordered_set>
 #include <utility>
@@ -282,9 +283,9 @@ std::size_t alignUp(std::size_t value, std::size_t alignment)
 struct VectorRenderer::GpuMesh {
   TileKey key;
   std::unique_ptr<GpuBuffer> fill;
-  int fillVertices = 0;
+  int32_t fillVertices = 0;
   std::unique_ptr<GpuBuffer> segments;
-  int segmentCount = 0;
+  int32_t segmentCount = 0;
   Float4 centreHigh{};
   Float4 centreLow{};
   double centreLonDeg = 0.0;
@@ -497,14 +498,15 @@ VectorRenderer::createGpuMesh(const VectorTileMesh& mesh) const
     gpu->fill = m_device.createBuffer(
         BufferType::Vertex, BufferUsage::Static,
         mesh.triangles.size() * sizeof(VectorVertex), mesh.triangles.data());
-    gpu->fillVertices = gpu->fill ? static_cast<int>(mesh.triangles.size()) : 0;
+    gpu->fillVertices =
+        gpu->fill ? static_cast<int32_t>(mesh.triangles.size()) : 0;
   }
   if (!mesh.segments.empty()) {
     gpu->segments = m_device.createBuffer(
         BufferType::Vertex, BufferUsage::Static,
         mesh.segments.size() * sizeof(VectorSegment), mesh.segments.data());
     gpu->segmentCount =
-        gpu->segments ? static_cast<int>(mesh.segments.size()) : 0;
+        gpu->segments ? static_cast<int32_t>(mesh.segments.size()) : 0;
   }
   gpu->bytes = mesh.bytes();
   return gpu;
@@ -512,7 +514,7 @@ VectorRenderer::createGpuMesh(const VectorTileMesh& mesh) const
 
 void VectorRenderer::upload()
 {
-  int budget = m_settings.uploadsPerFrame;
+  int32_t budget = m_settings.uploadsPerFrame;
   bool progress = true;
   // Round robin, so one busy source can't starve the others.
   while (budget > 0 && progress) {
@@ -732,7 +734,7 @@ void VectorRenderer::prepare(const Camera& camera)
   evict();
   writeUniforms(camera);
   for (const std::unique_ptr<Source>& source : m_sources) {
-    m_statistics.resident += static_cast<int>(source->meshes.size());
+    m_statistics.resident += static_cast<int32_t>(source->meshes.size());
     m_statistics.gpuBytes += source->bytes;
   }
 }
@@ -777,7 +779,7 @@ void VectorRenderer::drawLayer(std::size_t index)
       m_statistics.segments += mesh.segmentCount;
     }
   }
-  m_statistics.tilesDrawn += static_cast<int>(source.items.size());
+  m_statistics.tilesDrawn += static_cast<int32_t>(source.items.size());
 }
 
 } // namespace ts

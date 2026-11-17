@@ -26,6 +26,7 @@
 #define TS_APP_NEWREGIONDIALOG_H
 
 #include <atomic>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -85,7 +86,7 @@ class NewRegionDialog : public QDialog
 
 public:
   /** Most tiles in one region. */
-  static constexpr long long maximumTiles = 1000000;
+  static constexpr int64_t maximumTiles = 1000000;
 
   /**
    * Sets up a region of @p manager for one of @p layers.
@@ -123,10 +124,10 @@ public:
   const std::optional<RegionGeometry>& area() const { return m_area; }
 
   /** Sets the levels. */
-  void setLevels(int minimumLevel, int maximumLevel);
+  void setLevels(int32_t minimumLevel, int32_t maximumLevel);
 
   /** Returns the tile count shown. */
-  long long tileCount() const { return m_tiles; }
+  int64_t tileCount() const { return m_tiles; }
 
   /** Returns true while the size is being estimated. */
   bool isEstimating() const { return m_estimating; }
@@ -142,7 +143,7 @@ protected:
   void changeEvent(QEvent* event) override;
 
   /** Hides the outline on the globe. */
-  void done(int result) override;
+  void done(int32_t result) override;
 
 private:
   void retranslateUi();
@@ -155,7 +156,7 @@ private:
   void stopEstimate();
   void pollEstimate();
   void showOutline();
-  void countryActivated(int index);
+  void countryActivated(int32_t index);
 
   OfflineRegionManager& m_manager;
   const std::vector<RegionLayerChoice> m_layers;
@@ -167,7 +168,7 @@ private:
   QString m_areaCountry;
   /** The name the dialog gave the region, until the user changes it. */
   QString m_automaticName;
-  long long m_tiles = 0;
+  int64_t m_tiles = 0;
   bool m_refused = false;
 
   QLabel* m_nameLabel = nullptr;

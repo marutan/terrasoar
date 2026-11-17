@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <utility>
 #include <vector>
@@ -60,7 +61,7 @@ QString text(const QJsonObject& json, const char* name)
   return json.value(QLatin1String(name)).toString();
 }
 
-int integer(const QJsonObject& json, const char* name, int fallback)
+int32_t integer(const QJsonObject& json, const char* name, int32_t fallback)
 {
   return json.value(QLatin1String(name)).toInt(fallback);
 }
@@ -102,7 +103,7 @@ bool copyGdalFile(const QByteArray& from, const QString& target,
   std::vector<char> buffer(std::size_t{1} << 16);
   std::size_t read = 0;
   while ((read = VSIFReadL(buffer.data(), 1, buffer.size(), in)) > 0) {
-    contents.append(buffer.data(), static_cast<int>(read));
+    contents.append(buffer.data(), static_cast<int32_t>(read));
   }
   VSIFCloseL(in);
   QFile out(target);
@@ -135,13 +136,13 @@ std::optional<SourceSpec> readSource(const QJsonObject& entry)
   source.version = text(entry, "version");
   const QJsonArray notices = entry.value(QStringLiteral("notices")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int j = 0; j < notices.size(); ++j) {
+  for (int32_t j = 0; j < notices.size(); ++j) {
     source.notices.push_back(notices.at(j).toString());
   }
   const QJsonArray local =
       entry.value(QStringLiteral("localNotices")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int j = 0; j < local.size(); ++j) {
+  for (int32_t j = 0; j < local.size(); ++j) {
     source.localNotices.push_back(local.at(j).toString());
   }
   if (source.id.isEmpty() || source.file.isEmpty() ||
@@ -157,7 +158,7 @@ bool readElevation(const QJsonObject& json, PackConfig* config,
 {
   const QJsonArray geoids = json.value(QStringLiteral("geoids")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < geoids.size(); ++i) {
+  for (int32_t i = 0; i < geoids.size(); ++i) {
     const QJsonObject entry = geoids.at(i).toObject();
     GeoidSpec spec;
     spec.dataset = text(entry, "dataset");
@@ -225,7 +226,7 @@ bool readCountries(const QJsonObject& json, PackConfig* config,
   const QJsonArray exclude =
       countries.value(QStringLiteral("exclude")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < exclude.size(); ++i) {
+  for (int32_t i = 0; i < exclude.size(); ++i) {
     spec.exclude.push_back(exclude.at(i).toString());
   }
   if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty() ||
@@ -251,7 +252,7 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
   const QJsonArray sources = json.value(QStringLiteral("sources")).toArray();
   // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < sources.size(); ++i) {
+  for (int32_t i = 0; i < sources.size(); ++i) {
     std::optional<SourceSpec> source = readSource(sources.at(i).toObject());
     if (!source) {
       fail(errorString, QStringLiteral("Bad source entry %1").arg(i));
@@ -295,7 +296,7 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
         shoreline.value(QStringLiteral("minimumAreaKm2")).toDouble(0.0);
     const QJsonArray lods = shoreline.value(QStringLiteral("lods")).toArray();
     // NOLINTNEXTLINE(modernize-loop-convert)
-    for (int i = 0; i < lods.size(); ++i) {
+    for (int32_t i = 0; i < lods.size(); ++i) {
       const QJsonObject entry = lods.at(i).toObject();
       ShorelineLod lod;
       lod.resolution = text(entry, "resolution");
@@ -476,8 +477,9 @@ private:
     const ImagerySpec& spec = *m_config->imagery;
     const SourceSpec& source = *findSource(*m_config, spec.source);
     const QString file = spec.dataset + QStringLiteral(".sqlite");
-    const int width = spec.tiling.tileSizePx *
-                      static_cast<int>(TileKey::columns(spec.tiling.maxLevel));
+    const int32_t width =
+        spec.tiling.tileSizePx *
+        static_cast<int32_t>(TileKey::columns(spec.tiling.maxLevel));
     m_progress(QStringLiteral("Reading %1 into a %2 × %3 mosaic")
                    .arg(source.file)
                    .arg(width)

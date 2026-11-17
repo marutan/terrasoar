@@ -20,6 +20,7 @@
 
 #include "ts/packs/packlibrary.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <QDateTime>
@@ -132,7 +133,7 @@ QString PackLibrary::trashSlot(const QString& id) const
   const QString stamp =
       QString::number(QDateTime::currentMSecsSinceEpoch(), 36);
   QString slot = trash.filePath(id + QLatin1Char('-') + stamp);
-  for (int n = 1; QFileInfo::exists(slot); ++n) {
+  for (int32_t n = 1; QFileInfo::exists(slot); ++n) {
     slot = trash.filePath(QStringLiteral("%1-%2-%3").arg(id, stamp).arg(n));
   }
   return slot;

@@ -20,6 +20,8 @@
 
 #include "ts/providers/sqlitetileimageryprovider.h"
 
+#include <cstdint>
+
 #include <QFileInfo>
 #include <QImage>
 #include <QLocale>
@@ -53,7 +55,7 @@ bool readInfo(const SqliteConnection& connection, SqliteTileStoreInfo* info,
     return false;
   }
   QString scheme;
-  int found = 0;
+  int32_t found = 0;
   while (sqlite3_step(statement) == SQLITE_ROW) {
     const QString name = QString::fromUtf8(
         reinterpret_cast<const char*>(sqlite3_column_text(statement, 0)));
@@ -174,7 +176,7 @@ bool SqliteTileStoreWriter::putTile(TileKey key, const QByteArray& data)
   sqlite3_bind_int(statement, 2, key.x);
   sqlite3_bind_int(statement, 3, key.y);
   sqlite3_bind_blob(statement, 4, data.constData(),
-                    static_cast<int>(data.size()), SQLITE_TRANSIENT);
+                    static_cast<int32_t>(data.size()), SQLITE_TRANSIENT);
   if (sqlite3_step(statement) != SQLITE_DONE) {
     m_error = QString::fromUtf8(sqlite3_errmsg(m_connection.get()));
     return false;
@@ -244,7 +246,7 @@ QByteArray SqliteTileImageryProvider::loadEncoded(TileKey key)
   sqlite3_bind_int(statement, 3, key.y);
   QByteArray data;
   if (sqlite3_step(statement) == SQLITE_ROW) {
-    const int bytes = sqlite3_column_bytes(statement, 0);
+    const int32_t bytes = sqlite3_column_bytes(statement, 0);
     const void* blob = sqlite3_column_blob(statement, 0);
     if (blob != nullptr && bytes > 0) {
       data = QByteArray(static_cast<const char*>(blob), bytes);

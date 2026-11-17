@@ -21,6 +21,7 @@
 #include "ts/regions/offlineregionstore.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 #include <QCoreApplication>
@@ -48,9 +49,9 @@ QDateTime dateFrom(const QJsonValue& value)
   return date.isValid() ? date.toUTC() : QDateTime();
 }
 
-long long integer(const QJsonObject& json, const char* name)
+int64_t integer(const QJsonObject& json, const char* name)
 {
-  return static_cast<long long>(json.value(QLatin1String(name)).toDouble(0.0));
+  return static_cast<int64_t>(json.value(QLatin1String(name)).toDouble(0.0));
 }
 
 } // namespace
@@ -146,7 +147,7 @@ bool OfflineRegionStore::load(QString* errorString)
   }
   const QJsonArray regions = root.value(QStringLiteral("regions")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < regions.size(); ++i) {
+  for (int32_t i = 0; i < regions.size(); ++i) {
     std::optional<OfflineRegion> region =
         OfflineRegion::fromJson(regions.at(i).toObject());
     if (region && !find(region->id)) {
@@ -182,14 +183,14 @@ bool OfflineRegionStore::save(QString* errorString) const
   return true;
 }
 
-long long OfflineRegionStore::add(OfflineRegion region)
+int64_t OfflineRegionStore::add(OfflineRegion region)
 {
   region.id = m_nextId++;
   m_regions.push_back(std::move(region));
   return m_regions.back().id;
 }
 
-OfflineRegion* OfflineRegionStore::find(long long id)
+OfflineRegion* OfflineRegionStore::find(int64_t id)
 {
   for (OfflineRegion& region : m_regions) {
     if (region.id == id) {
@@ -199,7 +200,7 @@ OfflineRegion* OfflineRegionStore::find(long long id)
   return nullptr;
 }
 
-const OfflineRegion* OfflineRegionStore::find(long long id) const
+const OfflineRegion* OfflineRegionStore::find(int64_t id) const
 {
   for (const OfflineRegion& region : m_regions) {
     if (region.id == id) {
@@ -209,7 +210,7 @@ const OfflineRegion* OfflineRegionStore::find(long long id) const
   return nullptr;
 }
 
-bool OfflineRegionStore::remove(long long id)
+bool OfflineRegionStore::remove(int64_t id)
 {
   const std::vector<OfflineRegion>::iterator found = std::find_if(
       m_regions.begin(), m_regions.end(),

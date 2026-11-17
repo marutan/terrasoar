@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -235,10 +236,10 @@ private slots:
     // included, at each grid height: geodetic → ECEF → geodetic → ECEF.
     double worstM = 0.0;
     double worstHeightM = 0.0;
-    int count = 0;
+    int32_t count = 0;
     for (const double heightM : gridHeightsM) {
-      for (int lat = -90; lat <= 90; ++lat) {
-        for (int lon = -180; lon <= 180; ++lon) {
+      for (int32_t lat = -90; lat <= 90; ++lat) {
+        for (int32_t lon = -180; lon <= 180; ++lon) {
           const ts::Geodetic start{static_cast<double>(lat),
                                    static_cast<double>(lon), heightM};
           const ts::Vec3 ecef = ts::geodeticToEcef(start);
@@ -261,9 +262,9 @@ private slots:
   {
     // Latitude and longitude come back too, not just the ECEF point.
     for (const double heightM : gridHeightsM) {
-      for (int i = 0; i < 25; ++i) {
+      for (int32_t i = 0; i < 25; ++i) {
         const double lat = -89.75 + 7.25 * i;
-        for (int j = 0; j < 32; ++j) {
+        for (int32_t j = 0; j < 32; ++j) {
           const double lon = -179.875 + 11.5 * j;
           const ts::Geodetic back = ts::ecefToGeodetic(
               ts::geodeticToEcef(ts::Geodetic{lat, lon, heightM}));
@@ -308,8 +309,8 @@ private slots:
     double worstForwardM = 0.0;
     for (const double heightM : gridHeightsM) {
       double worstInverseM = 0.0;
-      for (int lat = -90; lat <= 90; lat += 5) {
-        for (int lon = -180; lon <= 180; lon += 10) {
+      for (int32_t lat = -90; lat <= 90; lat += 5) {
+        for (int32_t lon = -180; lon <= 180; lon += 10) {
           const ts::Geodetic position{static_cast<double>(lat),
                                       static_cast<double>(lon), heightM};
           const ts::Vec3 reference = proj.toEcef(position);
@@ -336,9 +337,9 @@ private slots:
 
   void normals()
   {
-    for (int i = -6; i <= 6; ++i) {
+    for (int32_t i = -6; i <= 6; ++i) {
       const double lat = 15.0 * i;
-      for (int j = -6; j < 6; ++j) {
+      for (int32_t j = -6; j < 6; ++j) {
         const double lon = 30.0 * j;
         const ts::Vec3 normal = ts::surfaceNormalEcef(lat, lon);
         QVERIFY(std::abs(ts::length(normal) - 1.0) < 1e-15);
@@ -410,9 +411,9 @@ private slots:
     // A camera ten Earth radii away looks at points on the near side; the
     // ray must hit exactly that point, not just close to it.
     const ts::Vec3 camera{10.0 * ts::wgs84::semiMajorAxisM, 0.0, 0.0};
-    for (int i = -8; i <= 8; ++i) {
+    for (int32_t i = -8; i <= 8; ++i) {
       const double lat = 10.0 * i;
-      for (int j = -8; j <= 8; ++j) {
+      for (int32_t j = -8; j <= 8; ++j) {
         const double lon = 10.0 * j;
         // From ten radii the visible cap reaches about 84 degrees from the
         // sub-camera point; keep to points well inside it (70 degrees).
@@ -489,7 +490,7 @@ private slots:
     // place, which the camera's frame-rate independence relies on.
     double lat = 35.0;
     double lon = 139.0;
-    for (int i = 0; i < 10; ++i) {
+    for (int32_t i = 0; i < 10; ++i) {
       const ts::GeodesicDirect step = ts::rhumbDirect(lat, lon, 63.0, 1.0e5);
       lat = step.latDeg;
       lon = step.lonDeg;
@@ -522,7 +523,7 @@ private slots:
   void geodesicReferenceData()
   {
     const std::vector<GeodesicCase> cases = readGeodesicCases();
-    QCOMPARE(static_cast<int>(cases.size()), 500);
+    QCOMPARE(static_cast<int32_t>(cases.size()), 500);
     double worstDistanceM = 0.0;
     double worstPositionDeg = 0.0;
     for (const GeodesicCase& c : cases) {
@@ -542,7 +543,7 @@ private slots:
                         : 0.0});
     }
     qInfo("%d geodesics: worst distance error %.3g m, worst end point %.3g deg",
-          static_cast<int>(cases.size()), worstDistanceM, worstPositionDeg);
+          static_cast<int32_t>(cases.size()), worstDistanceM, worstPositionDeg);
     // GeographicLib is accurate to about 15 nm; allow 1 µm.
     QVERIFY(worstDistanceM < 1e-6);
     // 1e-12 degrees is about 0.1 µm on the ground.
@@ -606,8 +607,8 @@ private slots:
           ts::geodesicInverse(c.lat1Deg, c.lon1Deg, c.lat2Deg, c.lon2Deg)
               .distanceM);
     }
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&cases, &expectedM](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&cases, &expectedM](int32_t thread) {
           for (std::size_t i = 0; i < cases.size(); ++i) {
             const GeodesicCase& c = cases[i];
             if (ts::geodesicInverse(c.lat1Deg, c.lon1Deg, c.lat2Deg, c.lon2Deg)

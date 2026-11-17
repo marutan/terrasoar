@@ -49,7 +49,7 @@ double codeHeightM(std::int32_t code)
 }
 
 /** Index of sample (@p row, @p column) in a @p samples-wide grid. */
-std::size_t indexOf(int row, int column, int samples)
+std::size_t indexOf(int32_t row, int32_t column, int32_t samples)
 {
   return static_cast<std::size_t>(row) * static_cast<std::size_t>(samples) +
          static_cast<std::size_t>(column);
@@ -58,8 +58,8 @@ std::size_t indexOf(int row, int column, int samples)
 /** The prediction of value (@p row, @p column) from its decoded neighbours. */
 // Row then column, as everywhere in a height grid.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::int32_t predicted(const std::vector<std::int32_t>& codes, int samples,
-                       int row, int column)
+std::int32_t predicted(const std::vector<std::int32_t>& codes, int32_t samples,
+                       int32_t row, int32_t column)
 {
   const std::size_t n = static_cast<std::size_t>(samples);
   const std::size_t r = static_cast<std::size_t>(row);
@@ -84,7 +84,7 @@ double quantizedHeightM(double heightM)
   return codeHeightM(heightCode(heightM));
 }
 
-QByteArray encodeHeightGrid(const std::vector<float>& heightsM, int samples)
+QByteArray encodeHeightGrid(const std::vector<float>& heightsM, int32_t samples)
 {
   const std::size_t count =
       static_cast<std::size_t>(samples) * static_cast<std::size_t>(samples);
@@ -96,9 +96,9 @@ QByteArray encodeHeightGrid(const std::vector<float>& heightsM, int samples)
     codes[i] = heightCode(static_cast<double>(heightsM[i]));
   }
   QByteArray residuals;
-  residuals.reserve(static_cast<int>(count * 2));
-  for (int row = 0; row < samples; ++row) {
-    for (int column = 0; column < samples; ++column) {
+  residuals.reserve(static_cast<int32_t>(count * 2));
+  for (int32_t row = 0; row < samples; ++row) {
+    for (int32_t column = 0; column < samples; ++column) {
       const std::int32_t value = codes[indexOf(row, column, samples)];
       const std::int32_t residual =
           value - predicted(codes, samples, row, column);
@@ -118,7 +118,7 @@ QByteArray encodeHeightGrid(const std::vector<float>& heightsM, int samples)
 }
 
 std::optional<std::vector<float>> decodeHeightGrid(const QByteArray& data,
-                                                   int samples)
+                                                   int32_t samples)
 {
   if (samples < 2 || data.size() < 2 || data.at(0) != formatVersion) {
     return std::nullopt;
@@ -129,15 +129,15 @@ std::optional<std::vector<float>> decodeHeightGrid(const QByteArray& data,
   std::vector<std::int32_t> codes(count);
   std::size_t position = 0;
   const std::size_t size = static_cast<std::size_t>(residuals.size());
-  for (int row = 0; row < samples; ++row) {
-    for (int column = 0; column < samples; ++column) {
+  for (int32_t row = 0; row < samples; ++row) {
+    for (int32_t column = 0; column < samples; ++column) {
       std::uint32_t zigzag = 0;
-      for (unsigned shift = 0;; shift += 7U) {
+      for (uint32_t shift = 0;; shift += 7U) {
         if (position >= size || shift > 28U) {
           return std::nullopt;
         }
         const unsigned char byte = static_cast<unsigned char>(
-            residuals.at(static_cast<int>(position++)));
+            residuals.at(static_cast<int32_t>(position++)));
         zigzag |= static_cast<std::uint32_t>(byte & 0x7fU) << shift;
         if ((byte & 0x80U) == 0) {
           break;
@@ -165,7 +165,8 @@ namespace
 /** Value (@p row, @p column) of an @p n-wide grid. */
 // Row then column, as everywhere in a height grid.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-double gridValue(const std::vector<float>& values, int n, int row, int column)
+double gridValue(const std::vector<float>& values, int32_t n, int32_t row,
+                 int32_t column)
 {
   return static_cast<double>(values[indexOf(row, column, n)]);
 }
@@ -176,7 +177,7 @@ std::optional<double> sampleGrid(const HeightTile& tile,
                                  double latDeg, double lonDeg)
 {
   const GeoRect bounds = tile.key.bounds();
-  const int n = tile.samples;
+  const int32_t n = tile.samples;
   if (n < 2 ||
       values.size() !=
           static_cast<std::size_t>(n) * static_cast<std::size_t>(n) ||
@@ -187,8 +188,9 @@ std::optional<double> sampleGrid(const HeightTile& tile,
   // Grid coordinates: row 0 north, column 0 west.
   const double y = (bounds.northDeg - latDeg) / bounds.heightDeg() * (n - 1);
   const double x = (lonDeg - bounds.westDeg) / bounds.widthDeg() * (n - 1);
-  const int row = std::clamp(static_cast<int>(std::floor(y)), 0, n - 2);
-  const int column = std::clamp(static_cast<int>(std::floor(x)), 0, n - 2);
+  const int32_t row = std::clamp(static_cast<int32_t>(std::floor(y)), 0, n - 2);
+  const int32_t column =
+      std::clamp(static_cast<int32_t>(std::floor(x)), 0, n - 2);
   const double fy = y - row;
   const double fx = x - column;
   const double north = gridValue(values, n, row, column) * (1.0 - fx) +
@@ -221,7 +223,8 @@ std::optional<double> sampleSeaLevelM(const HeightTile& tile, double latDeg,
 
 // Size, then row and column, as everywhere in a height grid.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-GeoPoint heightSamplePoint(TileKey key, int samples, int row, int column)
+GeoPoint heightSamplePoint(TileKey key, int32_t samples, int32_t row,
+                           int32_t column)
 {
   const GeoRect bounds = key.bounds();
   const double step = 1.0 / static_cast<double>(samples - 1);
@@ -230,15 +233,15 @@ GeoPoint heightSamplePoint(TileKey key, int samples, int row, int column)
 }
 
 HeightTile resampleHeightTile(const HeightTile& ancestor, TileKey key,
-                              int samples)
+                              int32_t samples)
 {
   HeightTile tile;
   tile.key = key;
   tile.samples = samples;
   tile.heightsM.resize(static_cast<std::size_t>(samples) *
                        static_cast<std::size_t>(samples));
-  for (int row = 0; row < samples; ++row) {
-    for (int column = 0; column < samples; ++column) {
+  for (int32_t row = 0; row < samples; ++row) {
+    for (int32_t column = 0; column < samples; ++column) {
       const GeoPoint point = heightSamplePoint(key, samples, row, column);
       tile.heightsM[indexOf(row, column, samples)] = static_cast<float>(
           sampleHeightM(ancestor, point.latDeg, point.lonDeg).value_or(0.0));

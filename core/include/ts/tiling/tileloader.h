@@ -29,6 +29,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -68,7 +69,7 @@ struct TileLoaderSettings {
    * that asks for more (ImageryProvider::preferredLoaderThreads(), a
    * network source waiting on its server) gets what it asks for.
    */
-  int threads = 2;
+  int32_t threads = 2;
   /**
    * After a tile failed to load (ImageLoadResult::Outcome::Failed), it is
    * not asked for again for this long, so an unreachable server isn't
@@ -78,7 +79,7 @@ struct TileLoaderSettings {
   /** Budget of the decoded-image cache in bytes (common use: 48 MB). */
   std::size_t cacheBytes = std::size_t{48} * 1024 * 1024;
   /** Grid segments of the tile meshes. */
-  int meshSegments = TileMesh::defaultSegments;
+  int32_t meshSegments = TileMesh::defaultSegments;
   /** False to load images only (the renderer builds meshes itself). */
   bool buildMeshes = true;
 };
@@ -133,10 +134,10 @@ public:
   void setRequests(const std::vector<TileLoadRequest>& requests);
 
   /** Returns up to @p maximum loaded tiles, oldest first. */
-  std::vector<LoadedTile> takeLoaded(int maximum);
+  std::vector<LoadedTile> takeLoaded(int32_t maximum);
 
   /** Returns how many tiles are queued, loading or waiting to be taken. */
-  int outstanding() const;
+  int32_t outstanding() const;
 
   /**
    * Sets the function called (on a worker thread) each time a tile has
@@ -148,16 +149,16 @@ public:
   LruCache<TileKey, QImage, TileKeyHash>& cache() { return m_cache; }
 
   /** Returns the number of tiles loaded so far (from cache or provider). */
-  int loadedCount() const { return m_loadedCount.load(); }
+  int32_t loadedCount() const { return m_loadedCount.load(); }
 
   /** Returns the number of loads that were cancelled. */
-  int cancelledCount() const { return m_cancelledCount.load(); }
+  int32_t cancelledCount() const { return m_cancelledCount.load(); }
 
   /** Returns how many loads failed (and wait to be retried). */
-  int failedCount() const { return m_failedCount.load(); }
+  int32_t failedCount() const { return m_failedCount.load(); }
 
   /** Returns the number of worker threads. */
-  int threadCount() const { return static_cast<int>(m_workers.size()); }
+  int32_t threadCount() const { return static_cast<int32_t>(m_workers.size()); }
 
   /** Forgets every failure, so failed tiles are asked for again at once. */
   void retryFailed();
@@ -185,9 +186,9 @@ private:
       m_failed;
   std::function<void()> m_callback;
   bool m_stopping = false;
-  std::atomic<int> m_loadedCount{0};
-  std::atomic<int> m_cancelledCount{0};
-  std::atomic<int> m_failedCount{0};
+  std::atomic<int32_t> m_loadedCount{0};
+  std::atomic<int32_t> m_cancelledCount{0};
+  std::atomic<int32_t> m_failedCount{0};
   std::vector<std::thread> m_workers;
 };
 

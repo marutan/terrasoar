@@ -25,6 +25,8 @@
 #ifndef TS_DEPS_SQLITECONNECTION_H
 #define TS_DEPS_SQLITECONNECTION_H
 
+#include <cstdint>
+
 #include <QString>
 
 /** SQLite's opaque connection type (from sqlite3.h). */
@@ -93,7 +95,7 @@ public:
    * @param ok Set to true on success, false on error or no rows. May be null.
    * @return The value, or 0 on failure.
    */
-  long long queryInteger(const QString& sql, bool* ok = nullptr);
+  int64_t queryInteger(const QString& sql, bool* ok = nullptr);
 
   /** Returns the raw sqlite3 pointer. Ownership stays here. */
   sqlite3* get() const { return m_db; }

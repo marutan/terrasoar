@@ -20,6 +20,7 @@
 
 #include "ts/deps/dependencies.h"
 
+#include <cstdint>
 #include <mutex>
 #include <vector>
 
@@ -111,7 +112,7 @@ bool useProjData(const QString& directory)
   for (const QByteArray& path : encoded) {
     pointers.push_back(path.constData());
   }
-  proj_context_set_search_paths(nullptr, static_cast<int>(pointers.size()),
+  proj_context_set_search_paths(nullptr, static_cast<int32_t>(pointers.size()),
                                 pointers.data());
   // GDAL keeps its own PROJ contexts (one per thread): a null-terminated
   // list for them.

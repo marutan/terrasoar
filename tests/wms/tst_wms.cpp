@@ -22,6 +22,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -118,7 +119,7 @@ private slots:
     QTest::addColumn<QString>("layer");
     QTest::addColumn<QString>("host");
     QTest::addColumn<QString>("crs");
-    QTest::addColumn<int>("minimumLayers");
+    QTest::addColumn<int32_t>("minimumLayers");
     QTest::newRow("terrestris 1.3.0")
         << QStringLiteral("terrestris-130.xml") << QStringLiteral("1.3.0")
         << QStringLiteral("OSM-WMS") << QStringLiteral("ows.terrestris.de")
@@ -158,7 +159,7 @@ private slots:
     QFETCH(QString, layer);
     QFETCH(QString, host);
     QFETCH(QString, crs);
-    QFETCH(int, minimumLayers);
+    QFETCH(int32_t, minimumLayers);
     QString error;
     const std::optional<ts::WmsCapabilities> parsed =
         ts::parseWmsCapabilities(fixture(file), &error);
@@ -169,7 +170,7 @@ private slots:
     QCOMPARE(caps.getMapUrl.host(), host);
     QVERIFY(caps.getMapFormats.contains(QStringLiteral("image/png")));
     const std::vector<const ts::WmsLayer*> named = caps.namedLayers();
-    QVERIFY2(static_cast<int>(named.size()) >= minimumLayers,
+    QVERIFY2(static_cast<int32_t>(named.size()) >= minimumLayers,
              qPrintable(QString::number(named.size())));
     const ts::WmsLayer* chosen =
         layer.isEmpty() ? named.at(1) : caps.findLayer(layer);
@@ -412,7 +413,7 @@ private slots:
     const QStringList got = actual.split(QLatin1Char(','));
     const QStringList want = bbox.split(QLatin1Char(','));
     QCOMPARE(got.size(), want.size());
-    for (int i = 0; i < got.size(); ++i) {
+    for (int32_t i = 0; i < got.size(); ++i) {
       bool okGot = false;
       bool okWant = false;
       const double g = got.at(i).toDouble(&okGot);
@@ -806,8 +807,8 @@ private slots:
     std::shared_ptr<ts::NetworkClient> network =
         std::make_shared<ts::NetworkClient>(testNetwork());
     QTemporaryDir cacheDir;
-    std::shared_ptr<std::atomic<long long>> clock =
-        std::make_shared<std::atomic<long long>>(1714564800);
+    std::shared_ptr<std::atomic<int64_t>> clock =
+        std::make_shared<std::atomic<int64_t>>(1714564800);
     ts::WmsProviderSettings settings;
     settings.cacheDirectory = cacheDir.path();
     settings.clock = [clock]() { return clock->load(); };
@@ -850,7 +851,7 @@ private slots:
     ts::WmsProviderSettings settings;
     settings.cacheDirectory = cacheDir.path();
     ts::WmsImageryProvider provider(mockSource(*server), network, settings);
-    std::atomic<int> statusChanges{0};
+    std::atomic<int32_t> statusChanges{0};
     provider.setStatusCallback([&statusChanges]() { ++statusChanges; });
     const ts::TileKey saved{3, 1, 1};
     QVERIFY(!provider.loadTileImage(saved, notCancelled).image.isNull());
@@ -868,7 +869,7 @@ private slots:
     QCOMPARE(provider.loadTileImage(ts::TileKey{3, 3, 1}, notCancelled).outcome,
              ts::ImageLoadResult::Outcome::Failed);
     // Left alone now: no request, saved tiles still shown.
-    const int attempts = network->attemptsSent();
+    const int32_t attempts = network->attemptsSent();
     QCOMPARE(provider.loadTileImage(ts::TileKey{3, 4, 1}, notCancelled).outcome,
              ts::ImageLoadResult::Outcome::Failed);
     QCOMPARE(provider.loadTileImage(saved, notCancelled).outcome,
@@ -880,7 +881,7 @@ private slots:
 
   void providerServerErrors_data()
   {
-    QTest::addColumn<int>("mode");
+    QTest::addColumn<int32_t>("mode");
     QTest::addColumn<QString>("message");
     QTest::newRow("service exception")
         << 0 << QStringLiteral("Layer 'x' is not defined");
@@ -892,7 +893,7 @@ private slots:
 
   void providerServerErrors()
   {
-    QFETCH(int, mode);
+    QFETCH(int32_t, mode);
     QFETCH(QString, message);
     std::shared_ptr<MockWmsBehaviour> behaviour =
         std::make_shared<MockWmsBehaviour>();
@@ -965,7 +966,7 @@ private slots:
     QCOMPARE(loader.threadCount(), 6);
     std::vector<ts::TileLoadRequest> wanted;
     wanted.reserve(6);
-    for (int x = 0; x < 6; ++x) {
+    for (int32_t x = 0; x < 6; ++x) {
       wanted.push_back(ts::TileLoadRequest{ts::TileKey{3, x, 1}, 0.0});
     }
     loader.setRequests(wanted);
@@ -1004,7 +1005,7 @@ private slots:
     QVERIFY(QTest::qWaitFor([&]() { return loader.failedCount() == 2; }, 5000));
     QCOMPARE(loader.outstanding(), 0);
     QVERIFY(loader.takeLoaded(10).empty());
-    const int sent = ts::test::mockGetMapCount(server);
+    const int32_t sent = ts::test::mockGetMapCount(server);
     loader.setRequests(wanted); // too soon: not asked again
     QTest::qWait(100);
     QCOMPARE(ts::test::mockGetMapCount(server), sent);
@@ -1055,10 +1056,10 @@ private slots:
     ts::WmsImageryProvider provider(
         mockSource(server), std::make_shared<ts::NetworkClient>(testNetwork()),
         settings);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&provider](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&provider](int32_t thread) {
           bool ok = true;
-          for (int i = 0; i < 6; ++i) {
+          for (int32_t i = 0; i < 6; ++i) {
             const std::atomic<bool> go{false};
             ok = ok &&
                  !provider.loadImage(ts::TileKey{4, (thread + i) % 8, 3}, go)

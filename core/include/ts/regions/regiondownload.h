@@ -53,12 +53,12 @@ struct RegionDownloadSettings {
    * the network client's limit so the view's own tiles still get through,
    * and polite to the server.
    */
-  int threads = 2;
+  int32_t threads = 2;
   /**
    * After this many tiles in a row fail because the server can't be
    * reached, the download pauses itself (it can be resumed).
    */
-  int unreachableBeforePause = 6;
+  int32_t unreachableBeforePause = 6;
 };
 
 /** Where a RegionDownload is, see RegionDownload::progress(). */
@@ -75,19 +75,19 @@ struct RegionDownloadProgress {
   /** The state. */
   State state = State::Ready;
   /** Tiles in the region. */
-  long long totalTiles = 0;
+  int64_t totalTiles = 0;
   /** Tiles done so far (whatever became of them). */
-  long long doneTiles = 0;
+  int64_t doneTiles = 0;
   /** Tiles fetched or revalidated. */
-  long long downloadedTiles = 0;
+  int64_t downloadedTiles = 0;
   /** Tiles already stored and fresh. */
-  long long cachedTiles = 0;
+  int64_t cachedTiles = 0;
   /** Tiles the source has no data for. */
-  long long noDataTiles = 0;
+  int64_t noDataTiles = 0;
   /** Tiles that failed. */
-  long long failedTiles = 0;
+  int64_t failedTiles = 0;
   /** Bytes of the region's tiles stored so far. */
-  long long bytes = 0;
+  int64_t bytes = 0;
   /** The last failure (translated); why it paused itself, or refused. */
   QString errorString;
 
@@ -137,9 +137,9 @@ public:
    * @p minimumLevel to @p maximumLevel of @p provider's source for the
    * region @p region (an id, not 0). Counts the tiles at once.
    */
-  RegionDownload(std::shared_ptr<WmsImageryProvider> provider, long long region,
-                 const RegionGeometry& geometry, int minimumLevel,
-                 int maximumLevel, RegionDownloadSettings settings = {});
+  RegionDownload(std::shared_ptr<WmsImageryProvider> provider, int64_t region,
+                 const RegionGeometry& geometry, int32_t minimumLevel,
+                 int32_t maximumLevel, RegionDownloadSettings settings = {});
 
   /** Cancels the download and waits for its threads. */
   ~RegionDownload();
@@ -170,7 +170,7 @@ public:
   RegionDownloadProgress progress() const;
 
   /** Returns the region id. */
-  long long region() const { return m_region; }
+  int64_t region() const { return m_region; }
 
   /** Returns the provider. */
   const std::shared_ptr<WmsImageryProvider>& provider() const
@@ -187,10 +187,10 @@ public:
 private:
   void work();
   bool takeTile(std::unique_lock<std::mutex>& lock, TileKey& key,
-                int& attempts);
+                int32_t& attempts);
 
   const std::shared_ptr<WmsImageryProvider> m_provider;
-  const long long m_region;
+  const int64_t m_region;
   const RegionDownloadSettings m_settings;
   RegionTileIterator m_tiles;
   std::atomic<bool> m_cancelled{false};
@@ -198,9 +198,9 @@ private:
   mutable std::condition_variable m_changed;
   RegionDownloadProgress m_progress;
   /** Tiles to try again (unreachable server), with attempts so far. */
-  std::deque<std::pair<TileKey, int>> m_retry;
-  int m_unreachableInARow = 0;
-  int m_working = 0;
+  std::deque<std::pair<TileKey, int32_t>> m_retry;
+  int32_t m_unreachableInARow = 0;
+  int32_t m_working = 0;
   bool m_exhausted = false;
   std::vector<std::thread> m_threads;
 };
@@ -208,11 +208,11 @@ private:
 /** How big a region will be, see estimateRegionSize(). */
 struct RegionEstimate {
   /** Tiles in the region. */
-  long long tiles = 0;
+  int64_t tiles = 0;
   /** Bytes on disk, estimated. */
-  long long bytes = 0;
+  int64_t bytes = 0;
   /** Sample tiles the estimate is based on (0: a guess from the format). */
-  int sampledTiles = 0;
+  int32_t sampledTiles = 0;
 };
 
 /**
@@ -221,7 +221,7 @@ struct RegionEstimate {
  *
  * @reentrant
  */
-long long typicalTileBytes(const WmsImageryProvider& provider);
+int64_t typicalTileBytes(const WmsImageryProvider& provider);
 
 /**
  * Estimates the size of a region: counts its tiles exactly, then fetches
@@ -238,7 +238,7 @@ long long typicalTileBytes(const WmsImageryProvider& provider);
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 RegionEstimate
 estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
-                   int minimumLevel, int maximumLevel, int samples,
+                   int32_t minimumLevel, int32_t maximumLevel, int32_t samples,
                    const std::atomic<bool>& cancelled, std::uint64_t seed = 1);
 // NOLINTEND(bugprone-easily-swappable-parameters)
 

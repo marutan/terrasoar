@@ -98,7 +98,7 @@ std::vector<double> gridLatitudes(const ts::Projection& projection)
 {
   std::vector<double> lats = {projection.minimumLatDeg(),
                               projection.maximumLatDeg(), 1e-9, -1e-9};
-  for (int step = -36; step <= 36; ++step) {
+  for (int32_t step = -36; step <= 36; ++step) {
     const double lat = 2.5 * step;
     if (projection.containsLatitude(lat)) {
       lats.push_back(lat);
@@ -111,7 +111,7 @@ std::vector<double> gridLatitudes(const ts::Projection& projection)
 std::vector<double> gridLongitudes()
 {
   std::vector<double> lons = {-180.0, -179.999999, 179.999999};
-  for (int step = -23; step < 24; ++step) {
+  for (int32_t step = -23; step < 24; ++step) {
     lons.push_back(7.5 * step);
   }
   return lons;
@@ -180,7 +180,7 @@ private slots:
       ids.insert(projection->id());
       functions.insert(projection->glslFunction());
       QCOMPARE(ts::projectionById(projection->id()), projection);
-      QCOMPARE(ts::projectionIndex(projection), static_cast<int>(i));
+      QCOMPARE(ts::projectionIndex(projection), static_cast<int32_t>(i));
       QCOMPARE(projection->centralMeridianDeg(), 0.0);
     }
     QCOMPARE(ids.size(), 3);
@@ -197,7 +197,7 @@ private slots:
 
   void againstProj_data()
   {
-    QTest::addColumn<int>("index");
+    QTest::addColumn<int32_t>("index");
     QTest::newRow("mercator") << 0;
     QTest::newRow("web-mercator") << 1;
     QTest::newRow("miller") << 2;
@@ -207,7 +207,7 @@ private slots:
   {
     // Forward and inverse agree with PROJ to a millimetre over a global
     // grid, the limits of the domain and both sides of the antimeridian.
-    QFETCH(int, index);
+    QFETCH(int32_t, index);
     const ts::Projection& projection =
         *ts::projections().at(static_cast<std::size_t>(index));
     const ProjPipeline proj(projection.projString());
@@ -242,7 +242,7 @@ private slots:
   void roundTrip()
   {
     // forward then inverse comes back within a millimetre on the ground.
-    QFETCH(int, index);
+    QFETCH(int32_t, index);
     const ts::Projection& projection =
         *ts::projections().at(static_cast<std::size_t>(index));
     double worstM = 0.0;
@@ -431,7 +431,7 @@ private slots:
     ts::test::OffscreenGl gl;
     TS_TEST_REQUIRE_GL(gl);
     ts::RenderDevice& device = gl.device();
-    constexpr int samples = 256;
+    constexpr int32_t samples = 256;
     ts::ShaderDesc shaderDesc;
     shaderDesc.label = QStringLiteral("projection probe");
     shaderDesc.vertexSource = probeVertexGlsl;
@@ -458,7 +458,7 @@ private slots:
     // down to level 24 or so.
     const std::vector<double> spans = {170.0, 45.0, 5.0, 0.5, 1e-2, 1e-4, 1e-6};
     double worstRelative = 0.0;
-    int compared = 0;
+    int32_t compared = 0;
     const std::vector<const ts::Projection*>& all = ts::projections();
     for (std::size_t p = 0; p < all.size(); ++p) {
       const ts::Projection& projection = *all[p];
@@ -480,7 +480,7 @@ private slots:
           const float first = -0.5F * samples;
           block.which = {static_cast<float>(p), 0.0F, 0.0F, 0.0F};
           std::array<QImage, 2> images;
-          for (int component = 0; component < 2; ++component) {
+          for (int32_t component = 0; component < 2; ++component) {
             block.steps = {stepLon, stepLat, first,
                            static_cast<float>(component)};
             uniforms->update(0, &block, sizeof(block));
@@ -496,7 +496,7 @@ private slots:
                 device.readPixels(*target);
           }
           QCOMPARE(device.takeErrors(), QString());
-          for (int i = 0; i < samples; ++i) {
+          for (int32_t i = 0; i < samples; ++i) {
             std::array<float, 2> gpu{};
             for (std::size_t component = 0; component < 2; ++component) {
               std::memcpy(&gpu.at(component),
@@ -548,10 +548,10 @@ private slots:
   void concurrentSharedInstances()
   {
     // Projections are immutable: many threads share the registered ones.
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [](int32_t thread) {
           bool ok = true;
-          for (int i = 0; i < 2000; ++i) {
+          for (int32_t i = 0; i < 2000; ++i) {
             for (const ts::Projection* projection : ts::projections()) {
               const double lat = -80.0 + (thread * 7 + i) % 160;
               const double lon = -179.0 + (thread * 13 + i * 3) % 358;
@@ -573,7 +573,7 @@ private slots:
     double sum = 0.0;
     QBENCHMARK
     {
-      for (int i = 0; i < 1000; ++i) {
+      for (int32_t i = 0; i < 1000; ++i) {
         sum += mercator.forward(-80.0 + 0.16 * i, -170.0 + 0.34 * i).yM;
       }
     }
@@ -586,7 +586,7 @@ private slots:
     double sum = 0.0;
     QBENCHMARK
     {
-      for (int i = 0; i < 1000; ++i) {
+      for (int32_t i = 0; i < 1000; ++i) {
         sum += mercator.inverse(ts::MapPoint{1.0e4 * i, -1.5e7 + 3.0e4 * i})
                    .value_or(nowhere)
                    .latDeg;

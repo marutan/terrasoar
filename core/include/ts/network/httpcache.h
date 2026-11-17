@@ -25,6 +25,7 @@
 #ifndef TS_NETWORK_HTTPCACHE_H
 #define TS_NETWORK_HTTPCACHE_H
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -45,7 +46,7 @@ struct HttpFreshness {
    * 1970 (UTC). After that it is stale: it is revalidated when the server
    * can be reached and shown as it is when not.
    */
-  long long expiresS = 0;
+  int64_t expiresS = 0;
   /** The ETag, for If-None-Match; empty if none. */
   QByteArray etag;
   /** The Last-Modified date, for If-Modified-Since; empty if none. */
@@ -67,8 +68,8 @@ struct HttpFreshness {
  *
  * @threadsafe
  */
-HttpFreshness httpFreshness(const HttpResponse& response, long long nowS,
-                            long long defaultLifetimeS);
+HttpFreshness httpFreshness(const HttpResponse& response, int64_t nowS,
+                            int64_t defaultLifetimeS);
 
 /**
  * Returns @p previous updated by a 304 Not Modified @p response: a new
@@ -77,8 +78,8 @@ HttpFreshness httpFreshness(const HttpResponse& response, long long nowS,
  * @threadsafe
  */
 HttpFreshness revalidatedFreshness(const HttpFreshness& previous,
-                                   const HttpResponse& response, long long nowS,
-                                   long long defaultLifetimeS);
+                                   const HttpResponse& response, int64_t nowS,
+                                   int64_t defaultLifetimeS);
 
 /**
  * Returns the request headers that ask the server whether a stored
@@ -98,7 +99,7 @@ revalidationHeaders(const QByteArray& etag, const QByteArray& lastModified);
  *
  * @threadsafe
  */
-std::optional<long long> parseHttpDate(const QByteArray& value);
+std::optional<int64_t> parseHttpDate(const QByteArray& value);
 
 } // namespace ts
 

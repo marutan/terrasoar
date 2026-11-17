@@ -22,6 +22,7 @@
  * @file
  * Program entry point: translators, command line and the main window.
  */
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -62,11 +63,11 @@ enum ExitCode {
  * (software OpenGL, the locale) must be known before the application object
  * or the translated --help text is created.
  */
-const char* findArgument(int argc, char** argv, const char* name,
+const char* findArgument(int32_t argc, char** argv, const char* name,
                          bool wantsValue)
 {
   const std::size_t length = std::strlen(name);
-  for (int i = 1; i < argc; ++i) {
+  for (int32_t i = 1; i < argc; ++i) {
     if (argv[i] == nullptr || std::strncmp(argv[i], name, length) != 0) {
       continue;
     }
@@ -99,7 +100,7 @@ bool writeJson(const QJsonObject& object, const QString& target)
   return file.write(json) == json.size();
 }
 
-int runGlCheck()
+int32_t runGlCheck()
 {
   const ts::GlProbeResult probe = ts::probeOpenGl(3, 3);
   QJsonObject object;
@@ -121,7 +122,7 @@ int runGlCheck()
 
 } // namespace
 
-int main(int argc, char* argv[])
+int32_t main(int32_t argc, char* argv[])
 {
   QElapsedTimer sinceMain;
   sinceMain.start();
@@ -142,7 +143,7 @@ int main(int argc, char* argv[])
   // The window icon, and the desktop entry it belongs to (Wayland and
   // desktops match windows to their launcher by it).
   QIcon icon;
-  for (const int size : {16, 24, 32, 48, 64, 128, 256}) {
+  for (const int32_t size : {16, 24, 32, 48, 64, 128, 256}) {
     icon.addFile(QStringLiteral(":/icons/terrasoar-%1.png").arg(size));
   }
   QApplication::setWindowIcon(icon);
@@ -232,7 +233,7 @@ int main(int argc, char* argv[])
   }
 
   bool idleOk = false;
-  const int idleS = parser.value(idleOption).toInt(&idleOk);
+  const int32_t idleS = parser.value(idleOption).toInt(&idleOk);
   if (!idleOk || idleS < 0) {
     // Nothing useful to do if stderr itself fails.
     static_cast<void>(std::fputs(

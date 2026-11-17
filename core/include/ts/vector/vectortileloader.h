@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <memory>
@@ -48,14 +49,14 @@ class FeatureProvider;
 /** How a VectorTileLoader works. */
 struct VectorTileLoaderSettings {
   /** Worker threads. */
-  int threads = 2;
+  int32_t threads = 2;
   /** How the meshes are cut. */
   VectorMeshSettings mesh;
   /**
    * The terrain's heights are sampled this many levels below a stored
    * tile's level (at most the elevation source's deepest level).
    */
-  int terrainLevelsBelow = 3;
+  int32_t terrainLevelsBelow = 3;
 };
 
 /**
@@ -104,16 +105,16 @@ public:
    * Takes up to @p maximum finished meshes. A tile without features comes
    * back as a mesh without triangles or segments.
    */
-  std::vector<VectorTileMesh> takeLoaded(int maximum);
+  std::vector<VectorTileMesh> takeLoaded(int32_t maximum);
 
   /** Returns how many tiles are queued, loading or waiting to be taken. */
-  int outstanding() const;
+  int32_t outstanding() const;
 
   /** Sets a function called on a worker thread when a mesh is ready. */
   void setTilesReadyCallback(std::function<void()> callback);
 
   /** Returns how many meshes have been built. */
-  int loadedCount() const { return m_loadedCount.load(); }
+  int32_t loadedCount() const { return m_loadedCount.load(); }
 
 private:
   void work();
@@ -130,7 +131,7 @@ private:
   std::deque<VectorTileMesh> m_done;
   std::unordered_set<TileKey, TileKeyHash> m_doneKeys;
   std::function<void()> m_callback;
-  std::atomic<int> m_loadedCount{0};
+  std::atomic<int32_t> m_loadedCount{0};
   std::vector<std::thread> m_workers;
 };
 

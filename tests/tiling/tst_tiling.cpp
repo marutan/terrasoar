@@ -22,6 +22,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <set>
@@ -95,12 +96,12 @@ std::set<std::string> keyStrings(const std::vector<ts::TileKey>& keys)
  * Checks that every pixel (on a grid) showing the globe is covered by
  * exactly one selected tile. Returns the number of failures.
  */
-int coverageFailures(const ts::Camera& camera,
-                     const std::vector<ts::TileKey>& tiles)
+int32_t coverageFailures(const ts::Camera& camera,
+                         const std::vector<ts::TileKey>& tiles)
 {
-  int failures = 0;
-  for (int row = 0; row < 30; ++row) {
-    for (int column = 0; column < 40; ++column) {
+  int32_t failures = 0;
+  for (int32_t row = 0; row < 30; ++row) {
+    for (int32_t column = 0; column < 40; ++column) {
       const std::optional<ts::Geodetic> hit = camera.pickGeodetic(
           (column + 0.5) * widthPx / 40.0, (row + 0.5) * heightPx / 30.0);
       if (!hit) {
@@ -108,7 +109,7 @@ int coverageFailures(const ts::Camera& camera,
       }
       const double lat = hit->latDeg;
       const double lon = hit->lonDeg;
-      const int covering = static_cast<int>(std::count_if(
+      const int32_t covering = static_cast<int32_t>(std::count_if(
           tiles.begin(), tiles.end(), [lat, lon](ts::TileKey key) {
             return key.bounds().contains(lat, lon);
           }));
@@ -150,12 +151,12 @@ class CountingProvider : public ts::ImageryProvider
 public:
   QString id() const override { return QStringLiteral("test:counting"); }
   QString name() const override { return QStringLiteral("counting"); }
-  int maximumLevel() const override { return ts::TileKey::maximumLevel; }
-  int tileSizePx() const override { return 16; }
+  int32_t maximumLevel() const override { return ts::TileKey::maximumLevel; }
+  int32_t tileSizePx() const override { return 16; }
   QImage loadImage(ts::TileKey key, const std::atomic<bool>& cancelled) override
   {
     ++loads;
-    for (int i = 0; i < delayLoops && !cancelled.load(); ++i) {
+    for (int32_t i = 0; i < delayLoops && !cancelled.load(); ++i) {
       std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
     QImage image(16, 16, QImage::Format_RGBA8888);
@@ -163,8 +164,8 @@ public:
     return image;
   }
 
-  std::atomic<int> loads{0};
-  int delayLoops = 0;
+  std::atomic<int32_t> loads{0};
+  int32_t delayLoops = 0;
 };
 
 } // namespace
@@ -218,7 +219,7 @@ private slots:
     if (lonDeg >= 180.0 && lon == -180.0) {
       lon = 180.0;
     }
-    for (int level = 0; level <= ts::TileKey::maximumLevel; ++level) {
+    for (int32_t level = 0; level <= ts::TileKey::maximumLevel; ++level) {
       const ts::TileKey key =
           ts::TileKey::containing(level, ts::Geodetic{latDeg, lonDeg, 0.0});
       QVERIFY(key.isValid());
@@ -234,7 +235,7 @@ private slots:
   void parentsAndChildren()
   {
     const ts::TileKey key{5, 37, 11};
-    for (int i = 0; i < 4; ++i) {
+    for (int32_t i = 0; i < 4; ++i) {
       const ts::TileKey child = key.child(i);
       QCOMPARE(child.parent(), key);
       QVERIFY(key.contains(child));
@@ -261,9 +262,9 @@ private slots:
     QVERIFY((ts::TileKey{4, 3, 15}.touchesPole()));
     QVERIFY(!(ts::TileKey{4, 3, 7}.touchesPole()));
     std::unordered_set<std::uint64_t> packed;
-    for (int level = 0; level < 5; ++level) {
-      for (int y = 0; y < ts::TileKey::rows(level); ++y) {
-        for (int x = 0; x < ts::TileKey::columns(level); ++x) {
+    for (int32_t level = 0; level < 5; ++level) {
+      for (int32_t y = 0; y < ts::TileKey::rows(level); ++y) {
+        for (int32_t x = 0; x < ts::TileKey::columns(level); ++x) {
           QVERIFY(packed.insert(ts::TileKey{level, x, y}.packed()).second);
         }
       }
@@ -282,13 +283,13 @@ private slots:
     ts::HeightTile heights;
     heights.key = key;
     heights.samples = 5;
-    for (int row = 0; row < 5; ++row) {
-      for (int column = 0; column < 5; ++column) {
+    for (int32_t row = 0; row < 5; ++row) {
+      for (int32_t column = 0; column < 5; ++column) {
         heights.heightsM.push_back(static_cast<float>(-50.0 + 100.0 * column));
         heights.seaLevelM.push_back(20.0F);
       }
     }
-    const int n = 4;
+    const int32_t n = 4;
     const ts::TileMesh flat = ts::buildTileMesh(key, n);
     const ts::TileMesh raised = ts::buildTileMesh(key, n, &heights);
     QCOMPARE(raised.vertices.size(), flat.vertices.size());
@@ -334,9 +335,9 @@ private slots:
 
   void meshGeometry_data()
   {
-    QTest::addColumn<int>("level");
-    QTest::addColumn<int>("x");
-    QTest::addColumn<int>("y");
+    QTest::addColumn<int32_t>("level");
+    QTest::addColumn<int32_t>("x");
+    QTest::addColumn<int32_t>("y");
     QTest::newRow("root") << 0 << 1 << 0;
     QTest::newRow("north pole") << 3 << 5 << 0;
     QTest::newRow("antimeridian") << 4 << 31 << 6;
@@ -345,19 +346,20 @@ private slots:
 
   void meshGeometry()
   {
-    QFETCH(int, level);
-    QFETCH(int, x);
-    QFETCH(int, y);
+    QFETCH(int32_t, level);
+    QFETCH(int32_t, x);
+    QFETCH(int32_t, y);
     const ts::TileKey key{level, x, y};
-    const int n = 8;
+    const int32_t n = 8;
     const ts::TileMesh mesh = ts::buildTileMesh(key, n);
-    QCOMPARE(static_cast<int>(mesh.vertices.size()), (n + 1) * (n + 1) + 4 * n);
+    QCOMPARE(static_cast<int32_t>(mesh.vertices.size()),
+             (n + 1) * (n + 1) + 4 * n);
     const ts::GeoRect rect = key.bounds();
     // Grid vertices lie on the ellipsoid (to float precision of the
     // offset) at their latitude and longitude.
     double worstM = 0.0;
-    for (int row = 0; row <= n; ++row) {
-      for (int column = 0; column <= n; ++column) {
+    for (int32_t row = 0; row <= n; ++row) {
+      for (int32_t column = 0; column <= n; ++column) {
         const ts::TileVertex& v = mesh.vertices.at(
             static_cast<std::size_t>(row) * static_cast<std::size_t>(n + 1) +
             static_cast<std::size_t>(column));
@@ -378,7 +380,7 @@ private slots:
              qPrintable(QString::number(worstM)));
     // Skirt vertices are below the surface by the skirt depth.
     const double depthM = ts::tileSkirtDepthM(level, n);
-    const int gridVertices = (n + 1) * (n + 1);
+    const int32_t gridVertices = (n + 1) * (n + 1);
     for (std::size_t i = static_cast<std::size_t>(gridVertices);
          i < mesh.vertices.size(); ++i) {
       const ts::TileVertex& v = mesh.vertices[i];
@@ -392,11 +394,11 @@ private slots:
   {
     // Every grid triangle's normal points away from the globe's centre.
     const ts::TileKey key{3, 6, 2};
-    const int n = 8;
+    const int32_t n = 8;
     const ts::TileMesh mesh = ts::buildTileMesh(key, n);
     const std::vector<std::uint16_t> indices = ts::tileMeshIndices(n);
-    QCOMPARE(static_cast<int>(indices.size()), 6 * n * n + 24 * n);
-    const int gridTriangleCount = 2 * n * n;
+    QCOMPARE(static_cast<int32_t>(indices.size()), 6 * n * n + 24 * n);
+    const int32_t gridTriangleCount = 2 * n * n;
     const std::size_t gridTriangles =
         static_cast<std::size_t>(gridTriangleCount);
     for (std::size_t t = 0; t < indices.size() / 3; ++t) {
@@ -446,7 +448,7 @@ private slots:
     const ts::TileSelection selection =
         selector.select(camera, everythingRenderable);
     qInfo("%d tiles drawn, %d visited",
-          static_cast<int>(selection.render.size()), selection.visited);
+          static_cast<int32_t>(selection.render.size()), selection.visited);
     QVERIFY(!selection.render.empty());
     QVERIFY(selection.load.empty());
     QVERIFY(!overlaps(selection.render));
@@ -550,7 +552,7 @@ private slots:
     const ts::TileSelection selection =
         selector.select(camera, everythingRenderable);
     qInfo("%d tiles drawn, %d visited",
-          static_cast<int>(selection.render.size()), selection.visited);
+          static_cast<int32_t>(selection.render.size()), selection.visited);
     QVERIFY(!selection.render.empty());
     QVERIFY(selection.load.empty());
     QVERIFY(!overlaps(selection.render));
@@ -572,8 +574,8 @@ private slots:
     // ±5° by ±3.7°.
     const ts::Camera camera =
         makeMapCamera("mercator", ts::CameraPose{0.0, 0.0, 1.0e6, 0.0, 0.0});
-    const std::function<ts::TileKey(int, double, double)> tileAt =
-        [](int level, double lat, double lon) {
+    const std::function<ts::TileKey(int32_t, double, double)> tileAt =
+        [](int32_t level, double lat, double lon) {
           return ts::TileKey::containing(level, ts::Geodetic{lat, lon, 0.0});
         };
     QVERIFY(ts::TileSelector::isVisibleOnMap(camera, tileAt(6, 1.0, 1.0)));
@@ -649,7 +651,7 @@ private slots:
     const ts::CameraPose pose{0.0, 0.0, 5.0e7, 0.0, 0.0};
     const ts::TileSelection map =
         selector.select(makeMapCamera("miller", pose), everythingRenderable);
-    QCOMPARE(static_cast<int>(map.render.size()), 128);
+    QCOMPARE(static_cast<int32_t>(map.render.size()), 128);
     for (const ts::TileKey& key : map.render) {
       QCOMPARE(key.level, 3);
     }
@@ -663,8 +665,8 @@ private slots:
     const ts::TileSelection waiting =
         selector.select(makeMapCamera("miller", pose),
                         [](ts::TileKey key) { return key.level == 0; });
-    QCOMPARE(static_cast<int>(waiting.render.size()), 2);
-    QCOMPARE(static_cast<int>(waiting.load.size()), 8);
+    QCOMPARE(static_cast<int32_t>(waiting.render.size()), 2);
+    QCOMPARE(static_cast<int32_t>(waiting.load.size()), 8);
   }
 
   void mapGeometryError()
@@ -675,8 +677,8 @@ private slots:
     const ts::TileSelector selector;
     const ts::CameraPose world{0.0, 0.0, 5.0e7, 0.0, 0.0};
     const ts::Camera mercator = makeMapCamera("mercator", world);
-    const std::function<double(const ts::Camera&, int, double)> errorAt =
-        [&](const ts::Camera& camera, int level, double lat) {
+    const std::function<double(const ts::Camera&, int32_t, double)> errorAt =
+        [&](const ts::Camera& camera, int32_t level, double lat) {
           return selector.mapGeometryErrorPx(
               camera,
               ts::TileKey::containing(level, ts::Geodetic{lat, 5.0, 0.0}));
@@ -711,7 +713,7 @@ private slots:
     const ts::TileSelector coarse(settings);
     const ts::TileSelection selection =
         coarse.select(mercator, everythingRenderable);
-    int deepest = 0;
+    int32_t deepest = 0;
     for (const ts::TileKey& key : selection.render) {
       QVERIFY(coarse.mapGeometryErrorPx(mercator, key) <=
               settings.maximumMapGeometryErrorPx);
@@ -738,16 +740,16 @@ private slots:
   {
     // One column of quads per mesh: each grid row from its west end to
     // its east end, facing the same way as the full grid.
-    const int n = 16;
+    const int32_t n = 16;
     const std::vector<std::uint16_t> strip = ts::tileMeshStripIndices(n);
-    QCOMPARE(static_cast<int>(strip.size()), 6 * n);
+    QCOMPARE(static_cast<int32_t>(strip.size()), 6 * n);
     const ts::TileMesh mesh = ts::buildTileMesh(ts::TileKey{3, 9, 2}, n);
     for (std::size_t i = 0; i + 2 < strip.size(); i += 3) {
       std::array<ts::Vec3, 3> corners;
       for (std::size_t k = 0; k < 3; ++k) {
-        const int index = strip[i + k];
+        const int32_t index = strip[i + k];
         QVERIFY(index < (n + 1) * (n + 1)); // no skirt
-        const int column = index % (n + 1);
+        const int32_t column = index % (n + 1);
         QVERIFY(column == 0 || column == n);
         corners.at(k) =
             mesh.centreEcef +
@@ -758,7 +760,7 @@ private slots:
           ts::cross(corners[1] - corners[0], corners[2] - corners[0]);
       QVERIFY(ts::dot(normal, corners[0]) > 0.0);
     }
-    QCOMPARE(static_cast<int>(ts::tileMeshStripIndices(1).size()), 12);
+    QCOMPARE(static_cast<int32_t>(ts::tileMeshStripIndices(1).size()), 12);
   }
 
   void morphSelectionShowsBothViews()
@@ -815,7 +817,7 @@ private slots:
     const ts::TileSelection empty =
         selector.select(camera, [](ts::TileKey /*key*/) { return false; });
     QVERIFY(empty.render.empty());
-    QCOMPARE(static_cast<int>(empty.load.size()), 2);
+    QCOMPARE(static_cast<int32_t>(empty.load.size()), 2);
     QCOMPARE(empty.load[0].key.level, 0);
   }
 
@@ -838,7 +840,7 @@ private slots:
 
   void lruCache()
   {
-    ts::LruCache<int, std::string> cache(10);
+    ts::LruCache<int32_t, std::string> cache(10);
     cache.insert(1, "one", 4);
     cache.insert(2, "two", 4);
     QCOMPARE(cache.size(), std::size_t{2});
@@ -863,13 +865,13 @@ private slots:
   void lruCacheShared()
   {
     // Thread-safe: many threads insert and look up in one cache.
-    ts::LruCache<int, int> cache(500);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&cache](int thread) {
-          for (int i = 0; i < 2000; ++i) {
-            const int key = (thread * 7919 + i) % 1000;
+    ts::LruCache<int32_t, int32_t> cache(500);
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&cache](int32_t thread) {
+          for (int32_t i = 0; i < 2000; ++i) {
+            const int32_t key = (thread * 7919 + i) % 1000;
             cache.insert(key, key * 2, 1);
-            const std::optional<int> value = cache.find((key + 13) % 1000);
+            const std::optional<int32_t> value = cache.find((key + 13) % 1000);
             if (value && *value != ((key + 13) % 1000) * 2) {
               return false;
             }
@@ -887,11 +889,11 @@ private slots:
     const std::shared_ptr<CountingProvider> provider =
         std::make_shared<CountingProvider>();
     ts::TileLoader loader(provider);
-    std::atomic<int> ready{0};
+    std::atomic<int32_t> ready{0};
     loader.setTilesReadyCallback([&ready]() { ++ready; });
     std::vector<ts::TileLoadRequest> requests;
     requests.reserve(8);
-    for (int x = 0; x < 8; ++x) {
+    for (int32_t x = 0; x < 8; ++x) {
       requests.push_back(ts::TileLoadRequest{ts::TileKey{2, x, 1}, 0.0});
     }
     loader.setRequests(requests);
@@ -932,7 +934,7 @@ private slots:
     ts::TileLoader loader(provider, settings);
     std::vector<ts::TileLoadRequest> requests;
     requests.reserve(40);
-    for (int x = 0; x < 40; ++x) {
+    for (int32_t x = 0; x < 40; ++x) {
       requests.push_back(ts::TileLoadRequest{ts::TileKey{5, x, 3}, 0.0});
     }
     loader.setRequests(requests);
@@ -962,12 +964,12 @@ private slots:
     settings.cacheBytes = std::size_t{2} * 1024 * 1024;
     settings.meshSegments = 4;
     ts::TileLoader loader(provider, settings);
-    std::atomic<int> callbacks{0};
+    std::atomic<int32_t> callbacks{0};
     loader.setTilesReadyCallback([&callbacks]() { ++callbacks; });
     const ts::TileSelector selector;
     std::unordered_set<ts::TileKey, ts::TileKeyHash> resident;
     std::unordered_set<ts::TileKey, ts::TileKeyHash> requested;
-    int taken = 0;
+    int32_t taken = 0;
     bool unrequestedTile = false;
     ts::Camera camera;
     const std::function<void()> step = [&]() {
@@ -977,7 +979,7 @@ private slots:
         ++taken;
       }
     };
-    for (int frame = 0; frame < 400; ++frame) {
+    for (int32_t frame = 0; frame < 400; ++frame) {
       const double t = frame / 400.0;
       camera = makeCamera(ts::CameraPose{
           60.0 * std::sin(6.0 * t), 360.0 * t - 180.0,
@@ -1024,8 +1026,8 @@ private slots:
         makeCamera(ts::CameraPose{48.0, 10.0, 2.0e6, 30.0, 50.0});
     const std::set<std::string> expected = keyStrings(
         ts::TileSelector().select(camera, everythingRenderable).render);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&camera, &expected](int) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&camera, &expected](int32_t) {
           const ts::TileSelector selector;
           return keyStrings(
                      selector.select(camera, everythingRenderable).render) ==

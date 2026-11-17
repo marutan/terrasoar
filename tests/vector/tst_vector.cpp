@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -98,7 +99,7 @@ class FixtureProvider : public ts::FeatureProvider
 public:
   QString id() const override { return QStringLiteral("fixture"); }
   QString name() const override { return QStringLiteral("Fixture"); }
-  int maximumLevel() const override { return 1; }
+  int32_t maximumLevel() const override { return 1; }
   ts::TileKey storedKey(ts::TileKey key) const override
   {
     while (key.level > 1) {
@@ -121,7 +122,7 @@ public:
     }
     return tile;
   }
-  std::atomic<int> loads{0};
+  std::atomic<int32_t> loads{0};
 };
 
 } // namespace
@@ -228,7 +229,7 @@ private slots:
       QVERIFY(alongEdge[i] - alongEdge[i - 1] <= longest);
     }
     // The outline has the same points.
-    int outlineOnEdge = 0;
+    int32_t outlineOnEdge = 0;
     for (const ts::VectorSegment& segment : mesh->segments) {
       const double lon = mesh->lonDeg(segment.a);
       if (std::abs(mesh->latDeg(segment.a) - (60.0 + 0.5 * lon)) < 1e-4 &&
@@ -290,8 +291,9 @@ private slots:
       QFAIL("no mesh");
     }
     const double quarter = mesher.cellSizeDeg(3) * 0.25;
-    const int expectedLine = static_cast<int>(std::ceil(21.0 / quarter));
-    int fromLine = 0;
+    const int32_t expectedLine =
+        static_cast<int32_t>(std::ceil(21.0 / quarter));
+    int32_t fromLine = 0;
     bool tinyInside = false;
     for (const ts::VectorSegment& segment : mesh->segments) {
       const std::array<float, 2> a = lonLatDeg(*mesh, segment.a);
@@ -325,10 +327,10 @@ private slots:
       QFAIL("no mesh");
     }
     const std::size_t expected = reference->triangles.size();
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&tile, expected](int) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&tile, expected](int32_t) {
           ts::VectorMesher mesher;
-          for (int i = 0; i < 5; ++i) {
+          for (int32_t i = 0; i < 5; ++i) {
             const std::optional<ts::VectorTileMesh> mesh =
                 mesher.build(tile, notCancelled);
             if (!mesh || mesh->triangles.size() != expected) {
@@ -347,8 +349,8 @@ private slots:
     const ts::TileKey key{6, 70, 15}; // 16.9°–19.7°E, 47.8°–50.6°N
     const ts::GeoRect rect = key.bounds();
     std::vector<double> coast;
-    const int vertices = 20000;
-    for (int i = 0; i < vertices; ++i) {
+    const int32_t vertices = 20000;
+    for (int32_t i = 0; i < vertices; ++i) {
       const double angle = 2.0 * 3.14159265358979 * i / vertices;
       const double radius =
           1.1 + 0.15 * std::sin(37.0 * angle) + 0.05 * std::sin(311.0 * angle);
@@ -378,7 +380,7 @@ private slots:
     const std::shared_ptr<FixtureProvider> provider =
         std::make_shared<FixtureProvider>();
     ts::VectorTileLoader loader(provider);
-    std::atomic<int> ready{0};
+    std::atomic<int32_t> ready{0};
     loader.setTilesReadyCallback([&ready]() { ready.fetch_add(1); });
     loader.setRequests({ts::TileKey{1, 2, 0}, ts::TileKey{1, 0, 0}});
     std::vector<ts::VectorTileMesh> meshes;
@@ -423,21 +425,21 @@ private slots:
     ts::VectorTileLoaderSettings settings;
     settings.threads = 3;
     ts::VectorTileLoader loader(provider, settings);
-    int taken = 0;
-    for (int frame = 0; frame < 200; ++frame) {
+    int32_t taken = 0;
+    for (int32_t frame = 0; frame < 200; ++frame) {
       std::vector<ts::TileKey> keys;
       keys.reserve(6);
-      for (int i = 0; i < 6; ++i) {
+      for (int32_t i = 0; i < 6; ++i) {
         keys.push_back(ts::TileKey{1, (frame + i) % 4, (frame / 4 + i) % 2});
       }
       loader.setRequests(keys);
-      taken += static_cast<int>(loader.takeLoaded(4).size());
+      taken += static_cast<int32_t>(loader.takeLoaded(4).size());
       QTest::qWait(1);
     }
     loader.setRequests({});
     QVERIFY(QTest::qWaitFor(
         [&]() {
-          taken += static_cast<int>(loader.takeLoaded(64).size());
+          taken += static_cast<int32_t>(loader.takeLoaded(64).size());
           return loader.outstanding() == 0;
         },
         10000));

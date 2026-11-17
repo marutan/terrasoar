@@ -25,6 +25,7 @@
 #ifndef TS_RENDER_GLRENDERDEVICE_H
 #define TS_RENDER_GLRENDERDEVICE_H
 
+#include <cstdint>
 #include <memory>
 
 #include <QSize>
@@ -75,7 +76,7 @@ public:
    * Sets the framebuffer object that passes without a target draw into,
    * and its size in device pixels.
    */
-  void setDefaultFramebuffer(unsigned int framebufferId, QSize sizePx);
+  void setDefaultFramebuffer(uint32_t framebufferId, QSize sizePx);
 
   RenderDeviceInfo info() const override;
   std::unique_ptr<GpuBuffer> createBuffer(BufferType type, BufferUsage usage,
@@ -85,20 +86,23 @@ public:
   std::unique_ptr<ShaderProgram>
   createShaderProgram(const ShaderDesc& desc, QString* errorString) override;
   std::unique_ptr<Pipeline> createPipeline(const PipelineDesc& desc) override;
-  std::unique_ptr<RenderTarget> createRenderTarget(int width,
-                                                   int height) override;
+  std::unique_ptr<RenderTarget> createRenderTarget(int32_t width,
+                                                   int32_t height) override;
   void beginPass(const PassDesc& pass) override;
   void setPipeline(const Pipeline& pipeline) override;
-  void setVertexBuffer(int slot, const GpuBuffer& buffer,
+  void setVertexBuffer(int32_t slot, const GpuBuffer& buffer,
                        std::size_t offsetBytes) override;
   void setIndexBuffer(const GpuBuffer& buffer, IndexFormat format) override;
-  void setUniformBuffer(int binding, const GpuBuffer& buffer,
+  void setUniformBuffer(int32_t binding, const GpuBuffer& buffer,
                         std::size_t offsetBytes,
                         std::size_t sizeBytes) override;
-  void setTexture(int unit, const GpuTexture& texture) override;
-  void setRenderTargetTexture(int unit, const RenderTarget& target) override;
-  void draw(int vertexCount, int firstVertex, int instances) override;
-  void drawIndexed(int indexCount, int firstIndex, int instances) override;
+  void setTexture(int32_t unit, const GpuTexture& texture) override;
+  void setRenderTargetTexture(int32_t unit,
+                              const RenderTarget& target) override;
+  void draw(int32_t vertexCount, int32_t firstVertex,
+            int32_t instances) override;
+  void drawIndexed(int32_t indexCount, int32_t firstIndex,
+                   int32_t instances) override;
   void endPass() override;
   QImage readPixels(const RenderTarget& target) override;
   QString takeErrors() override;

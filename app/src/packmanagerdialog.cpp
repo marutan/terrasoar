@@ -21,6 +21,7 @@
 #include "packmanagerdialog.h"
 
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -43,7 +44,7 @@ namespace
 {
 
 /** Item data: the pack's id. */
-constexpr int packIdRole = Qt::UserRole + 1;
+constexpr int32_t packIdRole = Qt::UserRole + 1;
 
 enum Column { NameColumn, VersionColumn, SizeColumn, StateColumn, ColumnCount };
 
@@ -142,7 +143,7 @@ QString PackManagerDialog::selectedPack() const
 
 void PackManagerDialog::selectPack(const QString& id)
 {
-  for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
+  for (int32_t i = 0; i < m_list->topLevelItemCount(); ++i) {
     QTreeWidgetItem* item = m_list->topLevelItem(i);
     if (item->data(NameColumn, packIdRole).toString() == id) {
       m_list->setCurrentItem(item);
@@ -215,8 +216,8 @@ bool PackManagerDialog::describeDownload(
     return false;
   }
   using State = PackInstallProgress::State;
-  const int percent =
-      static_cast<int>(std::floor(progress->fraction() * 100.0));
+  const int32_t percent =
+      static_cast<int32_t>(std::floor(progress->fraction() * 100.0));
   switch (progress->state) {
   case State::Running:
   case State::Ready:
@@ -280,7 +281,7 @@ void PackManagerDialog::fill()
 void PackManagerDialog::updateRows()
 {
   const QLocale locale;
-  for (int i = 0; i < m_list->topLevelItemCount(); ++i) {
+  for (int32_t i = 0; i < m_list->topLevelItemCount(); ++i) {
     QTreeWidgetItem* item = m_list->topLevelItem(i);
     const Row shown = row(item->data(NameColumn, packIdRole).toString());
     item->setText(NameColumn, shown.name);

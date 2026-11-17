@@ -21,6 +21,7 @@
 #include "ts/vector/vectortileloader.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <unordered_map>
@@ -40,7 +41,7 @@ namespace
  * Puts the terrain's height and sea level under every vertex of @p mesh,
  * from @p elevation's tiles at @p level (loaded once per mesh).
  */
-void liftMesh(VectorTileMesh& mesh, ElevationProvider& elevation, int level,
+void liftMesh(VectorTileMesh& mesh, ElevationProvider& elevation, int32_t level,
               const std::atomic<bool>& cancelled)
 {
   std::unordered_map<TileKey, std::optional<HeightTile>, TileKeyHash> tiles;
@@ -84,9 +85,9 @@ VectorTileLoader::VectorTileLoader(std::shared_ptr<FeatureProvider> provider,
     : m_provider(std::move(provider)), m_settings(settings),
       m_elevation(std::move(elevation))
 {
-  const int threads = std::clamp(m_settings.threads, 1, 16);
+  const int32_t threads = std::clamp(m_settings.threads, 1, 16);
   m_workers.reserve(static_cast<std::size_t>(threads));
-  for (int i = 0; i < threads; ++i) {
+  for (int32_t i = 0; i < threads; ++i) {
     m_workers.emplace_back(&VectorTileLoader::work, this);
   }
 }
@@ -136,11 +137,11 @@ void VectorTileLoader::setRequests(const std::vector<TileKey>& keys)
   m_wake.notify_all();
 }
 
-std::vector<VectorTileMesh> VectorTileLoader::takeLoaded(int maximum)
+std::vector<VectorTileMesh> VectorTileLoader::takeLoaded(int32_t maximum)
 {
   std::vector<VectorTileMesh> meshes;
   const std::lock_guard<std::mutex> lock(m_mutex);
-  while (!m_done.empty() && static_cast<int>(meshes.size()) < maximum) {
+  while (!m_done.empty() && static_cast<int32_t>(meshes.size()) < maximum) {
     m_doneKeys.erase(m_done.front().key);
     meshes.push_back(std::move(m_done.front()));
     m_done.pop_front();
@@ -148,10 +149,11 @@ std::vector<VectorTileMesh> VectorTileLoader::takeLoaded(int maximum)
   return meshes;
 }
 
-int VectorTileLoader::outstanding() const
+int32_t VectorTileLoader::outstanding() const
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  return static_cast<int>(m_queue.size() + m_inFlight.size() + m_done.size());
+  return static_cast<int32_t>(m_queue.size() + m_inFlight.size() +
+                              m_done.size());
 }
 
 void VectorTileLoader::work()
@@ -190,7 +192,7 @@ void VectorTileLoader::work()
       // Keyed by the requested (stored) tile, whatever the source said.
       mesh->key = key;
       if (m_elevation) {
-        const int level =
+        const int32_t level =
             std::min(key.level + m_settings.terrainLevelsBelow,
                      std::max(m_elevation->maximumLevel(), key.level));
         liftMesh(*mesh, *m_elevation, level, *cancelled);

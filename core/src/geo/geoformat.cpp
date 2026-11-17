@@ -21,6 +21,7 @@
 #include "ts/geo/geoformat.h"
 
 #include <cmath>
+#include <cstdint>
 
 #include <QCoreApplication>
 
@@ -33,7 +34,7 @@ namespace
 {
 
 /** Decimal places of degrees: 1e-5° is about a metre. */
-constexpr int degreeDecimals = 5;
+constexpr int32_t degreeDecimals = 5;
 
 QString degrees(double valueDeg, const QLocale& locale)
 {

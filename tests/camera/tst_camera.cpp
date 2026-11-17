@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <optional>
 
@@ -75,8 +76,9 @@ double targetDistanceM(const ts::CameraPose& a, const ts::CameraPose& b)
 void runFor(ts::CameraController& controller, double durationS,
             double frameRateHz)
 {
-  const int frames = static_cast<int>(std::lround(durationS * frameRateHz));
-  for (int i = 0; i < frames; ++i) {
+  const int32_t frames =
+      static_cast<int32_t>(std::lround(durationS * frameRateHz));
+  for (int32_t i = 0; i < frames; ++i) {
     controller.advance(1.0 / frameRateHz);
   }
 }
@@ -326,9 +328,9 @@ private slots:
     // same pixel.
     for (const ts::CameraPose& pose : samplePoses) {
       const ts::Camera camera = makeCamera(pose);
-      for (int row = 0; row < 17; ++row) {
+      for (int32_t row = 0; row < 17; ++row) {
         const double y = 0.5 + 37.0 * row;
-        for (int column = 0; column < 20; ++column) {
+        for (int32_t column = 0; column < 20; ++column) {
           const double x = 0.5 + 41.0 * column;
           const std::optional<ts::Vec3> hit = hitAt(camera, x, y);
           if (!hit) {
@@ -381,7 +383,7 @@ private slots:
     const ts::Camera camera =
         makeCamera(ts::CameraPose{0.0, 0.0, 3.0e7, 0.0, 0.0});
     double farthest = 0.0;
-    for (int row = 0; row < static_cast<int>(heightPx); ++row) {
+    for (int32_t row = 0; row < static_cast<int32_t>(heightPx); ++row) {
       const std::optional<ts::Vec3> hit =
           hitAt(camera, widthPx / 2.0, row + 0.5);
       const std::optional<ts::ScreenPoint> point =
@@ -408,7 +410,7 @@ private slots:
       }
       QVERIFY(controller.beginPan(from, 0.0));
       double worstM = 0.0;
-      for (int i = 1; i <= 10; ++i) {
+      for (int32_t i = 1; i <= 10; ++i) {
         const QPointF to = from + QPointF(13.0 * i, -7.0 * i);
         controller.dragTo(to, 0.01 * i);
         const std::optional<ts::Vec3> under =
@@ -456,13 +458,13 @@ private slots:
   void zoomStopsOneMetreUp()
   {
     ts::CameraController controller = makeController(samplePoses[1]);
-    for (int i = 0; i < 200; ++i) {
+    for (int32_t i = 0; i < 200; ++i) {
       controller.zoomAt(QPointF(widthPx / 2.0, heightPx / 2.0), 1.0);
     }
     const double heightM = controller.camera().eyeGeodetic().heightM;
     QVERIFY(heightM >= ts::Camera::minimumEyeHeightM - 1e-6);
     QVERIFY(heightM < ts::Camera::minimumEyeHeightM + 1e-3);
-    for (int i = 0; i < 200; ++i) {
+    for (int32_t i = 0; i < 200; ++i) {
       controller.zoomAt(QPointF(widthPx / 2.0, heightPx / 2.0), -1.0);
     }
     QCOMPARE(controller.camera().pose().rangeM, ts::Camera::maximumRangeM);
@@ -488,18 +490,16 @@ private slots:
 
   void keysAreFrameRateIndependent_data()
   {
-    QTest::addColumn<unsigned int>("motion");
+    QTest::addColumn<uint32_t>("motion");
     QTest::addColumn<double>("toleranceM");
-    QTest::newRow("forward")
-        << static_cast<unsigned int>(ts::MoveForward) << 1e-6;
+    QTest::newRow("forward") << static_cast<uint32_t>(ts::MoveForward) << 1e-6;
     QTest::newRow("diagonal")
-        << static_cast<unsigned int>(ts::MoveForward | ts::MoveRight) << 1e-6;
+        << static_cast<uint32_t>(ts::MoveForward | ts::MoveRight) << 1e-6;
     QTest::newRow("diagonal while zooming in")
-        << static_cast<unsigned int>(ts::MoveBackward | ts::MoveLeft |
-                                     ts::ZoomIn)
+        << static_cast<uint32_t>(ts::MoveBackward | ts::MoveLeft | ts::ZoomIn)
         << 1e-6;
     QTest::newRow("zoom out, turn and tilt")
-        << static_cast<unsigned int>(ts::ZoomOut | ts::TurnLeft | ts::TiltUp)
+        << static_cast<uint32_t>(ts::ZoomOut | ts::TurnLeft | ts::TiltUp)
         << 1e-6;
   }
 
@@ -507,7 +507,7 @@ private slots:
   {
     // The same 1.5 s of held keys at 10, 20, 60 and 144 fps ends at the
     // same pose.
-    QFETCH(unsigned int, motion);
+    QFETCH(uint32_t, motion);
     QFETCH(double, toleranceM);
     const ts::CameraPose start{35.0, 139.0, 4.0e5, 40.0, 20.0};
     std::optional<ts::CameraPose> reference;
@@ -570,8 +570,8 @@ private slots:
       ts::CameraController controller = makeController(start);
       const QPointF from(300.0, 300.0);
       QVERIFY(controller.beginPan(from, 0.0));
-      const int frames = static_cast<int>(std::lround(0.3 * rate));
-      for (int i = 1; i <= frames; ++i) {
+      const int32_t frames = static_cast<int32_t>(std::lround(0.3 * rate));
+      for (int32_t i = 1; i <= frames; ++i) {
         const double t = i / rate;
         controller.dragTo(from + QPointF(400.0 * t, 150.0 * t), t);
       }
@@ -957,7 +957,7 @@ private slots:
     QVERIFY(controller.isMorphing() && controller.isAnimating());
     QCOMPARE(controller.camera().morph(), 0.0);
     double previous = 0.0;
-    for (int frame = 1; frame <= 59; ++frame) {
+    for (int32_t frame = 1; frame <= 59; ++frame) {
       QVERIFY(controller.advance(1.0 / 60.0));
       const ts::Camera& camera = controller.camera();
       QVERIFY(camera.morph() > previous && camera.morph() < 1.0);
@@ -1133,7 +1133,7 @@ private slots:
           QFAIL("grabbed: no value");
         }
         QVERIFY(controller.beginPan(from, 0.0));
-        for (int i = 1; i <= 10; ++i) {
+        for (int32_t i = 1; i <= 10; ++i) {
           const QPointF to = from + QPointF(23.0 * i, -11.0 * i);
           controller.dragTo(to, 0.01 * i);
           const std::optional<ts::Geodetic> under =
@@ -1198,7 +1198,7 @@ private slots:
   {
     // The same 1.5 s of held keys at 10, 20, 60 and 144 fps ends at the
     // same place on the map.
-    QFETCH(unsigned int, motion);
+    QFETCH(uint32_t, motion);
     QFETCH(double, toleranceM);
     for (const char* id : projectionIds) {
       const ts::CameraPose start{35.0, 139.0, 4.0e5, 0.0, 0.0};
@@ -1248,7 +1248,7 @@ private slots:
     round.setMotion(ts::MoveRight);
     bool crossed = false;
     double previousLon = 170.0;
-    for (int i = 0; i < 400 && !crossed; ++i) {
+    for (int32_t i = 0; i < 400 && !crossed; ++i) {
       round.advance(0.05);
       const double lon = round.camera().pose().targetLonDeg;
       crossed = lon < previousLon;
@@ -1277,8 +1277,8 @@ private slots:
       ts::CameraController controller = makeMapController("mercator", start);
       const QPointF from(300.0, 300.0);
       QVERIFY(controller.beginPan(from, 0.0));
-      const int frames = static_cast<int>(std::lround(0.3 * rate));
-      for (int i = 1; i <= frames; ++i) {
+      const int32_t frames = static_cast<int32_t>(std::lround(0.3 * rate));
+      for (int32_t i = 1; i <= frames; ++i) {
         const double t = i / rate;
         controller.dragTo(from + QPointF(400.0 * t, 150.0 * t), t);
       }
@@ -1401,7 +1401,7 @@ private slots:
     const std::function<ts::CameraPose()> drive = []() {
       ts::CameraController controller = makeController(samplePoses[1]);
       controller.beginPan(QPointF(300.0, 300.0), 0.0);
-      for (int i = 1; i <= 20; ++i) {
+      for (int32_t i = 1; i <= 20; ++i) {
         controller.dragTo(QPointF(300.0 + 5.0 * i, 300.0 + 2.0 * i), 0.01 * i);
       }
       controller.endDrag(0.2);
@@ -1411,8 +1411,8 @@ private slots:
       return controller.camera().pose();
     };
     const ts::CameraPose expected = drive();
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&drive, &expected](int) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&drive, &expected](int32_t) {
           const ts::CameraPose pose = drive();
           return pose.targetLatDeg == expected.targetLatDeg &&
                  pose.targetLonDeg == expected.targetLonDeg &&

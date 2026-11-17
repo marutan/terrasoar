@@ -20,6 +20,7 @@
 
 #include "ts/network/cachedtilefetcher.h"
 
+#include <cstdint>
 #include <optional>
 #include <utility>
 
@@ -86,7 +87,7 @@ void CachedTileFetcher::countRequest()
   ++m_statistics.requests;
 }
 
-long long CachedTileFetcher::now() const
+int64_t CachedTileFetcher::now() const
 {
   return m_settings.clock ? m_settings.clock()
                           : QDateTime::currentSecsSinceEpoch();
@@ -175,7 +176,7 @@ bool CachedTileFetcher::leftAlone()
 
 FetchOutcome CachedTileFetcher::revalidated(
     TileKey key, const CachedTile& cached, const HttpResponse& response,
-    long long nowS, const std::function<bool(const QByteArray&)>& accept)
+    int64_t nowS, const std::function<bool(const QByteArray&)>& accept)
 {
   const HttpFreshness previous{true, cached.expiresS, cached.etag,
                                cached.lastModified};
@@ -191,7 +192,7 @@ FetchOutcome CachedTileFetcher::revalidated(
 }
 
 void CachedTileFetcher::store(TileKey key, const HttpResponse& response,
-                              long long nowS)
+                              int64_t nowS)
 {
   if (!m_cache) {
     return;
@@ -211,7 +212,7 @@ CachedTileFetcher::fetch(TileKey key, const QUrl& url,
                          const std::function<bool(const QByteArray&)>& accept,
                          const std::atomic<bool>& cancelled)
 {
-  const long long nowS = now();
+  const int64_t nowS = now();
   const std::optional<CachedTile> cached =
       m_cache ? m_cache->find(key) : std::nullopt;
   if (cached && nowS < cached->expiresS) {

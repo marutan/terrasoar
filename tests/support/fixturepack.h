@@ -64,9 +64,9 @@ namespace ts::test
 /** Appends @p value to @p bytes, little-endian. */
 inline void appendUint32(QByteArray& bytes, std::uint32_t value)
 {
-  for (int i = 0; i < 4; ++i) {
+  for (int32_t i = 0; i < 4; ++i) {
     bytes.append(
-        static_cast<char>((value >> (8U * static_cast<unsigned>(i))) & 0xffU));
+        static_cast<char>((value >> (8U * static_cast<uint32_t>(i))) & 0xffU));
   }
 }
 
@@ -143,9 +143,9 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
     buffer.open(QIODevice::WriteOnly);
     tile.save(&buffer, "PNG");
     SqliteTileStoreWriter writer(dir.filePath(file), info);
-    for (int level = 0; level <= 1; ++level) {
-      for (int y = 0; y < TileKey::rows(level); ++y) {
-        for (int x = 0; x < TileKey::columns(level); ++x) {
+    for (int32_t level = 0; level <= 1; ++level) {
+      for (int32_t y = 0; y < TileKey::rows(level); ++y) {
+        for (int32_t x = 0; x < TileKey::columns(level); ++x) {
           writer.putTile(TileKey{level, x, y}, png);
         }
       }
@@ -166,9 +166,9 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
                                          50, 10, 50, 10, 40};
     wkb.append(static_cast<char>(1));
     for (const std::uint32_t value : {3U, 1U, 5U}) {
-      for (int i = 0; i < 4; ++i) {
+      for (int32_t i = 0; i < 4; ++i) {
         wkb.append(static_cast<char>(
-            (value >> (8U * static_cast<unsigned>(i))) & 0xffU));
+            (value >> (8U * static_cast<uint32_t>(i))) & 0xffU));
       }
     }
     for (const double value : ring) {
@@ -190,9 +190,9 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
     heightsInfo.name = QStringLiteral("Fixture elevation");
     SqliteTileStoreWriter writer(dir.filePath(elevation), heightsInfo);
     const std::vector<float> flat(81, 500.0F);
-    for (int level = 0; level <= 1; ++level) {
-      for (int y = 0; y < TileKey::rows(level); ++y) {
-        for (int x = 0; x < TileKey::columns(level); ++x) {
+    for (int32_t level = 0; level <= 1; ++level) {
+      for (int32_t y = 0; y < TileKey::rows(level); ++y) {
+        for (int32_t x = 0; x < TileKey::columns(level); ++x) {
           writer.putTile(TileKey{level, x, y}, encodeHeightGrid(flat, 9));
         }
       }
@@ -250,7 +250,7 @@ inline PackManifest writeFixtureBasePack(const QString& directory,
 inline bool writeFixtureDem(const QString& path, float heightM)
 {
   initialiseGdal();
-  const int size = 200;
+  const int32_t size = 200;
   const QByteArray encoded = path.toUtf8();
   GDALDatasetH dataset =
       GDALCreate(GDALGetDriverByName("GTiff"), encoded.constData(), size, size,

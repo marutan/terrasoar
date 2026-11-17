@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 #include <QComboBox>
@@ -52,16 +53,16 @@ namespace
 {
 
 /** Pause after a change before the size is estimated, ms. */
-constexpr int estimateDelayMs = 400;
+constexpr int32_t estimateDelayMs = 400;
 
 /** How often the estimate is looked at, ms. */
-constexpr int pollIntervalMs = 50;
+constexpr int32_t pollIntervalMs = 50;
 
 /** Sample tiles for the estimate. */
-constexpr int estimateSamples = 24;
+constexpr int32_t estimateSamples = 24;
 
 /** Ground size of one pixel at the equator at @p level, metres. */
-double metresPerPixel(int level, int tileSizePx)
+double metresPerPixel(int32_t level, int32_t tileSizePx)
 {
   const double equatorM = 40075016.7;
   return equatorM / 360.0 * TileKey::sizeDeg(level) / tileSizePx;
@@ -170,12 +171,12 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
 
   connect(m_buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
   connect(m_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
-  connect(m_layerBox, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-          &NewRegionDialog::layerChanged);
+  connect(m_layerBox, QOverload<int32_t>::of(&QComboBox::currentIndexChanged),
+          this, &NewRegionDialog::layerChanged);
   connect(m_nameEdit, &QLineEdit::textChanged, this, &NewRegionDialog::refresh);
-  connect(m_minimumBox, QOverload<int>::of(&QSpinBox::valueChanged), this,
+  connect(m_minimumBox, QOverload<int32_t>::of(&QSpinBox::valueChanged), this,
           &NewRegionDialog::refresh);
-  connect(m_maximumBox, QOverload<int>::of(&QSpinBox::valueChanged), this,
+  connect(m_maximumBox, QOverload<int32_t>::of(&QSpinBox::valueChanged), this,
           &NewRegionDialog::refresh);
   connect(m_viewButton, &QPushButton::clicked, this,
           &NewRegionDialog::useCurrentView);
@@ -183,7 +184,7 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
           [this]() { draw(false); });
   connect(m_polygonButton, &QPushButton::clicked, this,
           [this]() { draw(true); });
-  connect(m_countryBox, QOverload<int>::of(&QComboBox::activated), this,
+  connect(m_countryBox, QOverload<int32_t>::of(&QComboBox::activated), this,
           &NewRegionDialog::countryActivated);
   m_estimateDelay->setSingleShot(true);
   m_estimateDelay->setInterval(estimateDelayMs);
@@ -204,7 +205,7 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
 
   retranslateUi();
   m_automaticName =
-      tr("Region %1").arg(static_cast<int>(m_manager.regions().size()) + 1);
+      tr("Region %1").arg(static_cast<int32_t>(m_manager.regions().size()) + 1);
   m_nameEdit->setText(m_automaticName);
   layerChanged();
   if (m_view) {
@@ -229,7 +230,7 @@ void NewRegionDialog::changeEvent(QEvent* event)
   QDialog::changeEvent(event);
 }
 
-void NewRegionDialog::done(int result)
+void NewRegionDialog::done(int32_t result)
 {
   stopEstimate();
   if (m_view) {
@@ -268,8 +269,8 @@ OfflineRegion NewRegionDialog::region() const
 {
   OfflineRegion region;
   region.name = m_nameEdit->text().trimmed();
-  const int index = m_layerBox->currentIndex();
-  if (index >= 0 && index < static_cast<int>(m_layers.size())) {
+  const int32_t index = m_layerBox->currentIndex();
+  if (index >= 0 && index < static_cast<int32_t>(m_layers.size())) {
     region.source = m_layers[static_cast<std::size_t>(index)].source;
     region.sourceName = m_layers[static_cast<std::size_t>(index)].name;
   }
@@ -317,14 +318,14 @@ bool NewRegionDialog::chooseCountry(const QString& id)
   return true;
 }
 
-void NewRegionDialog::countryActivated(int index)
+void NewRegionDialog::countryActivated(int32_t index)
 {
   if (index >= 0) {
     chooseCountry(m_countryBox->itemData(index).toString());
   }
 }
 
-void NewRegionDialog::setLevels(int minimumLevel, int maximumLevel)
+void NewRegionDialog::setLevels(int32_t minimumLevel, int32_t maximumLevel)
 {
   m_minimumBox->setValue(minimumLevel);
   m_maximumBox->setValue(maximumLevel);
@@ -332,14 +333,14 @@ void NewRegionDialog::setLevels(int minimumLevel, int maximumLevel)
 
 void NewRegionDialog::layerChanged()
 {
-  const int index = m_layerBox->currentIndex();
+  const int32_t index = m_layerBox->currentIndex();
   m_provider.reset();
-  if (index >= 0 && index < static_cast<int>(m_layers.size())) {
+  if (index >= 0 && index < static_cast<int32_t>(m_layers.size())) {
     QString error;
     m_provider = m_manager.providerFor(
         m_layers[static_cast<std::size_t>(index)].source, &error);
   }
-  const int deepest = m_provider ? m_provider->maximumLevel() : 0;
+  const int32_t deepest = m_provider ? m_provider->maximumLevel() : 0;
   m_minimumBox->setRange(0, deepest);
   m_maximumBox->setRange(0, deepest);
   // A sensible start: the whole pyramid down to about 150 m per pixel.
@@ -410,11 +411,11 @@ void NewRegionDialog::refresh()
                                     area));
     } else if (m_area->rings().size() > 1) {
       m_areaLabel->setText(tr("Polygon in %n part(s) (%1 km²)", "",
-                              static_cast<int>(m_area->rings().size()))
+                              static_cast<int32_t>(m_area->rings().size()))
                                .arg(area));
     } else {
       m_areaLabel->setText(tr("Polygon with %n corner(s) (%1 km²)", "",
-                              static_cast<int>(m_area->vertices().size()))
+                              static_cast<int32_t>(m_area->vertices().size()))
                                .arg(area));
     }
   }
@@ -423,7 +424,7 @@ void NewRegionDialog::refresh()
   if (m_maximumBox->value() < m_minimumBox->value()) {
     m_maximumBox->setValue(m_minimumBox->value());
   }
-  const int tileSize = m_provider ? m_provider->tileSizePx() : 256;
+  const int32_t tileSize = m_provider ? m_provider->tileSizePx() : 256;
   m_detailLabel->setText(
       tr("Down to about %1 per pixel")
           .arg(formatDistance(metresPerPixel(m_maximumBox->value(), tileSize),

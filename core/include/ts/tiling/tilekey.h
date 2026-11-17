@@ -86,29 +86,29 @@ struct GeoRect {
  */
 struct TileKey {
   /** Deepest level supported (tiles of about 1.2 m at the equator). */
-  static constexpr int maximumLevel = 24;
+  static constexpr int32_t maximumLevel = 24;
 
   /** Zoom level, 0 to maximumLevel. */
-  int level = 0;
+  int32_t level = 0;
   /** Column, 0 to 2^(level+1) − 1, from 180° W eastwards. */
-  int x = 0;
+  int32_t x = 0;
   /** Row, 0 to 2^level − 1, from the north pole southwards. */
-  int y = 0;
+  int32_t y = 0;
 
   /** Returns the number of columns at @p level. */
-  static constexpr std::int64_t columns(int level)
+  static constexpr std::int64_t columns(int32_t level)
   {
     return std::int64_t{2} << level;
   }
 
   /** Returns the number of rows at @p level. */
-  static constexpr std::int64_t rows(int level)
+  static constexpr std::int64_t rows(int32_t level)
   {
     return std::int64_t{1} << level;
   }
 
   /** Returns the tile size in degrees at @p level (both directions). */
-  static constexpr double sizeDeg(int level)
+  static constexpr double sizeDeg(int32_t level)
   {
     return 180.0 / static_cast<double>(rows(level));
   }
@@ -125,7 +125,7 @@ struct TileKey {
    * Longitude is normalised; points on an edge belong to the tile east
    * or south of it (except at 180° E and the south pole).
    */
-  static TileKey containing(int level, const Geodetic& position);
+  static TileKey containing(int32_t level, const Geodetic& position);
 
   /** Returns true if level, x and y are in range. */
   constexpr bool isValid() const
@@ -144,7 +144,7 @@ struct TileKey {
    * Returns child @p index (0 north-west, 1 north-east, 2 south-west,
    * 3 south-east), one level down.
    */
-  TileKey child(int index) const;
+  TileKey child(int32_t index) const;
 
   /** Returns true if @p other is this tile or lies inside it. */
   bool contains(TileKey other) const;

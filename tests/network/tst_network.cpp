@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -76,12 +77,12 @@ withHeaders(std::vector<std::pair<QByteArray, QByteArray>> headers)
 }
 
 /** 2024-05-01 12:00:00 UTC. */
-constexpr long long nowS = 1714564800;
-constexpr long long dayS = 86400;
+constexpr int64_t nowS = 1714564800;
+constexpr int64_t dayS = 86400;
 
 // Size, then the byte to fill with, as QByteArray(int, char).
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-ts::CachedTile tileOf(int bytes, char fill, long long expiresS = 0)
+ts::CachedTile tileOf(int32_t bytes, char fill, int64_t expiresS = 0)
 {
   ts::CachedTile tile;
   tile.data = QByteArray(bytes, fill);
@@ -163,7 +164,7 @@ private slots:
   void retriesWithBackOff()
   {
     // Two 503s, then success: three attempts, 50 + 100 ms apart.
-    std::atomic<int> calls{0};
+    std::atomic<int32_t> calls{0};
     MockHttpServer server([&calls](const MockHttpRequest&) {
       return ++calls <= 2 ? mockResponse(503, "busy") : mockResponse(200, "ok");
     });
@@ -186,7 +187,7 @@ private slots:
 
   void honoursRetryAfterWithinLimit()
   {
-    std::atomic<int> calls{0};
+    std::atomic<int32_t> calls{0};
     MockHttpServer server([&calls](const MockHttpRequest&) {
       if (++calls == 1) {
         MockHttpResponse response = mockResponse(429, "slow down");
@@ -267,7 +268,7 @@ private slots:
 
   void refusesOversizedResponses()
   {
-    constexpr int threeMiB = 3 * 1024 * 1024;
+    constexpr int32_t threeMiB = 3 * 1024 * 1024;
     MockHttpServer server([](const MockHttpRequest&) {
       return mockResponse(200, QByteArray(threeMiB, 'x'), "image/png");
     });
@@ -303,7 +304,7 @@ private slots:
     // The connection closes while the redirect is being followed (GitHub's
     // release downloads over HTTP/2 did this): that is a connection
     // failure, retried, not a 302 answer.
-    std::atomic<int> targetRequests{0};
+    std::atomic<int32_t> targetRequests{0};
     MockHttpServer server([&targetRequests](const MockHttpRequest& request) {
       if (request.url.path() == QLatin1String("/old")) {
         MockHttpResponse response = mockResponse(302, QByteArray());
@@ -387,7 +388,7 @@ private slots:
     ts::NetworkClient client(settings);
     std::vector<std::shared_ptr<ts::NetworkTicket>> tickets;
     tickets.reserve(12);
-    for (int i = 0; i < 12; ++i) {
+    for (int32_t i = 0; i < 12; ++i) {
       tickets.push_back(client.start(
           ts::HttpRequest{server.url(QStringLiteral("/%1").arg(i)), {}}));
     }
@@ -402,7 +403,7 @@ private slots:
     server.resetLog();
     std::vector<std::shared_ptr<ts::NetworkTicket>> more;
     more.reserve(9);
-    for (int i = 0; i < 9; ++i) {
+    for (int32_t i = 0; i < 9; ++i) {
       more.push_back(client.start(
           ts::HttpRequest{server.url(QStringLiteral("/%1").arg(i)), {}}));
     }
@@ -448,7 +449,7 @@ private slots:
       ts::NetworkSettings settings = testSettings();
       settings.maximumInFlight = 2;
       ts::NetworkClient client(settings);
-      for (int i = 0; i < 5; ++i) {
+      for (int32_t i = 0; i < 5; ++i) {
         tickets.push_back(client.start(ts::HttpRequest{server.url(), {}}));
       }
       QVERIFY(
@@ -467,10 +468,10 @@ private slots:
       return mockResponse(200, request.url.path().toLatin1());
     });
     ts::NetworkClient client(testSettings());
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&client, &server](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&client, &server](int32_t thread) {
           bool ok = true;
-          for (int i = 0; i < 8; ++i) {
+          for (int32_t i = 0; i < 8; ++i) {
             const QString path = QStringLiteral("/%1/%2").arg(thread).arg(i);
             const std::atomic<bool> notCancelled{false};
             const ts::HttpResponse response = client.fetch(
@@ -490,17 +491,17 @@ private slots:
   void parsesHttpDates()
   {
     // RFC 9110's example, in its three formats.
-    const long long expected = 784111777;
+    const int64_t expected = 784111777;
     QCOMPARE(ts::parseHttpDate("Sun, 06 Nov 1994 08:49:37 GMT"),
-             std::optional<long long>(expected));
+             std::optional<int64_t>(expected));
     QCOMPARE(ts::parseHttpDate("Sunday, 06-Nov-94 08:49:37 GMT"),
-             std::optional<long long>(expected));
+             std::optional<int64_t>(expected));
     QCOMPARE(ts::parseHttpDate("Sun Nov  6 08:49:37 1994"),
-             std::optional<long long>(expected));
+             std::optional<int64_t>(expected));
     QCOMPARE(ts::parseHttpDate("Wed, 01 May 2024 12:00:00 GMT"),
-             std::optional<long long>(nowS));
+             std::optional<int64_t>(nowS));
     QCOMPARE(ts::parseHttpDate("Thu, 29 Feb 2024 23:59:59 GMT"),
-             std::optional<long long>(1709251199));
+             std::optional<int64_t>(1709251199));
     QVERIFY(!ts::parseHttpDate(""));
     QVERIFY(!ts::parseHttpDate("0"));
     QVERIFY(!ts::parseHttpDate("-1"));
@@ -510,7 +511,7 @@ private slots:
 
   void freshnessFromHeaders()
   {
-    const long long week = 7 * dayS;
+    const int64_t week = 7 * dayS;
     // Nothing said: the default.
     ts::HttpFreshness f = ts::httpFreshness(withHeaders({}), nowS, week);
     QVERIFY(f.storable);
@@ -577,7 +578,7 @@ private slots:
   {
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("sub/dir/c.sqlite")),
-                            1024LL * 1024);
+                            int64_t{1024} * 1024);
     const ts::TileKey key{5, 17, 9};
     QVERIFY(!cache.find(key));
     ts::CachedTile tile = tileOf(1000, 'a', nowS + 60);
@@ -592,11 +593,11 @@ private slots:
     QCOMPARE(found.value_or(ts::CachedTile{}).expiresS, nowS + 60);
     QCOMPARE(found.value_or(ts::CachedTile{}).etag, tile.etag);
     QCOMPARE(found.value_or(ts::CachedTile{}).lastModified, tile.lastModified);
-    QCOMPARE(cache.sizeBytes(), 1000LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{1000});
     QCOMPARE(cache.count(), 1);
     // Replacing keeps one copy.
     QVERIFY(cache.store(key, tileOf(400, 'b')));
-    QCOMPARE(cache.sizeBytes(), 400LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{400});
     QCOMPARE(cache.count(), 1);
     // Refresh after a 304.
     QVERIFY(cache.refresh(key, nowS + 99, "\"f\"", {}));
@@ -610,10 +611,10 @@ private slots:
     QCOMPARE(cache.count(), 2);
     cache.remove(key);
     QVERIFY(!cache.find(key));
-    QCOMPARE(cache.sizeBytes(), 10LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{10});
     cache.clear();
     QCOMPARE(cache.count(), 0);
-    QCOMPARE(cache.sizeBytes(), 0LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{0});
     QCOMPARE(cache.recoveries(), 0);
   }
 
@@ -622,15 +623,15 @@ private slots:
     // 10 KB tiles into a 50 KB cache: the oldest go, unless used lately.
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            50LL * 1000);
-    for (int i = 0; i < 5; ++i) {
+                            int64_t{50} * 1000);
+    for (int32_t i = 0; i < 5; ++i) {
       QVERIFY(cache.store(ts::TileKey{3, i, 0}, tileOf(10000, 'a')));
     }
     QCOMPARE(cache.count(), 5);
     QVERIFY(cache.find(ts::TileKey{3, 0, 0})); // 0 is now the newest
     QVERIFY(cache.store(ts::TileKey{3, 5, 0}, tileOf(10000, 'b')));
     // Over the limit: down to 45 KB, so the two least recently used go.
-    QCOMPARE(cache.sizeBytes(), 40000LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{40000});
     QVERIFY(cache.find(ts::TileKey{3, 0, 0}));
     QVERIFY(!cache.find(ts::TileKey{3, 1, 0}));
     QVERIFY(!cache.find(ts::TileKey{3, 2, 0}));
@@ -644,30 +645,30 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 50LL * 1000);
+      ts::TileDiskCache cache(path, int64_t{50} * 1000);
       QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(10000, 'x', nowS)));
       QVERIFY(cache.store(ts::TileKey{1, 1, 0}, tileOf(10000, 'y', nowS)));
       QVERIFY(cache.find(ts::TileKey{1, 0, 0}));
     }
-    ts::TileDiskCache cache(path, 50LL * 1000);
+    ts::TileDiskCache cache(path, int64_t{50} * 1000);
     QCOMPARE(cache.count(), 2);
-    QCOMPARE(cache.sizeBytes(), 20000LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{20000});
     QCOMPARE(cache.find(ts::TileKey{1, 1, 0}).value_or(ts::CachedTile{}).data,
              QByteArray(10000, 'y'));
     // The order of use survived too: 1/0/0 was used last before the
     // restart, then 1/1/0 now. Filling up to 55 KB evicts 1/0/0 only.
-    for (int i = 2; i < 5; ++i) {
+    for (int32_t i = 2; i < 5; ++i) {
       QVERIFY(cache.store(ts::TileKey{1, i, 0}, tileOf(10000, 'z')));
     }
     QVERIFY(cache.store(ts::TileKey{2, 0, 0}, tileOf(5000, 'w')));
-    QCOMPARE(cache.sizeBytes(), 45000LL);
+    QCOMPARE(cache.sizeBytes(), int64_t{45000});
     QVERIFY(!cache.find(ts::TileKey{1, 0, 0}));
     QVERIFY(cache.find(ts::TileKey{1, 1, 0}));
   }
 
   void cacheRecoversFromDamage_data()
   {
-    QTest::addColumn<int>("damage");
+    QTest::addColumn<int32_t>("damage");
     QTest::newRow("garbage") << 0;
     QTest::newRow("truncated") << 1;
     QTest::newRow("overwritten pages") << 2;
@@ -677,12 +678,12 @@ private slots:
   void cacheRecoversFromDamage()
   {
     // A damaged file is replaced by an empty cache that works.
-    QFETCH(int, damage);
+    QFETCH(int32_t, damage);
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 10LL * 1000 * 1000);
-      for (int i = 0; i < 200; ++i) {
+      ts::TileDiskCache cache(path, int64_t{10} * 1000 * 1000);
+      for (int32_t i = 0; i < 200; ++i) {
         QVERIFY(cache.store(ts::TileKey{8, i, 3}, tileOf(5000, 'q')));
       }
     }
@@ -709,9 +710,9 @@ private slots:
       QFile::remove(path + QLatin1String(suffix));
     }
 
-    ts::TileDiskCache cache(path, 10LL * 1000 * 1000);
+    ts::TileDiskCache cache(path, int64_t{10} * 1000 * 1000);
     // Reading may meet the damage now or later; either way it recovers.
-    for (int i = 0; i < 200; ++i) {
+    for (int32_t i = 0; i < 200; ++i) {
       cache.find(ts::TileKey{8, i, 3});
     }
     QVERIFY(cache.store(ts::TileKey{0, 0, 0}, tileOf(100, 'n')));
@@ -727,14 +728,14 @@ private slots:
     QTemporaryDir dir;
     const QString path = dir.filePath(QStringLiteral("c.sqlite"));
     {
-      ts::TileDiskCache cache(path, 1000LL * 1000);
+      ts::TileDiskCache cache(path, int64_t{1000} * 1000);
       QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(10, 'a')));
     }
     {
       ts::SqliteConnection db(path, ts::SqliteConnection::OpenMode::ReadWrite);
       QVERIFY(db.execute(QStringLiteral("PRAGMA user_version=99")));
     }
-    ts::TileDiskCache cache(path, 1000LL * 1000);
+    ts::TileDiskCache cache(path, int64_t{1000} * 1000);
     QCOMPARE(cache.count(), 0);
     QVERIFY(cache.store(ts::TileKey{1, 0, 0}, tileOf(10, 'b')));
   }
@@ -743,11 +744,11 @@ private slots:
   {
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            200LL * 1000);
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&cache](int thread) {
+                            int64_t{200} * 1000);
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&cache](int32_t thread) {
           bool ok = true;
-          for (int i = 0; i < 40; ++i) {
+          for (int32_t i = 0; i < 40; ++i) {
             const ts::TileKey key{10, thread, i};
             ok = ok && cache.store(
                            key, tileOf(1000, static_cast<char>('a' + i % 26)));
@@ -765,11 +766,11 @@ private slots:
   {
     QTemporaryDir dir;
     ts::TileDiskCache cache(dir.filePath(QStringLiteral("c.sqlite")),
-                            100LL * 1000 * 1000);
-    for (int i = 0; i < 256; ++i) {
+                            int64_t{100} * 1000 * 1000);
+    for (int32_t i = 0; i < 256; ++i) {
       cache.store(ts::TileKey{8, i, 0}, tileOf(20000, 'b'));
     }
-    int i = 0;
+    int32_t i = 0;
     QBENCHMARK
     {
       const std::optional<ts::CachedTile> tile =

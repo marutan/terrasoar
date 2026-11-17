@@ -20,6 +20,7 @@
 
 #include "ts/deps/projcontext.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <proj.h>
@@ -57,7 +58,7 @@ QString ProjContext::lastErrorString() const
   if (m_context == nullptr) {
     return QString();
   }
-  const int errorNumber = proj_context_errno(m_context);
+  const int32_t errorNumber = proj_context_errno(m_context);
   if (errorNumber == 0) {
     return QString();
   }

@@ -25,6 +25,7 @@
 #ifndef TS_LAYERS_LAYERTREEMODEL_H
 #define TS_LAYERS_LAYERTREEMODEL_H
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <vector>
@@ -52,7 +53,7 @@ struct ImageryStackEntry {
    */
   double alpha = 1.0;
   /** Index into LayerStack::groups, or −1. */
-  int group = -1;
+  int32_t group = -1;
 };
 
 /** A collection drawn offscreen and faded as one image. */
@@ -161,20 +162,20 @@ public:
   ~LayerTreeModel() override;
 
   /** Returns the index of @p row, @p column under @p parent. */
-  QModelIndex index(int row, int column,
+  QModelIndex index(int32_t row, int32_t column,
                     const QModelIndex& parent = QModelIndex()) const override;
   /** Returns the parent of @p child. */
   QModelIndex parent(const QModelIndex& child) const override;
   /** Returns the number of children of @p parent. */
-  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+  int32_t rowCount(const QModelIndex& parent = QModelIndex()) const override;
   /** Returns 1. */
-  int columnCount(const QModelIndex& parent = QModelIndex()) const override;
+  int32_t columnCount(const QModelIndex& parent = QModelIndex()) const override;
   /** Returns the data of @p index for @p role. */
   QVariant data(const QModelIndex& index,
-                int role = Qt::DisplayRole) const override;
+                int32_t role = Qt::DisplayRole) const override;
   /** Sets the name, visibility, opacity or composite flag. */
   bool setData(const QModelIndex& index, const QVariant& value,
-               int role = Qt::EditRole) override;
+               int32_t role = Qt::EditRole) override;
   /** Returns the item flags; collections and the root accept drops. */
   Qt::ItemFlags flags(const QModelIndex& index) const override;
   /** Returns Qt::MoveAction. */
@@ -188,15 +189,16 @@ public:
    * even when it moved them, so that the view doesn't remove the source
    * rows a second time.
    */
-  bool dropMimeData(const QMimeData* data, Qt::DropAction action, int row,
-                    int column, const QModelIndex& parent) override;
+  bool dropMimeData(const QMimeData* data, Qt::DropAction action, int32_t row,
+                    int32_t column, const QModelIndex& parent) override;
 
   /**
    * Adds a layer showing @p definition at @p row (0 = top) under
    * @p parent (a collection, or the root). Returns its index.
    */
   QModelIndex addLayer(const LayerDefinition& definition,
-                       const QModelIndex& parent = QModelIndex(), int row = 0);
+                       const QModelIndex& parent = QModelIndex(),
+                       int32_t row = 0);
 
   /**
    * Replaces the definition of the layer at @p index (to change its
@@ -208,7 +210,7 @@ public:
   /** Adds an empty collection named @p name. Returns its index. */
   QModelIndex addCollection(const QString& name,
                             const QModelIndex& parent = QModelIndex(),
-                            int row = 0);
+                            int32_t row = 0);
 
   /** Removes @p index and everything under it. */
   bool removeNode(const QModelIndex& index);
@@ -218,7 +220,7 @@ public:
    * Refuses to move a collection into itself or its descendants.
    */
   bool moveNode(const QModelIndex& index, const QModelIndex& newParent,
-                int row);
+                int32_t row);
 
   /** Removes everything. */
   void clear();
@@ -262,7 +264,7 @@ private:
   Node* nodeAt(const QModelIndex& index) const;
   QModelIndex indexOf(const Node* node) const;
   QModelIndex insertNode(std::unique_ptr<Node> node, const QModelIndex& parent,
-                         int row);
+                         int32_t row);
   void emitSubtreeChanged(const QModelIndex& index);
   void emitDataChangedBelow(const QModelIndex& index);
 

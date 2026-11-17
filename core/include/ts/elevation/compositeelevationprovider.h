@@ -25,6 +25,7 @@
 #ifndef TS_ELEVATION_COMPOSITEELEVATIONPROVIDER_H
 #define TS_ELEVATION_COMPOSITEELEVATIONPROVIDER_H
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -69,8 +70,8 @@ public:
   /** The first source's name. */
   QString name() const override;
   /** The deepest of the sources'. */
-  int maximumLevel() const override;
-  int preferredLoaderThreads() const override;
+  int32_t maximumLevel() const override;
+  int32_t preferredLoaderThreads() const override;
 
   /** Heights above the WGS 84 ellipsoid, never NaN. */
   std::optional<HeightTile>

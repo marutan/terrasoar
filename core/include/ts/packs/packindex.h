@@ -25,6 +25,7 @@
 #ifndef TS_PACKS_PACKINDEX_H
 #define TS_PACKS_PACKINDEX_H
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <vector>
@@ -99,7 +100,7 @@ class PackIndex
 {
 public:
   /** The highest format version this code reads. */
-  static constexpr int currentFormat = 1;
+  static constexpr int32_t currentFormat = 1;
 
   /**
    * Parses an index. Returns nothing and sets @p errorString (English) if

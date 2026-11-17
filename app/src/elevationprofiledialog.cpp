@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <utility>
 
@@ -213,7 +214,7 @@ void ElevationProfileChart::mouseMoveEvent(QMouseEvent* event)
   const double x = event->localPos().x();
 #endif
   const std::optional<std::size_t> index = pointAt(x);
-  const int hovered = index ? static_cast<int>(*index) : -1;
+  const int32_t hovered = index ? static_cast<int32_t>(*index) : -1;
   if (hovered != m_hovered) {
     m_hovered = hovered;
     update();
@@ -265,16 +266,17 @@ ElevationProfileDialog::ElevationProfileDialog(QWidget* parent)
   connect(m_saveButton, &QPushButton::clicked, this,
           &ElevationProfileDialog::saveCsv);
   connect(m_closeButton, &QPushButton::clicked, this, &QDialog::close);
-  connect(m_chart, &ElevationProfileChart::hovered, this, [this](int index) {
-    const std::optional<ElevationProfile>& profile = m_chart->profile();
-    if (index < 0 || !profile.has_value() ||
-        static_cast<std::size_t>(index) >= profile->points.size()) {
-      emit pointHovered(std::nullopt);
-    } else {
-      emit pointHovered(
-          profile->points[static_cast<std::size_t>(index)].position);
-    }
-  });
+  connect(m_chart, &ElevationProfileChart::hovered, this,
+          [this](int32_t index) {
+            const std::optional<ElevationProfile>& profile = m_chart->profile();
+            if (index < 0 || !profile.has_value() ||
+                static_cast<std::size_t>(index) >= profile->points.size()) {
+              emit pointHovered(std::nullopt);
+            } else {
+              emit pointHovered(
+                  profile->points[static_cast<std::size_t>(index)].position);
+            }
+          });
   retranslateUi();
 }
 

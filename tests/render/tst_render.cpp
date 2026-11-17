@@ -34,7 +34,7 @@
 namespace
 {
 
-constexpr int sizePx = 64;
+constexpr int32_t sizePx = 64;
 
 /** Colour from a uniform block; position from attribute 0. */
 const char* const solidVertexGlsl = R"(
@@ -88,7 +88,7 @@ struct SolidBlock {
   std::array<float, 3> padding{};
 };
 
-QRgb pixel(const QImage& image, int x, int y)
+QRgb pixel(const QImage& image, int32_t x, int32_t y)
 {
   return image.pixel(x, y) & 0x00ffffffU;
 }
@@ -277,7 +277,7 @@ private slots:
     const QImage image = device.readPixels(*m_target);
     // Instance 0 at (−0.5, +0.5): top left; instance 1 at (+0.5, −0.5):
     // bottom right. The other two quarters stay black.
-    const int quarter = sizePx / 4;
+    const int32_t quarter = sizePx / 4;
     QCOMPARE(pixel(image, quarter, quarter), 0x000000ffU);
     QCOMPARE(pixel(image, 3 * quarter, 3 * quarter), 0x000000ffU);
     QCOMPARE(pixel(image, 3 * quarter, quarter), 0U);
@@ -351,7 +351,7 @@ private slots:
     device.draw(6, 0, 1);
     device.endPass();
     const QImage result = device.readPixels(*m_target);
-    const int q = sizePx / 4;
+    const int32_t q = sizePx / 4;
     QCOMPARE(pixel(result, q, 3 * q), 0x00ff0000U);     // bottom left: row 0
     QCOMPARE(pixel(result, 3 * q, 3 * q), 0x0000ff00U); // bottom right
     QCOMPARE(pixel(result, q, q), 0x000000ffU);         // top left: row 1

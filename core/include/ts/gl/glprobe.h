@@ -25,6 +25,8 @@
 #ifndef TS_GL_GLPROBE_H
 #define TS_GL_GLPROBE_H
 
+#include <cstdint>
+
 #include <QString>
 
 namespace ts
@@ -39,9 +41,9 @@ struct GlProbeResult {
   /** True if a context of at least the requested version was made current. */
   bool ok = false;
   /** Context version actually obtained: major part. */
-  int majorVersion = 0;
+  int32_t majorVersion = 0;
   /** Context version actually obtained: minor part. */
-  int minorVersion = 0;
+  int32_t minorVersion = 0;
   /** True if the context uses the core profile. */
   bool coreProfile = false;
   /** GL_VENDOR string. */
@@ -67,7 +69,7 @@ struct GlProbeResult {
  * @param major Minimum major version, e.g. 3.
  * @param minor Minimum minor version, e.g. 3.
  */
-GlProbeResult probeOpenGl(int major, int minor);
+GlProbeResult probeOpenGl(int32_t major, int32_t minor);
 
 /**
  * Returns true if @p renderer (a GL_RENDERER string) names a software

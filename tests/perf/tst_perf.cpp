@@ -69,7 +69,7 @@ private slots:
   void rollingWindow()
   {
     ts::FrameTimeStats stats(3);
-    for (int i = 1; i <= 5; ++i) {
+    for (int32_t i = 1; i <= 5; ++i) {
       stats.addFrame(i * 0.1);
     }
     // Keeps 0.3, 0.4, 0.5.
@@ -110,7 +110,7 @@ private slots:
     QFETCH(double, expected);
     ts::FrameTimeStats stats(100);
     // Added in reverse to check that order does not matter.
-    for (int ms = 100; ms >= 1; --ms) {
+    for (int32_t ms = 100; ms >= 1; --ms) {
       stats.addFrame(ms / 1000.0);
     }
     QVERIFY(qFuzzyCompare(stats.percentileS(p), expected));
@@ -144,7 +144,7 @@ private slots:
     timer.start();
     volatile double sink = 0.0;
     while (timer.elapsed() < 200) {
-      for (int i = 0; i < 10000; ++i) {
+      for (int32_t i = 0; i < 10000; ++i) {
         sink = sink + i * 0.5;
       }
     }
@@ -153,10 +153,10 @@ private slots:
 
   void concurrentOwnInstances()
   {
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [](int thread) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [](int32_t thread) {
           ts::FrameTimeStats stats(64);
-          for (int i = 0; i < 10000; ++i) {
+          for (int32_t i = 0; i < 10000; ++i) {
             stats.addFrame((thread + 1) * 0.001);
           }
           const ts::ProcessStats process = ts::currentProcessStats();
@@ -178,7 +178,7 @@ private slots:
   void benchmarkPercentile()
   {
     ts::FrameTimeStats stats(240);
-    for (int i = 0; i < 240; ++i) {
+    for (int32_t i = 0; i < 240; ++i) {
       stats.addFrame(i * 0.0001);
     }
     double p = 0.0;

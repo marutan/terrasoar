@@ -25,6 +25,7 @@
 #ifndef TS_PACKAGER_PACKBUILDER_H
 #define TS_PACKAGER_PACKBUILDER_H
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <vector>
@@ -115,9 +116,9 @@ struct ElevationSpec {
   /** Attribution. */
   QString attribution;
   /** Deepest level stored. */
-  int maxLevel = 6;
+  int32_t maxLevel = 6;
   /** Samples along a tile's side. */
-  int samples = 65;
+  int32_t samples = 65;
   /** The heights' vertical datum: a geoid dataset of the pack, or empty. */
   QString verticalDatum;
 };
@@ -135,7 +136,7 @@ struct GeoidSpec {
   /** Attribution. */
   QString attribution;
   /** Keep every step-th sample. */
-  int step = 1;
+  int32_t step = 1;
   /** The base pack dataset it takes the place of, or empty. */
   QString replaces;
   /**

@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 
 #include <QList>
 
@@ -34,19 +35,19 @@ namespace
 {
 
 /** Days from 1970-01-01 to the civil date (proleptic Gregorian). */
-long long daysFromCivil(long long year, int month, int day)
+int64_t daysFromCivil(int64_t year, int32_t month, int32_t day)
 {
   year -= month <= 2 ? 1 : 0;
-  const long long era = (year >= 0 ? year : year - 399) / 400;
-  const long long yearOfEra = year - era * 400;
-  const long long dayOfYear =
+  const int64_t era = (year >= 0 ? year : year - 399) / 400;
+  const int64_t yearOfEra = year - era * 400;
+  const int64_t dayOfYear =
       (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
-  const long long dayOfEra =
+  const int64_t dayOfEra =
       yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear;
   return era * 146097 + dayOfEra - 719468;
 }
 
-int monthNumber(const QByteArray& token)
+int32_t monthNumber(const QByteArray& token)
 {
   static const std::array<const char*, 12> months = {
       "jan", "feb", "mar", "apr", "may", "jun",
@@ -54,7 +55,7 @@ int monthNumber(const QByteArray& token)
   const QByteArray prefix = token.left(3).toLower();
   for (std::size_t i = 0; i < months.size(); ++i) {
     if (prefix == months.at(i)) {
-      return static_cast<int>(i) + 1;
+      return static_cast<int32_t>(i) + 1;
     }
   }
   return 0;
@@ -71,7 +72,7 @@ bool isDigits(const QByteArray& token)
 struct CacheControl {
   bool noStore = false;
   bool noCache = false;
-  std::optional<long long> maxAge;
+  std::optional<int64_t> maxAge;
 };
 
 CacheControl parseCacheControl(const QByteArray& header)
@@ -79,7 +80,7 @@ CacheControl parseCacheControl(const QByteArray& header)
   CacheControl result;
   const QList<QByteArray> directives = header.split(',');
   for (const QByteArray& directive : directives) {
-    const int equals = static_cast<int>(directive.indexOf('='));
+    const int32_t equals = static_cast<int32_t>(directive.indexOf('='));
     const QByteArray name =
         (equals < 0 ? directive : directive.left(equals)).trimmed().toLower();
     QByteArray value =
@@ -93,9 +94,9 @@ CacheControl parseCacheControl(const QByteArray& header)
       result.noCache = true;
     } else if (name == "max-age") {
       bool ok = false;
-      const long long seconds = value.toLongLong(&ok);
+      const int64_t seconds = value.toLongLong(&ok);
       if (ok) {
-        result.maxAge = std::max(seconds, 0LL);
+        result.maxAge = std::max(seconds, int64_t{0});
       }
     }
   }
@@ -105,8 +106,8 @@ CacheControl parseCacheControl(const QByteArray& header)
 /** The response's lifetime in seconds, and how old it already is. */
 // Now, then the default.
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
-long long lifetimeS(const HttpResponse& response, const CacheControl& control,
-                    long long nowS, long long defaultLifetimeS)
+int64_t lifetimeS(const HttpResponse& response, const CacheControl& control,
+                  int64_t nowS, int64_t defaultLifetimeS)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
   if (control.noCache) {
@@ -115,13 +116,13 @@ long long lifetimeS(const HttpResponse& response, const CacheControl& control,
   if (control.maxAge) {
     return *control.maxAge;
   }
-  const long long dateS = parseHttpDate(response.header("date")).value_or(nowS);
+  const int64_t dateS = parseHttpDate(response.header("date")).value_or(nowS);
   const QByteArray expires = response.header("expires");
   if (!expires.isEmpty()) {
-    const std::optional<long long> expiresS = parseHttpDate(expires);
-    return expiresS ? std::max(*expiresS - dateS, 0LL) : 0;
+    const std::optional<int64_t> expiresS = parseHttpDate(expires);
+    return expiresS ? std::max(*expiresS - dateS, int64_t{0}) : 0;
   }
-  const std::optional<long long> modifiedS =
+  const std::optional<int64_t> modifiedS =
       parseHttpDate(response.header("last-modified"));
   if (modifiedS && *modifiedS <= dateS) {
     return std::min((dateS - *modifiedS) / 10, defaultLifetimeS);
@@ -129,21 +130,21 @@ long long lifetimeS(const HttpResponse& response, const CacheControl& control,
   return defaultLifetimeS;
 }
 
-long long ageS(const HttpResponse& response)
+int64_t ageS(const HttpResponse& response)
 {
   bool ok = false;
-  const long long age = response.header("age").trimmed().toLongLong(&ok);
+  const int64_t age = response.header("age").trimmed().toLongLong(&ok);
   return ok && age > 0 ? age : 0;
 }
 
 /** The fields of an HTTP date, as they are found. */
 struct DateFields {
-  int month = 0;
-  int day = -1;
-  long long year = -1;
-  int hour = -1;
-  int minute = -1;
-  int second = -1;
+  int32_t month = 0;
+  int32_t day = -1;
+  int64_t year = -1;
+  int32_t hour = -1;
+  int32_t minute = -1;
+  int32_t second = -1;
 };
 
 /** Reads "hh:mm:ss"; false if it isn't one. */
@@ -187,7 +188,7 @@ bool isComplete(const DateFields& date)
 
 } // namespace
 
-std::optional<long long> parseHttpDate(const QByteArray& value)
+std::optional<int64_t> parseHttpDate(const QByteArray& value)
 {
   // Commas and the dashes of RFC 850 dates separate fields like spaces.
   QByteArray text = value.trimmed();
@@ -215,12 +216,12 @@ std::optional<long long> parseHttpDate(const QByteArray& value)
   if (!isComplete(date)) {
     return std::nullopt;
   }
-  const long long days = daysFromCivil(date.year, date.month, date.day);
+  const int64_t days = daysFromCivil(date.year, date.month, date.day);
   return ((days * 24 + date.hour) * 60 + date.minute) * 60 + date.second;
 }
 
-HttpFreshness httpFreshness(const HttpResponse& response, long long nowS,
-                            long long defaultLifetimeS)
+HttpFreshness httpFreshness(const HttpResponse& response, int64_t nowS,
+                            int64_t defaultLifetimeS)
 {
   const CacheControl control =
       parseCacheControl(response.header("cache-control"));
@@ -229,15 +230,15 @@ HttpFreshness httpFreshness(const HttpResponse& response, long long nowS,
   freshness.expiresS =
       nowS + std::max(lifetimeS(response, control, nowS, defaultLifetimeS) -
                           ageS(response),
-                      0LL);
+                      int64_t{0});
   freshness.etag = response.header("etag");
   freshness.lastModified = response.header("last-modified");
   return freshness;
 }
 
 HttpFreshness revalidatedFreshness(const HttpFreshness& previous,
-                                   const HttpResponse& response, long long nowS,
-                                   long long defaultLifetimeS)
+                                   const HttpResponse& response, int64_t nowS,
+                                   int64_t defaultLifetimeS)
 {
   HttpFreshness freshness = httpFreshness(response, nowS, defaultLifetimeS);
   freshness.storable = previous.storable && freshness.storable;

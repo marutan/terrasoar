@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 #include <QStringList>
@@ -36,7 +37,7 @@ namespace
 {
 
 /** How often installs and the index are looked at, ms. */
-constexpr int pollIntervalMs = 250;
+constexpr int32_t pollIntervalMs = 250;
 
 } // namespace
 

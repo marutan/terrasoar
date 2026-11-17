@@ -20,6 +20,7 @@
 
 #include "ts/i18n/translationloader.h"
 
+#include <cstdint>
 #include <utility>
 
 #include <QDir>
@@ -39,7 +40,8 @@ QString loadTranslation(QTranslator& translator, const QLocale& locale,
     QString name = language;
     name.replace(QLatin1Char('-'), QLatin1Char('_'));
     candidates << name;
-    const int separator = static_cast<int>(name.indexOf(QLatin1Char('_')));
+    const int32_t separator =
+        static_cast<int32_t>(name.indexOf(QLatin1Char('_')));
     if (separator > 0) {
       candidates << name.left(separator);
     }

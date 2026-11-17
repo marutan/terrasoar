@@ -25,6 +25,8 @@
 #ifndef TS_I18N_PSEUDOTRANSLATOR_H
 #define TS_I18N_PSEUDOTRANSLATOR_H
 
+#include <cstdint>
+
 #include <QString>
 #include <QTranslator>
 
@@ -58,7 +60,7 @@ public:
    * ignored. */
   QString translate(const char* context, const char* sourceText,
                     const char* disambiguation = nullptr,
-                    int n = -1) const override;
+                    int32_t n = -1) const override;
 
   /** Always false: the translator handles every string. */
   bool isEmpty() const override;
@@ -73,7 +75,7 @@ public:
   static bool isPseudoTranslated(const QString& text);
 
   /** Length growth applied to every string, in percent (rounded up). */
-  static constexpr int expansionPercent = 30;
+  static constexpr int32_t expansionPercent = 30;
 };
 
 } // namespace ts

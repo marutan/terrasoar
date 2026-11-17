@@ -21,18 +21,19 @@
 #include "ts/elevation/heighttileloader.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 namespace ts
 {
 
 HeightTileLoader::HeightTileLoader(std::shared_ptr<ElevationProvider> provider,
-                                   int threads)
+                                   int32_t threads)
     : m_provider(std::move(provider))
 {
-  const int count = std::clamp(threads, 1, 16);
+  const int32_t count = std::clamp(threads, 1, 16);
   m_workers.reserve(static_cast<std::size_t>(count));
-  for (int i = 0; i < count; ++i) {
+  for (int32_t i = 0; i < count; ++i) {
     m_workers.emplace_back(&HeightTileLoader::work, this);
   }
 }
@@ -82,11 +83,11 @@ void HeightTileLoader::setRequests(const std::vector<TileKey>& keys)
   m_wake.notify_all();
 }
 
-std::vector<LoadedHeights> HeightTileLoader::takeLoaded(int maximum)
+std::vector<LoadedHeights> HeightTileLoader::takeLoaded(int32_t maximum)
 {
   std::vector<LoadedHeights> loaded;
   const std::lock_guard<std::mutex> lock(m_mutex);
-  while (!m_done.empty() && static_cast<int>(loaded.size()) < maximum) {
+  while (!m_done.empty() && static_cast<int32_t>(loaded.size()) < maximum) {
     m_doneKeys.erase(m_done.front().key);
     loaded.push_back(std::move(m_done.front()));
     m_done.pop_front();
@@ -94,10 +95,11 @@ std::vector<LoadedHeights> HeightTileLoader::takeLoaded(int maximum)
   return loaded;
 }
 
-int HeightTileLoader::outstanding() const
+int32_t HeightTileLoader::outstanding() const
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  return static_cast<int>(m_queue.size() + m_inFlight.size() + m_done.size());
+  return static_cast<int32_t>(m_queue.size() + m_inFlight.size() +
+                              m_done.size());
 }
 
 void HeightTileLoader::work()

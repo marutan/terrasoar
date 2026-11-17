@@ -26,6 +26,7 @@
 #ifndef TS_PROVIDERS_SQLITETILEIMAGERYPROVIDER_H
 #define TS_PROVIDERS_SQLITETILEIMAGERYPROVIDER_H
 
+#include <cstdint>
 #include <memory>
 
 #include <QByteArray>
@@ -60,11 +61,11 @@ struct SqliteTileStoreInfo {
   /** Image format of the tiles: "jpeg" or "png". */
   QString format = QStringLiteral("jpeg");
   /** Width and height of every tile, pixels. */
-  int tileSizePx = 256;
+  int32_t tileSizePx = 256;
   /** Shallowest level stored (complete from here down to maxLevel). */
-  int minLevel = 0;
+  int32_t minLevel = 0;
   /** Deepest level stored. */
-  int maxLevel = 0;
+  int32_t maxLevel = 0;
   /** Name of the imagery (English). */
   QString name;
   /**
@@ -152,8 +153,8 @@ public:
 
   /** Returns the name stored in the metadata. */
   QString name() const override { return m_info.name; }
-  int maximumLevel() const override { return m_info.maxLevel; }
-  int tileSizePx() const override { return m_info.tileSizePx; }
+  int32_t maximumLevel() const override { return m_info.maxLevel; }
+  int32_t tileSizePx() const override { return m_info.tileSizePx; }
   QImage loadImage(TileKey key, const std::atomic<bool>& cancelled) override;
 
   /**

@@ -20,6 +20,8 @@
 
 #include "ts/layers/projectfile.h"
 
+#include <cstdint>
+
 #include <QCoreApplication>
 #include <QFile>
 #include <QJsonDocument>
@@ -72,7 +74,7 @@ CameraPose cameraFromJson(const QJsonObject& json)
  * format change adds a step here and a fixture of the old version to
  * tests/data/projects, which the tests keep loading.
  */
-QJsonObject migrate(QJsonObject document, int fromVersion)
+QJsonObject migrate(QJsonObject document, int32_t fromVersion)
 {
   if (fromVersion < 2) {
     // Version 2 added the view: before it there was only the globe.
@@ -120,7 +122,7 @@ std::optional<Project> projectFromJson(const QByteArray& json,
         errorString, QCoreApplication::translate("ts::ProjectFile",
                                                  "The file is not a project."));
   }
-  const int version = object.value(QStringLiteral("version")).toInt(0);
+  const int32_t version = object.value(QStringLiteral("version")).toInt(0);
   if (version < 1) {
     return failProject(errorString,
                        QCoreApplication::translate(

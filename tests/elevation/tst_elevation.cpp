@@ -21,6 +21,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -71,8 +72,8 @@ double fixtureUndulation(double latDeg, double lonDeg)
 bool writeFixtureGeoid(const QString& path, double offsetM = 0.0)
 {
   ts::initialiseGdal();
-  const int width = 360;
-  const int height = 181;
+  const int32_t width = 360;
+  const int32_t height = 181;
   const QByteArray encoded = path.toUtf8();
   GDALDatasetH dataset =
       GDALCreate(GDALGetDriverByName("GTiff"), encoded.constData(), width,
@@ -94,8 +95,8 @@ bool writeFixtureGeoid(const QString& path, double offsetM = 0.0)
                       nullptr);
   std::vector<float> values(static_cast<std::size_t>(width) *
                             static_cast<std::size_t>(height));
-  for (int row = 0; row < height; ++row) {
-    for (int column = 0; column < width; ++column) {
+  for (int32_t row = 0; row < height; ++row) {
+    for (int32_t column = 0; column < width; ++column) {
       values[static_cast<std::size_t>(row) * static_cast<std::size_t>(width) +
              static_cast<std::size_t>(column)] =
           static_cast<float>(fixtureUndulation(90.0 - row, -180.0 + column) +
@@ -116,8 +117,8 @@ bool writeFixtureGeoid(const QString& path, double offsetM = 0.0)
 bool writeRegionalGeoid(const QString& path)
 {
   ts::initialiseGdal();
-  const int width = 21;
-  const int height = 21;
+  const int32_t width = 21;
+  const int32_t height = 21;
   const QByteArray encoded = path.toUtf8();
   GDALDatasetH dataset =
       GDALCreate(GDALGetDriverByName("GTiff"), encoded.constData(), width,
@@ -135,8 +136,8 @@ bool writeRegionalGeoid(const QString& path)
   GDALSetMetadataItem(dataset, "TYPE", "VERTICAL_OFFSET_GEOGRAPHIC_TO_VERTICAL",
                       nullptr);
   std::vector<float> values;
-  for (int row = 0; row < height; ++row) {
-    for (int column = 0; column < width; ++column) {
+  for (int32_t row = 0; row < height; ++row) {
+    for (int32_t column = 0; column < width; ++column) {
       values.push_back(static_cast<float>(
           fixtureUndulation(47.0 - 0.1 * row, 7.0 + 0.1 * column) - 20.0));
     }
@@ -166,13 +167,15 @@ bool writeFixtureHeights(const QString& path, const QString& verticalDatum)
   info.name = QStringLiteral("Fixture heights");
   info.verticalDatum = verticalDatum;
   ts::SqliteTileStoreWriter writer(path, info);
-  for (int level = 0; level <= 2; ++level) {
-    for (int y = 0; y < static_cast<int>(ts::TileKey::rows(level)); ++y) {
-      for (int x = 0; x < static_cast<int>(ts::TileKey::columns(level)); ++x) {
+  for (int32_t level = 0; level <= 2; ++level) {
+    for (int32_t y = 0; y < static_cast<int32_t>(ts::TileKey::rows(level));
+         ++y) {
+      for (int32_t x = 0; x < static_cast<int32_t>(ts::TileKey::columns(level));
+           ++x) {
         const ts::TileKey key{level, x, y};
         std::vector<float> heights;
-        for (int row = 0; row < 9; ++row) {
-          for (int column = 0; column < 9; ++column) {
+        for (int32_t row = 0; row < 9; ++row) {
+          for (int32_t column = 0; column < 9; ++column) {
             const ts::GeoPoint point =
                 ts::heightSamplePoint(key, 9, row, column);
             heights.push_back(
@@ -200,7 +203,8 @@ double demHeight(double latDeg, double lonDeg)
  * @p transform, each pixel @p value(x, y) of its centre in CRS units.
  */
 bool writeDem(const QString& path, const char* crs,
-              const std::array<double, 6>& transform, int width, int height,
+              const std::array<double, 6>& transform, int32_t width,
+              int32_t height,
               const std::function<double(double, double)>& value,
               const double* noDataValue = nullptr)
 {
@@ -223,8 +227,8 @@ bool writeDem(const QString& path, const char* crs,
     GDALSetRasterNoDataValue(band, *noDataValue);
   }
   std::vector<float> values;
-  for (int row = 0; row < height; ++row) {
-    for (int column = 0; column < width; ++column) {
+  for (int32_t row = 0; row < height; ++row) {
+    for (int32_t column = 0; column < width; ++column) {
       const double x = transform[0] + transform[1] * (column + 0.5);
       const double y = transform[3] + transform[5] * (row + 0.5);
       values.push_back(static_cast<float>(value(x, y)));
@@ -255,7 +259,7 @@ bool writeGeographicDem(const QString& path, const char* crs = "EPSG:4326",
 }
 
 /** Sample (@p row, @p column) of @p tile. */
-double heightAt(const ts::HeightTile& tile, int row, int column)
+double heightAt(const ts::HeightTile& tile, int32_t row, int32_t column)
 {
   return static_cast<double>(
       tile.heightsM[static_cast<std::size_t>(row) *
@@ -270,16 +274,16 @@ double webHeight(double globalX, double globalY)
 }
 
 /** Terrarium PNG of web tile (@p zoom, @p x, @p y) of webHeight(). */
-QByteArray terrariumTile(int x, int y)
+QByteArray terrariumTile(int32_t x, int32_t y)
 {
   QImage image(256, 256, QImage::Format_ARGB32);
-  for (int row = 0; row < 256; ++row) {
-    for (int column = 0; column < 256; ++column) {
+  for (int32_t row = 0; row < 256; ++row) {
+    for (int32_t column = 0; column < 256; ++column) {
       const double height =
           webHeight(x * 256 + column + 0.5, y * 256 + row + 0.5) + 32768.0;
-      const int whole = static_cast<int>(std::floor(height));
-      const int fraction =
-          static_cast<int>(std::lround((height - whole) * 256.0));
+      const int32_t whole = static_cast<int32_t>(std::floor(height));
+      const int32_t fraction =
+          static_cast<int32_t>(std::lround((height - whole) * 256.0));
       image.setPixel(column, row,
                      qRgb(whole / 256, whole % 256, std::min(fraction, 255)));
     }
@@ -318,9 +322,9 @@ terrariumHandler(const std::shared_ptr<std::atomic<bool>>& failing)
     if (parts.size() != 3) {
       return ts::test::mockResponse(404, "no");
     }
-    const int zoom = parts[0].toInt();
-    const int x = parts[1].toInt();
-    const int y = QString(parts[2]).remove(QStringLiteral(".png")).toInt();
+    const int32_t zoom = parts[0].toInt();
+    const int32_t x = parts[1].toInt();
+    const int32_t y = QString(parts[2]).remove(QStringLiteral(".png")).toInt();
     if (zoom == 2 && x == 3) {
       return ts::test::mockResponse(404, "none here");
     }
@@ -331,7 +335,7 @@ terrariumHandler(const std::shared_ptr<std::atomic<bool>>& failing)
 /** The global pixel coordinates of (@p latDeg, @p lonDeg) at @p zoom. */
 // Latitude then longitude, as everywhere.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::pair<double, double> webPixel(double latDeg, double lonDeg, int zoom)
+std::pair<double, double> webPixel(double latDeg, double lonDeg, int32_t zoom)
 {
   const double world = std::ldexp(256.0, zoom);
   const double lat = latDeg * 3.14159265358979323846 / 180.0;
@@ -358,7 +362,7 @@ private slots:
     QCOMPARE(ts::quantizedHeightM(-104.0), -100.0);
     QCOMPARE(ts::quantizedHeightM(-106.0), -110.0);
     QCOMPARE(ts::quantizedHeightM(-10994.0), -10990.0);
-    for (int step = 0; step < 54000; ++step) {
+    for (int32_t step = 0; step < 54000; ++step) {
       const double h = -11000.0 + 0.37 * step;
       QVERIFY(std::abs(ts::quantizedHeightM(h) - h) <=
               (h >= -100.0 ? 1.0 : 5.0));
@@ -368,10 +372,10 @@ private slots:
   void codecRoundTrip()
   {
     // Mountains, a cliff and deep sea in one grid.
-    const int samples = 65;
+    const int32_t samples = 65;
     std::vector<float> heights;
-    for (int row = 0; row < samples; ++row) {
-      for (int column = 0; column < samples; ++column) {
+    for (int32_t row = 0; row < samples; ++row) {
+      for (int32_t column = 0; column < samples; ++column) {
         double h = 3000.0 * std::sin(row * 0.2) * std::cos(column * 0.15);
         if (column > 40) {
           h -= 9000.0;
@@ -410,8 +414,8 @@ private slots:
     ts::HeightTile tile;
     tile.key = ts::TileKey{2, 5, 1};
     tile.samples = 5;
-    for (int row = 0; row < 5; ++row) {
-      for (int column = 0; column < 5; ++column) {
+    for (int32_t row = 0; row < 5; ++row) {
+      for (int32_t column = 0; column < 5; ++column) {
         const ts::GeoPoint point =
             ts::heightSamplePoint(tile.key, 5, row, column);
         tile.heightsM.push_back(
@@ -482,8 +486,8 @@ private slots:
     if (!stored || !loaded) {
       QFAIL("no heights");
     }
-    for (int row = 0; row < 9; row += 4) {
-      for (int column = 0; column < 9; column += 4) {
+    for (int32_t row = 0; row < 9; row += 4) {
+      for (int32_t column = 0; column < 9; column += 4) {
         const ts::GeoPoint point = ts::heightSamplePoint(key, 9, row, column);
         const std::size_t i = static_cast<std::size_t>(row) * 9 +
                               static_cast<std::size_t>(column);
@@ -593,7 +597,7 @@ private slots:
     QCOMPARE(provider.name(), QStringLiteral("dem.tif"));
 
     // Inside: the plane exactly, at full resolution and averaged.
-    for (const int level : {9, 8}) {
+    for (const int32_t level : {9, 8}) {
       const ts::TileKey key =
           ts::TileKey::containing(level, ts::Geodetic{46.0, 8.0, 0.0});
       const std::optional<ts::HeightTile> tile =
@@ -603,8 +607,8 @@ private slots:
       }
       QCOMPARE(tile->samples, 65);
       QVERIFY(tile->seaLevelM.empty());
-      for (int row = 0; row < 65; row += 8) {
-        for (int column = 0; column < 65; column += 8) {
+      for (int32_t row = 0; row < 65; row += 8) {
+        for (int32_t column = 0; column < 65; column += 8) {
           const ts::GeoPoint point =
               ts::heightSamplePoint(key, 65, row, column);
           QVERIFY2(std::abs(heightAt(*tile, row, column) -
@@ -619,7 +623,7 @@ private slots:
     }
 
     // Neighbours share their edge samples exactly, also when averaged.
-    for (const int level : {6, 8}) {
+    for (const int32_t level : {6, 8}) {
       const ts::TileKey west =
           ts::TileKey::containing(level, ts::Geodetic{46.0, 7.9, 0.0});
       const ts::TileKey east{west.level, west.x + 1, west.y};
@@ -635,7 +639,7 @@ private slots:
       }
       const ts::HeightTile& westTile = *a;
       const ts::HeightTile& eastTile = *b;
-      for (int row = 0; row < 65; ++row) {
+      for (int32_t row = 0; row < 65; ++row) {
         const double left = heightAt(westTile, row, 64);
         const double right = heightAt(eastTile, row, 0);
         QVERIFY((std::isnan(left) && std::isnan(right)) || left == right);
@@ -651,10 +655,10 @@ private slots:
       QFAIL("no heights across the edge");
     }
     const ts::HeightTile& across = *partial;
-    int inside = 0;
-    int outside = 0;
-    for (int row = 0; row < 65; ++row) {
-      for (int column = 0; column < 65; ++column) {
+    int32_t inside = 0;
+    int32_t outside = 0;
+    for (int32_t row = 0; row < 65; ++row) {
+      for (int32_t column = 0; column < 65; ++column) {
         const ts::GeoPoint point = ts::heightSamplePoint(edge, 65, row, column);
         const double height = heightAt(across, row, column);
         if (point.latDeg > 47.01 || point.lonDeg > 9.01 ||
@@ -708,9 +712,9 @@ private slots:
     if (!tile) {
       QFAIL("no heights");
     }
-    int holes = 0;
-    for (int row = 0; row < 65; ++row) {
-      for (int column = 0; column < 65; ++column) {
+    int32_t holes = 0;
+    for (int32_t row = 0; row < 65; ++row) {
+      for (int32_t column = 0; column < 65; ++column) {
         const ts::GeoPoint point = ts::heightSamplePoint(key, 65, row, column);
         const double height = heightAt(*tile, row, column);
         if (std::abs(point.latDeg - 46.5) < 0.03 &&
@@ -767,8 +771,8 @@ private slots:
     if (!tile) {
       QFAIL("no heights");
     }
-    for (int row = 0; row < 65; row += 16) {
-      for (int column = 0; column < 65; column += 16) {
+    for (int32_t row = 0; row < 65; row += 16) {
+      for (int32_t column = 0; column < 65; column += 16) {
         const ts::GeoPoint point = ts::heightSamplePoint(key, 65, row, column);
         double x = point.lonDeg;
         double y = point.latDeg;
@@ -791,9 +795,9 @@ private slots:
     ts::GdalElevationProvider provider(path, QStringLiteral("ellipsoid"),
                                        nullptr, nullptr);
     QVERIFY(provider.isValid());
-    const int failures = ts::test::runConcurrently(
-        ts::test::concurrentThreadCount, [&](int thread) {
-          for (int i = 0; i < 4; ++i) {
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount, [&](int32_t thread) {
+          for (int32_t i = 0; i < 4; ++i) {
             const ts::TileKey key = ts::TileKey::containing(
                 9, ts::Geodetic{45.2 + 0.2 * thread, 7.2 + 0.4 * i, 0.0});
             const std::optional<ts::HeightTile> tile =
@@ -825,13 +829,13 @@ private slots:
          {"EPSG:4326+5773", ts::DemVerticalDatum::Egm96},
          {"EPSG:4979", ts::DemVerticalDatum::Ellipsoid},
          {"EPSG:4326+5701", ts::DemVerticalDatum::Odn}}};
-    int index = 0;
+    int32_t index = 0;
     for (const Case& c : cases) {
       const QString path =
           dir.filePath(QStringLiteral("dem%1.tif").arg(index++));
       QVERIFY(writeGeographicDem(path, c.crs));
-      QCOMPARE(static_cast<int>(ts::detectDemVerticalDatum(path)),
-               static_cast<int>(c.expected));
+      QCOMPARE(static_cast<int32_t>(ts::detectDemVerticalDatum(path)),
+               static_cast<int32_t>(c.expected));
     }
     QCOMPARE(ts::demVerticalDatumId(ts::DemVerticalDatum::Egm96),
              QStringLiteral("egm96"));
@@ -917,10 +921,10 @@ private slots:
     }
     QCOMPARE(tile->samples, 65);
     QCOMPARE(tile->seaLevelM.size(), tile->heightsM.size());
-    int fromLocal = 0;
-    int fromGlobal = 0;
-    for (int row = 0; row < 65; ++row) {
-      for (int column = 0; column < 65; ++column) {
+    int32_t fromLocal = 0;
+    int32_t fromGlobal = 0;
+    for (int32_t row = 0; row < 65; ++row) {
+      for (int32_t column = 0; column < 65; ++column) {
         const ts::GeoPoint point = ts::heightSamplePoint(key, 65, row, column);
         const double height = heightAt(*tile, row, column);
         QVERIFY(!std::isnan(height));
@@ -1098,8 +1102,8 @@ private slots:
     }
     const ts::HeightTile& heights = *tile;
     QVERIFY(!heights.incomplete);
-    for (int row = 0; row < 65; row += 8) {
-      for (int column = 0; column < 65; column += 8) {
+    for (int32_t row = 0; row < 65; row += 8) {
+      for (int32_t column = 0; column < 65; column += 8) {
         const ts::GeoPoint point = ts::heightSamplePoint(key, 65, row, column);
         const std::pair<double, double> pixel =
             webPixel(point.latDeg, point.lonDeg, 2);
@@ -1117,11 +1121,11 @@ private slots:
       QFAIL("no heights east");
     }
     const ts::HeightTile& eastHeights = *next;
-    for (int row = 0; row < 65; ++row) {
+    for (int32_t row = 0; row < 65; ++row) {
       QCOMPARE(heightAt(heights, row, 64), heightAt(eastHeights, row, 0));
     }
     // Web tiles shared by neighbours are fetched once.
-    const int requests = provider.statistics().requests;
+    const int32_t requests = provider.statistics().requests;
     QVERIFY(provider.loadHeights(key, notCancelled).has_value());
     QCOMPARE(provider.statistics().requests, requests);
 
@@ -1257,7 +1261,7 @@ private slots:
         ts::samplePath({ts::GeoPoint{0.0, 0.0}, ts::GeoPoint{0.0, 1.0}}, 11);
     QCOMPARE(along.size(), std::size_t{11});
     QVERIFY(std::abs(along.back().first - 111319.49) < 0.1);
-    for (int i = 0; i < 11; ++i) {
+    for (int32_t i = 0; i < 11; ++i) {
       const std::pair<double, ts::GeoPoint>& at =
           along[static_cast<std::size_t>(i)];
       QVERIFY(std::abs(at.second.lonDeg - 0.1 * i) < 1e-9);

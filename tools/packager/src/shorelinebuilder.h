@@ -25,6 +25,7 @@
 #ifndef TS_PACKAGER_SHORELINEBUILDER_H
 #define TS_PACKAGER_SHORELINEBUILDER_H
 
+#include <cstdint>
 #include <functional>
 #include <vector>
 
@@ -46,11 +47,11 @@ struct ShorelineLod {
   /** GSHHG resolution letter: c, l, i, h or f. */
   QString resolution;
   /** Quadtree level the polygons and lines are cut to. */
-  int storageLevel = 0;
+  int32_t storageLevel = 0;
   /** Shallowest display level served. */
-  int minLevel = 0;
+  int32_t minLevel = 0;
   /** Deepest display level served, or -1 for every deeper level. */
-  int maxLevel = -1;
+  int32_t maxLevel = -1;
 };
 
 /** What to build. */
@@ -76,13 +77,13 @@ struct ShorelineLodStats {
   /** The GSHHG resolution. */
   QString resolution;
   /** Source polygons read, after the minimum area. */
-  int sourcePolygons = 0;
+  int32_t sourcePolygons = 0;
   /** Polygons GEOS found invalid and repaired (source and cut). */
-  int repairedPolygons = 0;
+  int32_t repairedPolygons = 0;
   /** Tiles with land written. */
-  int landTiles = 0;
+  int32_t landTiles = 0;
   /** Vertices written. */
-  long long vertices = 0;
+  int64_t vertices = 0;
   /** Land area written, km² on the WGS 84 ellipsoid (rhumb-line edges). */
   double landAreaKm2 = 0.0;
   /**

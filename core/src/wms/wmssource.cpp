@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 
 #include <QCoreApplication>
 #include <QJsonArray>
@@ -163,7 +164,7 @@ std::optional<WmsSource> WmsSource::fromJson(const QJsonObject& json,
   const QJsonArray layers = json.value(QStringLiteral("layers")).toArray();
   const QJsonArray styles = json.value(QStringLiteral("styles")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int i = 0; i < layers.size(); ++i) {
+  for (int32_t i = 0; i < layers.size(); ++i) {
     const QString name = layers.at(i).toString();
     if (!name.isEmpty()) {
       source.layers.append(name);
@@ -412,9 +413,9 @@ std::optional<GeoRect> unitedBounds(const std::optional<GeoRect>& a,
 }
 
 /** @p tileSizePx halved until the server can draw it. */
-int tileSizeWithin(const WmsCapabilities& capabilities, int tileSizePx)
+int32_t tileSizeWithin(const WmsCapabilities& capabilities, int32_t tileSizePx)
 {
-  const int limit =
+  const int32_t limit =
       std::min(capabilities.maxWidth > 0 ? capabilities.maxWidth : 4096,
                capabilities.maxHeight > 0 ? capabilities.maxHeight : 4096);
   while (tileSizePx > limit && tileSizePx > 16) {
@@ -454,7 +455,7 @@ std::optional<WmsSource> wmsSourceFor(const WmsCapabilities& capabilities,
   QStringList titles;
   QStringList commonCrs;
   QStringList attributions;
-  for (int i = 0; i < layerNames.size(); ++i) {
+  for (int32_t i = 0; i < layerNames.size(); ++i) {
     const WmsLayer* layer = capabilities.findLayer(layerNames.at(i));
     const QString problem = unusableLayerReason(layer, layerNames.at(i));
     if (!problem.isEmpty()) {

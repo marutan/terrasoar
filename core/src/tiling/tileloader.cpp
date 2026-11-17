@@ -21,6 +21,7 @@
 #include "ts/tiling/tileloader.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <utility>
 
 #include "ts/providers/tileprovider.h"
@@ -33,12 +34,12 @@ TileLoader::TileLoader(std::shared_ptr<ImageryProvider> provider,
     : m_provider(std::move(provider)), m_settings(settings),
       m_cache(settings.cacheBytes)
 {
-  const int threads = std::clamp(
+  const int32_t threads = std::clamp(
       std::max(m_settings.threads,
                m_provider ? m_provider->preferredLoaderThreads() : 0),
       1, 16);
   m_workers.reserve(static_cast<std::size_t>(threads));
-  for (int i = 0; i < threads; ++i) {
+  for (int32_t i = 0; i < threads; ++i) {
     m_workers.emplace_back(&TileLoader::work, this);
   }
 }
@@ -102,11 +103,11 @@ void TileLoader::setRequests(const std::vector<TileLoadRequest>& requests)
   m_wake.notify_all();
 }
 
-std::vector<LoadedTile> TileLoader::takeLoaded(int maximum)
+std::vector<LoadedTile> TileLoader::takeLoaded(int32_t maximum)
 {
   std::vector<LoadedTile> tiles;
   const std::lock_guard<std::mutex> lock(m_mutex);
-  while (!m_done.empty() && static_cast<int>(tiles.size()) < maximum) {
+  while (!m_done.empty() && static_cast<int32_t>(tiles.size()) < maximum) {
     m_doneKeys.erase(m_done.front().key);
     tiles.push_back(std::move(m_done.front()));
     m_done.pop_front();
@@ -114,10 +115,11 @@ std::vector<LoadedTile> TileLoader::takeLoaded(int maximum)
   return tiles;
 }
 
-int TileLoader::outstanding() const
+int32_t TileLoader::outstanding() const
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
-  return static_cast<int>(m_queue.size() + m_inFlight.size() + m_done.size());
+  return static_cast<int32_t>(m_queue.size() + m_inFlight.size() +
+                              m_done.size());
 }
 
 void TileLoader::retryFailed()

@@ -25,6 +25,7 @@
 #ifndef TS_ELEVATION_HEIGHTGRID_H
 #define TS_ELEVATION_HEIGHTGRID_H
 
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -49,14 +50,15 @@ double quantizedHeightM(double heightM);
  * varints and compressed with zlib. About 4.8 bits a sample for ETOPO
  * 2022 at 5 km. See docs/design/terrain.md.
  */
-QByteArray encodeHeightGrid(const std::vector<float>& heightsM, int samples);
+QByteArray encodeHeightGrid(const std::vector<float>& heightsM,
+                            int32_t samples);
 
 /**
  * Decodes encodeHeightGrid()'s bytes into @p samples² heights, or returns
  * nothing if they are damaged or of another size.
  */
 std::optional<std::vector<float>> decodeHeightGrid(const QByteArray& data,
-                                                   int samples);
+                                                   int32_t samples);
 
 /**
  * Returns the height at (@p latDeg, @p lonDeg) in @p tile, interpolated
@@ -79,13 +81,14 @@ std::optional<double> sampleSeaLevelM(const HeightTile& tile, double latDeg,
  * deeper than a source stores).
  */
 HeightTile resampleHeightTile(const HeightTile& ancestor, TileKey key,
-                              int samples);
+                              int32_t samples);
 
 /**
  * Returns the latitude and longitude of sample (@p row, @p column) of a
  * @p samples-wide grid over @p key (row 0 at the north edge).
  */
-GeoPoint heightSamplePoint(TileKey key, int samples, int row, int column);
+GeoPoint heightSamplePoint(TileKey key, int32_t samples, int32_t row,
+                           int32_t column);
 
 } // namespace ts
 

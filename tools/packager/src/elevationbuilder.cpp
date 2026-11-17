@@ -57,17 +57,17 @@ bool fail(QString* errorString, const QString& message)
 
 /** A grid of point samples, row 0 at 90° N, column 0 at 180° W. */
 struct PointGrid {
-  int width = 0;
-  int height = 0;
+  int32_t width = 0;
+  int32_t height = 0;
   std::vector<float> values;
 
-  float& at(int row, int column)
+  float& at(int32_t row, int32_t column)
   {
     return values[static_cast<std::size_t>(row) *
                       static_cast<std::size_t>(width) +
                   static_cast<std::size_t>(column)];
   }
-  float at(int row, int column) const
+  float at(int32_t row, int32_t column) const
   {
     return values[static_cast<std::size_t>(row) *
                       static_cast<std::size_t>(width) +
@@ -76,7 +76,7 @@ struct PointGrid {
 };
 
 /** Overlap of the source cells with an interval, as (cell, weight) pairs. */
-using Weights = std::vector<std::pair<int, double>>;
+using Weights = std::vector<std::pair<int32_t, double>>;
 
 /**
  * The cells of [@p from, @p to) (in cell units) and how much of each lies
@@ -85,17 +85,17 @@ using Weights = std::vector<std::pair<int, double>>;
  */
 // An interval's two ends.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-Weights cellWeights(double from, double to, int count, bool wrap)
+Weights cellWeights(double from, double to, int32_t count, bool wrap)
 {
   Weights weights;
-  for (int cell = static_cast<int>(std::floor(from));
-       cell < static_cast<int>(std::ceil(to)); ++cell) {
+  for (int32_t cell = static_cast<int32_t>(std::floor(from));
+       cell < static_cast<int32_t>(std::ceil(to)); ++cell) {
     const double overlap =
         std::min(to, cell + 1.0) - std::max(from, static_cast<double>(cell));
     if (overlap <= 0.0) {
       continue;
     }
-    int index = cell;
+    int32_t index = cell;
     if (wrap) {
       index = ((cell % count) + count) % count;
     } else if (cell < 0 || cell >= count) {
@@ -110,9 +110,9 @@ Weights cellWeights(double from, double to, int count, bool wrap)
 class RowReader
 {
 public:
-  RowReader(GDALRasterBandH band, int width) : m_band(band), m_width(width)
+  RowReader(GDALRasterBandH band, int32_t width) : m_band(band), m_width(width)
   {
-    int hasNoData = 0;
+    int32_t hasNoData = 0;
     m_noData = GDALGetRasterNoDataValue(band, &hasNoData);
     m_hasNoData = hasNoData != 0;
   }
@@ -120,7 +120,7 @@ public:
   /** Row @p row; rows before @p keepFrom are forgotten. Null on error. */
   // The row wanted, then the first still needed.
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  const std::vector<float>* row(int row, int keepFrom)
+  const std::vector<float>* row(int32_t row, int32_t keepFrom)
   {
     while (!m_rows.empty() && m_first < keepFrom) {
       m_rows.pop_front();
@@ -129,9 +129,9 @@ public:
     if (m_rows.empty()) {
       m_first = row;
     }
-    while (m_first + static_cast<int>(m_rows.size()) <= row) {
+    while (m_first + static_cast<int32_t>(m_rows.size()) <= row) {
       std::vector<float> values(static_cast<std::size_t>(m_width));
-      const int next = m_first + static_cast<int>(m_rows.size());
+      const int32_t next = m_first + static_cast<int32_t>(m_rows.size());
       if (GDALRasterIO(m_band, GF_Read, 0, next, m_width, 1, values.data(),
                        m_width, 1, GDT_Float32, 0, 0) != CE_None) {
         return nullptr;
@@ -149,23 +149,23 @@ public:
 
 private:
   GDALRasterBandH m_band;
-  int m_width;
+  int32_t m_width;
   double m_noData = 0.0;
   bool m_hasNoData = false;
-  int m_first = 0;
+  int32_t m_first = 0;
   std::deque<std::vector<float>> m_rows;
 };
 
 /** Sets each pole row to its mean: the pole is one point. */
 void flattenPoles(PointGrid& grid)
 {
-  for (const int row : {0, grid.height - 1}) {
+  for (const int32_t row : {0, grid.height - 1}) {
     double sum = 0.0;
-    for (int column = 0; column < grid.width - 1; ++column) {
+    for (int32_t column = 0; column < grid.width - 1; ++column) {
       sum += static_cast<double>(grid.at(row, column));
     }
     const float mean = static_cast<float>(sum / (grid.width - 1));
-    for (int column = 0; column < grid.width; ++column) {
+    for (int32_t column = 0; column < grid.width; ++column) {
       grid.at(row, column) = mean;
     }
   }
@@ -180,7 +180,7 @@ bool accumulateRows(RowReader& reader, const Weights& rowWeights,
 {
   std::fill(sums->begin(), sums->end(), 0.0);
   std::fill(totals->begin(), totals->end(), 0.0);
-  for (const std::pair<int, double>& weight : rowWeights) {
+  for (const std::pair<int32_t, double>& weight : rowWeights) {
     const std::vector<float>* values =
         reader.row(weight.first, rowWeights.front().first);
     if (values == nullptr) {
@@ -204,7 +204,7 @@ float weightedMean(const Weights& weights, const std::vector<double>& sums,
 {
   double sum = 0.0;
   double total = 0.0;
-  for (const std::pair<int, double>& weight : weights) {
+  for (const std::pair<int32_t, double>& weight : weights) {
     sum += weight.second * sums[static_cast<std::size_t>(weight.first)];
     total += weight.second * totals[static_cast<std::size_t>(weight.first)];
   }
@@ -212,7 +212,7 @@ float weightedMean(const Weights& weights, const std::vector<double>& sums,
 }
 
 /** The deepest level's samples, box-filtered from the source. */
-bool sampleSource(const GdalDataset& source, int intervals, PointGrid* grid,
+bool sampleSource(const GdalDataset& source, int32_t intervals, PointGrid* grid,
                   const std::function<void(const QString&)>& progress,
                   QString* errorString)
 {
@@ -224,8 +224,8 @@ bool sampleSource(const GdalDataset& source, int intervals, PointGrid* grid,
     return fail(errorString,
                 QStringLiteral("The DEM is not a north-up geographic grid"));
   }
-  const int sourceWidth = GDALGetRasterXSize(dataset);
-  const int sourceHeight = GDALGetRasterYSize(dataset);
+  const int32_t sourceWidth = GDALGetRasterXSize(dataset);
+  const int32_t sourceHeight = GDALGetRasterYSize(dataset);
   // The source must go the whole way round for wrapping to be right.
   if (std::abs(transform[1] * sourceWidth - 360.0) > 1e-6) {
     return fail(errorString, QStringLiteral("The DEM does not span 360°"));
@@ -239,7 +239,7 @@ bool sampleSource(const GdalDataset& source, int intervals, PointGrid* grid,
                       0.0F);
   // Horizontal weights are the same for every row.
   std::vector<Weights> columnWeights;
-  for (int column = 0; column < grid->width; ++column) {
+  for (int32_t column = 0; column < grid->width; ++column) {
     const double lon = -180.0 + column * step;
     columnWeights.push_back(cellWeights(
         (lon - step / 2.0 - transform[0]) / transform[1],
@@ -247,7 +247,7 @@ bool sampleSource(const GdalDataset& source, int intervals, PointGrid* grid,
   }
   std::vector<double> sums(static_cast<std::size_t>(sourceWidth));
   std::vector<double> totals(static_cast<std::size_t>(sourceWidth));
-  for (int row = 0; row < grid->height; ++row) {
+  for (int32_t row = 0; row < grid->height; ++row) {
     if (row % 512 == 0) {
       progress(QStringLiteral("Sampling the DEM, row %1 of %2")
                    .arg(row)
@@ -267,7 +267,7 @@ bool sampleSource(const GdalDataset& source, int intervals, PointGrid* grid,
                   QStringLiteral("Cannot read the DEM: %1")
                       .arg(QString::fromUtf8(CPLGetLastErrorMsg())));
     }
-    for (int column = 0; column < grid->width; ++column) {
+    for (int32_t column = 0; column < grid->width; ++column) {
       grid->at(row, column) = weightedMean(
           columnWeights[static_cast<std::size_t>(column)], sums, totals);
     }
@@ -284,17 +284,17 @@ PointGrid coarser(const PointGrid& fine)
   grid.height = (fine.height - 1) / 2 + 1;
   grid.values.resize(static_cast<std::size_t>(grid.width) *
                      static_cast<std::size_t>(grid.height));
-  const int period = fine.width - 1; // the last column repeats the first
+  const int32_t period = fine.width - 1; // the last column repeats the first
   constexpr std::array<double, 3> taps{0.25, 0.5, 0.25};
-  for (int row = 0; row < grid.height; ++row) {
-    for (int column = 0; column < grid.width; ++column) {
+  for (int32_t row = 0; row < grid.height; ++row) {
+    for (int32_t column = 0; column < grid.width; ++column) {
       double sum = 0.0;
       for (std::size_t i = 0; i < taps.size(); ++i) {
-        const int y =
-            std::clamp(2 * row + static_cast<int>(i) - 1, 0, fine.height - 1);
+        const int32_t y = std::clamp(2 * row + static_cast<int32_t>(i) - 1, 0,
+                                     fine.height - 1);
         for (std::size_t j = 0; j < taps.size(); ++j) {
-          const int x =
-              ((2 * column + static_cast<int>(j) - 1) % period + period) %
+          const int32_t x =
+              ((2 * column + static_cast<int32_t>(j) - 1) % period + period) %
               period;
           sum += taps.at(i) * taps.at(j) * static_cast<double>(fine.at(y, x));
         }
@@ -307,17 +307,18 @@ PointGrid coarser(const PointGrid& fine)
 }
 
 /** Writes every tile of @p level from its grid. */
-bool writeLevel(const PointGrid& grid, int level, int samples,
+bool writeLevel(const PointGrid& grid, int32_t level, int32_t samples,
                 SqliteTileStoreWriter* writer, ElevationStats* stats,
                 QString* errorString)
 {
-  const int intervals = samples - 1;
+  const int32_t intervals = samples - 1;
   const std::size_t n = static_cast<std::size_t>(samples);
   std::vector<float> heights(n * n);
-  for (int y = 0; y < static_cast<int>(TileKey::rows(level)); ++y) {
-    for (int x = 0; x < static_cast<int>(TileKey::columns(level)); ++x) {
-      for (int row = 0; row < samples; ++row) {
-        for (int column = 0; column < samples; ++column) {
+  for (int32_t y = 0; y < static_cast<int32_t>(TileKey::rows(level)); ++y) {
+    for (int32_t x = 0; x < static_cast<int32_t>(TileKey::columns(level));
+         ++x) {
+      for (int32_t row = 0; row < samples; ++row) {
+        for (int32_t column = 0; column < samples; ++column) {
           const float value =
               grid.at(y * intervals + row, x * intervals + column);
           heights[static_cast<std::size_t>(row) * n +
@@ -359,7 +360,7 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
                 QStringLiteral("Cannot read %1: %2")
                     .arg(options.sourcePath, source.errorString()));
   }
-  const int intervals = (options.samples - 1) << options.maxLevel;
+  const int32_t intervals = (options.samples - 1) << options.maxLevel;
   PointGrid grid;
   if (!sampleSource(source, intervals, &grid, progress, errorString)) {
     return false;
@@ -381,7 +382,7 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
   if (!writer.errorString().isEmpty()) {
     return fail(errorString, writer.errorString());
   }
-  for (int level = options.maxLevel; level >= 0; --level) {
+  for (int32_t level = options.maxLevel; level >= 0; --level) {
     progress(QStringLiteral("Writing elevation level %1").arg(level));
     if (!writeLevel(grid, level, options.samples, &writer, stats,
                     errorString)) {
@@ -408,8 +409,8 @@ bool buildGeoidGrid(const GeoidGridOptions& options, GeoidGridStats* stats,
                     .arg(options.sourcePath, source.errorString()));
   }
   GDALDatasetH dataset = static_cast<GDALDatasetH>(source.handle());
-  const int width = GDALGetRasterXSize(dataset);
-  const int height = GDALGetRasterYSize(dataset);
+  const int32_t width = GDALGetRasterXSize(dataset);
+  const int32_t height = GDALGetRasterYSize(dataset);
   std::array<double, 6> transform{};
   GDALGetGeoTransform(dataset, transform.data());
   std::vector<float> values(static_cast<std::size_t>(width) *
@@ -426,8 +427,8 @@ bool buildGeoidGrid(const GeoidGridOptions& options, GeoidGridStats* stats,
   std::vector<std::int16_t> centimetres(
       static_cast<std::size_t>(stats->width) *
       static_cast<std::size_t>(stats->height));
-  for (int row = 0; row < stats->height; ++row) {
-    for (int column = 0; column < stats->width; ++column) {
+  for (int32_t row = 0; row < stats->height; ++row) {
+    for (int32_t column = 0; column < stats->width; ++column) {
       const std::size_t sourceRow = static_cast<std::size_t>(row) *
                                     static_cast<std::size_t>(options.step);
       const std::size_t sourceColumn = static_cast<std::size_t>(column) *

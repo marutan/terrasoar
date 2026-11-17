@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -40,12 +41,12 @@ namespace
 constexpr double metresPerDegree = 111320.0;
 
 /** Samples along a height tile's side, as the providers deliver them. */
-constexpr int tileSamples = 65;
+constexpr int32_t tileSamples = 65;
 
 } // namespace
 
 std::vector<std::pair<double, GeoPoint>>
-samplePath(const std::vector<GeoPoint>& vertices, int count)
+samplePath(const std::vector<GeoPoint>& vertices, int32_t count)
 {
   std::vector<std::pair<double, GeoPoint>> samples;
   if (vertices.size() < 2 || count < 2) {
@@ -63,7 +64,7 @@ samplePath(const std::vector<GeoPoint>& vertices, int count)
   }
   samples.reserve(static_cast<std::size_t>(count));
   std::size_t leg = 0;
-  for (int i = 0; i < count; ++i) {
+  for (int32_t i = 0; i < count; ++i) {
     const double distance = i == count - 1 ? length : length * i / (count - 1);
     while (leg + 1 < legs.size() && distance > starts[leg + 1]) {
       ++leg;
@@ -83,9 +84,9 @@ samplePath(const std::vector<GeoPoint>& vertices, int count)
 
 // A spacing, then a level cap: different things, different types.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-int profileLevel(double spacingM, int maximumLevel)
+int32_t profileLevel(double spacingM, int32_t maximumLevel)
 {
-  for (int level = 0; level < maximumLevel; ++level) {
+  for (int32_t level = 0; level < maximumLevel; ++level) {
     const double sampleM =
         TileKey::sizeDeg(level) / (tileSamples - 1) * metresPerDegree;
     if (sampleM <= spacingM) {
@@ -97,7 +98,7 @@ int profileLevel(double spacingM, int maximumLevel)
 
 std::optional<ElevationProfile>
 computeElevationProfile(ElevationProvider& provider,
-                        const std::vector<GeoPoint>& vertices, int count,
+                        const std::vector<GeoPoint>& vertices, int32_t count,
                         const std::atomic<bool>& cancelled)
 {
   const std::vector<std::pair<double, GeoPoint>> path =
