@@ -23,7 +23,7 @@ The first roadmap's rules still apply to every phase here:
 | --- | --- | --- |
 | 9 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
 | 10 | Local data files | Vector files (GeoJSON, shapefile, GPX, GeoPackage) and GeoTIFF imagery |
-| 11 | More web services | XYZ/TMS, WMTS, WFS; WMS TIME and GetFeatureInfo |
+| 11 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
 | 12 | More projections | Plate Carrée, UTM/British National Grid, LCC, polar stereographic, world projections |
 | 13 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
 | 14 | Realism | Atmosphere, sun lighting, glTF models |
@@ -32,8 +32,9 @@ The first roadmap's rules still apply to every phase here:
 | 17 | User guide in the program | The `docs/user` guide in a window from the Help menu |
 | 18 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
 | 19 | KML | 19a: import KML/KMZ and draw it on the globe and map; 19b: create KML, add elements, export |
+| 20 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
 
-The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock.
+The phases are mostly independent. Phase 9 should come first because it finishes the release work. Phases 10 and 11 share the vector pipeline, so 10 should come before 11's WFS. Phase 14's lighting is easier after Phase 15, if both are wanted. Phase 17 depends on nothing else and could be done at any time, including before 1.0. Phase 18 needs a program-wide clock, which Phase 11's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. Phase 19 draws through Phase 10's vector pipeline (feature styles, picking, draping), so it comes after Phase 10. KML's time elements use the same clock. Phase 20 (WMTS) reuses the WMS machinery and needs nothing else, so it can come at any time. If it comes before Phase 11, Phase 11's XYZ tiles reuse its Web Mercator reprojection.
 
 ## Phase 9 – Road to 1.0
 
@@ -103,7 +104,7 @@ Goal: the common web map services beyond WMS.
 **Deliverables**
 
 - XYZ/TMS tile services (`{z}/{x}/{y}` templates), reprojected from Web Mercator onto the quadtree, through `CachedTileFetcher` (disk cache, revalidation, offline regions).
-- WMTS: capabilities, tile matrix sets in EPSG:4326 and EPSG:3857, styles and dimensions.
+- (WMTS has its own phase, 20.)
 - WFS 2.0: features in the visible area, with paging, into the Phase 10 vector pipeline.
 - WMS extras:
   - The TIME dimension, with a time slider and a play button
@@ -113,14 +114,14 @@ Goal: the common web map services beyond WMS.
 
 **Technical documentation**
 
-- `docs/design/wmts.md` and `docs/design/wfs.md`; time handling added to `docs/design/wms.md`
+- `docs/design/wfs.md`; time handling added to `docs/design/wms.md`
 
 **Regression tests**
 
-- Mock servers for XYZ, WMTS and WFS, with stored capabilities from real services.
+- Mock servers for XYZ and WFS, with stored capabilities from real services.
 - TIME: the right request for each slider position, and cache keys that include the time.
 - GetFeatureInfo parsing (HTML, XML, JSON responses).
-- Offline regions work for XYZ and WMTS layers.
+- Offline regions work for XYZ layers.
 
 **Exit criteria**: each service type adds, draws, caches and goes offline like WMS.
 
@@ -450,6 +451,78 @@ Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make the
 **Exit criteria**:
 - **19a:** the fixture KML from Google Earth, QGIS and the OGC examples displays correctly on the globe and the map.
 - **19b:** documents made in Terra Soar export to valid KML and KMZ that other programs open, and round trips lose nothing.
+
+## Phase 20 – WMTS
+
+Goal: users add any WMTS layer by URL or from the catalogue, and it streams, caches, blends and goes offline like a WMS layer. WMTS serves pre-cut tiles, so it is usually faster than WMS and is how many national mapping agencies and NASA GIBS publish their maps.
+
+**Approach**: the same structure as WMS (Phase 5), sharing what WMS already built:
+- `CachedTileFetcher` for the network, disk cache, revalidation and offline handling
+- the catalogue
+- the layer tree and project storage
+- offline regions and the attribution display
+
+What is new is the capabilities model, tile matrix sets, and fitting their tiles to the EPSG:4326 quadtree.
+
+**Deliverables**
+
+- **Capabilities parser** (WMTS 1.0.0), for both KVP (`GetCapabilities` by query) and RESTful (`WMTSCapabilities.xml`) services:
+  - layers
+  - styles (and the default)
+  - formats
+  - tile matrix sets: CRS, scale denominators, top-left corners, tile and matrix sizes, and limits per layer
+  - dimensions (TIME and others)
+  - resource URL templates
+  - bounding boxes, legends, and the service's attribution and access constraints
+- **`WmtsImageryProvider`:**
+  - **Requests:** each quadtree tile is drawn from the tile matrix whose resolution best matches it, by `GetTile` (KVP) or the resource URL template (RESTful).
+  - **Tile matrix sets:**
+    - In EPSG:4326 (including `WorldCRS84Quad`), the tiles are used directly when they line up with the quadtree, and cut or combined when they don't.
+    - In EPSG:3857 (`GoogleMapsCompatible`/`WebMercatorQuad`), they are reprojected as WMS's EPSG:3857 fallback is.
+    - Other CRSs that PROJ knows (e.g. British National Grid, EPSG:27700; national grids) are reprojected through PROJ.
+  - **Axis order** as each CRS defines it (WMTS uses the CRS's own axis order, like WMS 1.3.0).
+  - **Coverage:** areas outside a layer's tile matrix limits are never requested.
+- **Formats:** PNG with transparency for overlays and JPEG for opaque layers, choosing the service's best offer by default. The format can be changed per layer.
+- **Dimensions:** TIME follows the program's clock (see Phase 18), with the service's default when there is no clock. Other dimensions are chosen in the layer's properties. Cache keys include every dimension value.
+- **Add WMTS Layer… dialog**, like Add WMS Layer…:
+  - the service URL, or a pick from the catalogue
+  - a layer browser with titles, abstracts and legends
+  - style, format, tile matrix set and dimension choices
+  - the service's terms and attribution shown before adding
+  - adding to the layer tree
+- **Catalogue:** open WMTS services in the online catalogue (JSON), editable without a release, with their terms and attribution. Candidates include:
+  - NASA GIBS
+  - national mapping agencies with open WMTS services (Ordnance Survey's open data, swisstopo, basemap.at, the Dutch PDOK and others)
+  - EMODnet Bathymetry
+- **Network behaviour, as WMS:**
+  - concurrency limit
+  - off-screen tiles cancelled
+  - retries with back-off
+  - per-layer error and offline states
+  - HTTP cache headers honoured
+- **Offline regions:** WMTS layers can be kept offline, counting tiles by the service's own tile matrices, and only where the service's terms allow it.
+- **Everywhere:** WMTS layers work in the 2D views, through the morph and draped on terrain, like every other layer.
+
+**Technical documentation**
+
+- `docs/design/wmts.md`: the capabilities model, tile matrix selection, alignment with the quadtree, reprojection, axis order, dimensions and cache keys
+- `docs/user/adding-wmts-layers.md`: the user guide, alongside `adding-wms-layers.md`
+
+**Regression tests**
+
+- **Capabilities parsing:** a stored set of real-world capabilities documents, KVP and RESTful, including odd-but-valid ones, multiple tile matrix sets and per-layer limits.
+- **Tile matrix maths:** the tile chosen for a quadtree tile, and its pixel window, match hand-computed values in EPSG:4326, EPSG:3857 and EPSG:27700. The scale denominator to resolution conversion is checked for degree- and metre-based CRSs.
+- **Request building:** `GetTile` URLs and filled resource templates match expected strings, including style, format, dimension and tile matrix values.
+- **Mock WMTS server** (local `QTcpServer`, as for WMS): slow, failing, oversized, wrong-format and missing-tile (404) responses.
+- **Cancellation:** tiles leaving the view are cancelled and never uploaded.
+- **Cache and offline:** hits and misses, revalidation, cache keys that differ by dimension value, and offline regions downloaded and used without a network.
+- **Golden images:**
+  - a mock WMTS overlay at 50% alpha over Blue Marble, in EPSG:4326 and EPSG:3857 tile matrix sets
+  - the same overlay in Mercator, in Miller and at morph t = 0.5
+  - a British National Grid layer lined up with the shoreline
+- **Dialog:** the UI test adds a layer from a mock service through Add WMTS Layer…
+
+**Exit criteria**: a public WMTS service can be added and browsed smoothly in 3D and 2D, in each supported tile matrix set, and taken offline. All tests run without internet access.
 
 ## Items deferred from 0.0.1
 
