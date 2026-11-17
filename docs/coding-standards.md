@@ -181,7 +181,19 @@ clang-format sorts the lines inside each block. Headers use include
 guards named `TS_<PATH>_H` (e.g. `TS_DEPS_GEOSCONTEXT_H`). Forward-declare
 in headers where that avoids an include.
 
-Every file starts with `// SPDX-License-Identifier: GPL-2.0-or-later`.
+Every file starts with `// SPDX-License-Identifier: GPL-2.0-or-later`,
+followed by the GPL notice block (copy it from any existing source file,
+or from `tests/template/tst_template.cpp.in`):
+
+```cpp
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+  Terra Soar - A virtual globe
+
+  Copyright (C) 2026 Peter Howkins
+  ...
+ */
+```
 
 ## Documentation comments
 

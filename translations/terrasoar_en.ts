@@ -77,10 +77,6 @@
             <translation>About Terra Soar</translation>
         </message>
         <message>
-            <source>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</source>
-            <translation>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</translation>
-        </message>
-        <message>
             <source>About</source>
             <translation>About</translation>
         </message>
@@ -111,6 +107,10 @@
         <message>
             <source>Close</source>
             <translation>Close</translation>
+        </message>
+        <message>
+            <source>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</source>
+            <translation>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</translation>
         </message>
     </context>
     <context>
@@ -704,14 +704,6 @@
         <message>
             <source>Show the program version and licence</source>
             <translation>Show the program version and licence</translation>
-        </message>
-        <message>
-            <source>About &amp;Qt</source>
-            <translation>About &amp;Qt</translation>
-        </message>
-        <message>
-            <source>Show the Qt version in use</source>
-            <translation>Show the Qt version in use</translation>
         </message>
         <message>
             <source>Ready</source>
