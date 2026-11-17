@@ -846,10 +846,25 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
   - Each control has a tooltip, an accessible name, and its keyboard shortcut in the tooltip.
   - The overlay can be reached from the keyboard (Tab into the view, then arrow keys and Enter), in line with Phase 9's accessibility work.
 - **Performance:** the overlay costs nothing measurable when idle, and the view still stops redrawing when nothing moves.
+- **Tile detail by distance from the camera, and performance when tilted:** a tilted view, especially near the horizon, shows far more of the Earth than a view straight down. Detail must therefore fall off with distance, or the tile count, downloads and frame time grow without limit.
+  - **On the globe:** this already holds. A tile's screen-space error uses the distance from the eye to the tile (`docs/design/tiling.md`), so distant tiles are coarser. This phase checks it at the new tilt limits and keeps it.
+  - **On the flat map:** today a tile's error depends only on its latitude and the zoom, not on distance. That is right for a map seen straight down, but wrong once the map tilts. The map's tile selection changes to the same perspective screen-space error as the globe: the tile's texel size projected through the camera at its distance from the eye. Near tiles get fine detail, and tiles towards the horizon get coarser levels. At no tilt the result equals today's selection, so existing views and golden images don't change.
+  - **The horizon on a tilted map:** a tilted flat map never reaches a horizon of its own, so it needs limits:
+    - a far limit, past which nothing is drawn, set so that the coarsest level still meets the error limit there;
+    - a tilt limit, so the view can't look along the map's surface;
+    - a haze or sky band at the far limit, shared with Phase 14's atmosphere if that exists, to fade the edge rather than cut it.
+  - **Terrain:** height meshes use the same distance-based levels, so distant terrain uses coarser meshes. Skirts keep tiles of different levels crack-free.
+  - **Loading order:** requests are ordered by screen-space error and then by distance from the camera, so near tiles load first. Tiles beyond the far limit are never requested, including from WMS, WMTS and web terrain servers.
+  - **Budgets:**
+    - **Frame time:** a fully tilted view of the globe and of the flat map, at the tilt limit over a detailed area with terrain on, stays within the frame-rate budgets on the reference PC and under software rendering.
+    - **Tile counts:** the number of tiles drawn stays within a fixed limit, measured and recorded in `docs/design/tiling.md` with the existing selection budgets.
+    - **GPU memory:** the GPU tile budget (96 MB) is unchanged.
+    - **Lower quality tiers:** they raise the error limit, which also shortens the far limit.
 
 **Technical documentation**
 
 - `docs/design/camera-and-precision.md`: the controls' mapping to camera motions, and the flat map's new rotation and tilt
+- `docs/design/tiling.md`: the flat map's distance-based screen-space error, the far and tilt limits, request ordering, and the tilted-view budgets
 - `docs/design/morph.md`: rotation and tilt through the morph
 - `docs/user/getting-around.md`: the navigation controls, and turning and tilting the map
 
@@ -875,8 +890,19 @@ Goal: an overlay of controls on the view (the globe and the flat map) to rotate,
 - **Contrast on light and dark backgrounds:** the overlay is drawn over solid white, solid black, mid-grey and busy imagery (Blue Marble cloud and desert, a pale WMS fixture). For each control, the symbol's contrast against what surrounds it meets WCAG 2.1's non-text contrast (at least 3:1), in the normal, hover, pressed and least-opaque states.
 - **Golden images:** the overlay in each corner, at normal and high DPI, over light and dark backgrounds, in high-contrast mode, and a turned and tilted flat map.
 - **Idle:** with the overlay shown and nothing moving, the view stops drawing.
+- **Tile selection by distance (`tests/tiling`):**
+  - for tilted cameras on the globe and the flat map (in each projection), every drawn tile's screen-space error, computed with its distance from the eye, is within the limit;
+  - along a ray from the camera to the horizon, tile levels never get finer with distance;
+  - every visible pixel is covered;
+  - fixed tilted cameras select fixed tile sets;
+  - with no tilt, the flat map's selection is identical to today's.
+- **Far limit:** on a tilted map, no tile beyond the far limit is selected or requested, from any provider (checked with the mock WMS and tile servers).
+- **Request order:** near tiles are requested before far ones in a tilted view.
+- **Performance (`tests/perf`):**
+  - frame time, tiles drawn, requests and GPU memory at the tilt limit, on the globe and the flat map, with and without terrain, against the budgets on the reference PC and under llvmpipe;
+  - a tilted-map selection time added to the measured budgets beside the existing tilted city view.
 
-**Exit criteria**: every control works by mouse, touch and keyboard on the globe and the flat map, and stays readable (3:1 contrast) on light and dark backgrounds. View → Navigation Controls shows and hides the overlay and is remembered. The flat map can be turned and tilted, the overlay can be moved, and the idle and frame budgets hold.
+**Exit criteria**: every control works by mouse, touch and keyboard on the globe and the flat map, and stays readable (3:1 contrast) on light and dark backgrounds. Tile detail falls off with distance from the camera on both views, and tilted views stay within the frame, tile and memory budgets. View → Navigation Controls shows and hides the overlay and is remembered. The flat map can be turned and tilted, the overlay can be moved, and the idle and frame budgets hold.
 
 ## Items deferred from 0.0.1
 
