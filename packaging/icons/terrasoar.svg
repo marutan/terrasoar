@@ -1,27 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
-<!--
-  Terra Soar - A virtual globe
-
-  Copyright (C) 2026 Peter Howkins
-
-  This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation; either version 2 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program; if not, see <https://www.gnu.org/licenses/>.
- -->
-
 <!-- Terra Soar's icon: the globe with a graticule, and an arc soaring
      over it. Drawn for the project. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- The licence comments are inside <svg>: gdk-pixbuf (the AppStream
+       compose and desktop icon loaders) recognises an SVG only by an
+       "<svg" tag near the start of the file. -->
+  <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+  <!--
+    Terra Soar - A virtual globe
+
+    Copyright (C) 2026 Peter Howkins
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, see <https://www.gnu.org/licenses/>.
+   -->
   <defs>
     <radialGradient id="ocean" cx="0.38" cy="0.34" r="0.75">
       <stop offset="0" stop-color="#5fb2ec"/>
