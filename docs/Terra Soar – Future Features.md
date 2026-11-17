@@ -883,6 +883,7 @@ Projections, grouped by kind. Each is in View → Map Projection, with its param
 - **Graticule and readout**: a latitude/longitude graticule in every projection, and a grid for projected systems (UTM, UK National Grid, Cassini and Lambert zones). The status bar reads coordinates in the current projection's system (eastings and northings, grid references) beside latitude and longitude.
 - **Everywhere:**
   - Layers, terrain hillshade, the scale bar, attributions, picking and the 3D/2D morph work in every projection.
+  - The flat map's turning and tilting, and its distance-based tile detail, from Phase 20 (navigation controls) work in every projection too.
   - **Beyond cylindrical:** the renderer and the morph must handle:
     - curved and interrupted map outlines;
     - projections that show only part of the Earth (gnomonic, one RPF zone);
