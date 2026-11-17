@@ -473,6 +473,8 @@ Every program subsection (maths, coordinates, tiling, providers, layer model, ne
 
 **Later work (after 1.0)**
 
+Now planned, with the items 0.0.1 deferred, in [Terra Soar – Future Features](<Terra Soar – Future Features.md>).
+
 - More projections: Plate Carrée, Transverse Mercator/UTM/British National Grid, Lambert Conformal Conic, Polar Stereographic, Robinson, Mollweide, Winkel Tripel
 - More formats: GeoJSON, shapefile, KML/KMZ, GPX, GeoTIFF imagery, WMTS, WFS, XYZ/TMS
 - WMS TIME dimension and GetFeatureInfo; Blue Marble monthly variants
