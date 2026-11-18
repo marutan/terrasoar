@@ -7,7 +7,7 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
-## [0.0.2] – 2026-11-18
+## [0.0.2] – 2026-11-19
 
 ### Added
 
