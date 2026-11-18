@@ -19,6 +19,9 @@ All notable changes to Terra Soar. The format follows
 
 ### Fixed
 
+- Zooming, panning and tilting with an imagery layer such as a WMS layer
+  no longer makes the detail drop to a coarse level and come back
+  (flicker): what the view relies on is no longer evicted from the GPU.
 - Close to the ground and looking towards the horizon (terrain off), the
   globe's plain blue no longer shows through the imagery in the distance.
 - Changing between the globe and the map while zoomed in no longer makes

@@ -833,19 +833,20 @@ void TileRenderer::uploadImages()
 }
 
 void TileRenderer::buildMeshes(const std::vector<TileLoadRequest>& wanted,
-                               const std::vector<TileKey>& rebuild)
+                               const std::vector<TileKey>& rebuild,
+                               int32_t budget)
 {
   int32_t built = 0;
   // Meshes that now have their own heights, then new ones.
   for (const TileKey& key : rebuild) {
-    if (built >= m_settings.meshBuildsPerFrame) {
+    if (built >= budget) {
       break;
     }
     uploadMesh(key);
     ++built;
   }
   for (const TileLoadRequest& request : wanted) {
-    if (built >= m_settings.meshBuildsPerFrame) {
+    if (built >= budget) {
       break;
     }
     uploadMesh(request.key);
@@ -915,7 +916,13 @@ void TileRenderer::requestImages()
             wanted = wanted.parent();
           }
         }
-        if (source->images.count(wanted) == 0 && seen.insert(wanted).second) {
+        const std::unordered_map<TileKey, GpuImage, TileKeyHash>::iterator
+            present = source->images.find(wanted);
+        if (present != source->images.end()) {
+          // Wanted and here: keep it (a stand-in no tile is drawn with yet
+          // would otherwise be evicted, then asked for again).
+          present->second.lastUsedFrame = m_frame;
+        } else if (seen.insert(wanted).second) {
           requests.push_back(TileLoadRequest{wanted, 0.0});
         }
       }
@@ -1073,8 +1080,33 @@ void TileRenderer::prepare(const Camera& camera)
   }
   uploadImages();
   takeHeights();
-  const TileSelection selection = m_selector.select(
-      camera, [this](TileKey key) { return m_meshes.count(key) != 0; });
+  // Every mesh the selection asks about is kept this frame, not only the
+  // drawn ones: it reaches a drawn tile through the meshes above it, and
+  // replaces a tile by its children only while all the visible ones have
+  // meshes. Evicting those (least recently drawn, so first to go) made
+  // the next frame fall back to coarse tiles, and the one after that
+  // evict the fine ones: the detail dropped and recovered over and over.
+  //
+  // A mesh it asks for that isn't there is built at once while this
+  // frame's budget lasts (they are cheap): otherwise, zooming out, a tile
+  // that comes into view without meshes for its children is drawn whole
+  // instead of them, and the detail drops for a frame.
+  int32_t builds = m_settings.meshBuildsPerFrame;
+  const TileSelection selection =
+      m_selector.select(camera, [this, &builds](TileKey key) {
+        std::unordered_map<TileKey, std::unique_ptr<GpuMesh>,
+                           TileKeyHash>::iterator it = m_meshes.find(key);
+        if (it == m_meshes.end() && builds > 0) {
+          --builds;
+          uploadMesh(key);
+          it = m_meshes.find(key);
+        }
+        if (it == m_meshes.end()) {
+          return false;
+        }
+        it->second->lastUsedFrame = m_frame;
+        return true;
+      });
   m_drawTiles.reserve(selection.render.size());
   const MapFrame frame = m_morph > 0.0 ? camera.mapFrame() : MapFrame();
   for (const TileKey& key : selection.render) {
@@ -1126,7 +1158,7 @@ void TileRenderer::prepare(const Camera& camera)
     }
   }
   requestHeights(selection);
-  buildMeshes(selection.load, rebuild);
+  buildMeshes(selection.load, rebuild, builds);
   if (!rebuild.empty()) {
     // A rebuilt mesh replaced the one the draw list points to.
     for (DrawTile& tile : m_drawTiles) {
