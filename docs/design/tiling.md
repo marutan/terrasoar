@@ -160,8 +160,24 @@ draw()                                  callback → GUI thread: new frame
 - **Upload queue**: at most 8 tiles go to the GPU per frame, so a burst
   of finished tiles never stalls a frame.
 - **GPU tiles** (`ts::TileRenderer`, 96 MB): a texture (RGBA8 with
-  mipmaps) and a vertex buffer per tile; when over budget, the tiles drawn
-  least recently are dropped, never one drawn this frame. A tile the
+  mipmaps) and a vertex buffer per tile; when over budget, the tiles used
+  least recently are dropped, never one used this frame. "Used" is
+  everything the frame relies on, not only what it draws: every mesh the
+  selection asks about (the walk from the roots only passes through tiles
+  with meshes, and replaces a tile by its children only while all the
+  visible ones have them), and every image the frame wants that is
+  already there (each drawn tile's own and its coarse stand-in). When
+  only drawn tiles counted, those were the least recently drawn and went
+  first once the budget was full: the next frame fell back to a few
+  coarse tiles, the one after evicted the fine ones, and the detail
+  dropped and came back over and over (level 10 to 3 and back, zooming
+  with a WMS layer). If one frame needs more than the budget it is let
+  through, and evicted back down once the frame doesn't (measured: at
+  most 123 MB, tilting a full HD view with two layers).
+  A mesh the selection asks for that isn't there is built at once, within
+  `meshBuildsPerFrame`, so that a tile coming into view isn't drawn whole
+  for a frame instead of its children. `detailHoldsUnderGpuPressure` in
+  `tests/globe` zooms, pans and tilts with a 24 MB budget. A tile the
   provider has no image for is kept as an empty tile and not drawn, so the
   plain globe shows there.
 - **Frames**: the loader's callback runs on a worker; the view posts a

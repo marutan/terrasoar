@@ -36,6 +36,7 @@
 #include <QImage>
 #include <QNetworkProxy>
 #include <QTemporaryDir>
+#include <QThread>
 #include <QtTest>
 
 #include "goldenimage.h"
@@ -153,6 +154,17 @@ ts::Camera makeCamera(const ts::CameraPose& pose)
   camera.setPose(pose);
   return camera;
 }
+
+/** A checkerboard that takes as long per tile as a network server. */
+class SlowCheckerboard : public ts::CheckerboardImageryProvider
+{
+public:
+  QImage loadImage(ts::TileKey key, const std::atomic<bool>& cancelled) override
+  {
+    QThread::msleep(10);
+    return ts::CheckerboardImageryProvider::loadImage(key, cancelled);
+  }
+};
 
 /** Centroid of the pixels where red clearly exceeds blue (the markers). */
 std::optional<QPointF> redCentroid(const QImage& image)
@@ -1644,6 +1656,93 @@ private slots:
       }
     }
     QCOMPARE(mismatches, 0);
+  }
+
+  void detailHoldsUnderGpuPressure()
+  {
+    // With the GPU budget full, moving the camera keeps the detail: the
+    // deepest level drawn never drops by two or more from one frame to
+    // the next, and the number of tiles never collapses. (Tiles the
+    // selection walks through but doesn't draw, and the coarse stand-in
+    // images, were evicted first, being least recently drawn; the next
+    // frame then fell back to a handful of coarse tiles, the one after
+    // evicted the fine ones, and the detail dropped and came back over
+    // and over: level 10 to 3 and back, zooming with a WMS layer.)
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    ts::TileRendererSettings settings;
+    settings.gpuBytes = std::size_t{24} * 1024 * 1024;
+    ts::GlobeRenderer renderer(m_gl->device(), settings);
+    QString error;
+    QVERIFY2(renderer.initialise(&error), qPrintable(error));
+    renderer.setImageryLayers(
+        {ts::ImageryLayerDraw{
+             std::make_shared<ts::CheckerboardImageryProvider>(), 1.0, -1},
+         ts::ImageryLayerDraw{std::make_shared<SlowCheckerboard>(), 1.0, -1}},
+        {});
+    struct Move {
+      const char* name = nullptr;
+      ts::CameraPose from;
+      ts::CameraPose to;
+    };
+    const std::array<Move, 5> moves = {
+        {{"zoom in",
+          {51.5, -0.5, 2.0e7, 0.0, 0.0},
+          {51.5, -0.5, 3.0e4, 0.0, 0.0}},
+         {"hold", {51.5, -0.5, 3.0e4, 0.0, 0.0}, {51.5, -0.5, 3.0e4, 0.0, 0.0}},
+         {"pan", {51.5, -0.5, 3.0e4, 0.0, 0.0}, {52.5, -1.5, 3.0e4, 0.0, 0.0}},
+         {"tilt",
+          {52.5, -1.5, 3.0e4, 0.0, 0.0},
+          {52.5, -1.5, 3.0e4, 90.0, 75.0}},
+         {"zoom out",
+          {52.5, -1.5, 3.0e4, 90.0, 75.0},
+          {52.5, -1.5, 2.0e7, 90.0, 0.0}}}};
+    for (const Move& move : moves) {
+      int32_t previousDeepest = -1;
+      int32_t previousDrawn = -1;
+      for (int32_t i = 0; i < 45; ++i) {
+        const double t = i / 44.0;
+        const ts::CameraPose& a = move.from;
+        const ts::CameraPose& b = move.to;
+        ts::Camera camera;
+        // Selection for a full HD window, drawn into the small target.
+        camera.setViewportSize(1920, 1080);
+        camera.setPose(ts::CameraPose{
+            a.targetLatDeg + t * (b.targetLatDeg - a.targetLatDeg),
+            a.targetLonDeg + t * (b.targetLonDeg - a.targetLonDeg),
+            std::exp(std::log(a.rangeM) +
+                     t * (std::log(b.rangeM) - std::log(a.rangeM))),
+            a.headingDeg + t * (b.headingDeg - a.headingDeg),
+            a.tiltDeg + t * (b.tiltDeg - a.tiltDeg)});
+        ts::PassDesc pass;
+        pass.target = m_target.get();
+        pass.viewportPx = QRect(0, 0, imageWidthPx, imageHeightPx);
+        m_gl->makeCurrent();
+        renderer.render(camera, pass, 1.0);
+        const ts::TileStatistics tiles = renderer.tileStatistics();
+        // The first frames of the zoom in are still loading the roots.
+        if (previousDeepest >= 0 && previousDrawn > 0) {
+          QVERIFY2(tiles.deepestLevel >= previousDeepest - 1,
+                   qPrintable(QStringLiteral("%1, frame %2: deepest level %3 "
+                                             "after %4")
+                                  .arg(QLatin1String(move.name))
+                                  .arg(i)
+                                  .arg(tiles.deepestLevel)
+                                  .arg(previousDeepest)));
+          QVERIFY2(previousDrawn <= 20 || tiles.rendered >= previousDrawn / 4,
+                   qPrintable(QStringLiteral("%1, frame %2: %3 tiles drawn "
+                                             "after %4")
+                                  .arg(QLatin1String(move.name))
+                                  .arg(i)
+                                  .arg(tiles.rendered)
+                                  .arg(previousDrawn)));
+        }
+        previousDeepest = tiles.deepestLevel;
+        previousDrawn = tiles.rendered;
+        QTest::qWait(16);
+      }
+    }
+    QCOMPARE(m_gl->device().takeErrors(), QString());
   }
 
   void horizonOneMetreAboveSurface()

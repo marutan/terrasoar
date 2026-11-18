@@ -323,7 +323,7 @@ private:
 
   void uploadImages();
   void buildMeshes(const std::vector<TileLoadRequest>& wanted,
-                   const std::vector<TileKey>& rebuild);
+                   const std::vector<TileKey>& rebuild, int32_t budget);
   void uploadMesh(TileKey key);
   void takeHeights();
   void requestHeights(const TileSelection& selection);
