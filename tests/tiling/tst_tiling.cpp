@@ -391,6 +391,56 @@ private slots:
     }
   }
 
+  void surfaceSagBoundsTheMesh()
+  {
+    // A mesh's flat triangles lie below the ellipsoid by at most
+    // tileSurfaceSagM() (the ray-cast globe's depth allows for that), and
+    // the bound is not much looser than the real gap.
+    const int32_t n = ts::TileMesh::defaultSegments;
+    const std::vector<std::uint16_t> indices = ts::tileMeshIndices(n);
+    const std::size_t gridIndices = std::size_t{6} *
+                                    static_cast<std::size_t>(n) *
+                                    static_cast<std::size_t>(n);
+    QVERIFY(indices.size() >= gridIndices);
+    for (const ts::TileKey key :
+         {ts::TileKey::containing(1, ts::Geodetic{10.0, 10.0, 0.0}),
+          ts::TileKey::containing(2, ts::Geodetic{50.0, -1.0, 0.0}),
+          ts::TileKey::containing(4, ts::Geodetic{-70.0, 120.0, 0.0}),
+          ts::TileKey::containing(7, ts::Geodetic{51.5, -0.5, 0.0})}) {
+      const ts::TileMesh mesh = ts::buildTileMesh(key, n);
+      const double boundM = ts::tileSurfaceSagM(key.level, n);
+      double deepestM = 0.0;
+      // The grid's triangles only (the skirt hangs below on purpose).
+      for (std::size_t i = 0; i + 2 < gridIndices; i += 3) {
+        std::array<ts::Vec3, 3> corners;
+        for (std::size_t k = 0; k < 3; ++k) {
+          corners.at(k) =
+              mesh.centreEcef + offsetOf(mesh.vertices.at(indices.at(i + k)));
+        }
+        const std::array<ts::Vec3, 4> inside = {
+            (corners[0] + corners[1] + corners[2]) * (1.0 / 3.0),
+            (corners[0] + corners[1]) * 0.5, (corners[1] + corners[2]) * 0.5,
+            (corners[2] + corners[0]) * 0.5};
+        for (const ts::Vec3& p : inside) {
+          deepestM = std::max(deepestM, -ts::ecefToGeodetic(p).heightM);
+        }
+      }
+      QVERIFY2(deepestM <= boundM * 1.0001 + 1e-3,
+               qPrintable(QStringLiteral("%1: %2 m below, bound %3 m")
+                              .arg(key.toString())
+                              .arg(deepestM)
+                              .arg(boundM)));
+      QVERIFY2(deepestM >= 0.3 * boundM,
+               qPrintable(QStringLiteral("%1: bound %2 m for %3 m")
+                              .arg(key.toString())
+                              .arg(boundM)
+                              .arg(deepestM)));
+    }
+    // A quarter as much at each finer level.
+    QVERIFY(std::abs(ts::tileSurfaceSagM(6, n) / ts::tileSurfaceSagM(5, n) -
+                     0.25) < 0.001);
+  }
+
   void meshIndicesFaceOutwards()
   {
     // Every grid triangle's normal points away from the globe's centre.

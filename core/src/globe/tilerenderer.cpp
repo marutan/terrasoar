@@ -1045,6 +1045,19 @@ void TileRenderer::evict()
   }
 }
 
+double TileRenderer::surfaceSagM() const
+{
+  if (m_drawTiles.empty()) {
+    return 0.0;
+  }
+  // The coarsest tile sags most.
+  int32_t coarsest = TileKey::maximumLevel;
+  for (const DrawTile& tile : m_drawTiles) {
+    coarsest = std::min(coarsest, tile.key.level);
+  }
+  return tileSurfaceSagM(coarsest, m_settings.loader.meshSegments);
+}
+
 void TileRenderer::prepare(const Camera& camera)
 {
   ++m_frame;

@@ -170,10 +170,18 @@ draw()                                  callback → GUI thread: new frame
 
 ## Drawing order and depth
 
-Within the globe's pass: the ray-cast ellipsoid (its depth pushed 1 %
-farther, so that a tile's flat triangles, which lie slightly below the
-curved surface, pass the depth test), then the tiles (depth test and
-write, back faces culled), then markers. All write logarithmic depth.
+Within the globe's pass: the ray-cast ellipsoid, then the tiles (depth
+test and write, back faces culled), then markers. A tile's flat triangles
+lie slightly below the curved surface, by up to `tileSurfaceSagM()` (the
+gap under a grid cell's diagonal; 15 m at level 6, 960 m at level 3), so
+the ellipsoid's depth is pushed farther for them to pass the depth test:
+1 % of the distance, plus that sag for the coarsest tile drawn this frame
+(`TileRenderer::surfaceSagM()`) divided by the cosine of the angle
+between the view ray and the vertical (at most 100 times the sag, towards
+the limb). Along a ray that meets the surface at a shallow angle the gap
+is that much longer: looking towards the horizon from a few kilometres
+up, a 1 % margin alone let the ellipsoid's plain colour show through the
+imagery (`base-uk-grazing` in `tests/globe`). All write logarithmic depth.
 The ray-cast globe shows wherever no tile is drawn: before the first
 tiles load, and where a provider has no data. While terrain is shown the
 ray-cast pass is left out and the tiles carry the surface colour, since

@@ -1263,6 +1263,11 @@ private slots:
         << 54.5 << -3.0 << 2.0e6 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-uk-close")
         << 51.5 << -0.5 << 1.5e5 << 30.0 << none << 0.0 << 0.0;
+    // About 5 km up, looking towards the horizon: the coarse tiles far
+    // away lie below the ray-cast ellipsoid by more along the ray than at
+    // a steep angle, and must still cover it (the plain blue showed).
+    QTest::newRow("base-uk-grazing")
+        << 51.5 << -0.5 << 3.0e4 << 80.0 << none << 0.0 << 0.0;
     QTest::newRow("base-pacific-antimeridian")
         << -17.5 << 179.5 << 1.5e6 << 0.0 << none << 0.0 << 0.0;
     QTest::newRow("base-pacific-wide")

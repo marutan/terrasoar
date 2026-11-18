@@ -71,7 +71,10 @@ struct FrameBlock {
 
 /** Uniform block "Globe" (std140). Binding 1. */
 struct GlobeBlock {
-  /** View direction (xyz), unused (w). */
+  /**
+   * View direction (xyz); how far below the ellipsoid the tiles drawn this
+   * frame can lie, metres (w; see TileRenderer::surfaceSagM()).
+   */
   Float4 camForward{};
   /** Screen right (xyz), tan(horizontal fov / 2) (w). */
   Float4 camRight{};

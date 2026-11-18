@@ -160,9 +160,14 @@ void main()
   vec3 color = surfaceColor.rgb * (0.30 + 0.70 * diffuse)
              * (0.85 + 0.15 * facing);
   fragColor = vec4(color * hit.coverage, hit.coverage);
-  // 1 % farther than the surface: a tile's flat triangles lie a little
-  // below the curved surface and must still pass the depth test.
-  float w = 1.01 * hit.tM * dot(hit.d, camForward.xyz);
+  // Farther than the surface: a tile's flat triangles lie a little below
+  // the curved surface and must still pass the depth test. Along the ray
+  // that gap grows as the ray meets the surface at a shallower angle
+  // (sag / cos of the angle from the vertical), which is where the tiles
+  // looking towards the horizon would otherwise lose to the ellipsoid.
+  // Not beyond 100 times the sag at the limb, where it is unbounded.
+  float sagAlongRayM = camForward.w / max(facing, 0.01);
+  float w = (1.01 * hit.tM + sagAlongRayM) * dot(hit.d, camForward.xyz);
   gl_FragDepth = clamp(log2(1.0 + max(w, 0.0)) * depthParams.x, 0.0, 1.0);
 }
 )";
@@ -699,6 +704,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
       graticuleFadeEndM, graticuleFadeStartM, camera.eyeGeodetic().heightM);
 
   GlobeBlock globe;
+  // The tiles' sag (camForward.w) is set once they are chosen, below.
   globe.camForward = float4(camera.forwardEcef(), 0.0);
   globe.camRight = float4(camera.rightEcef(), camera.tanHalfFovX());
   globe.camUp = float4(camera.upEcef(), camera.tanHalfFovY());
@@ -718,6 +724,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
 
   if (m_tiles) {
     m_tiles->prepare(camera);
+    globe.camForward.at(3) = static_cast<float>(m_tiles->surfaceSagM());
   }
   if (m_vectors) {
     m_vectors->prepare(camera);
