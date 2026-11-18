@@ -170,6 +170,33 @@ public:
   }
 };
 
+/**
+ * Blanks the pixels of both @p images that don't show a point inside
+ * @p bounds, a little inside the edge (where both layers have pixels).
+ */
+void keepOnlyInside(std::array<QImage, 2>& images, const ts::Camera& camera,
+                    const std::optional<ts::GeoRect>& bounds)
+{
+  if (!bounds) {
+    return;
+  }
+  const double margin = 0.3;
+  for (int32_t y = 0; y < images[0].height(); ++y) {
+    for (int32_t x = 0; x < images[0].width(); ++x) {
+      const std::optional<ts::Geodetic> point =
+          camera.pickGeodetic(x + 0.5, y + 0.5);
+      const bool inside = point && point->latDeg > bounds->southDeg + margin &&
+                          point->latDeg < bounds->northDeg - margin &&
+                          point->lonDeg > bounds->westDeg + margin &&
+                          point->lonDeg < bounds->eastDeg - margin;
+      if (!inside) {
+        images[0].setPixel(x, y, qRgb(0, 0, 0));
+        images[1].setPixel(x, y, qRgb(0, 0, 0));
+      }
+    }
+  }
+}
+
 /** Centroid of the pixels where red clearly exceeds blue (the markers). */
 std::optional<QPointF> redCentroid(const QImage& image)
 {
@@ -329,7 +356,9 @@ private:
   }
 
   /** A WMS overlay from the mock server, in @p crs. */
-  std::shared_ptr<ts::WmsImageryProvider> mockWms(const QString& crs)
+  std::shared_ptr<ts::WmsImageryProvider>
+  mockWms(const QString& crs,
+          const std::optional<ts::GeoRect>& bounds = std::nullopt)
   {
     if (!m_wmsServer) {
       m_wmsServer =
@@ -344,6 +373,7 @@ private:
     source.layers = QStringList{QStringLiteral("pattern")};
     source.styles = QStringList{QString()};
     source.crs = crs;
+    source.bounds = bounds;
     source.title = QStringLiteral("Mock overlay");
     return std::make_shared<ts::WmsImageryProvider>(source, m_network);
   }
@@ -1144,6 +1174,14 @@ private slots:
         << QStringLiteral("Offset4326") << 30.0 << 20.0 << 1.6e7 << 0.0 << 0.01;
     QTest::newRow("offset close")
         << QStringLiteral("Offset4326") << 45.0 << 60.0 << 1.5e6 << 0.0 << 0.01;
+    // British National Grid tiles, reprojected through PROJ on the CPU:
+    // lined up with the WMS picture over the grid's area.
+    QTest::newRow("BNG over Britain") << QStringLiteral("BritishNationalGrid")
+                                      << 56.0 << -2.0 << 2.5e6 << 0.0 << 0.01;
+    QTest::newRow("BNG close") << QStringLiteral("BritishNationalGrid") << 59.0
+                               << 0.5 << 6.0e5 << 0.0 << 0.01;
+    QTest::newRow("BNG Mercator map") << QStringLiteral("BritishNationalGrid")
+                                      << 56.0 << -2.0 << 3.0e6 << 1.0 << 0.01;
   }
 
   void wmtsMatchesWms()
@@ -1168,10 +1206,13 @@ private slots:
       style.graticule = false;
       m_renderer->setStyle(style);
       std::shared_ptr<ts::ImageryProvider> overlay;
+      const std::shared_ptr<ts::WmtsImageryProvider> wmts = mockWmts(set);
       if (i == 0) {
-        overlay = mockWms(QStringLiteral("EPSG:4326"));
+        // Only where the WMTS layer has data (a national grid's area).
+        overlay = mockWms(QStringLiteral("EPSG:4326"),
+                          wmts ? wmts->source().bounds : std::nullopt);
       } else {
-        overlay = mockWmts(set);
+        overlay = wmts;
       }
       if (overlay == nullptr) {
         QFAIL("no overlay");
@@ -1185,6 +1226,13 @@ private slots:
     m_renderer->setImageryLayers({}, {});
     m_renderer->setStyle(ts::GlobeStyle());
     QCOMPARE(m_gl->device().takeErrors(), QString());
+    // A layer limited to an area (a national grid's area of use) is
+    // compared there only: the WMS layer's bounds keep whole tiles, so
+    // it draws on past them.
+    const std::shared_ptr<ts::WmtsImageryProvider> limited = mockWmts(set);
+    if (limited && ts::isProjectedWmtsCrs(limited->source().crs)) {
+      keepOnlyInside(images, camera, limited->source().bounds);
+    }
     const ts::test::ImageDifference difference =
         ts::test::compareImages(images[1], images[0], 40);
     qInfo("%.3f %% of pixels differ by more than 40",
@@ -1228,6 +1276,9 @@ private slots:
         << google << miller << 1.0 << 0.0 << 0.0 << 5.0e7;
     QTest::newRow("wmts-3857-morph-half")
         << google << mercator << 0.5 << 30.0 << 20.0 << 2.6e7;
+    // British National Grid tiles over Britain, reprojected through PROJ.
+    QTest::newRow("wmts-bng-britain") << QStringLiteral("BritishNationalGrid")
+                                      << none << 0.0 << 56.0 << -2.0 << 2.5e6;
   }
 
   void wmtsGolden()

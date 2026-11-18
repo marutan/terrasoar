@@ -524,12 +524,18 @@ void AddWmtsDialog::showDetails()
     return;
   }
   QStringList details;
-  details << (source->imageProjection() == TileImageProjection::WebMercator
-                  ? tr("Drawn from Web Mercator tiles (%1), reprojected.")
-                        .arg(source->tileMatrixSet)
-                  : tr("Drawn from %1 tiles in %2.")
-                        .arg(source->tileMatrixSet, source->crs))
-                 .toHtmlEscaped();
+  QString drawn;
+  if (source->imageProjection() == TileImageProjection::WebMercator) {
+    drawn = tr("Drawn from Web Mercator tiles (%1), reprojected.")
+                .arg(source->tileMatrixSet);
+  } else if (isProjectedWmtsCrs(source->crs)) {
+    drawn = tr("Drawn from %1 tiles in %2, reprojected.")
+                .arg(source->tileMatrixSet, source->crs);
+  } else {
+    drawn = tr("Drawn from %1 tiles in %2.")
+                .arg(source->tileMatrixSet, source->crs);
+  }
+  details << drawn.toHtmlEscaped();
   if (!source->attribution.isEmpty()) {
     details << tr("Credit: %1").arg(source->attribution).toHtmlEscaped();
   }

@@ -31,6 +31,8 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <utility>
+#include <vector>
 
 #include <QBuffer>
 #include <QImage>
@@ -39,6 +41,7 @@
 
 #include "mockhttpserver.h"
 #include "mockwms.h"
+#include "ts/wmts/wmtscrs.h"
 
 namespace ts::test
 {
@@ -62,6 +65,8 @@ struct MockWmtsSet {
   const char* crs;
   /** True for Web Mercator (metres), false for degrees. */
   bool mercator;
+  /** A projected CRS's code ("EPSG:27700"), or null. Its units are metres. */
+  const char* projected;
   /** Tile size, pixels. */
   int32_t tileSize;
   /** Columns of matrix 0 (doubling at each level). */
@@ -79,24 +84,34 @@ struct MockWmtsSet {
 /** Number of matrices in each set (0 to 9). */
 constexpr int32_t mockWmtsMatrices = 10;
 
-/** The mock's sets: aligned EPSG:4326, Web Mercator, unaligned EPSG:4326. */
-inline const std::array<MockWmtsSet, 3>& mockWmtsSets()
+/** Number of the mock's tile matrix sets. */
+constexpr std::size_t mockWmtsSetCount = 4;
+
+/**
+ * The mock's sets: aligned EPSG:4326, Web Mercator, unaligned EPSG:4326,
+ * British National Grid.
+ */
+inline const std::array<MockWmtsSet, mockWmtsSetCount>& mockWmtsSets()
 {
   constexpr double a = 6378137.0;
   constexpr double pi = 3.14159265358979323846;
-  static const std::array<MockWmtsSet, 3> sets = {{
+  static const std::array<MockWmtsSet, mockWmtsSetCount> sets = {{
       // Lines up with the quadtree: tile (z, x, y) is quadtree tile
       // (z, x, y).
-      {"WorldCRS84Quad", "urn:ogc:def:crs:OGC:1.3:CRS84", false, 256, 2, 1,
-       180.0 / 256.0, -180.0, 90.0},
+      {"WorldCRS84Quad", "urn:ogc:def:crs:OGC:1.3:CRS84", false, nullptr, 256,
+       2, 1, 180.0 / 256.0, -180.0, 90.0},
       // Zoom z + 1 lines up with quadtree level z, as Web Mercator images.
-      {"GoogleMapsCompatible", "urn:ogc:def:crs:EPSG::3857", true, 256, 1, 1,
-       2.0 * pi * a / 256.0, -pi * a, pi * a},
+      {"GoogleMapsCompatible", "urn:ogc:def:crs:EPSG::3857", true, nullptr, 256,
+       1, 1, 2.0 * pi * a / 256.0, -pi * a, pi * a},
       // 200-pixel tiles from a corner off the quadtree's meridians: every
       // quadtree tile takes pieces of several. Latitude first, as
       // EPSG:4326 is.
-      {"Offset4326", "urn:ogc:def:crs:EPSG::4326", false, 200, 3, 2,
+      {"Offset4326", "urn:ogc:def:crs:EPSG::4326", false, nullptr, 200, 3, 2,
        180.0 / 256.0, -183.5, 90.0},
+      // Ordnance Survey's British National Grid tiles (896 m pixels at
+      // level 0, from (-238375, 1376256)), reprojected through PROJ.
+      {"BritishNationalGrid", "urn:ogc:def:crs:EPSG::27700", false,
+       "EPSG:27700", 256, 5, 7, 896.0, -238375.0, 1376256.0},
   }};
   return sets;
 }
@@ -105,7 +120,9 @@ inline const std::array<MockWmtsSet, 3>& mockWmtsSets()
 inline double mockWmtsScale(const MockWmtsSet& set, double size)
 {
   constexpr double metresPerDegree = 111319.49079327357;
-  return size * (set.mercator ? 1.0 : metresPerDegree) / 0.00028;
+  return size *
+         (set.mercator || set.projected != nullptr ? 1.0 : metresPerDegree) /
+         0.00028;
 }
 
 /** The capabilities document, with tile addresses on @p server. */
@@ -187,6 +204,43 @@ inline QByteArray mockWmtsCapabilities(const QUrl& server)
 }
 
 /**
+ * Draws a tile of a projected @p set (pixel size @p pixel): each pixel's
+ * centre back to longitude and latitude through PROJ.
+ */
+// Matrix position as WMTS names it.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+inline QImage mockWmtsProjectedTile(const MockWmtsSet& set, double pixel,
+                                    int64_t column, int64_t row, bool opaque)
+{
+  const std::size_t size = static_cast<std::size_t>(set.tileSize);
+  std::vector<std::pair<double, double>> points;
+  points.reserve(size * size);
+  for (int32_t y = 0; y < set.tileSize; ++y) {
+    for (int32_t x = 0; x < set.tileSize; ++x) {
+      points.emplace_back(
+          set.originX +
+              (static_cast<double>(column * set.tileSize + x) + 0.5) * pixel,
+          set.originY -
+              (static_cast<double>(row * set.tileSize + y) + 0.5) * pixel);
+    }
+  }
+  const ts::WmtsCrsTransform transform(QString::fromLatin1(set.projected));
+  transform.inverse(points);
+  QImage image(set.tileSize, set.tileSize, QImage::Format_ARGB32);
+  std::size_t next = 0;
+  for (int32_t y = 0; y < set.tileSize; ++y) {
+    for (int32_t x = 0; x < set.tileSize; ++x) {
+      const std::pair<double, double>& lonLat = points.at(next++);
+      image.setPixel(x, y,
+                     std::isnan(lonLat.first)
+                         ? qRgba(0, 0, 0, 0)
+                         : mockWmsColour(lonLat.first, lonLat.second, !opaque));
+    }
+  }
+  return image;
+}
+
+/**
  * Draws tile (@p column, @p row) of matrix @p z of @p set: the mock WMS's
  * picture of the Earth (mockWmsColour()), from each pixel's position, so
  * a correct client draws the same Earth from every set; on white if
@@ -201,6 +255,9 @@ inline QImage mockWmtsTile(const MockWmtsSet& set, int32_t z, int64_t column,
   constexpr double degrees = 180.0 / 3.14159265358979323846;
   const double pixel = set.pixel0 / std::ldexp(1.0, z);
   QImage image(set.tileSize, set.tileSize, QImage::Format_ARGB32);
+  if (set.projected != nullptr) {
+    return mockWmtsProjectedTile(set, pixel, column, row, opaque);
+  }
   for (int32_t y = 0; y < set.tileSize; ++y) {
     const double northing =
         set.originY -
@@ -279,7 +336,7 @@ mockWmtsTileRequest(const MockHttpRequest& request)
   } else {
     return std::nullopt;
   }
-  const std::array<MockWmtsSet, 3>& sets = mockWmtsSets();
+  const std::array<MockWmtsSet, mockWmtsSetCount>& sets = mockWmtsSets();
   tile.set = -1;
   for (std::size_t i = 0; i < sets.size(); ++i) {
     if (setName == QLatin1String(sets.at(i).identifier)) {

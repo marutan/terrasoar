@@ -407,6 +407,10 @@
             <source>Legend</source>
             <translation>Legend</translation>
         </message>
+        <message>
+            <source>Drawn from %1 tiles in %2, reprojected.</source>
+            <translation>Drawn from %1 tiles in %2, reprojected.</translation>
+        </message>
     </context>
     <context>
         <name>ts::BuiltinLayers</name>
@@ -1956,10 +1960,6 @@
             <translation>The service has no layer %1.</translation>
         </message>
         <message>
-            <source>Layer %1 is only offered in coordinate systems that can't be drawn yet (%2); it needs EPSG:4326 or Web Mercator.</source>
-            <translation>Layer %1 is only offered in coordinate systems that can't be drawn yet (%2); it needs EPSG:4326 or Web Mercator.</translation>
-        </message>
-        <message>
             <source>Layer %1 can't be drawn in tile matrix set %2.</source>
             <translation>Layer %1 can't be drawn in tile matrix set %2.</translation>
         </message>
@@ -1978,6 +1978,10 @@
         <message>
             <source>Layer %1 needs a value for %2, and the service gives no default.</source>
             <translation>Layer %1 needs a value for %2, and the service gives no default.</translation>
+        </message>
+        <message>
+            <source>Layer %1 is only offered in coordinate systems that can't be drawn (%2): they aren't EPSG codes PROJ knows.</source>
+            <translation>Layer %1 is only offered in coordinate systems that can't be drawn (%2): they aren't EPSG codes PROJ knows.</translation>
         </message>
     </context>
 </TS>

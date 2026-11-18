@@ -35,6 +35,7 @@
 #include "ts/projection/cylindricalprojection.h"
 #include "ts/wms/wmssource.h"
 #include "ts/wmts/wmtscapabilities.h"
+#include "ts/wmts/wmtscrs.h"
 
 namespace ts
 {
@@ -42,8 +43,12 @@ namespace ts
 namespace
 {
 
-/** Most WMTS tiles fitted to one quadtree tile. */
-constexpr int32_t maximumTilesPerQuadtreeTile = 16;
+/**
+ * Most WMTS tiles fitted to one quadtree tile. A national grid's coarsest
+ * matrix may still be much finer than a coarse quadtree tile: then its
+ * tiles are drawn smaller (WmtsImageryProvider).
+ */
+constexpr int32_t maximumTilesPerQuadtreeTile = 64;
 
 /**
  * Most matrices a source keeps: the disk cache keys tiles by matrix index
@@ -71,21 +76,78 @@ const WebMercatorProjection& webMercator()
   return projection;
 }
 
+bool isWebMercator(const QString& crs)
+{
+  return crs == QLatin1String("EPSG:3857");
+}
+
+/** True for CRS:84, EPSG:4326 and other geographic CRSs PROJ knows. */
 bool isGeographic(const QString& crs)
 {
-  return crs == QLatin1String("CRS:84") || crs == QLatin1String("EPSG:4326");
+  if (crs == QLatin1String("CRS:84") || crs == QLatin1String("EPSG:4326")) {
+    return true;
+  }
+  if (isWebMercator(crs)) {
+    return false;
+  }
+  const std::optional<WmtsCrsInfo> info = wmtsCrsInfo(crs);
+  return info && info->geographic;
 }
 
-/** Width of a level-0 quadtree tile in @p crs units (180°). */
+/** Metres per unit of @p crs (WMTS's degree for geographic ones). */
+double metresPerUnit(const QString& crs)
+{
+  if (isGeographic(crs)) {
+    return wmtsMetresPerDegree;
+  }
+  if (isWebMercator(crs)) {
+    return 1.0;
+  }
+  const std::optional<WmtsCrsInfo> info = wmtsCrsInfo(crs);
+  return info && info->metresPerUnit > 0.0 ? info->metresPerUnit : 1.0;
+}
+
+/**
+ * Width of a level-0 quadtree tile in @p crs units: 180°, or that along a
+ * meridian (π a metres) for Web Mercator and projected CRSs, whose scale is
+ * about true near where they are used.
+ */
 double levelZeroWidth(const QString& crs)
 {
-  return isGeographic(crs) ? 180.0 : wgs84::semiMajorAxisM * pi;
+  return isGeographic(crs) ? 180.0
+                           : wgs84::semiMajorAxisM * pi / metresPerUnit(crs);
 }
 
-/** Scale denominators of a pixel this size, for comparing CRSs. */
+/** A pixel this size in metres, for comparing CRSs. */
 double pixelSizeM(double pixelSize, const QString& crs)
 {
-  return isGeographic(crs) ? pixelSize * wmtsMetresPerDegree : pixelSize;
+  return pixelSize * metresPerUnit(crs);
+}
+
+/**
+ * How @p crs is drawn, best first: 0 geographic (no reprojection), 1 Web
+ * Mercator (reprojected in the shader), 2 others (reprojected through
+ * PROJ, on the CPU).
+ */
+int32_t drawingRank(const QString& crs)
+{
+  if (isGeographic(crs)) {
+    return 0;
+  }
+  return isWebMercator(crs) ? 1 : 2;
+}
+
+/** The overlap of @p a and @p b (nothing if they don't overlap). */
+std::optional<GeoRect> intersection(const GeoRect& a, const GeoRect& b)
+{
+  const GeoRect overlap{
+      std::max(a.westDeg, b.westDeg), std::max(a.southDeg, b.southDeg),
+      std::min(a.eastDeg, b.eastDeg), std::min(a.northDeg, b.northDeg)};
+  if (!(overlap.westDeg < overlap.eastDeg) ||
+      !(overlap.southDeg < overlap.northDeg)) {
+    return GeoRect{0.0, 0.0, 0.0, 0.0};
+  }
+  return overlap;
 }
 
 /** The deepest quadtree level that gains detail from @p finest. */
@@ -235,8 +297,8 @@ std::vector<UsableSet> usableSets(const WmtsCapabilities& capabilities,
   }
   std::stable_sort(sets.begin(), sets.end(),
                    [](const UsableSet& a, const UsableSet& b) {
-                     if (isGeographic(a.crs) != isGeographic(b.crs)) {
-                       return isGeographic(a.crs);
+                     if (drawingRank(a.crs) != drawingRank(b.crs)) {
+                       return drawingRank(a.crs) < drawingRank(b.crs);
                      }
                      return pixelSizeM(a.matrices.back().pixelSize, a.crs) <
                             pixelSizeM(b.matrices.back().pixelSize, b.crs);
@@ -259,7 +321,7 @@ QString noUsableSetMessage(const WmtsCapabilities& capabilities,
   return QCoreApplication::translate(
              "ts::WmtsSource",
              "Layer %1 is only offered in coordinate systems that can't be "
-             "drawn yet (%2); it needs EPSG:4326 or Web Mercator.")
+             "drawn (%2): they aren't EPSG codes PROJ knows.")
       .arg(layer.identifier, offered.join(QStringLiteral(", ")));
 }
 
@@ -597,13 +659,21 @@ QString normalisedWmtsCrs(const QString& supportedCrs)
 
 bool isSupportedWmtsCrs(const QString& crs)
 {
-  return isGeographic(crs) || crs == QLatin1String("EPSG:3857");
+  if (crs.isEmpty()) {
+    return false;
+  }
+  return crs == QLatin1String("CRS:84") || crs == QLatin1String("EPSG:4326") ||
+         isWebMercator(crs) || wmtsCrsInfo(crs).has_value();
+}
+
+bool isProjectedWmtsCrs(const QString& crs)
+{
+  return isSupportedWmtsCrs(crs) && !isGeographic(crs) && !isWebMercator(crs);
 }
 
 double wmtsPixelSize(const WmtsTileMatrix& matrix, const QString& crs)
 {
-  const double metresPerUnit = isGeographic(crs) ? wmtsMetresPerDegree : 1.0;
-  return matrix.scaleDenominator * wmtsPixelSizeM / metresPerUnit;
+  return matrix.scaleDenominator * wmtsPixelSizeM / metresPerUnit(crs);
 }
 
 WmtsMatrix wmtsMatrix(const WmtsTileMatrix& matrix, const QString& crs)
@@ -613,10 +683,18 @@ WmtsMatrix wmtsMatrix(const WmtsTileMatrix& matrix, const QString& crs)
   result.pixelSize = wmtsPixelSize(matrix, crs);
   result.originX = matrix.topLeftFirst;
   result.originY = matrix.topLeftSecond;
-  // EPSG:4326 is latitude first, but a first value beyond ±90 must be a
-  // longitude: the server wrote it the other way round.
-  if (crs == QLatin1String("EPSG:4326") &&
-      std::abs(matrix.topLeftFirst) <= 90.0) {
+  // EPSG:4326 is latitude first (as other EPSG geographic CRSs, and some
+  // projected ones such as EPSG:3035), but a geographic corner's first
+  // value beyond ±90 must be a longitude: the server wrote it the other
+  // way round.
+  const std::optional<WmtsCrsInfo> info =
+      crs == QLatin1String("CRS:84") || isWebMercator(crs) ? std::nullopt
+                                                           : wmtsCrsInfo(crs);
+  const bool northingFirst =
+      crs == QLatin1String("EPSG:4326") || (info && info->northingFirst);
+  const bool writtenEastingFirst =
+      isGeographic(crs) && std::abs(matrix.topLeftFirst) > 90.0;
+  if (northingFirst && !writtenEastingFirst) {
     result.originX = matrix.topLeftSecond;
     result.originY = matrix.topLeftFirst;
   }
@@ -632,7 +710,11 @@ WmtsMatrix wmtsMatrix(const WmtsTileMatrix& matrix, const QString& crs)
 std::optional<GeoRect> wmtsExtent(const WmtsSource& source, TileKey key)
 {
   const GeoRect rect = key.bounds();
-  if (source.crs != QLatin1String("EPSG:3857")) {
+  if (isProjectedWmtsCrs(source.crs)) {
+    // Not a rectangle there: see WmtsImageryProvider.
+    return std::nullopt;
+  }
+  if (!isWebMercator(source.crs)) {
     return rect;
   }
   const std::optional<GeoRect> clipped = webMercatorCoverage(rect);
@@ -682,12 +764,25 @@ std::optional<WmtsTileWindow> wmtsTileWindow(const WmtsSource& source,
   if (!extent) {
     return std::nullopt;
   }
+  return wmtsTileWindowForExtent(source, *extent, matrix);
+}
+
+std::optional<WmtsTileWindow> wmtsTileWindowForExtent(const WmtsSource& source,
+                                                      const GeoRect& extent,
+                                                      int32_t matrix)
+{
+  if (matrix < 0 ||
+      static_cast<std::size_t>(matrix) >= source.matrices.size() ||
+      !(extent.westDeg <= extent.eastDeg) ||
+      !(extent.southDeg <= extent.northDeg)) {
+    return std::nullopt;
+  }
   const WmtsMatrix& m = source.matrices[static_cast<std::size_t>(matrix)];
   // The extent in the matrix's pixels, from its top-left corner.
-  const double left = (extent->westDeg - m.originX) / m.pixelSize;
-  const double right = (extent->eastDeg - m.originX) / m.pixelSize;
-  const double top = (m.originY - extent->northDeg) / m.pixelSize;
-  const double bottom = (m.originY - extent->southDeg) / m.pixelSize;
+  const double left = (extent.westDeg - m.originX) / m.pixelSize;
+  const double right = (extent.eastDeg - m.originX) / m.pixelSize;
+  const double top = (m.originY - extent.northDeg) / m.pixelSize;
+  const double bottom = (m.originY - extent.southDeg) / m.pixelSize;
   const double tileWidth = m.tileWidth;
   const double tileHeight = m.tileHeight;
   // A sliver of a pixel past a tile edge doesn't need the next tile.
@@ -909,6 +1004,16 @@ std::optional<WmtsSource> wmtsSourceFor(const WmtsCapabilities& capabilities,
     return std::nullopt;
   }
   source.bounds = layer->wgs84Bounds;
+  if (isProjectedWmtsCrs(source.crs)) {
+    // Only where the CRS is meant to be used: far from it a projection
+    // runs wild, or can't be computed at all.
+    const std::optional<WmtsCrsInfo> info = wmtsCrsInfo(source.crs);
+    if (info && info->areaOfUse) {
+      source.bounds = source.bounds
+                          ? intersection(*source.bounds, *info->areaOfUse)
+                          : info->areaOfUse;
+    }
+  }
   source.maximumLevel = deepestLevel(source.matrices.back().pixelSize,
                                      source.crs, source.tileSizePx);
   source.title = layer->title.isEmpty() ? layerId : layer->title;

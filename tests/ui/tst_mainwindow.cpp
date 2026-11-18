@@ -1625,7 +1625,7 @@ private slots:
     }
     QCOMPARE(formats->currentText(), QStringLiteral("image/png"));
     QCOMPARE(formats->count(), 2);
-    QCOMPARE(sets->count(), 3);
+    QCOMPARE(sets->count(), static_cast<int32_t>(ts::test::mockWmtsSetCount));
     // Geographic first: it needs no reprojection.
     QVERIFY(sets->currentData().toString() !=
             QLatin1String("GoogleMapsCompatible"));

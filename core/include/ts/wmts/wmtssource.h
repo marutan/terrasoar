@@ -210,8 +210,19 @@ struct WmtsSource {
  */
 QString normalisedWmtsCrs(const QString& supportedCrs);
 
-/** Returns true if WMTS sources in @p crs (normalised) can be drawn. */
+/**
+ * Returns true if WMTS sources in @p crs (normalised) can be drawn:
+ * CRS:84, EPSG:4326, Web Mercator, and any other EPSG geographic or
+ * projected CRS PROJ knows (wmtsCrsInfo()).
+ */
 bool isSupportedWmtsCrs(const QString& crs);
+
+/**
+ * Returns true if @p crs can be drawn and is neither geographic nor Web
+ * Mercator: its tiles are reprojected through PROJ (British National
+ * Grid, RD New, UTM zones, polar stereographic, …).
+ */
+bool isProjectedWmtsCrs(const QString& crs);
 
 /**
  * Returns the size of a pixel of @p matrix in units of @p crs
@@ -231,7 +242,9 @@ WmtsMatrix wmtsMatrix(const WmtsTileMatrix& matrix, const QString& crs);
 /**
  * Returns the extent of quadtree tile @p key in @p source's CRS units:
  * {west, south, east, north}. For Web Mercator, the tile's rectangle
- * clipped to the projection's limit; nothing if nothing is left.
+ * clipped to the projection's limit; nothing if nothing is left. Nothing
+ * for a projected CRS, where a quadtree tile isn't a rectangle (the
+ * provider works out its extent through PROJ).
  */
 std::optional<GeoRect> wmtsExtent(const WmtsSource& source, TileKey key);
 
@@ -248,10 +261,19 @@ int32_t wmtsMatrixFor(const WmtsSource& source, TileKey key);
  * exist (beyond the matrix's edge or the layer's limits, see
  * wmtsTileExists()); they are left transparent. Nothing if none of them
  * exist, the tile is outside the source's bounds, or it would take more
- * than 16 tiles (a layer without matrices as coarse as the tile).
+ * than 64 tiles (a layer without matrices nearly as coarse as the tile).
  */
 std::optional<WmtsTileWindow> wmtsTileWindow(const WmtsSource& source,
                                              TileKey key, int32_t matrix);
+
+/**
+ * Returns the block of tiles of matrix @p matrix covering @p extent (in
+ * @p source's CRS units: {west, south, east, north}), as wmtsTileWindow()
+ * does for a quadtree tile's extent.
+ */
+std::optional<WmtsTileWindow> wmtsTileWindowForExtent(const WmtsSource& source,
+                                                      const GeoRect& extent,
+                                                      int32_t matrix);
 
 /**
  * Returns true if @p tile exists: inside its matrix and the layer's

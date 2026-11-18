@@ -82,13 +82,21 @@
       <ResourceURL format="application/json" resourceType="FeatureInfo"
                    template="https://maps.example.org/info/{TileMatrix}/{TileRow}/{TileCol}/{J}/{I}.json"/>
     </Layer>
-    <!-- Only a national grid: not drawn yet. -->
+    <!-- Only British National Grid: reprojected through PROJ. -->
     <Layer>
       <ows:Title>Grid only</ows:Title>
       <ows:Identifier>gridonly</ows:Identifier>
       <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
       <Format>image/png</Format>
       <TileMatrixSetLink><TileMatrixSet>BritishNationalGrid</TileMatrixSet></TileMatrixSetLink>
+    </Layer>
+    <!-- Only a CRS that isn't an EPSG code: can't be drawn. -->
+    <Layer>
+      <ows:Title>Lambert only</ows:Title>
+      <ows:Identifier>lambertonly</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>Lambert93</TileMatrixSet></TileMatrixSetLink>
     </Layer>
     <!-- A link to a set that doesn't exist, then a usable one; no styles. -->
     <Layer>
@@ -143,6 +151,17 @@
         <TopLeftCorner>-238375.0 1376256.0</TopLeftCorner>
         <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
         <MatrixWidth>5</MatrixWidth><MatrixHeight>7</MatrixHeight>
+      </TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>Lambert93</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:IGNF::LAMB93</ows:SupportedCRS>
+      <TileMatrix>
+        <ows:Identifier>0</ows:Identifier>
+        <ScaleDenominator>4000000</ScaleDenominator>
+        <TopLeftCorner>0 7200000</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>4</MatrixWidth><MatrixHeight>4</MatrixHeight>
       </TileMatrix>
     </TileMatrixSet>
     <!-- Web Mercator under an old code, with a well-known scale set. -->

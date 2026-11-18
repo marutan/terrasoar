@@ -46,6 +46,7 @@
 #include "ts/regions/regiongeometry.h"
 #include "ts/wms/wmscatalogue.h"
 #include "ts/wmts/wmtscapabilities.h"
+#include "ts/wmts/wmtscrs.h"
 #include "ts/wmts/wmtsimageryprovider.h"
 #include "ts/wmts/wmtssource.h"
 
@@ -386,7 +387,7 @@ private slots:
     QCOMPARE(capabilities.getTileKvpUrl,
              QUrl(QStringLiteral("https://maps.example.org/wmts?map=base&")));
     // The layer without an identifier is dropped.
-    QCOMPARE(static_cast<int32_t>(capabilities.layers.size()), 3);
+    QCOMPARE(static_cast<int32_t>(capabilities.layers.size()), 4);
 
     const ts::WmtsLayer* limited =
         capabilities.findLayer(QStringLiteral("limited"));
@@ -863,9 +864,9 @@ private slots:
     QTest::newRow("no layer")
         << QStringLiteral("nothing") << QString() << QString() << QString()
         << QStringLiteral("has no layer nothing");
-    QTest::newRow("national grid only")
-        << QStringLiteral("gridonly") << QString() << QString() << QString()
-        << QStringLiteral("urn:ogc:def:crs:EPSG::27700");
+    QTest::newRow("no EPSG code")
+        << QStringLiteral("lambertonly") << QString() << QString() << QString()
+        << QStringLiteral("urn:ogc:def:crs:IGNF::LAMB93");
     QTest::newRow("no style")
         << QStringLiteral("limited") << QStringLiteral("day") << QString()
         << QString() << QStringLiteral("no style day");
@@ -874,9 +875,8 @@ private slots:
         << QStringLiteral("image/webp") << QString()
         << QStringLiteral("can't be requested as image/webp");
     QTest::newRow("unusable set")
-        << QStringLiteral("gridonly") << QString() << QString()
-        << QStringLiteral("BritishNationalGrid")
-        << QStringLiteral("can't be drawn yet");
+        << QStringLiteral("lambertonly") << QString() << QString()
+        << QStringLiteral("Lambert93") << QStringLiteral("can't be drawn");
   }
 
   void sourceErrors()
@@ -927,9 +927,9 @@ private slots:
 
     // What makes no sense is refused with a reason.
     QJsonObject broken = json;
-    broken.insert(QStringLiteral("crs"), QStringLiteral("EPSG:27700"));
+    broken.insert(QStringLiteral("crs"), QStringLiteral("EPSG:999999"));
     QVERIFY(!ts::WmtsSource::fromJson(broken, &error));
-    QVERIFY(error.contains(QLatin1String("27700")));
+    QVERIFY(error.contains(QLatin1String("999999")));
     broken = json;
     broken.remove(QStringLiteral("url"));
     QVERIFY(!ts::WmtsSource::fromJson(broken, &error));
@@ -1436,6 +1436,303 @@ private slots:
              ts::ImageLoadResult::Outcome::Image);
     QCOMPARE(offline.statistics().requests, 0);
     QCOMPARE(offline.diskCache()->regionUsage(11).tiles, tiles);
+  }
+
+  void crsInfo()
+  {
+    // What PROJ says of the CRSs WMTS services use.
+    const std::optional<ts::WmtsCrsInfo> bng =
+        ts::wmtsCrsInfo(QStringLiteral("EPSG:27700"));
+    if (!bng) {
+      QFAIL("PROJ doesn't know EPSG:27700");
+    }
+    QVERIFY(!bng->geographic);
+    QVERIFY(!bng->northingFirst);
+    QCOMPARE(bng->metresPerUnit, 1.0);
+    if (!bng->areaOfUse) {
+      QFAIL("no area of use");
+    }
+    QVERIFY(bng->areaOfUse->contains(52.0, -1.0));
+    QVERIFY(!bng->areaOfUse->contains(40.0, -1.0));
+    // LAEA Europe is northing first; RD New easting first.
+    const std::optional<ts::WmtsCrsInfo> laea =
+        ts::wmtsCrsInfo(QStringLiteral("EPSG:3035"));
+    QVERIFY(laea && laea->northingFirst && !laea->geographic);
+    const std::optional<ts::WmtsCrsInfo> rd =
+        ts::wmtsCrsInfo(QStringLiteral("EPSG:28992"));
+    QVERIFY(rd && !rd->northingFirst);
+    // ETRS89: geographic, latitude first, degrees as WMTS counts them.
+    const std::optional<ts::WmtsCrsInfo> etrs =
+        ts::wmtsCrsInfo(QStringLiteral("EPSG:4258"));
+    if (!etrs) {
+      QFAIL("PROJ doesn't know EPSG:4258");
+    }
+    QVERIFY(etrs->geographic && etrs->northingFirst);
+    QCOMPARE(etrs->metresPerUnit, ts::wmtsMetresPerDegree);
+    // New York Long Island in US survey feet.
+    const std::optional<ts::WmtsCrsInfo> feet =
+        ts::wmtsCrsInfo(QStringLiteral("EPSG:2263"));
+    QVERIFY(feet && std::abs(feet->metresPerUnit - 0.3048006096) < 1e-9);
+    QVERIFY(!ts::wmtsCrsInfo(QStringLiteral("EPSG:999999")));
+    // What can be drawn, and how.
+    QVERIFY(ts::isProjectedWmtsCrs(QStringLiteral("EPSG:27700")));
+    QVERIFY(!ts::isProjectedWmtsCrs(QStringLiteral("EPSG:3857")));
+    QVERIFY(!ts::isProjectedWmtsCrs(QStringLiteral("EPSG:4258")));
+    QVERIFY(ts::isSupportedWmtsCrs(QStringLiteral("EPSG:4258")));
+    QVERIFY(!ts::isSupportedWmtsCrs(QStringLiteral("EPSG:999999")));
+    QVERIFY(!ts::isSupportedWmtsCrs(QString()));
+  }
+
+  void transformsMatchProj()
+  {
+    // Big Ben: the Ordnance Survey puts it at about E 530268, N 179640
+    // (PROJ's own cs2cs: 530269.902, 179640.717). Easting first out,
+    // longitude first in, whatever the CRS's axis order.
+    const ts::WmtsCrsTransform bng(QStringLiteral("EPSG:27700"));
+    QVERIFY(bng.isValid());
+    std::vector<std::pair<double, double>> points{{-0.1246, 51.5007}};
+    bng.forward(points);
+    QVERIFY2(std::abs(points[0].first - 530269.9) < 5.0 &&
+                 std::abs(points[0].second - 179640.7) < 5.0,
+             qPrintable(QStringLiteral("%1, %2")
+                            .arg(points[0].first, 0, 'f', 1)
+                            .arg(points[0].second, 0, 'f', 1)));
+    bng.inverse(points);
+    QVERIFY(std::abs(points[0].first + 0.1246) < 1e-7);
+    QVERIFY(std::abs(points[0].second - 51.5007) < 1e-7);
+    // LAEA Europe is northing first in EPSG, easting first out of here.
+    const ts::WmtsCrsTransform laea(QStringLiteral("EPSG:3035"));
+    std::vector<std::pair<double, double>> centre{{10.0, 52.0}};
+    laea.forward(centre);
+    QVERIFY(std::abs(centre[0].first - 4321000.0) < 1.0);
+    QVERIFY(std::abs(centre[0].second - 3210000.0) < 1.0);
+    // A transformation PROJ can't make is not valid, and gives NaN.
+    const ts::WmtsCrsTransform nothing(QStringLiteral("EPSG:999999"));
+    QVERIFY(!nothing.isValid());
+    std::vector<std::pair<double, double>> lost{{0.0, 0.0}};
+    nothing.forward(lost);
+    QVERIFY(std::isnan(lost[0].first));
+  }
+
+  void britishNationalGridWindow()
+  {
+    // Ordnance Survey's grid of tiles: 896 m pixels at level 0 from
+    // (−238375, 1376256). Around E 530000, N 180000 (±1 km), by hand:
+    // x from (529000 + 238375) / 896 = 856.445 to 858.677 pixels, column 3
+    // (768 to 1024); y from (1376256 − 181000) / 896 = 1333.991 to
+    // 1336.223, row 5 (1280 to 1536).
+    ts::WmtsSource source;
+    source.url = QUrl(QStringLiteral("https://example.org/wmts"));
+    source.crs = QStringLiteral("EPSG:27700");
+    ts::WmtsMatrix matrix;
+    matrix.identifier = QStringLiteral("0");
+    matrix.pixelSize = 896.0;
+    matrix.originX = -238375.0;
+    matrix.originY = 1376256.0;
+    matrix.matrixWidth = 5;
+    matrix.matrixHeight = 7;
+    matrix.maxColumn = 4;
+    matrix.maxRow = 6;
+    source.matrices.push_back(matrix);
+    QCOMPARE(source.imageProjection(), ts::TileImageProjection::Geographic);
+    QVERIFY(!ts::wmtsExtent(source, ts::TileKey{6, 63, 17}));
+    const std::optional<ts::WmtsTileWindow> window =
+        ts::wmtsTileWindowForExtent(
+            source, ts::GeoRect{529000.0, 179000.0, 531000.0, 181000.0}, 0);
+    if (!window) {
+      QFAIL("no window");
+    }
+    QCOMPARE(window->firstColumn, int64_t{3});
+    QCOMPARE(window->firstRow, int64_t{5});
+    QCOMPARE(window->columns, 1);
+    QCOMPARE(window->rows, 1);
+    QVERIFY(std::abs(window->left - 88.4453125) < 1e-6);
+    QVERIFY(std::abs(window->top - 53.9910714) < 1e-6);
+    QVERIFY(std::abs(window->width - 2000.0 / 896.0) < 1e-9);
+    // The scale denominator of a 896 m pixel, 3 200 000.
+    ts::WmtsTileMatrix tileMatrix;
+    tileMatrix.scaleDenominator = 3200000.0;
+    QCOMPARE(ts::wmtsPixelSize(tileMatrix, QStringLiteral("EPSG:27700")),
+             896.0);
+  }
+
+  void projectedRealDocuments()
+  {
+    // EMODnet's LAEA set writes its corner northing first, as EPSG:3035
+    // is; PDOK's RD New easting first. Both are read right.
+    const ts::WmtsCapabilities emodnet =
+        capabilitiesOf("emodnet-bathymetry.xml");
+    const ts::WmtsTileMatrixSet* laea =
+        emodnet.findTileMatrixSet(QStringLiteral("laea"));
+    if (laea == nullptr) {
+      QFAIL("laea missing");
+    }
+    const ts::WmtsMatrix laea0 =
+        ts::wmtsMatrix(laea->matrices.front(), QStringLiteral("EPSG:3035"));
+    QCOMPARE(laea0.originX, -605551.336);
+    QCOMPARE(laea0.originY, 7369716.256);
+
+    const ts::WmtsCapabilities pdok = capabilitiesOf("pdok.xml");
+    // Every set can be drawn now; Web Mercator first (reprojected in the
+    // shader), then the national ones.
+    const QStringList sets =
+        ts::usableTileMatrixSets(pdok, QStringLiteral("standaard"));
+    QCOMPARE(sets.size(), 3);
+    QCOMPARE(sets.first(), QStringLiteral("EPSG:3857"));
+    QString error;
+    const std::optional<ts::WmtsSource> rd = ts::wmtsSourceFor(
+        pdok, QStringLiteral("standaard"),
+        ts::WmtsChoices{QString(), QString(), QStringLiteral("EPSG:28992"), {}},
+        &error);
+    if (!rd) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(rd->crs, QStringLiteral("EPSG:28992"));
+    QCOMPARE(rd->matrices.front().originX, -285401.92);
+    QCOMPARE(rd->matrices.front().originY, 903401.92);
+    QCOMPARE(rd->matrices.front().pixelSize, 3440.64);
+    QCOMPARE(rd->imageProjection(), ts::TileImageProjection::Geographic);
+    // Only where RD New is meant to be used: the Netherlands.
+    if (!rd->bounds) {
+      QFAIL("no bounds");
+    }
+    QVERIFY(rd->bounds->contains(52.0, 5.0));
+    QVERIFY(!rd->bounds->contains(48.5, 0.0));
+    // Narrower than the layer's own box (-1.66° to 12.43° E) on both
+    // sides. (The exact area depends on the version of PROJ's database:
+    // onshore only, about 3.2° to 7.2° E, or with the offshore zone.)
+    QVERIFY2(rd->bounds->westDeg > 0.0 && rd->bounds->eastDeg < 8.0,
+             qPrintable(QStringLiteral("%1° to %2° E")
+                            .arg(rd->bounds->westDeg)
+                            .arg(rd->bounds->eastDeg)));
+    QVERIFY(rd->maximumLevel >= 14);
+
+    // The synthetic layer in British National Grid only is drawable.
+    const std::optional<ts::WmtsSource> grid = ts::wmtsSourceFor(
+        capabilitiesOf("synthetic-kvp-limits.xml"), QStringLiteral("gridonly"),
+        ts::WmtsChoices{}, &error);
+    if (!grid) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(grid->crs, QStringLiteral("EPSG:27700"));
+    if (!grid->bounds) {
+      QFAIL("no bounds");
+    }
+    QVERIFY(grid->bounds->contains(54.0, -2.0));
+  }
+
+  void providerReprojects()
+  {
+    // The mock's British National Grid tiles drawn into geographic tiles:
+    // the same picture of the Earth, inside the grid's area of use;
+    // nothing, and nothing asked, outside it. A region keeps the tiles
+    // drawing needs.
+    std::shared_ptr<MockWmtsBehaviour> behaviour =
+        std::make_shared<MockWmtsBehaviour>();
+    behaviour->wms.maxAgeS = 3600;
+    MockHttpServer server;
+    server.setHandler(ts::test::mockWmtsHandler(behaviour, server.url()));
+    QString error;
+    const std::optional<ts::WmtsSource> source = ts::wmtsSourceFor(
+        mockCapabilities(server.url()), QStringLiteral("pattern"),
+        ts::WmtsChoices{
+            QString(), QString(), QStringLiteral("BritishNationalGrid"), {}},
+        &error);
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(source->crs, QStringLiteral("EPSG:27700"));
+    if (!source->bounds) {
+      QFAIL("no bounds");
+    }
+    QTemporaryDir cache;
+    ts::WebTileSettings settings;
+    settings.cacheDirectory = cache.path();
+    ts::WmtsImageryProvider provider(
+        *source, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+    const std::atomic<bool> cancelled{false};
+    // 56.25° N to 67.5° N, 0° to 11.25° E: the disc at (60° N, 0°) where
+    // the grid reaches (to 2° E, 61° N).
+    const ts::TileKey key{4, 16, 2};
+    const ts::ImageLoadResult result = provider.loadTileImage(key, cancelled);
+    QCOMPARE(result.outcome, ts::ImageLoadResult::Outcome::Image);
+    QImage expected = expectedTile(key, false, false);
+    const ts::GeoRect rect = key.bounds();
+    const ts::GeoRect& bounds = *source->bounds;
+    int32_t inside = 0;
+    for (int32_t row = 0; row < 256; ++row) {
+      const double lat = rect.northDeg - (row + 0.5) * rect.heightDeg() / 256;
+      for (int32_t column = 0; column < 256; ++column) {
+        const double lon =
+            rect.westDeg + (column + 0.5) * rect.widthDeg() / 256;
+        if (!bounds.contains(lat, lon)) {
+          expected.setPixel(column, row, qRgba(0, 0, 0, 0));
+        } else {
+          ++inside;
+        }
+      }
+    }
+    QVERIFY(inside > 1000);
+    const double different = mismatch(result.image, expected, 60);
+    QVERIFY2(
+        different < 0.01,
+        qPrintable(QStringLiteral("%1 of the pixels differ").arg(different)));
+    // Somewhere over London, closer: the same.
+    const ts::TileKey london =
+        ts::TileKey::containing(8, ts::Geodetic{51.5, -0.1, 0.0});
+    const ts::ImageLoadResult close = provider.loadTileImage(london, cancelled);
+    QCOMPARE(close.outcome, ts::ImageLoadResult::Outcome::Image);
+    QVERIFY(mismatch(close.image, expectedTile(london, false, false), 60) <
+            0.01);
+    // Every level, coarse ones too: a coarse quadtree tile over Britain
+    // takes more of the grid's coarsest tiles than any matrix is coarse
+    // enough for, drawn smaller (once no data, so half of Britain was
+    // missing zoomed out).
+    for (int32_t level = 2; level <= 8; ++level) {
+      for (const double lon : {-1.0, 1.0}) {
+        const ts::TileKey probeKey =
+            ts::TileKey::containing(level, ts::Geodetic{58.0, lon, 0.0});
+        const ts::ImageLoadResult probe =
+            provider.loadTileImage(probeKey, cancelled);
+        QCOMPARE(probe.outcome, ts::ImageLoadResult::Outcome::Image);
+        QImage want = expectedTile(probeKey, false, false);
+        const ts::GeoRect r = probeKey.bounds();
+        for (int32_t row = 0; row < 256; ++row) {
+          const double lat = r.northDeg - (row + 0.5) * r.heightDeg() / 256;
+          for (int32_t column = 0; column < 256; ++column) {
+            const double lo = r.westDeg + (column + 0.5) * r.widthDeg() / 256;
+            if (!bounds.contains(lat, lo)) {
+              want.setPixel(column, row, qRgba(0, 0, 0, 0));
+            }
+          }
+        }
+        const double off = mismatch(probe.image, want, 60);
+        QVERIFY2(off < 0.01, qPrintable(QStringLiteral("level %1 at %2°: %3")
+                                            .arg(level)
+                                            .arg(lon)
+                                            .arg(off)));
+      }
+    }
+    // Africa is far outside: no data, nothing asked.
+    const int32_t before = server.requestCount();
+    QCOMPARE(provider
+                 .loadTileImage(
+                     ts::TileKey::containing(6, ts::Geodetic{0.0, 20.0, 0.0}),
+                     cancelled)
+                 .outcome,
+             ts::ImageLoadResult::Outcome::NoData);
+    QCOMPARE(server.requestCount(), before);
+    // A region over London keeps the tiles drawing needs: drawn again
+    // with nothing asked.
+    const ts::TileKey other =
+        ts::TileKey::containing(9, ts::Geodetic{51.5, -0.1, 0.0});
+    QCOMPARE(provider.fetchForRegion(other, 3, cancelled).outcome,
+             ts::RegionTileResult::Outcome::Downloaded);
+    QVERIFY(provider.diskCache()->regionUsage(3).tiles >= 1);
+    const int32_t stored = server.requestCount();
+    QCOMPARE(provider.loadTileImage(other, cancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QCOMPARE(server.requestCount(), stored);
   }
 
   void registryCreatesWmts()

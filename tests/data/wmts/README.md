@@ -25,7 +25,7 @@ Written for the tests, to cover valid but unusual cases compactly.
 
 | File | Covers |
 | --- | --- |
-| `synthetic-kvp-limits.xml` | KVP only, with a RESTful Get listed first; limits listing some matrices (and a broken entry); a default style not listed first, with a legend; an extra dimension with a unit; a FeatureInfo template (ignored); an EPSG:4326 set whose corners are written longitude first, matrices out of order and one broken; a layer only in British National Grid; a link to a missing set; Web Mercator as EPSG:900913; two AccessConstraints; a layer without an identifier |
+| `synthetic-kvp-limits.xml` | KVP only, with a RESTful Get listed first; limits listing some matrices (and a broken entry); a default style not listed first, with a legend; an extra dimension with a unit; a FeatureInfo template (ignored); an EPSG:4326 set whose corners are written longitude first, matrices out of order and one broken; a layer only in British National Grid (reprojected through PROJ); a layer only in IGNF:LAMB93 (not an EPSG code: can't be drawn); a link to a missing set; Web Mercator as EPSG:900913; two AccessConstraints; a layer without an identifier |
 | `exception.xml` | An OWS ExceptionReport instead of capabilities |
 | `error-page.html` | An HTML error page (the same as `wms/error-page.html`) |
 | `truncated.xml` | The first 3,000 bytes of `basemapat.xml` |

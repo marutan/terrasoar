@@ -10,8 +10,9 @@ for users in [adding-wmts-layers.md](../user/adding-wmts-layers.md).
 
 Phase 10 delivers WMTS in three parts: **10a**, the engine (EPSG:4326 and
 Web Mercator tile matrix sets); **10b**, the Add WMTS Layer dialog, the
-catalogue and offline regions; and 10c, other CRSs through PROJ (such as
-British National Grid).
+catalogue and offline regions; and **10c**, any other CRS PROJ knows
+(national grids such as British National Grid, RD New, LAEA Europe, polar
+stereographic), reprojected on the CPU.
 
 ## From an address to tiles
 
@@ -72,14 +73,69 @@ check the address; a WMS document says to use Add WMS Layer instead.
 | `urn:ogc:def:crs:EPSG::4326`, `http://www.opengis.net/def/crs/EPSG/0/4326`, `EPSG:4326` | `EPSG:4326` |
 | `urn:ogc:def:crs:EPSG:6.18.3:3857` (basemap.at), `urn:ogc:def:crs:EPSG:6.18:3:3857` (GIBS), EPSG:900913, EPSG:102100, … | `EPSG:3857` |
 
-10a draws `CRS:84`, `EPSG:4326` and `EPSG:3857`; others are kept for 10c.
+Any other `EPSG:n` is drawn if PROJ knows it as a 2D geographic or
+projected CRS (`ts::isSupportedWmtsCrs()`); a code that isn't EPSG (such
+as `IGNF:LAMB93`) can't be. `ts::wmtsCrsInfo()` asks PROJ once per code
+(and keeps the answer) for what the rest needs:
+
+| What | From PROJ | Used for |
+| --- | --- | --- |
+| Geographic or projected | `proj_get_type()` | How it is drawn (below) |
+| The first axis's direction | `proj_cs_get_axis_info()` | Corner axis order |
+| Metres per unit | The axis's unit (feet: 0.3048…) | Pixel sizes, choosing matrices |
+| Area of use | `proj_get_area_of_use()` | The source's bounds |
 
 A matrix's **top-left corner** is written in the CRS's own axis order, as
 WMS 1.3.0 does: EPSG:4326 is latitude first (EMODnet's `inspire_quad`:
-`90.0 -180.0`), CRS:84 and Web Mercator x first. `ts::wmtsMatrix()`
-turns every corner into easting (or longitude) first. Servers often write
-an EPSG:4326 corner longitude first anyway; a first value beyond ±90° can't
-be a latitude, so such a corner is read the other way round.
+`90.0 -180.0`), and so are other EPSG geographic CRSs and some projected
+ones (EMODnet's LAEA Europe, EPSG:3035: `7369716.256 -605551.336`,
+northing first); CRS:84, Web Mercator, British National Grid and RD New
+are x first. `ts::wmtsMatrix()` turns every corner into easting (or
+longitude) first. Servers often write a geographic corner longitude first
+anyway; a first value beyond ±90° can't be a latitude, so such a corner is
+read the other way round.
+
+### Three ways of drawing
+
+| CRS | Image of a quadtree tile | Reprojection |
+| --- | --- | --- |
+| Geographic (CRS:84, EPSG:4326, other EPSG geographic CRSs) | Geographic | None: a scale and an offset |
+| Web Mercator | Web Mercator (rows in northing) | In the shader, as for WMS |
+| Projected (any other) | Geographic | On the CPU, through PROJ (below) |
+
+Of a layer's sets, `usableTileMatrixSets()` prefers them in that order.
+
+### Projected CRSs
+
+`WmtsImageryProvider` reprojects a projected set's tiles into each
+quadtree tile's geographic image:
+
+1. **Where:** the tile is clipped to the source's bounds, which for a
+   projected CRS are the layer's WGS 84 bounding box and the CRS's area of
+   use from PROJ (a national grid far from its country runs wild, or can't
+   be computed). Nothing outside is drawn or asked for.
+2. **A grid:** 17 × 17 points of the clipped part go through PROJ
+   (`ts::WmtsCrsTransform`, `proj_create_crs_to_crs()` from EPSG:4326,
+   normalised so longitude goes in and easting comes out first, whatever
+   the CRSs' axis orders). Points PROJ can't transform are NaN.
+3. **Which tiles:** the grid's extent in the CRS gives the block of WMTS
+   tiles (`ts::wmtsTileWindowForExtent()`), from the matrix chosen as
+   usual (the quadtree tile's pixel size along a meridian, about true for a
+   national grid near its country).
+4. **Each pixel:** its place in the CRS comes from the grid, bilinear
+   between the four points around it (a cell is 1/16 of the tile: it bends
+   too little to see), and its colour from the block, bilinear between
+   its pixels. Pixels outside the clip, or in a cell with a NaN corner,
+   stay transparent.
+
+PROJ objects may only be used by one thread at a time: the provider keeps
+a small pool of transformations, each taken by one loader thread for one
+tile. A datum shift is part of the transformation (WGS 84 to OSGB36 for
+British National Grid): with PROJ's grids installed it is OSTN15's, else a
+Helmert transformation good to a few metres.
+
+Offline regions keep the same tiles drawing needs (the same grid and
+window).
 
 ## Tile matrices
 
@@ -117,9 +173,15 @@ Each quadtree tile becomes one 256 × 256 image
    it, and where the tile lies in the block. A sliver of a millionth of a
    pixel past a tile edge doesn't bring in the next tile. Tiles of the
    block beyond the matrix's edge or the layer's limits are left
-   transparent (`ts::wmtsTileExists()`). A block needing more than 16 tiles
-   (a layer without matrices as coarse as the quadtree tile) is no data at
-   that level: the tile shows when zoomed in.
+   transparent (`ts::wmtsTileExists()`). A block needing more than 64 tiles
+   (a layer without matrices nearly as coarse as the quadtree tile) is no
+   data at that level: the tile shows when zoomed in. A block of more than
+   2048 pixels across is drawn **smaller** (each WMTS tile scaled down into
+   its place, in whole pixels so neighbours meet), as the quadtree tile
+   can't show more. This matters for national grids, whose coarsest
+   matrix is often much finer than a zoomed-out view: under 64 tiles at
+   896 m pixels, Britain at quadtree level 3 is drawn from about 24 of
+   them, shrunk.
 3. **The image** (`WmtsImageryProvider::loadTileImage()`): the block's
    tiles side by side in one image, and one scaled copy of the tile's part
    of it to 256 × 256 (bilinear). Copying from one mosaic leaves no seams
@@ -288,6 +350,20 @@ A quadtree tile is:
 - **cancelled** at once when the tile leaves the view.
 
 ## Tests
+
+10c adds: what PROJ says of British National Grid, LAEA Europe (northing
+first), RD New, ETRS89 (geographic, latitude first) and a CRS in US survey
+feet, and of a code it doesn't know; Big Ben through PROJ against the
+Ordnance Survey's grid reference and back; a British National Grid tile
+window computed by hand; EMODnet's LAEA and PDOK's RD New corners read the
+right way round, RD New's bounds (the Netherlands); the mock server's
+British National Grid set (`tests/support/mockwmts.h`, its tiles drawn
+through PROJ's inverse) drawing the picture of the Earth inside the grid's
+area at every level from 2 to 8, nothing (and nothing asked) outside, and
+an offline region (`tests/wmts`); and in `tests/globe` the British National
+Grid layer drawing the same picture as WMS over Britain, close up and on
+the Mercator map (at most 0.003 % of pixels differing inside the grid's
+area), and its golden image.
 
 Besides the parts above (10a), 10b adds: the shipped catalogue and each
 catalogue format refusing the other's file; the service address for the
