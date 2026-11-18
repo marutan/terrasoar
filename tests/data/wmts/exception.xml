@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1" version="1.0.0" xml:lang="en">
+  <ows:Exception exceptionCode="InvalidParameterValue" locator="service">
+    <ows:ExceptionText>The value of the service parameter "wmts" is invalid</ows:ExceptionText>
+  </ows:Exception>
+</ows:ExceptionReport>

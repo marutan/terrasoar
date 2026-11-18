@@ -81,6 +81,8 @@ Goal: the user guide in `docs/user/` can be read inside Terra Soar, offline, fro
 
 ## Phase 10 – WMTS
 
+**Status (2026-11-18):** being delivered in three parts. **10a**, the engine (capabilities, tile matrix maths, requests, the provider for EPSG:4326 and Web Mercator tile matrix sets, tests and `docs/design/wmts.md`), is done. Next are **10b** (the Add WMTS Layer dialog, the catalogue, the user guide page and offline regions) and **10c** (other CRSs through PROJ, such as British National Grid).
+
 Goal: users add any WMTS layer by URL or from the catalogue, and it streams, caches, blends and goes offline like a WMS layer. WMTS serves pre-cut tiles, so it is usually faster than WMS and is how many national mapping agencies and NASA GIBS publish their maps.
 
 **Approach**: the same structure as WMS (Phase 5), sharing what WMS already built:

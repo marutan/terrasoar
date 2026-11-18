@@ -1757,4 +1757,109 @@
             <translation>The server offers no image format Terra Soar can show (PNG, JPEG or GIF).</translation>
         </message>
     </context>
+    <context>
+        <name>ts::WmtsCapabilities</name>
+        <message>
+            <source>The capabilities document is empty.</source>
+            <translation>The capabilities document is empty.</translation>
+        </message>
+        <message>
+            <source>The capabilities are not valid XML: %1 (line %2).</source>
+            <translation>The capabilities are not valid XML: %1 (line %2).</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>The server sent a web page, not WMTS capabilities. Check the address.</source>
+            <translation>The server sent a web page, not WMTS capabilities. Check the address.</translation>
+        </message>
+        <message>
+            <source>This is a WMS service, not WMTS. Add it with Add WMS Layer instead.</source>
+            <translation>This is a WMS service, not WMTS. Add it with Add WMS Layer instead.</translation>
+        </message>
+        <message>
+            <source>This is not a WMTS capabilities document (it starts with &lt;%1&gt;).</source>
+            <translation>This is not a WMTS capabilities document (it starts with &lt;%1&gt;).</translation>
+        </message>
+        <message>
+            <source>The service has no layers.</source>
+            <translation>The service has no layers.</translation>
+        </message>
+        <message>
+            <source>The service describes no tile matrix sets.</source>
+            <translation>The service describes no tile matrix sets.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmtsImageryProvider</name>
+        <message>
+            <source>The server answered %1.</source>
+            <translation>The server answered %1.</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>The server sent something that isn't an image (%1).</source>
+            <translation>The server sent something that isn't an image (%1).</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmtsSource</name>
+        <message>
+            <source>This is not a WMTS source.</source>
+            <translation>This is not a WMTS source.</translation>
+        </message>
+        <message>
+            <source>The WMTS source has no usable address.</source>
+            <translation>The WMTS source has no usable address.</translation>
+        </message>
+        <message>
+            <source>The WMTS source names no layer or tile matrix set.</source>
+            <translation>The WMTS source names no layer or tile matrix set.</translation>
+        </message>
+        <message>
+            <source>The WMTS source's coordinate system (%1) can't be drawn.</source>
+            <translation>The WMTS source's coordinate system (%1) can't be drawn.</translation>
+        </message>
+        <message>
+            <source>The WMTS source has a tile matrix that makes no sense.</source>
+            <translation>The WMTS source has a tile matrix that makes no sense.</translation>
+        </message>
+        <message>
+            <source>The WMTS source has no tile matrices, or too many.</source>
+            <translation>The WMTS source has no tile matrices, or too many.</translation>
+        </message>
+        <message>
+            <source>The service has no layer %1.</source>
+            <translation>The service has no layer %1.</translation>
+        </message>
+        <message>
+            <source>Layer %1 is only offered in coordinate systems that can't be drawn yet (%2); it needs EPSG:4326 or Web Mercator.</source>
+            <translation>Layer %1 is only offered in coordinate systems that can't be drawn yet (%2); it needs EPSG:4326 or Web Mercator.</translation>
+        </message>
+        <message>
+            <source>Layer %1 can't be drawn in tile matrix set %2.</source>
+            <translation>Layer %1 can't be drawn in tile matrix set %2.</translation>
+        </message>
+        <message>
+            <source>Layer %1 has no style %2.</source>
+            <translation>Layer %1 has no style %2.</translation>
+        </message>
+        <message>
+            <source>Layer %1 can't be requested as %2.</source>
+            <translation>Layer %1 can't be requested as %2.</translation>
+        </message>
+        <message>
+            <source>The service gives no address for layer %1's tiles in %2.</source>
+            <translation>The service gives no address for layer %1's tiles in %2.</translation>
+        </message>
+        <message>
+            <source>Layer %1 needs a value for %2, and the service gives no default.</source>
+            <translation>Layer %1 needs a value for %2, and the service gives no default.</translation>
+        </message>
+    </context>
 </TS>

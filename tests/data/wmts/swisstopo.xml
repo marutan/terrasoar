@@ -1,0 +1,1467 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Capabilities xmlns="http://www.opengis.net/wmts/1.0"
+              xmlns:ows="http://www.opengis.net/ows/1.1"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xmlns:gml="http://www.opengis.net/gml"
+              xsi:schemaLocation="http://www.opengis.net/wmts/1.0 http://schemas.opengis.net/wmts/1.0/wmtsGetCapabilities_response.xsd"
+              version="1.0.0">
+    <ows:ServiceIdentification>
+        <ows:Title>WMTS BGDI</ows:Title>
+        <ows:Abstract>-</ows:Abstract>
+        <ows:Keywords>
+            <ows:Keyword>Switzerland</ows:Keyword>
+            <ows:Keyword>Web Map Service</ows:Keyword>
+            <ows:Keyword>Schweiz</ows:Keyword>
+            <ows:Keyword>OGC</ows:Keyword>
+            <ows:Keyword>WMS</ows:Keyword>
+            <ows:Keyword>swisstopo</ows:Keyword>
+            <ows:Keyword>Bundesamt fuer Landestopografie</ows:Keyword>
+            <ows:Keyword>Landeskarte</ows:Keyword>
+            <ows:Keyword>Pixelkarte</ows:Keyword>
+            <ows:Keyword>Luftbilder</ows:Keyword>
+            <ows:Keyword>SWISSIMAGE</ows:Keyword>
+            <ows:Keyword>Grenzen</ows:Keyword>
+            <ows:Keyword>swissBOUNDARIES3D</ows:Keyword>
+            <ows:Keyword>Historische Karten</ows:Keyword>
+            <ows:Keyword>Siegfriedatlas</ows:Keyword>
+            <ows:Keyword>Dufourkarte</ows:Keyword>
+        </ows:Keywords>
+        <ows:ServiceType>OGC WMTS</ows:ServiceType>
+        <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+        <ows:Fees>-</ows:Fees>
+        <ows:AccessConstraints>-</ows:AccessConstraints>
+    </ows:ServiceIdentification>
+    <ows:ServiceProvider>
+        <ows:ProviderName>Bundesamt für Landestopografie swisstopo</ows:ProviderName>
+        <ows:ProviderSite xlink:href="http://www.swisstopo.admin.ch"/>
+    </ows:ServiceProvider>
+    <ows:OperationsMetadata>
+        <ows:Operation name="GetCapabilities">
+            <ows:DCP>
+                <ows:HTTP>
+                    <ows:Get xlink:href="https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml">
+                        <ows:Constraint name="GetEncoding">
+                            <ows:AllowedValues>
+                                <ows:Value>REST</ows:Value>
+                            </ows:AllowedValues>
+                        </ows:Constraint>
+                    </ows:Get>
+                </ows:HTTP>
+            </ows:DCP>
+        </ows:Operation>
+        <ows:Operation name="GetTile">
+            <ows:DCP>
+                <ows:HTTP>
+                    <ows:Get xlink:href="https://wmts.geo.admin.ch/EPSG/3857/">
+                        <ows:Constraint name="GetEncoding">
+                            <ows:AllowedValues>
+                                <ows:Value>REST</ows:Value>
+                            </ows:AllowedValues>
+                        </ows:Constraint>
+                    </ows:Get>
+                </ows:HTTP>
+            </ows:DCP>
+        </ows:Operation>
+    </ows:OperationsMetadata>
+    <Contents>
+        <Layer>
+            <ows:Title>Ausbreitungskarte Alytes obstericans</ows:Title>
+            <ows:Abstract>Schweizweite Karte, die die Ausbreitungs-Wahrscheinlichkeit der Geburtshelferkröte (Alytes obstetricans) darstellt. Jede Rasterzelle gibt die relative Wahrscheinlichkeit an, dass sich wandernde Individuen auf ihrem Weg zwischen bekannten Amphibienlaichgebiete durch diesen Hektar wandern. Die Karte zeigt die Ausbreitungs-Wahrscheinlichkeit, die entlang einer Skala von Blau über Gelb bis Rot zunimmt.Diese Karten sollten als Heatmaps für die Ausbreitungsaktivität bestehender Populationen betrachtet werden. In der Praxis zeigen diese Karten auch Orte, an denen potenzielle neue Amphibienlaichgebiete die höchsten Chancen haben, besiedelt zu werden. Gebiete mit vielen Populationen in unmittelbarer Nähe erscheinen dunkler rot, was die höhere Wahrscheinlichkeit einer Ausbreitung widerspiegelt, da sich mehrere Ausbreitungsrouten zwischen den Populationen überschneiden. Diese Eigenschaft der Karten verdient besondere Aufmerksamkeit. Hellere Schattierungen an den Rändern der Artenverbreitung bedeuten nicht unbedingt eine schwächere Verbindung zwischen den Populationen, sondern sind eher eine Folge der geringeren Dichte an Amphibienlaichgebieten an den Rändern der Verbreitung. Die Farbskala soll im Kontext der unmittelbaren Umgebung betrachtet werden. Die Ausbreitungskarte wurde mit Circuitscape berechnet und basiert auf einer Landschaftswiderstandsmatrix, die aus dem am besten bewerteten Verbreitungsmodell für jede Art abgeleitet wurde. Für Details, siehe die beigefügte Datenbeschreibung. LIteratur: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_alytes_obstetricans</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/89ec47fa-79e1-4b89-b490-50d1f9e0069b"/>
+            <Style>
+                <ows:Title>Ausbreitungskarte Alytes obstericans</ows:Title>
+                <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_alytes_obstetricans</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.amphibien-ausbreitungskarten_alytes_obstetricans_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.amphibien-ausbreitungskarten_alytes_obstetricans/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Ausbreitungskarte Bombina variegata</ows:Title>
+            <ows:Abstract>Schweizweite Karte, die die Ausbreitungs-Wahrscheinlichkeit der Gelbbauchunke (Bombina variegata) darstellt. Jede Rasterzelle gibt die relative Wahrscheinlichkeit an, dass sich wandernde Individuen auf ihrem Weg zwischen bekannten Amphibienlaichgebiete durch diesen Hektar wandern. Die Karte zeigt die Ausbreitungs-Wahrscheinlichkeit, die entlang einer Skala von Blau über Gelb bis Rot zunimmt.Diese Karten sollten als Heatmaps für die Ausbreitungsaktivität bestehender Populationen betrachtet werden. In der Praxis zeigen diese Karten auch Orte, an denen potenzielle neue Amphibienlaichgebiete die höchsten Chancen haben, besiedelt zu werden. Gebiete mit vielen Populationen in unmittelbarer Nähe erscheinen dunkler rot, was die höhere Wahrscheinlichkeit einer Ausbreitung widerspiegelt, da sich mehrere Ausbreitungsrouten zwischen den Populationen überschneiden. Diese Eigenschaft der Karten verdient besondere Aufmerksamkeit. Hellere Schattierungen an den Rändern der Artenverbreitung bedeuten nicht unbedingt eine schwächere Verbindung zwischen den Populationen, sondern sind eher eine Folge der geringeren Dichte an Amphibienlaichgebieten an den Rändern der Verbreitung. Die Farbskala soll im Kontext der unmittelbaren Umgebung betrachtet werden. Die Ausbreitungskarte wurde mit Circuitscape berechnet und basiert auf einer Landschaftswiderstandsmatrix, die aus dem am besten bewerteten Verbreitungsmodell für jede Art abgeleitet wurde. Für Details, siehe die beigefügte Datenbeschreibung. Literatur: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_bombia_variegata</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/14cdf5f8-4081-4174-93af-0f73957fc81e"/>
+            <Style>
+                <ows:Title>Ausbreitungskarte Bombina variegata</ows:Title>
+                <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_bombia_variegata</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.amphibien-ausbreitungskarten_bombia_variegata_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.amphibien-ausbreitungskarten_bombia_variegata/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Ausbreitungskarte Epidalea calamita</ows:Title>
+            <ows:Abstract>Schweizweite Karte, die die Ausbreitungs-Wahrscheinlichkeit der Kreuzkröte (Epidalea calamita) darstellt. Jede Rasterzelle gibt die relative Wahrscheinlichkeit an, dass sich wandernde Individuen auf ihrem Weg zwischen bekannten Amphibienlaichgebiete durch diesen Hektar wandern. Die Karte zeigt die Ausbreitungs-Wahrscheinlichkeit, die entlang einer Skala von Blau über Gelb bis Rot zunimmt.Diese Karten sollten als Heatmaps für die Ausbreitungsaktivität bestehender Populationen betrachtet werden. In der Praxis zeigen diese Karten auch Orte, an denen potenzielle neue Amphibienlaichgebiete die höchsten Chancen haben, besiedelt zu werden. Gebiete mit vielen Populationen in unmittelbarer Nähe erscheinen dunkler rot, was die höhere Wahrscheinlichkeit einer Ausbreitung widerspiegelt, da sich mehrere Ausbreitungsrouten zwischen den Populationen überschneiden. Diese Eigenschaft der Karten verdient besondere Aufmerksamkeit. Hellere Schattierungen an den Rändern der Artenverbreitung bedeuten nicht unbedingt eine schwächere Verbindung zwischen den Populationen, sondern sind eher eine Folge der geringeren Dichte an Amphibienlaichgebieten an den Rändern der Verbreitung. Die Farbskala soll im Kontext der unmittelbaren Umgebung betrachtet werden. Die Ausbreitungskarte wurde mit Circuitscape berechnet und basiert auf einer Landschaftswiderstandsmatrix, die aus dem am besten bewerteten Verbreitungsmodell für jede Art abgeleitet wurde. Für Details, siehe die beigefügte Datenbeschreibung. Literatur: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_epidalea_calamita</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/fb4c0dd9-480c-4b9a-845c-dde501176714"/>
+            <Style>
+                <ows:Title>Ausbreitungskarte Epidalea calamita</ows:Title>
+                <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_epidalea_calamita</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.amphibien-ausbreitungskarten_epidalea_calamita_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.amphibien-ausbreitungskarten_epidalea_calamita/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Ausbreitungskarte Hyla arborea</ows:Title>
+            <ows:Abstract>Schweizweite Karte, die die Ausbreitungs-Wahrscheinlichkeit der Europäischer Laubfrosch (Hyla arborea) darstellt. Jede Rasterzelle gibt die relative Wahrscheinlichkeit an, dass sich wandernde Individuen auf ihrem Weg zwischen bekannten Amphibienlaichgebiete durch diesen Hektar wandern. Die Karte zeigt die Ausbreitungs-Wahrscheinlichkeit, die entlang einer Skala von Blau über Gelb bis Rot zunimmt.Diese Karten sollten als Heatmaps für die Ausbreitungsaktivität bestehender Populationen betrachtet werden. In der Praxis zeigen diese Karten auch Orte, an denen potenzielle neue Amphibienlaichgebiete die höchsten Chancen haben, besiedelt zu werden. Gebiete mit vielen Populationen in unmittelbarer Nähe erscheinen dunkler rot, was die höhere Wahrscheinlichkeit einer Ausbreitung widerspiegelt, da sich mehrere Ausbreitungsrouten zwischen den Populationen überschneiden. Diese Eigenschaft der Karten verdient besondere Aufmerksamkeit. Hellere Schattierungen an den Rändern der Artenverbreitung bedeuten nicht unbedingt eine schwächere Verbindung zwischen den Populationen, sondern sind eher eine Folge der geringeren Dichte an Amphibienlaichgebieten an den Rändern der Verbreitung. Die Farbskala soll im Kontext der unmittelbaren Umgebung betrachtet werden. Die Ausbreitungskarte wurde mit Circuitscape berechnet und basiert auf einer Landschaftswiderstandsmatrix, die aus dem am besten bewerteten Verbreitungsmodell für jede Art abgeleitet wurde. Für Details, siehe die beigefügte Datenbeschreibung. Literatur: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_hyla_arborea</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/1515556a-6a2a-4e30-97ca-7cdf4ad234ba"/>
+            <Style>
+                <ows:Title>Ausbreitungskarte Hyla arborea</ows:Title>
+                <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_hyla_arborea</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.amphibien-ausbreitungskarten_hyla_arborea_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.amphibien-ausbreitungskarten_hyla_arborea/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Ausbreitungskarte Triturus cristatus</ows:Title>
+            <ows:Abstract>Schweizweite Karte, die die Ausbreitungs-Wahrscheinlichkeit der Nördlicher Kammmolch (Triturus cristatus) darstellt. Jede Rasterzelle gibt die relative Wahrscheinlichkeit an, dass sich wandernde Individuen auf ihrem Weg zwischen bekannten Amphibienlaichgebiete durch diesen Hektar wandern. Die Karte zeigt die Ausbreitungs-Wahrscheinlichkeit, die entlang einer Skala von Blau über Gelb bis Rot zunimmt.Diese Karten sollten als Heatmaps für die Ausbreitungsaktivität bestehender Populationen betrachtet werden. In der Praxis zeigen diese Karten auch Orte, an denen potenzielle neue Amphibienlaichgebiete die höchsten Chancen haben, besiedelt zu werden. Gebiete mit vielen Populationen in unmittelbarer Nähe erscheinen dunkler rot, was die höhere Wahrscheinlichkeit einer Ausbreitung widerspiegelt, da sich mehrere Ausbreitungsrouten zwischen den Populationen überschneiden. Diese Eigenschaft der Karten verdient besondere Aufmerksamkeit. Hellere Schattierungen an den Rändern der Artenverbreitung bedeuten nicht unbedingt eine schwächere Verbindung zwischen den Populationen, sondern sind eher eine Folge der geringeren Dichte an Amphibienlaichgebieten an den Rändern der Verbreitung. Die Farbskala soll im Kontext der unmittelbaren Umgebung betrachtet werden. Die Ausbreitungskarte wurde mit Circuitscape berechnet und basiert auf einer Landschaftswiderstandsmatrix, die aus dem am besten bewerteten Verbreitungsmodell für jede Art abgeleitet wurde. Für Details, siehe die beigefügte Datenbeschreibung. Literatur: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_triturus_cristatus</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/2d6ab7a3-3e71-4074-bd51-16a9223dd8bd"/>
+            <Style>
+                <ows:Title>Ausbreitungskarte Triturus cristatus</ows:Title>
+                <ows:Identifier>ch.agroscope.amphibien-ausbreitungskarten_triturus_cristatus</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.amphibien-ausbreitungskarten_triturus_cristatus_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.amphibien-ausbreitungskarten_triturus_cristatus/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Landwirtschaft und Amphibien</ows:Title>
+            <ows:Abstract>Schweizweite Karte mit landwirtschaftlichen Parzellen, die sich potenziell entweder als terrestrischer Lebensraum oder als Teil einer Ausbreitungsroute zwischen Amphibeinlaichgebieten für eine bis 11 Amphibienarten eignen. Für jede landwirtschaftliche Parzelle enthält der Datensatz in seinen Attributen Informationen, welche Arten (falls vorhanden) in einem Amphibienlaichgebiet in der Nähe der Parzelle (innerhalb von 200 m, 500 m oder 1 km) zu finden sind und die Parzelle wahrscheinlich als terrestrischen Lebensraum nutzen werden. Ebenso wird angegeben, welche Arten (falls vorhanden) mit hoher Wahrscheinlichkeit Ausbreitungsrouten zwischen den Laichgewässern haben, die durch die Parzelle verlaufen.In der Standardansicht der Karte werden alle Parzellen angezeigt, die als Landlebensraum für mindestens eine Art mit einem nahe gelegenen Laichort (innerhalb von 500 m) geeignet sind und/oder entlang einer Ausbreitungsroute mindestens einer Art liegen. Durch Auswahl einer Parzelle können Sie anhand der Spalten „species_suitXXX“ und „species_corridors“ (Alias: &#34;Landlebensraum XXXm&#34; und &#34;Ausbreitung&#34;), die eine Liste der lateinischen Namen jeder Art enthalten, sehen, welche Arten diese Parzelle nutzen. „species_suit200“ ist ein geeigneter Lebensraum für eine Art mit einem Laichort innerhalb von 200 m, ‚species_suit500‘ für 500 m und ‚species_suit1000‘ für 1000 m. Die Karte basiert auf der räumlichen Verknüpfung der Schweizer Landwirtschaftsparzellenkarte von 2021 (KGK-CGC. (2022). Agricultural Landuse 2021. https://geodienste.ch/) und den Eignungs- und Ausbreitungskarten für jede der 11 Amphibienarten. Die Landwirtschaftsparzellenkarte unterscheidet den landwirtschaftliche Grundparzellen und überlagernde Elemente wie Biodiversitätsförderflächen und Kleinstrukturen. In der BGDI ist nur der Datensatz mit den Grundparzellen erhältlich. Weitere Details in der beigefügten Datenbeschreibung. LIteratur: Churko G., Szerencsits E., Aldrich A., Schmidt B. R. (2024). Spatial analysis of the potential exposure of amphibians to plant protection products at the landscape scale. Basic and Applied Ecology, 76, 14-24. https://doi.org/10.1016/j.baae.2024.02.004</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.amphibien-bedeutung_parzellen</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/0916243e-68d9-41c5-95f7-0f657e2ee07f"/>
+            <Style>
+                <ows:Title>Landwirtschaft und Amphibien</ows:Title>
+                <ows:Identifier>ch.agroscope.amphibien-bedeutung_parzellen</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.amphibien-bedeutung_parzellen_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.amphibien-bedeutung_parzellen/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Feuchtflächenpotential Agrarland</ows:Title>
+            <ows:Abstract>Das Feuchtflächenpotential wurde anhand der Prozesse Wasserakkumulation und Versickerung beurteilt. Aus dem Höhenmodell (Swissalti3d © swisstopo) wurden Reliefparameter berechnet und Ebenen und Mulden modelliert. Das Potential der Versickerung wurde von Bodenkarten abgeleitet. Wo keine detaillierten Bodenkarten vorhanden waren, wurden geologische Karten und andere Surrogate in einem Expertenmodell überlagert und gewichtet. Der Vektor-Datensatz ist auf die vorwiegend landwirtschaftlich genutzten Feldblöcke zugeschnitten.Versickerung: 4 Klassen; Wasserakkumulation: 5 Klassen. Zitat: Szerencsits, E., Prasuhn, V., Churko, G., Herzog, F., Utiger, C., Zihlmann, U. et al. (2018). Karte potenzieller Feucht-Acker-Flächen der Schweiz. Agroscope Science, 72, 67. https://www.feuchtacker.ch/</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.feuchtflaechenpotential-kulturlandschaft</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/5188235f-c5c3-4628-9173-055824b65539"/>
+            <Style>
+                <ows:Title>Feuchtflächenpotential Agrarland</ows:Title>
+                <ows:Identifier>ch.agroscope.feuchtflaechenpotential-kulturlandschaft</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.feuchtflaechenpotential-kulturlandschaft_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_16</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.feuchtflaechenpotential-kulturlandschaft/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <Layer>
+            <ows:Title>Fokuskarte Vögel</ows:Title>
+            <ows:Abstract>Die publizierten Daten wurden im Rahmen von Klein et al. 2025 erstellt, Teile des Projekts und Co-Autoren wurden von Agroscope, dem Bundesamt für Umwelt (BAFU) // Bund im Rahmen des Projekts &#34;ValPar.CH: Werte der ökologischen Infrastruktur in Schweizer Pärken&#34; (Grant-Nr. A1.2) und BiodivERsA-Belmont Forum Call on &#34;Scenarios of Biodiversity and Ecosystem services&#34; (Grant-Nr. BiodivScen-157) finanziert. Ziel des Projekts war es, die Auswirkungen landwirtschaftlicher Aktivitäten auf Feldebene mit der potenziellen Verbreitung von prioritären Schweizer Vogelarten zu kombinieren. Der Druck der Bewirtschaftung wurden für das Jahr 2021 mit Hilfe des Swiss Agricultural Life Cycle Assessment for Biodiversity (SALCA-BD, Jeanneret et al. 2014) bewertet. Das Potenzial wurde durch die Aggregation von Vorhersagen aus Verbreitungsmodellen für 27 prioritäre Vogelarten, die im Rahmen des ValParCH-Projekts (Adde et al. 2023) modelliert wurden, unter Verwendung der SWECO25-Datenbank für Umweltprädiktoren (Külling et al. 2024) bewertet. Zunächst wurde eine optimierte Hot-Spot-Analyse mit ArcGIS pro separat für den geschätzten Druck und das Verbreitungspotenzial durchgeführt. Anschließend wurden sie mithilfe eines multivariaten Clustering mit K-Mittelwert-Statistiken kombiniert, um Cluster mit vergleichbaren Kombinationen aus hohem und niedrigem Druck der Bewirtschaftung und hohem und niedrigem Potenzial zu ermitteln. Die daraus resultierende Karte zeigt 7 Cluster mit unterschiedlichen Kombinationen von hohem/niedrigem Druck und Potenzial. Die räumliche Auflösung des Rasterdatensatzes beträgt 25 m. &lt;br&gt;&lt;br&gt; Referenzen: &lt;br&gt; Adde, A., Rey, P. L., Brun, P., Külling, N., Fopp, F., Altermatt, F., Broennimann, O., Lehmann, A., Petitpierre, B., Zimmermann, N. E., Pellissier, L., &amp; Guisan, A. (2023). N-SDM: A high-performance computing pipeline for nested species distribution modelling. Ecography, 2023, e06540. https://doi.org/10.1111/ecog.06540 Jeanneret, P., Baumgartner, D. U., Freiermuth Knuchel, R., Koch, B., &amp; Gaillard, G. (2014). An expert system for integrating biodiversity into agricultural life-cycle assessment. Ecological Indicators, 46, 224–231. https://doi.org/10.1016/j.ecolind.2014.06.030 Klein N., Adde A., Grêt-Regamey A., Guisan A., Herzog F., Jeanneret P., Kay. S. Identifying focus zones for the conservation and promotion of priority birds in Swiss farmland. Conservation Science and Practice. 2025. https://doi.org/10.1111/csp2.13286 Külling, N., Adde, A., Fopp, F., Schweiger, A. K., Broennimann, O., Rey, P.-L., Giuliani, G., Goicolea, T., Petitpierre, B., Zimmermann, N. E., Pellissier, L., Altermatt, F., Lehmann, A., &amp; Guisan, A. (2024). SWECO25: A cross-thematic raster database for ecological research in Switzerland. Scientific Data, 11, 21. https://doi.org/10.1038/s41597-023-02899-1</ows:Abstract>
+            <ows:WGS84BoundingBox>
+                <ows:LowerCorner>5.140242 45.398181</ows:LowerCorner>
+                <ows:UpperCorner>11.47757 48.230651</ows:UpperCorner>
+            </ows:WGS84BoundingBox>
+            <ows:Identifier>ch.agroscope.fokuskarte-voegel</ows:Identifier>
+            <ows:Metadata xlink:href="https://www.geocat.ch/geonetwork/srv/ger/catalog.search#/metadata/849ba7b6-25d3-40c1-bccd-c91bf3f84d39"/>
+            <Style>
+                <ows:Title>Fokuskarte Vögel</ows:Title>
+                <ows:Identifier>ch.agroscope.fokuskarte-voegel</ows:Identifier>
+                <LegendURL format="image/png" xlink:href="https://api3.geo.admin.ch/static/images/legends/ch.agroscope.fokuskarte-voegel_de.png"/>
+            </Style>
+            <Format>image/png</Format>
+            <Dimension>
+                <ows:Identifier>Time</ows:Identifier>
+                <Default>current</Default>
+                <Value>current</Value>
+            </Dimension>
+            <TileMatrixSetLink>
+                <TileMatrixSet>3857_17</TileMatrixSet>
+            </TileMatrixSetLink>
+            <ResourceURL format="image/png" resourceType="tile" template="https://wmts.geo.admin.ch/1.0.0/ch.agroscope.fokuskarte-voegel/default/{Time}/3857/{TileMatrix}/{TileCol}/{TileRow}.png"/>
+        </Layer>
+        <TileMatrixSet>
+            <ows:Identifier>3857_16</ows:Identifier>
+            <ows:SupportedCRS>urn:ogc:def:crs:EPSG:3857</ows:SupportedCRS>
+            <TileMatrix>
+                <ows:Identifier>0</ows:Identifier>
+                <ScaleDenominator>559082264.0287178</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>1</MatrixWidth>
+                <MatrixHeight>1</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>1</ows:Identifier>
+                <ScaleDenominator>279541132.0143589</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>2</MatrixWidth>
+                <MatrixHeight>2</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>2</ows:Identifier>
+                <ScaleDenominator>139770566.00717944</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>4</MatrixWidth>
+                <MatrixHeight>4</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>3</ows:Identifier>
+                <ScaleDenominator>69885283.00358972</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>8</MatrixWidth>
+                <MatrixHeight>8</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>4</ows:Identifier>
+                <ScaleDenominator>34942641.50179486</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>16</MatrixWidth>
+                <MatrixHeight>16</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>5</ows:Identifier>
+                <ScaleDenominator>17471320.75089743</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>32</MatrixWidth>
+                <MatrixHeight>32</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>6</ows:Identifier>
+                <ScaleDenominator>8735660.375448715</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>64</MatrixWidth>
+                <MatrixHeight>64</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>7</ows:Identifier>
+                <ScaleDenominator>4367830.1877243575</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>128</MatrixWidth>
+                <MatrixHeight>128</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>8</ows:Identifier>
+                <ScaleDenominator>2183915.0938621787</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>256</MatrixWidth>
+                <MatrixHeight>256</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>9</ows:Identifier>
+                <ScaleDenominator>1091957.5469310894</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>512</MatrixWidth>
+                <MatrixHeight>512</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>10</ows:Identifier>
+                <ScaleDenominator>545978.7734655447</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>1024</MatrixWidth>
+                <MatrixHeight>1024</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>11</ows:Identifier>
+                <ScaleDenominator>272989.38673277234</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>2048</MatrixWidth>
+                <MatrixHeight>2048</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>12</ows:Identifier>
+                <ScaleDenominator>136494.69336638617</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>4096</MatrixWidth>
+                <MatrixHeight>4096</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>13</ows:Identifier>
+                <ScaleDenominator>68247.34668319309</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>8192</MatrixWidth>
+                <MatrixHeight>8192</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>14</ows:Identifier>
+                <ScaleDenominator>34123.67334159654</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>16384</MatrixWidth>
+                <MatrixHeight>16384</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>15</ows:Identifier>
+                <ScaleDenominator>17061.83667079827</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>32768</MatrixWidth>
+                <MatrixHeight>32768</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>16</ows:Identifier>
+                <ScaleDenominator>8530.918335399136</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>65536</MatrixWidth>
+                <MatrixHeight>65536</MatrixHeight>
+            </TileMatrix>
+        </TileMatrixSet>
+        <TileMatrixSet>
+            <ows:Identifier>3857_17</ows:Identifier>
+            <ows:SupportedCRS>urn:ogc:def:crs:EPSG:3857</ows:SupportedCRS>
+            <TileMatrix>
+                <ows:Identifier>0</ows:Identifier>
+                <ScaleDenominator>559082264.0287178</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>1</MatrixWidth>
+                <MatrixHeight>1</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>1</ows:Identifier>
+                <ScaleDenominator>279541132.0143589</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>2</MatrixWidth>
+                <MatrixHeight>2</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>2</ows:Identifier>
+                <ScaleDenominator>139770566.00717944</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>4</MatrixWidth>
+                <MatrixHeight>4</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>3</ows:Identifier>
+                <ScaleDenominator>69885283.00358972</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>8</MatrixWidth>
+                <MatrixHeight>8</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>4</ows:Identifier>
+                <ScaleDenominator>34942641.50179486</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>16</MatrixWidth>
+                <MatrixHeight>16</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>5</ows:Identifier>
+                <ScaleDenominator>17471320.75089743</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>32</MatrixWidth>
+                <MatrixHeight>32</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>6</ows:Identifier>
+                <ScaleDenominator>8735660.375448715</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>64</MatrixWidth>
+                <MatrixHeight>64</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>7</ows:Identifier>
+                <ScaleDenominator>4367830.1877243575</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>128</MatrixWidth>
+                <MatrixHeight>128</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>8</ows:Identifier>
+                <ScaleDenominator>2183915.0938621787</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>256</MatrixWidth>
+                <MatrixHeight>256</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>9</ows:Identifier>
+                <ScaleDenominator>1091957.5469310894</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>512</MatrixWidth>
+                <MatrixHeight>512</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>10</ows:Identifier>
+                <ScaleDenominator>545978.7734655447</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>1024</MatrixWidth>
+                <MatrixHeight>1024</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>11</ows:Identifier>
+                <ScaleDenominator>272989.38673277234</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>2048</MatrixWidth>
+                <MatrixHeight>2048</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>12</ows:Identifier>
+                <ScaleDenominator>136494.69336638617</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>4096</MatrixWidth>
+                <MatrixHeight>4096</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>13</ows:Identifier>
+                <ScaleDenominator>68247.34668319309</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>8192</MatrixWidth>
+                <MatrixHeight>8192</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>14</ows:Identifier>
+                <ScaleDenominator>34123.67334159654</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>16384</MatrixWidth>
+                <MatrixHeight>16384</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>15</ows:Identifier>
+                <ScaleDenominator>17061.83667079827</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>32768</MatrixWidth>
+                <MatrixHeight>32768</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>16</ows:Identifier>
+                <ScaleDenominator>8530.918335399136</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>65536</MatrixWidth>
+                <MatrixHeight>65536</MatrixHeight>
+            </TileMatrix>
+            <TileMatrix>
+                <ows:Identifier>17</ows:Identifier>
+                <ScaleDenominator>4265.459167699568</ScaleDenominator>
+                <TopLeftCorner>-20037508.342789244 20037508.342789244</TopLeftCorner>
+                <TileWidth>256</TileWidth>
+                <TileHeight>256</TileHeight>
+                <MatrixWidth>131072</MatrixWidth>
+                <MatrixHeight>131072</MatrixHeight>
+            </TileMatrix>
+        </TileMatrixSet>
+    </Contents>
+    <Themes>
+        <Theme>
+            <ows:Title>Basisdaten</ows:Title>
+            <ows:Abstract>Basisdaten</ows:Abstract>
+            <ows:Identifier>23c58de608ebd19b6d5908fd82aecd00</ows:Identifier>
+            <Theme>
+                <ows:Title>Geografische Bezeichnungen</ows:Title>
+                <ows:Abstract>Geografische Bezeichnungen</ows:Abstract>
+                <ows:Identifier>16</ows:Identifier>
+                <LayerRef>ch.bafu.klima-co2_ausstoss_gebaeude</LayerRef>
+                <LayerRef>ch.bfs.gebaeude_wohnungs_register_waermequelle_heizung</LayerRef>
+                <LayerRef>ch.swisstopo.hiks-dufour</LayerRef>
+                <LayerRef>ch.swisstopo.hiks-siegfried</LayerRef>
+                <LayerRef>ch.swisstopo.landeskarte-farbe-10</LayerRef>
+                <LayerRef>ch.swisstopo.landeskarte-grau-10</LayerRef>
+                <LayerRef>ch.swisstopo.leichte-basiskarte_reliefschattierung</LayerRef>
+                <LayerRef>ch.swisstopo.lotabweichungen</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-pk1000.noscale</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-pk100.noscale</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-pk200.noscale</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-pk25.noscale</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-pk500.noscale</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-pk50.noscale</LayerRef>
+                <LayerRef>ch.swisstopo.pixelkarte-farbe-winter</LayerRef>
+                <LayerRef>ch.swisstopo.swissnames3d</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-karte-farbe</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-karte-grau</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-miscellaneous</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-names-namedlocation</LayerRef>
+                <LayerRef>ch.swisstopo.zeitreihen</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Koordinatenreferenzsysteme</ows:Title>
+                <ows:Abstract>Koordinatenreferenzsysteme</ows:Abstract>
+                <ows:Identifier>2</ows:Identifier>
+                <LayerRef>ch.swisstopo.dreiecksvermaschung</LayerRef>
+                <LayerRef>ch.swisstopo.fixpunkte-agnes</LayerRef>
+                <LayerRef>ch.swisstopo.geoidmodell-ch1903</LayerRef>
+                <LayerRef>ch.swisstopo.geoidmodell-etrs89</LayerRef>
+                <LayerRef>ch.swisstopo.koordinatenaenderung</LayerRef>
+                <LayerRef>ch.swisstopo.transformationsgenauigkeit</LayerRef>
+                <LayerRef>ch.swisstopo-vd.spannungsarme-gebiete</LayerRef>
+                <LayerRef>ch.swisstopo.verschiebungsvektoren-tsp1</LayerRef>
+                <LayerRef>ch.swisstopo.verschiebungsvektoren-tsp2</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Adressen</ows:Title>
+                <ows:Abstract>Adressen</ows:Abstract>
+                <ows:Identifier>44</ows:Identifier>
+                <LayerRef>ch.bfs.gebaeude_wohnungs_register</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Katasterparzellen</ows:Title>
+                <ows:Abstract>Katasterparzellen</ows:Abstract>
+                <ows:Identifier>47</ows:Identifier>
+                <LayerRef>ch.are.bauzonen</LayerRef>
+                <LayerRef>ch.kantone.cadastralwebmap-farbe</LayerRef>
+                <LayerRef>ch.swisstopo-vd.spannungsarme-gebiete</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Verwaltungseinheiten</ows:Title>
+                <ows:Abstract>Verwaltungseinheiten</ows:Abstract>
+                <ows:Identifier>34</ows:Identifier>
+                <LayerRef>ch.are.agglomerationsverkehr</LayerRef>
+                <LayerRef>ch.are.alpenkonvention</LayerRef>
+                <LayerRef>ch.are.wohnungsinventar-zweitwohnungsanteil</LayerRef>
+                <LayerRef>ch.bfs.arbeitsmarktregionen</LayerRef>
+                <LayerRef>ch.bfs.generalisierte-grenzen_agglomerationen_g1</LayerRef>
+                <LayerRef>ch.swisstopo.hoheitsgrenze-landesvermessung</LayerRef>
+                <LayerRef>ch.swisstopo.hoheitsgrenzpunkte-landesvermessung</LayerRef>
+                <LayerRef>ch.swisstopo.swissboundaries3d-bezirk-flaeche.fill</LayerRef>
+                <LayerRef>ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill</LayerRef>
+                <LayerRef>ch.swisstopo.swissboundaries3d-kanton-flaeche.fill</LayerRef>
+                <LayerRef>ch.swisstopo.swissboundaries3d-land-flaeche.fill</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-adminboundaries-protectedarea</LayerRef>
+            </Theme>
+        </Theme>
+        <Theme>
+            <ows:Title>Energie und Wirtschaft</ows:Title>
+            <ows:Abstract>Energie und Wirtschaft</ows:Abstract>
+            <ows:Identifier>5dd7a565ca6c445a88fe243beb59bc7e</ows:Identifier>
+            <Theme>
+                <ows:Title>Landwirtschaftliche Anlagen und Aquakulturanlagen</ows:Title>
+                <ows:Abstract>Landwirtschaftliche Anlagen und Aquakulturanlagen</ows:Abstract>
+                <ows:Identifier>306</ows:Identifier>
+                <LayerRef>ch.agroscope.fokuskarte-voegel</LayerRef>
+                <LayerRef>ch.blw.bewaesserungsbeduerftigkeit</LayerRef>
+                <LayerRef>ch.blw.landwirtschaftliche-nutzungsflaechen</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Statistische Einheiten</ows:Title>
+                <ows:Abstract>Statistische Einheiten</ows:Abstract>
+                <ows:Identifier>284</ows:Identifier>
+                <LayerRef>ch.are.agglomerationsverkehr</LayerRef>
+                <LayerRef>ch.are.wohnungsinventar-zweitwohnungsanteil</LayerRef>
+                <LayerRef>ch.bfs.erreichbarkeit-apotheken</LayerRef>
+                <LayerRef>ch.bfs.erreichbarkeit-restaurants</LayerRef>
+                <LayerRef>ch.bfs.statistische-grundeinheiten_stufe1</LayerRef>
+                <LayerRef>ch.bfs.statistische-grundeinheiten_stufe2</LayerRef>
+                <LayerRef>ch.blw.milchmarktregionen</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Energiequellen</ows:Title>
+                <ows:Abstract>Energiequellen</ows:Abstract>
+                <ows:Identifier>308</ows:Identifier>
+                <LayerRef>ch.bazl.reflektierende-flaechen_flugplaetze</LayerRef>
+                <LayerRef>ch.bfe.biomasse-nicht-verholzt</LayerRef>
+                <LayerRef>ch.bfe.biomasse-verholzt</LayerRef>
+                <LayerRef>ch.bfe.energieforschung</LayerRef>
+                <LayerRef>ch.bfe.erneuerbarheizen</LayerRef>
+                <LayerRef>ch.bfe.fernwaerme-angebot</LayerRef>
+                <LayerRef>ch.bfe.fernwaerme-nachfrage_industrie</LayerRef>
+                <LayerRef>ch.bfe.fernwaerme-nachfrage_wohn_dienstleistungsgebaeude</LayerRef>
+                <LayerRef>ch.bfe.grundwasserwaermenutzungspotential</LayerRef>
+                <LayerRef>ch.bfe.kehrichtverbrennungsanlagen</LayerRef>
+                <LayerRef>ch.bfe.kernkraftwerke</LayerRef>
+                <LayerRef>ch.bfe.kleinwasserkraftpotentiale</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-fahrzeuge</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-heimladeverfuegbarkeit_bequem</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-heimladeverfuegbarkeit_flexibel</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-heimladeverfuegbarkeit_geplant</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-ladepunkte_bequem</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-ladepunkte_flexibel</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-ladepunkte_geplant</LayerRef>
+                <LayerRef>ch.bfe.ladebedarfswelt-strombedarf</LayerRef>
+                <LayerRef>ch.bfe.meteorologische-vereisung</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-eignung-daecher</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-eignung-fassaden</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-einstrahlung_0_grad</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-einstrahlung_30_grad</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-einstrahlung_75_grad</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-einstrahlung_90_grad</LayerRef>
+                <LayerRef>ch.bfe.statistik-wasserkraftanlagen</LayerRef>
+                <LayerRef>ch.bfe.stauanlagen-bundesaufsicht</LayerRef>
+                <LayerRef>ch.bfe.windenergieanlagen</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-geothermie</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-miscellaneous</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Bodennutzung</ows:Title>
+                <ows:Abstract>Bodennutzung</ows:Abstract>
+                <ows:Identifier>287</ows:Identifier>
+                <LayerRef>ch.are.bauzonen</LayerRef>
+                <LayerRef>ch.are.siedlung</LayerRef>
+                <LayerRef>ch.are.solaranlagen-nutzungsaspekte</LayerRef>
+                <LayerRef>ch.are.solaranlagen-pruefenswerte_gebiete</LayerRef>
+                <LayerRef>ch.are.solaranlagen-pruefenswerte_gebiete_vektor</LayerRef>
+                <LayerRef>ch.are.solaranlagen-schutzinteressen</LayerRef>
+                <LayerRef>ch.blw.hanglagen-abschwemmung</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-futterbau</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-getreidebau</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-kartoffeln</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-koernermais</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-kulturland</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-spezialkulturen</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-typ</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-zwischenfruchtbau</LayerRef>
+                <LayerRef>ch.blw.niederschlagshaushalt</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-fleisch</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-kaese</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-konditoreiwaren</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-pflanzen</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-spirituosen</LayerRef>
+                <LayerRef>ch.swisstopo.vec25-einzelobjekte</LayerRef>
+            </Theme>
+        </Theme>
+        <Theme>
+            <ows:Title>Infrastruktur und Kommunikation</ows:Title>
+            <ows:Abstract>Infrastruktur und Kommunikation</ows:Abstract>
+            <ows:Identifier>a001cf461fa252d16bc1365636dfbf64</ows:Identifier>
+            <Theme>
+                <ows:Title>Verkehrsnetze</ows:Title>
+                <ows:Abstract>Verkehrsnetze</ows:Abstract>
+                <ows:Identifier>109</ows:Identifier>
+                <LayerRef>ch.are.belastung-personenverkehr-bahn</LayerRef>
+                <LayerRef>ch.are.belastung-personenverkehr-bahn_zukunft</LayerRef>
+                <LayerRef>ch.are.belastung-personenverkehr-strasse</LayerRef>
+                <LayerRef>ch.are.belastung-personenverkehr-strasse_zukunft</LayerRef>
+                <LayerRef>ch.are.erreichbarkeit-miv</LayerRef>
+                <LayerRef>ch.are.erreichbarkeit-oev</LayerRef>
+                <LayerRef>ch.are.reisezeit-agglomerationen-miv</LayerRef>
+                <LayerRef>ch.are.reisezeit-agglomerationen-oev</LayerRef>
+                <LayerRef>ch.astra.hauptstrassennetz</LayerRef>
+                <LayerRef>ch.astra.ivs-gelaendekarte</LayerRef>
+                <LayerRef>ch.astra.ivs-nat</LayerRef>
+                <LayerRef>ch.astra.ivs-nat_abgrenzungen</LayerRef>
+                <LayerRef>ch.astra.ivs-nat-verlaeufe</LayerRef>
+                <LayerRef>ch.astra.ivs-nat_wegbegleiter</LayerRef>
+                <LayerRef>ch.astra.ivs-reg_loc</LayerRef>
+                <LayerRef>ch.astra.konsultationsbereiche-nationalstrassen</LayerRef>
+                <LayerRef>ch.astra.mountainbikeland</LayerRef>
+                <LayerRef>ch.astra.schneeschuhwanderwege</LayerRef>
+                <LayerRef>ch.astra.schwerverunfallte-kanton_alkohol</LayerRef>
+                <LayerRef>ch.astra.schwerverunfallte-kanton_geschwindigkeit</LayerRef>
+                <LayerRef>ch.astra.schwerverunfallte-kanton_jahresvergleich</LayerRef>
+                <LayerRef>ch.astra.schwerverunfallte-kanton_pro_einwohner</LayerRef>
+                <LayerRef>ch.astra.skatingland</LayerRef>
+                <LayerRef>ch.astra.strassenverkehrszaehlung-uebergeordnet</LayerRef>
+                <LayerRef>ch.astra.unfaelle-personenschaeden_alle</LayerRef>
+                <LayerRef>ch.astra.unfaelle-personenschaeden_fahrraeder</LayerRef>
+                <LayerRef>ch.astra.unfaelle-personenschaeden_fussgaenger</LayerRef>
+                <LayerRef>ch.astra.unfaelle-personenschaeden_getoetete</LayerRef>
+                <LayerRef>ch.astra.unfaelle-personenschaeden_motorraeder</LayerRef>
+                <LayerRef>ch.astra.veloland</LayerRef>
+                <LayerRef>ch.astra.wanderland</LayerRef>
+                <LayerRef>ch.astra.winterwanderwege</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-aulav_auen</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-aulav_jagdbanngebiete</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-aulav_moorlandschaften</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-aulav_uebrige</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-luftfahrt</LayerRef>
+                <LayerRef>ch.bav.haltestellen-oev</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_festgelegte_emissionen_nacht</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_festgelegte_emissionen_tag</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_tatsaechliche_emissionen_nacht</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_tatsaechliche_emissionen_tag</LayerRef>
+                <LayerRef>ch.bav.schienennetz</LayerRef>
+                <LayerRef>ch.bazl.bebaute-gebiete_luftfahrtrecht</LayerRef>
+                <LayerRef>ch.bazl.einschraenkungen-drohnen</LayerRef>
+                <LayerRef>ch.bazl.flugplaetze-heliports</LayerRef>
+                <LayerRef>ch.bazl.gebirgslandeplaetze</LayerRef>
+                <LayerRef>ch.bazl.intrinsisches-bodenrisiko_sora_100</LayerRef>
+                <LayerRef>ch.bazl.intrinsisches-bodenrisiko_sora_200</LayerRef>
+                <LayerRef>ch.bazl.landschaftsruhezonen</LayerRef>
+                <LayerRef>ch.bazl.luftfahrtkarten-icao</LayerRef>
+                <LayerRef>ch.bazl.luftraeume-fluginformationsgebiet</LayerRef>
+                <LayerRef>ch.bazl.luftraeume-fluginformationszonen</LayerRef>
+                <LayerRef>ch.bazl.luftraeume-kontrollbezirke</LayerRef>
+                <LayerRef>ch.bazl.luftraeume-kontrollzonen</LayerRef>
+                <LayerRef>ch.bazl.luftraeume-nahkontrollbezirke</LayerRef>
+                <LayerRef>ch.bazl.segelflugkarte</LayerRef>
+                <LayerRef>ch.bazl.spitallandeplaetze</LayerRef>
+                <LayerRef>ch.bazl.uas-aktivitaetszonen</LayerRef>
+                <LayerRef>ch.bazl.wohngebiete-aulav</LayerRef>
+                <LayerRef>ch.swisstopo.bahnen-winter</LayerRef>
+                <LayerRef>ch.swisstopo-karto.schneeschuhrouten</LayerRef>
+                <LayerRef>ch.swisstopo-karto.skitouren</LayerRef>
+                <LayerRef>ch.swisstopo.strassenkarte-200</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-eisenbahnnetz</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-strassen</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-uebrigerverkehr</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-wanderwege</LayerRef>
+                <LayerRef>ch.swisstopo.swisstne-base</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-transportation-oeffentliche-verkehr</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-transportation-strassennetz</LayerRef>
+                <LayerRef>ch.swisstopo.vec25-anlagen</LayerRef>
+                <LayerRef>ch.vbs.sperr-gefahrenzonenkarte</LayerRef>
+                <LayerRef>ch.vbs.swissmilpilotschart</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Versorgungswirtschaft und staatliche Dienste</ows:Title>
+                <ows:Abstract>Versorgungswirtschaft und staatliche Dienste</ows:Abstract>
+                <ows:Identifier>133</ows:Identifier>
+                <LayerRef>ch.armasuisse.natur-landschaft_armee</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-klaeranlagen_anteilq347</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-klaeranlagen_ausbaugroesse</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-klaeranlagen_reinigungstyp</LayerRef>
+                <LayerRef>ch.bakom.anbieter-eigenes_festnetz</LayerRef>
+                <LayerRef>ch.bakom.anschlussart-glasfaser</LayerRef>
+                <LayerRef>ch.bakom.anschlussart-koaxialkabel</LayerRef>
+                <LayerRef>ch.bakom.anschlussart-kupferdraht</LayerRef>
+                <LayerRef>ch.bakom.downlink10</LayerRef>
+                <LayerRef>ch.bakom.downlink100</LayerRef>
+                <LayerRef>ch.bakom.downlink1000</LayerRef>
+                <LayerRef>ch.bakom.downlink30</LayerRef>
+                <LayerRef>ch.bakom.downlink300</LayerRef>
+                <LayerRef>ch.bakom.downlink500</LayerRef>
+                <LayerRef>ch.bakom.mobilnetz-3g</LayerRef>
+                <LayerRef>ch.bakom.mobilnetz-4g</LayerRef>
+                <LayerRef>ch.bakom.mobilnetz-5g</LayerRef>
+                <LayerRef>ch.bakom.notruf</LayerRef>
+                <LayerRef>ch.bakom.notruf-112_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-112_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-112_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-117_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-117_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-117_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-118_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-118_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-118_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-142_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-142_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-142_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-143_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-143_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-143_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-144_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-144_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-144_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-145_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-145_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-145_zentral</LayerRef>
+                <LayerRef>ch.bakom.notruf-147_festnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-147_mobilnetz</LayerRef>
+                <LayerRef>ch.bakom.notruf-147_zentral</LayerRef>
+                <LayerRef>ch.bakom.standorte-mobilfunkanlagen</LayerRef>
+                <LayerRef>ch.bakom.uplink1</LayerRef>
+                <LayerRef>ch.bakom.uplink10</LayerRef>
+                <LayerRef>ch.bakom.uplink100</LayerRef>
+                <LayerRef>ch.bakom.uplink1000</LayerRef>
+                <LayerRef>ch.bakom.versorgungsgebiet-tv</LayerRef>
+                <LayerRef>ch.bakom.versorgungsgebiet-ukw</LayerRef>
+                <LayerRef>ch.bfe.energieforschung</LayerRef>
+                <LayerRef>ch.bfe.kernkraftwerke</LayerRef>
+                <LayerRef>ch.bfe.rohrleitungen-konsultationsbereiche</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-eignung-daecher</LayerRef>
+                <LayerRef>ch.bfe.solarenergie-eignung-fassaden</LayerRef>
+                <LayerRef>ch.blw.alpprodukte</LayerRef>
+                <LayerRef>ch.blw.bergprodukte</LayerRef>
+                <LayerRef>ch.vbs.armee-kriegsdenkmaeler</LayerRef>
+                <LayerRef>ch.vbs.armeelogistikcenter</LayerRef>
+                <LayerRef>ch.vbs.grunddispositiv-zeus</LayerRef>
+                <LayerRef>ch.vbs.ladestationen</LayerRef>
+                <LayerRef>ch.vbs.logistikraeume-armeelogistikcenter</LayerRef>
+                <LayerRef>ch.vbs.milairspacechart</LayerRef>
+                <LayerRef>ch.vbs.panzerverschiebungsrouten</LayerRef>
+                <LayerRef>ch.vbs.patrouilledesglaciers-a_rennen</LayerRef>
+                <LayerRef>ch.vbs.patrouilledesglaciers-z_rennen</LayerRef>
+                <LayerRef>ch.vbs.retablierungsstellen</LayerRef>
+                <LayerRef>ch.vbs.schiessanzeigen</LayerRef>
+                <LayerRef>ch.vbs.waldschadenkarte</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Gebäude</ows:Title>
+                <ows:Abstract>Gebäude</ows:Abstract>
+                <ows:Identifier>128</ows:Identifier>
+                <LayerRef>ch.baspo.nationales-sportanlagenkonzept</LayerRef>
+                <LayerRef>ch.bfs.gebaeude_wohnungs_register</LayerRef>
+                <LayerRef>ch.bfs.volkszaehlung-gebaeudestatistik_gebaeude</LayerRef>
+                <LayerRef>ch.bfs.volkszaehlung-gebaeudestatistik_wohnungen</LayerRef>
+                <LayerRef>ch.swisstopo.unterkuenfte-winter</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-building</LayerRef>
+                <LayerRef>ch.swisstopo.vec25-gebaeude</LayerRef>
+            </Theme>
+        </Theme>
+        <Theme>
+            <ows:Title>Oberflächendarstellung</ows:Title>
+            <ows:Abstract>Oberflächendarstellung</ows:Abstract>
+            <ows:Identifier>b49235b6588b3e7b24afb78cb17a9850</ows:Identifier>
+            <Theme>
+                <ows:Title>Bodenbedeckung</ows:Title>
+                <ows:Abstract>Bodenbedeckung</ows:Abstract>
+                <ows:Identifier>69</ows:Identifier>
+                <LayerRef>ch.bfs.arealstatistik</LayerRef>
+                <LayerRef>ch.bfs.arealstatistik-bodenbedeckung</LayerRef>
+                <LayerRef>ch.bfs.landschaftswandel</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-wald</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-landcover</LayerRef>
+                <LayerRef>ch.swisstopo.vec25-heckenbaeume</LayerRef>
+                <LayerRef>ch.swisstopo.vec25-primaerflaechen</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Höhe</ows:Title>
+                <ows:Abstract>Höhe</ows:Abstract>
+                <ows:Identifier>62</ows:Identifier>
+                <LayerRef>ch.bazl.luftfahrtkarten-icao</LayerRef>
+                <LayerRef>ch.bazl.segelflugkarte</LayerRef>
+                <LayerRef>ch.swisstopo.digitales-hoehenmodell_25_reliefschattierung</LayerRef>
+                <LayerRef>ch.swisstopo.geoidmodell-ch1903</LayerRef>
+                <LayerRef>ch.swisstopo.geoidmodell-etrs89</LayerRef>
+                <LayerRef>ch.swisstopo.hangneigung-ueber_30</LayerRef>
+                <LayerRef>ch.swisstopo-karto.hangneigung</LayerRef>
+                <LayerRef>ch.swisstopo.swissalti3d-reliefschattierung</LayerRef>
+                <LayerRef>ch.swisstopo.swissalti3d-reliefschattierung_monodirektional</LayerRef>
+                <LayerRef>ch.swisstopo.swissaltiregio-reliefschattierung_monodirektional</LayerRef>
+                <LayerRef>ch.swisstopo.swissaltiregio-reliefschattierung_multidirektional</LayerRef>
+                <LayerRef>ch.swisstopo.swissbathy3d-reliefschattierung</LayerRef>
+                <LayerRef>ch.swisstopo.swisssurface3d-reliefschattierung_monodirektional</LayerRef>
+                <LayerRef>ch.swisstopo.swisssurface3d-reliefschattierung-multidirektional</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-miscellaneous-geodpoint</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Orthofotografie</ows:Title>
+                <ows:Abstract>Orthofotografie</ows:Abstract>
+                <ows:Identifier>78</ows:Identifier>
+                <LayerRef>ch.swisstopo.lubis-luftbilder-dritte-firmen</LayerRef>
+                <LayerRef>ch.swisstopo.lubis-luftbilder-dritte-kantone</LayerRef>
+                <LayerRef>ch.swisstopo.lubis-luftbilder_farbe</LayerRef>
+                <LayerRef>ch.swisstopo.lubis-luftbilder_infrarot</LayerRef>
+                <LayerRef>ch.swisstopo.lubis-luftbilder_schwarzweiss</LayerRef>
+                <LayerRef>ch.swisstopo.lubis-terrestrische_aufnahmen</LayerRef>
+                <LayerRef>ch.swisstopo.swissimage-product</LayerRef>
+                <LayerRef>ch.swisstopo.swissimage-product_1946</LayerRef>
+                <LayerRef>ch.swisstopo.swissimage-product.metadata</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Gewässernetz</ows:Title>
+                <ows:Abstract>Gewässernetz</ows:Abstract>
+                <ows:Identifier>58</ows:Identifier>
+                <LayerRef>ch.bafu.feststoffe-geschiebemessnetz</LayerRef>
+                <LayerRef>ch.bafu.flussordnungszahlen-strahler</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-badewasserqualitaet</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-chemischer_zustand_ammonium</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-chemischer_zustand_doc</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-chemischer_zustand_nitrat</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-chemischer_zustand_nitrit</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-chemischer_zustand_phosphat</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-chemischer_zustand_phosphor_gesamt</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-diffuse_eintraege_gesamt_phosphor</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-diffuse_eintraege_phosphor</LayerRef>
+                <LayerRef>ch.bafu.gewaesserschutz-diffuse_eintraege_stickstoff</LayerRef>
+                <LayerRef>ch.bafu.gewaesser-uferbestockung</LayerRef>
+                <LayerRef>ch.bafu.gewaesser-uferbestockung_vegetation</LayerRef>
+                <LayerRef>ch.bafu.hydrogeologie-markierversuche</LayerRef>
+                <LayerRef>ch.bafu.hydrogeologische-karte_100</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-daueruntersuchung_fliessgewaesser</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-hochwasserstatistik</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-niedrigwasserstatistik</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-q347</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-untersuchungsgebiete</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-untersuchungsgebiete_stationen</LayerRef>
+                <LayerRef>ch.bafu.hydrologischer-atlas_basisgebiete</LayerRef>
+                <LayerRef>ch.bafu.hydrologischer-atlas_bilanzgebiete</LayerRef>
+                <LayerRef>ch.bafu.hydrologischer-atlas_flussgebiete</LayerRef>
+                <LayerRef>ch.bafu.hydrologischer-atlas_kantonale-messstationen</LayerRef>
+                <LayerRef>ch.bafu.mittlere-abfluesse</LayerRef>
+                <LayerRef>ch.bafu.mittlere-abfluesse_zukunft</LayerRef>
+                <LayerRef>ch.bafu.oekomorphologie-f_abschnitte</LayerRef>
+                <LayerRef>ch.bafu.oekomorphologie-f_abstuerze</LayerRef>
+                <LayerRef>ch.bafu.oekomorphologie-f_bauwerke</LayerRef>
+                <LayerRef>ch.bafu.strukturguete-hochrhein_linkesufer</LayerRef>
+                <LayerRef>ch.bafu.strukturguete-hochrhein_linkesumfeld</LayerRef>
+                <LayerRef>ch.bafu.strukturguete-hochrhein_rechtesufer</LayerRef>
+                <LayerRef>ch.bafu.strukturguete-hochrhein_rechtesumfeld</LayerRef>
+                <LayerRef>ch.bafu.strukturguete-hochrhein_sohle</LayerRef>
+                <LayerRef>ch.bafu.typisierung-fliessgewaesser</LayerRef>
+                <LayerRef>ch.bafu.vec25-gewaessernetz_2000</LayerRef>
+                <LayerRef>ch.bafu.vec25-seen</LayerRef>
+                <LayerRef>ch.bafu.wasserbau-querprofilmarken</LayerRef>
+                <LayerRef>ch.bafu.wasserbau-vermessungsstrecken</LayerRef>
+                <LayerRef>ch.bafu.wasser-gebietsauslaesse</LayerRef>
+                <LayerRef>ch.bafu.wasser-teileinzugsgebiete_2</LayerRef>
+                <LayerRef>ch.bafu.wasser-teileinzugsgebiete_40</LayerRef>
+                <LayerRef>ch.bafu.wasser-vorfluter</LayerRef>
+                <LayerRef>ch.bfe.kleinwasserkraftpotentiale</LayerRef>
+                <LayerRef>ch.swisstopo.swisstlm3d-gewaessernetz</LayerRef>
+                <LayerRef>ch.swisstopo.vec200-hydrography</LayerRef>
+                <LayerRef>ch.swisstopo.vec25-gewaessernetz_referenz</LayerRef>
+            </Theme>
+        </Theme>
+        <Theme>
+            <ows:Title>Umwelt, Biologie und Geologie</ows:Title>
+            <ows:Abstract>Umwelt, Biologie und Geologie</ows:Abstract>
+            <ows:Identifier>dcf0cad08fc749baa39453bb22e1a6f4</ows:Identifier>
+            <Theme>
+                <ows:Title>Schutzgebiete</ows:Title>
+                <ows:Abstract>Schutzgebiete</ows:Abstract>
+                <ows:Identifier>166</ows:Identifier>
+                <LayerRef>ch.bafu.alpweiden-herdenschutzhunde</LayerRef>
+                <LayerRef>ch.bafu.amphibienwanderung-verkehrskonflikte</LayerRef>
+                <LayerRef>ch.bafu.auen-ausserhalb_bundesinventar</LayerRef>
+                <LayerRef>ch.bafu.auen-ausserhalb_bundesinventar_alpin</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-amphibien</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-amphibien_wanderobjekte</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-auen</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-auen_anhang2</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-bln</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-flachmoore</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-hochmoore</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-jagdbanngebiete</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-moorlandschaften</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-trockenwiesen_trockenweiden</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-trockenwiesen_trockenweiden_anhang2</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-vogelreservate</LayerRef>
+                <LayerRef>ch.bafu.grundwasserkoerper</LayerRef>
+                <LayerRef>ch.bafu.lebensraumkarte-schweiz</LayerRef>
+                <LayerRef>ch.bafu.lebensraumkarte-schweiz_gehoelze</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-paerke_nationaler_bedeutung</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-paerke_nationaler_bedeutung_perimeter</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-ramsar</LayerRef>
+                <LayerRef>ch.bafu.schutzgebiete-schweizerischer_nationalpark</LayerRef>
+                <LayerRef>ch.bafu.tranquillity-gebiete</LayerRef>
+                <LayerRef>ch.bafu.tranquillity-karte</LayerRef>
+                <LayerRef>ch.bafu.unesco-weltnaturerbe</LayerRef>
+                <LayerRef>ch.bafu.waldreservate</LayerRef>
+                <LayerRef>ch.bafu.wrz-jagdbanngebiete_select</LayerRef>
+                <LayerRef>ch.bafu.wrz-wildruhezonen_portal</LayerRef>
+                <LayerRef>ch.bak.schutzgebiete-unesco_weltkulturerbe</LayerRef>
+                <LayerRef>ch.pronatura.naturschutzgebiete</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotope</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Gebiete mit naturbedingten Risiken</ows:Title>
+                <ows:Abstract>Gebiete mit naturbedingten Risiken</ows:Abstract>
+                <ows:Identifier>232</ows:Identifier>
+                <LayerRef>ch.bafu.gefaehrdungskarte-oberflaechenabfluss</LayerRef>
+                <LayerRef>ch.bafu.permafrost</LayerRef>
+                <LayerRef>ch.bafu.silvaprotect-hangmuren</LayerRef>
+                <LayerRef>ch.bafu.silvaprotect-lawinen</LayerRef>
+                <LayerRef>ch.bafu.silvaprotect-murgang</LayerRef>
+                <LayerRef>ch.bafu.silvaprotect-sturz</LayerRef>
+                <LayerRef>ch.bafu.silvaprotect-uebersarung</LayerRef>
+                <LayerRef>ch.bafu.sturm-boeenspitzen_100</LayerRef>
+                <LayerRef>ch.bafu.sturm-boeenspitzen_30</LayerRef>
+                <LayerRef>ch.bafu.sturm-boeenspitzen_300</LayerRef>
+                <LayerRef>ch.bafu.sturm-boeenspitzen_50</LayerRef>
+                <LayerRef>ch.bafu.sturm-staudruck_100</LayerRef>
+                <LayerRef>ch.bafu.sturm-staudruck_30</LayerRef>
+                <LayerRef>ch.bafu.sturm-staudruck_300</LayerRef>
+                <LayerRef>ch.bafu.sturm-staudruck_50</LayerRef>
+                <LayerRef>ch.bafu.trockenheitswarnkarte</LayerRef>
+                <LayerRef>ch.bag.radonkarte</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Verteilung der Arten</ows:Title>
+                <ows:Abstract>Verteilung der Arten</ows:Abstract>
+                <ows:Identifier>277</ows:Identifier>
+                <LayerRef>ch.agroscope.amphibien-ausbreitungskarten_alytes_obstetricans</LayerRef>
+                <LayerRef>ch.agroscope.amphibien-ausbreitungskarten_bombia_variegata</LayerRef>
+                <LayerRef>ch.agroscope.amphibien-ausbreitungskarten_epidalea_calamita</LayerRef>
+                <LayerRef>ch.agroscope.amphibien-ausbreitungskarten_hyla_arborea</LayerRef>
+                <LayerRef>ch.agroscope.amphibien-ausbreitungskarten_triturus_cristatus</LayerRef>
+                <LayerRef>ch.agroscope.amphibien-bedeutung_parzellen</LayerRef>
+                <LayerRef>ch.agroscope.korridore-feuchtgebietsarten_bereiche</LayerRef>
+                <LayerRef>ch.agroscope.korridore-feuchtgebietsarten_qualitaet</LayerRef>
+                <LayerRef>ch.bafu.fauna-steinbockkolonien</LayerRef>
+                <LayerRef>ch.bafu.fauna-wildtierpassagen</LayerRef>
+                <LayerRef>ch.bafu.moose</LayerRef>
+                <LayerRef>ch.bafu.neophyten-amerikanische_kermesbeere</LayerRef>
+                <LayerRef>ch.bafu.neophyten-amerikanischer_stinktierkohl</LayerRef>
+                <LayerRef>ch.bafu.neophyten-armenische_brombeere</LayerRef>
+                <LayerRef>ch.bafu.neophyten-aufrechtes_traubenkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-auslaeuferbildendes_fettkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-balfours_springkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-bastardindigo</LayerRef>
+                <LayerRef>ch.bafu.neophyten-bastard_staudenknoeterich</LayerRef>
+                <LayerRef>ch.bafu.neophyten-besen_radmelde</LayerRef>
+                <LayerRef>ch.bafu.neophyten-blauglockenbaum</LayerRef>
+                <LayerRef>ch.bafu.neophyten-brasilianisches_tausendblatt</LayerRef>
+                <LayerRef>ch.bafu.neophyten-carolina_nachtschatten</LayerRef>
+                <LayerRef>ch.bafu.neophyten-chinesische_samtpappel</LayerRef>
+                <LayerRef>ch.bafu.neophyten-druesiges_springkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-einjaehriges_berufkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-essbare_kermesbeere</LayerRef>
+                <LayerRef>ch.bafu.neophyten-essbares_zypergras</LayerRef>
+                <LayerRef>ch.bafu.neophyten-essigbaum</LayerRef>
+                <LayerRef>ch.bafu.neophyten-felsen_greiskraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-fortunes_hanfpalme</LayerRef>
+                <LayerRef>ch.bafu.neophyten-gestreiftes_suessgras</LayerRef>
+                <LayerRef>ch.bafu.neophyten-gewoehnliche_jungfernrebe</LayerRef>
+                <LayerRef>ch.bafu.neophyten-glattes_zackenschoetchen</LayerRef>
+                <LayerRef>ch.bafu.neophyten-goetterbaum</LayerRef>
+                <LayerRef>ch.bafu.neophyten-grossbluetiges_heusenkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-grosser_wassernabel</LayerRef>
+                <LayerRef>ch.bafu.neophyten-haargurke</LayerRef>
+                <LayerRef>ch.bafu.neophyten-henrys_geissblatt</LayerRef>
+                <LayerRef>ch.bafu.neophyten-herbst_traubenkirsche</LayerRef>
+                <LayerRef>ch.bafu.neophyten-igelgurke</LayerRef>
+                <LayerRef>ch.bafu.neophyten-japanischer_staudenknoeterich</LayerRef>
+                <LayerRef>ch.bafu.neophyten-japanisches_geissblatt</LayerRef>
+                <LayerRef>ch.bafu.neophyten-kanadische_goldrute</LayerRef>
+                <LayerRef>ch.bafu.neophyten-kanadische_wasserpest</LayerRef>
+                <LayerRef>ch.bafu.neophyten-karolina_haarnixe</LayerRef>
+                <LayerRef>ch.bafu.neophyten-kaukasus_fettkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-kirschlorbeer</LayerRef>
+                <LayerRef>ch.bafu.neophyten-kletternder_giftsumach</LayerRef>
+                <LayerRef>ch.bafu.neophyten-kopoubohne</LayerRef>
+                <LayerRef>ch.bafu.neophyten-mahonie</LayerRef>
+                <LayerRef>ch.bafu.neophyten-nadelkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-nuttalls_wasserpest</LayerRef>
+                <LayerRef>ch.bafu.neophyten-portulak_heusenkraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-riesenbaerenklau</LayerRef>
+                <LayerRef>ch.bafu.neophyten-robinie</LayerRef>
+                <LayerRef>ch.bafu.neophyten-runzelblaettriger_schneeball</LayerRef>
+                <LayerRef>ch.bafu.neophyten-sachalin_staudenknoeterich</LayerRef>
+                <LayerRef>ch.bafu.neophyten-schmetterlingsstrauch</LayerRef>
+                <LayerRef>ch.bafu.neophyten-seidiger_hornstrauch</LayerRef>
+                <LayerRef>ch.bafu.neophyten-spaetbluehende_goldrute</LayerRef>
+                <LayerRef>ch.bafu.neophyten-suedafrikanisches_greiskraut</LayerRef>
+                <LayerRef>ch.bafu.neophyten-syrische_seidenpflanze</LayerRef>
+                <LayerRef>ch.bafu.neophyten-topinambur</LayerRef>
+                <LayerRef>ch.bafu.neophyten-verlotscher_beifuss</LayerRef>
+                <LayerRef>ch.bafu.neophyten-vielaehriger_knoeterich</LayerRef>
+                <LayerRef>ch.bafu.neophyten-vielblaettrige_lupine</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Meteorologisch-geografische Kennwerte</ows:Title>
+                <ows:Abstract>Meteorologisch-geografische Kennwerte</ows:Abstract>
+                <ows:Identifier>242</ows:Identifier>
+                <LayerRef>ch.bafu.luftreinhaltung-ammoniakkonzentration</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-feinstaub_pm10</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-feinstaub_pm2_5</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-ozon</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-schwefeldioxid</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-stickstoffdeposition</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-stickstoffdioxid</LayerRef>
+                <LayerRef>ch.bafu.luftreinhaltung-stickstoff_kritischer_eintrag</LayerRef>
+                <LayerRef>ch.bafu.wald-foehnhaeufigkeit_jahr</LayerRef>
+                <LayerRef>ch.bafu.wald-kontinentalitaet_jahr_1000m_1981_2010</LayerRef>
+                <LayerRef>ch.bafu.wald-kontinentalitaet_juli_1000m_1981_2010</LayerRef>
+                <LayerRef>ch.bafu.wald-lufttemperatur_juli_1961_1990</LayerRef>
+                <LayerRef>ch.bafu.wald-lufttemperatur_juli_1981_2010</LayerRef>
+                <LayerRef>ch.bafu.wald-lufttemperatur_juli_2085_gering</LayerRef>
+                <LayerRef>ch.bafu.wald-lufttemperatur_juli_2085_maessig</LayerRef>
+                <LayerRef>ch.bafu.wald-lufttemperatur_juli_2085_stark</LayerRef>
+                <LayerRef>ch.bafu.wald-niederschlag_april_august_2085_gering</LayerRef>
+                <LayerRef>ch.bafu.wald-niederschlag_april_august_2085_maessig</LayerRef>
+                <LayerRef>ch.bafu.wald-niederschlag_april_august_2085_stark</LayerRef>
+                <LayerRef>ch.bafu.wald-niederschlag_sommer_2085_gering</LayerRef>
+                <LayerRef>ch.bafu.wald-niederschlag_sommer_2085_maessig</LayerRef>
+                <LayerRef>ch.bafu.wald-niederschlag_sommer_2085_stark</LayerRef>
+                <LayerRef>ch.bafu.wald-obere_waldgrenze</LayerRef>
+                <LayerRef>ch.bafu.wald-relative_luftfeuchte_jahr_1981_2010</LayerRef>
+                <LayerRef>ch.bafu.wald-relative_luftfeuchte_juli_1981_2010</LayerRef>
+                <LayerRef>ch.blw.bewaesserungsbeduerftigkeit</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-gruendigkeit</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-kulturland</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-kulturtyp</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-naehrstoffspeichervermoegen</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-skelettgehalt</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-vernaessung</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-wasserdurchlaessigkeit</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-wasserspeichervermoegen</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-futterbau</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-getreidebau</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-kartoffeln</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-koernermais</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-kulturland</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-spezialkulturen</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-typ</LayerRef>
+                <LayerRef>ch.blw.klimaeignung-zwischenfruchtbau</LayerRef>
+                <LayerRef>ch.blw.niederschlagshaushalt</LayerRef>
+                <LayerRef>ch.meteoschweiz.hagelgefaehrdung-korngroesse_100_jahre</LayerRef>
+                <LayerRef>ch.meteoschweiz.hagelgefaehrdung-korngroesse_10_jahre</LayerRef>
+                <LayerRef>ch.meteoschweiz.hagelgefaehrdung-korngroesse_20_jahre</LayerRef>
+                <LayerRef>ch.meteoschweiz.hagelgefaehrdung-korngroesse_50_jahre</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-globalstrahlung_aktuelle_periode</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-niederschlag_1961_1990</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-niederschlag_aktuelle_periode</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-sonnenscheindauer_1961_1990</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-sonnenscheindauer_aktuelle_periode</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-temperatur_1961_1990</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimanormwerte-temperatur_aktuelle_periode</LayerRef>
+                <LayerRef>ch.meteoschweiz.klimaszenarien-raumklima</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Geologie</ows:Title>
+                <ows:Abstract>Geologie</ows:Abstract>
+                <ows:Identifier>183</ows:Identifier>
+                <LayerRef>ch.bafu.hydrogeologie-uebersichtskarte</LayerRef>
+                <LayerRef>ch.nagra.aeromagnetische-karte_1100</LayerRef>
+                <LayerRef>ch.nagra.aeromagnetische-karte_1500</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-bodenunruhe</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-bohrungen_tiefer_500</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-dosisleistung-terrestrisch</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-eiszeit-lgm</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-eiszeit-lgm-raster</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-felsoberflaeche_hoehenmodell</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-generalkarte-ggk200</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geodaesie-bouguer_anomalien</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geodaesie-isostatische_anomalien</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geologische_3dmodelle</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geologische_karte</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geologischer_atlas</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geologischer_atlas_profile</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol_hoehe_top_omm</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturmodell_eingangsdaten</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturverteilung_1000</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturverteilung_1500</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturverteilung_2000</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturverteilung_3000</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturverteilung_4000</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomol-temperaturverteilung_500</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geomorphologie</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-aeromagnetische_karte_jura</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-aeromagnetische_karte_schweiz</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-deklination</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-geothermie</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-inklination</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geophysik-totalintensitaet</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotechnik-gk500-genese</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotechnik-gk500-gesteinsklassierung</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotechnik-gk500-lithologie_hauptgruppen</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotechnik-steine_historische_bauwerke</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotope</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geotope_kantone_stand</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-geowege</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-gesteinsdichte</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-gletscherausdehnung</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-gletschermaechtigkeit</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-gravimetrischer_atlas</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-gravimetrischer_atlas.messpunkte</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-hartsteinvorkommen</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-hydrogeologische_karte-grundwasservorkommen</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-hydrogeologische_karte-grundwasservulnerabilitaet</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-lockergestein_maechtigkeitsmodell</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-reflexionsseismik</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-rohstoffe-ziegel_abbau</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-spezialkarten_schweiz.metadata</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-swissgeocover2d_bedrock</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-swissgeocover2d_lines</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-swissgeocover2d_points</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-swissgeocover2d_surfaces</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-swissgeocover2d_tecto_lines</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-swissgeocover2d_unconsolidated</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-tektonische_karte</LayerRef>
+                <LayerRef>ch.swisstopo.geologie-thermale_waesser</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Umweltüberwachung</ows:Title>
+                <ows:Abstract>Umweltüberwachung</ows:Abstract>
+                <ows:Identifier>223</ows:Identifier>
+                <LayerRef>ch.are.alpenkonvention</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-gewaesserzustandsmessstationen</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-hydromessstationen</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-wassertemperaturmessstationen</LayerRef>
+                <LayerRef>ch.bafu.wasser-entnahme</LayerRef>
+                <LayerRef>ch.bafu.wasser-leitungen</LayerRef>
+                <LayerRef>ch.bafu.wasser-rueckgabe</LayerRef>
+                <LayerRef>ch.bav.betriebe-stoerfallverordnung_eisenbahnanlagen</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_effektive_immissionen_nacht</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_effektive_immissionen_tag</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_zulaessige_immissionen_nacht</LayerRef>
+                <LayerRef>ch.bav.laermbelastung-eisenbahn_zulaessige_immissionen_tag</LayerRef>
+                <LayerRef>ch.bav.lage-stoerfallverordnung_eisenbahnanlagen</LayerRef>
+                <LayerRef>ch.bazl.betriebe-stoerfallverordnung-zivilflugplaetze</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Boden</ows:Title>
+                <ows:Abstract>Boden</ows:Abstract>
+                <ows:Identifier>205</ows:Identifier>
+                <LayerRef>ch.agroscope.feuchtflaechenpotential-kulturlandschaft</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_apr</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_aug</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_dez</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_feb</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_jan</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_jul</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_jun</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_mai</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_mrz</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_nov</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_okt</LayerRef>
+                <LayerRef>ch.bafu.erosion-gruenland_bodenabtrag_sep</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_antimon</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_arsen</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_blei</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_cadmium</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_calcium</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_chrom</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_cobalt</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_eisen</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_kupfer</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_magnesium</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_mangan</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_molybdaen</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_natrium</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_nickel</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_quecksilber</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_schwefel</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_thallium</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_uran</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_vanadium</LayerRef>
+                <LayerRef>ch.bafu.geochemischer-bodenatlas_schweiz_zink</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-apr</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-aug</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-dez</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-feb</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-jan</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-jul</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-jun</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-mai</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-mrz</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-nov</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-okt</LayerRef>
+                <LayerRef>ch.bafu.niederschlagserosivitaet-sep</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-gruendigkeit</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-kulturland</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-kulturtyp</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-naehrstoffspeichervermoegen</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-skelettgehalt</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-vernaessung</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-wasserdurchlaessigkeit</LayerRef>
+                <LayerRef>ch.blw.bodeneignung-wasserspeichervermoegen</LayerRef>
+                <LayerRef>ch.blw.erosion</LayerRef>
+                <LayerRef>ch.blw.erosion-fliesswegkarte</LayerRef>
+                <LayerRef>ch.blw.erosion-quantitativ</LayerRef>
+                <LayerRef>ch.blw.feldblockkarte</LayerRef>
+                <LayerRef>ch.blw.gewaesseranschlusskarte</LayerRef>
+                <LayerRef>ch.blw.gewaesseranschlusskarte-direkt</LayerRef>
+                <LayerRef>ch.blw.hang_steillagen</LayerRef>
+                <LayerRef>ch.blw.steil_terrassenlagen_rebbau</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Mineralische Bodenschätze</ows:Title>
+                <ows:Abstract>Mineralische Bodenschätze</ows:Abstract>
+                <ows:Identifier>280</ows:Identifier>
+                <LayerRef>ch.swisstopo.geologie-rohstoffe-ziegel_abbau</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Lebensräume und Biotope</ows:Title>
+                <ows:Abstract>Lebensräume und Biotope</ows:Abstract>
+                <ows:Identifier>261</ows:Identifier>
+                <LayerRef>ch.bafu.auen-vegetationskarten</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-amphibien</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-amphibien_wanderobjekte</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-auen</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-flachmoore</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-hochmoore</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-jagdbanngebiete</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-moorlandschaften</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-trockenwiesen_trockenweiden</LayerRef>
+                <LayerRef>ch.bafu.bundesinventare-vogelreservate</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-kantone</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-licht_verjuengungspotential</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-produktionsregionen</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-schutzwaldregionen</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-vegetationshoehenmodell</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-vegetationshoehenmodell_lidar</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-vegetationshoehenmodell_relief</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-vegetationshoehenmodell_relief_sentinel</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-vegetationshoehenmodell_sentinel</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-waldmischungsgrad</LayerRef>
+                <LayerRef>ch.bafu.landesforstinventar-wirtschaftsregionen</LayerRef>
+                <LayerRef>ch.bafu.ren-extensive_landwirtschaftsgebiete</LayerRef>
+                <LayerRef>ch.bafu.ren-feuchtgebiete</LayerRef>
+                <LayerRef>ch.bafu.ren-fliessgewaesser_seen</LayerRef>
+                <LayerRef>ch.bafu.ren-trockenstandorte</LayerRef>
+                <LayerRef>ch.bafu.ren-wald</LayerRef>
+                <LayerRef>ch.bafu.unesco-weltnaturerbe</LayerRef>
+                <LayerRef>ch.bafu.wald-standortsregionen</LayerRef>
+                <LayerRef>ch.bafu.wald-tannenareale</LayerRef>
+                <LayerRef>ch.bafu.wald-vegetationshoehenstufen_1975</LayerRef>
+                <LayerRef>ch.bafu.wald-vegetationshoehenstufen_2085_trocken</LayerRef>
+                <LayerRef>ch.bafu.wald-vegetationshoehenstufen_2085_weniger_trocken</LayerRef>
+                <LayerRef>ch.bafu.wald-wasserverfuegbarkeit_boden</LayerRef>
+                <LayerRef>ch.bafu.wald-wasserverfuegbarkeit_pflanzen</LayerRef>
+            </Theme>
+        </Theme>
+        <Theme>
+            <ows:Title>Raum und Bevölkerung</ows:Title>
+            <ows:Abstract>Raum und Bevölkerung</ows:Abstract>
+            <ows:Identifier>fa15cedf4a1634d288c710b8b1371888</ows:Identifier>
+            <Theme>
+                <ows:Title>Geregelte Gebiete und Berichterstattungseinheiten</ows:Title>
+                <ows:Abstract>Geregelte Gebiete und Berichterstattungseinheiten</ows:Abstract>
+                <ows:Identifier>95</ows:Identifier>
+                <LayerRef>ch.babs.kulturgueter</LayerRef>
+                <LayerRef>ch.bak.bundesinventar-schuetzenswerte-ortsbilder</LayerRef>
+                <LayerRef>ch.bak.bundesinventar-schuetzenswerte-ortsbilder_fotos</LayerRef>
+                <LayerRef>ch.blw.alpprodukte</LayerRef>
+                <LayerRef>ch.blw.bergprodukte</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-fleisch</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-kaese</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-konditoreiwaren</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-pflanzen</LayerRef>
+                <LayerRef>ch.blw.ursprungsbezeichnungen-spirituosen</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Verteilung der Bevölkerung - Demografie</ows:Title>
+                <ows:Abstract>Verteilung der Bevölkerung - Demografie</ows:Abstract>
+                <ows:Identifier>15156</ows:Identifier>
+                <LayerRef>ch.bak.halteplaetze-jenische_sinti_roma</LayerRef>
+            </Theme>
+            <Theme>
+                <ows:Title>Gesundheit und Sicherheit</ows:Title>
+                <ows:Abstract>Gesundheit und Sicherheit</ows:Abstract>
+                <ows:Identifier>81</ows:Identifier>
+                <LayerRef>ch.bafu.hydrologie-gewaesserzustandsmessstationen</LayerRef>
+                <LayerRef>ch.bafu.hydrologie-wassertemperaturmessstationen</LayerRef>
+                <LayerRef>ch.bafu.laerm-bahnlaerm_nacht</LayerRef>
+                <LayerRef>ch.bafu.laerm-bahnlaerm_tag</LayerRef>
+                <LayerRef>ch.bafu.laerm-strassenlaerm_nacht</LayerRef>
+                <LayerRef>ch.bafu.laerm-strassenlaerm_tag</LayerRef>
+                <LayerRef>ch.bafu.nabelstationen</LayerRef>
+                <LayerRef>ch.bafu.swissprtr</LayerRef>
+                <LayerRef>ch.bag.radonkarte</LayerRef>
+                <LayerRef>ch.bag.zecken-fsme-faelle</LayerRef>
+                <LayerRef>ch.bag.zecken-fsme-impfung</LayerRef>
+                <LayerRef>ch.bag.zeckenstichmodell</LayerRef>
+                <LayerRef>ch.ensi.zonenplan-notfallschutz-kernanlagen</LayerRef>
+            </Theme>
+        </Theme>
+    </Themes>
+    <ServiceMetadataURL xlink:href="https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml"/>
+</Capabilities>

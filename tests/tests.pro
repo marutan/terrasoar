@@ -44,6 +44,7 @@ SUBDIRS = \
     projection \
     network \
     wms \
+    wmts \
     regions \
     elevation \
     help

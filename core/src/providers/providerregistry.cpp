@@ -43,6 +43,8 @@
 #include "ts/tiling/tilekey.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
+#include "ts/wmts/wmtsimageryprovider.h"
+#include "ts/wmts/wmtssource.h"
 
 namespace ts
 {
@@ -166,6 +168,21 @@ ProviderRegistry::createWmsImagery(const QJsonObject& source,
   }
   return std::make_shared<WmsImageryProvider>(*wms, networkLocked(),
                                               *m_wmsSettings);
+}
+
+std::shared_ptr<ImageryProvider>
+ProviderRegistry::createWmtsImagery(const QJsonObject& source,
+                                    QString* errorString)
+{
+  const std::optional<WmtsSource> wmts =
+      WmtsSource::fromJson(source, errorString);
+  if (!wmts) {
+    return nullptr;
+  }
+  // The same network client and cache settings as WMS: one limit on
+  // concurrent requests, one cache directory.
+  return std::make_shared<WmtsImageryProvider>(*wmts, networkLocked(),
+                                               *m_wmsSettings);
 }
 
 std::shared_ptr<ImageryProvider>
@@ -588,8 +605,8 @@ std::vector<VerticalDatum> ProviderRegistry::verticalDatums() const
 QString ProviderRegistry::attribution(const QJsonObject& source) const
 {
   const QString kind = source.value(QStringLiteral("kind")).toString();
-  if (kind == QLatin1String("wms") || kind == QLatin1String("web") ||
-      kind == QLatin1String("file")) {
+  if (kind == QLatin1String("wms") || kind == QLatin1String("wmts") ||
+      kind == QLatin1String("web") || kind == QLatin1String("file")) {
     return source.value(QStringLiteral("attribution")).toString();
   }
   const std::lock_guard<std::mutex> lock(m_mutex);
@@ -639,6 +656,9 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("wms")) {
     provider = createWmsImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("wmts")) {
+    provider = createWmtsImagery(source, errorString);
   } else {
     provider = createImageryProvider(source, errorString);
   }

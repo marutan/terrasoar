@@ -70,6 +70,7 @@ Subsections so far:
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling on the globe and on the flat map, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 | `vector` | Vector styles, meshing feature tiles into triangles and outline segments on the ellipsoid, the worker-thread feature loader (`docs/design/vector-rendering.md`) |
 | `wms` | WMS capabilities (1.1.1, 1.3.0), GetMap requests with the axis-order rules, the WMS imagery provider with its disk cache and offline behaviour, the catalogue of open services and their bulk-download terms (`docs/design/wms.md`) |
+| `wmts` | WMTS capabilities (1.0.0, KVP and RESTful), tile matrix sets and fitting their tiles to the quadtree, GetTile and RESTful requests, the WMTS imagery provider sharing WMS's network, cache and offline behaviour (`docs/design/wmts.md`) |
 
 ### app (`terrasoar`)
 
