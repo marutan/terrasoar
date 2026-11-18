@@ -15,7 +15,7 @@ python3 tools/checks/check_format.py --fix # reformat in place
 | Include order | `check_include_order.py` | Includes out of group order, or groups not separated |
 | No `auto` | `check_no_auto.py` | The `auto` keyword anywhere |
 | Fixed-width integers | `check_int_types.py` | `short`, `int`, `long`, `long long` (signed or unsigned), or an `L`/`LL` literal |
-| Translatable strings | `check_translatable.py` | A literal passed to a user-visible API without `tr()` |
+| Translatable strings | `check_translatable.py` | A literal passed to a user-visible API without `tr()`; a `QCoreApplication::translate()` context that isn't a literal (lupdate can't read a variable) |
 | Licence audit | `check_notices.py` | A Qt module, linked library or data source missing from `THIRD_PARTY_NOTICES` |
 | User guide built in | `check_user_guide.py` | A `docs/user/` page or image missing from `app/userguide.qrc`, a broken link or heading anchor in the guide, or a page the contents don't list |
 | Translations up to date | `tools/i18n/update_translations.py --check` | `terrasoar_en.ts` out of step with the code |
@@ -283,7 +283,9 @@ code:
 
 - Every user-visible string is translatable: `tr()` in QObject classes,
   `QCoreApplication::translate("context", …)` elsewhere, and
-  `QT_TR_NOOP` / `QT_TRANSLATE_NOOP` for static tables.
+  `QT_TR_NOOP` / `QT_TRANSLATE_NOOP` for static tables. Write the context
+  as a literal each time, not through a variable: lupdate reads the source
+  text and can't follow one.
 - Use placeholders, never concatenation:
   `tr("%1 of %2 tiles").arg(done).arg(total)`. Use `%n` for plurals:
   `tr("%n layer(s)", nullptr, count)`.

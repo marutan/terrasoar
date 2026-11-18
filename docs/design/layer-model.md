@@ -128,6 +128,14 @@ A project (`*.terrasoar`) is an indented JSON document:
   ([wms.md](wms.md)); its `origin` is `"catalogue"`. Everything needed to
   draw it is there: opening a project asks the server for nothing but
   tiles.
+- A WMTS layer's `definition.source` is `{"kind": "wmts", "url": … or
+  "template": …, "layer": …, "style": …, "format": …, "tileMatrixSet": …,
+  "crs": …, "matrices": [{"id", "pixelSize", "x", "y", "tileWidth",
+  "tileHeight", "matrixWidth", "matrixHeight", "minRow", "maxRow",
+  "minColumn", "maxColumn"}, …], "dimensions": [[id, value], …],
+  "tileSize": …, "maximumLevel": …, "bounds": […], "title": …,
+  "attribution": …}` ([wmts.md](wmts.md)). The tile matrices are kept in
+  the project, so it too asks the server for nothing but tiles.
 - `view.mode` is `"globe"` or `"map"`; `view.projection` is the flat
   map's projection by its identifier ([projections.md](projections.md)),
   kept also while the globe is shown. A projection this build doesn't

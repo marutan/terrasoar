@@ -27,6 +27,10 @@ as setText(), setWindowTitle(), addAction() or QMessageBox::warning() is
 reported. Mark a deliberate exception with `// ts-notr: <reason>` on the
 same line.
 
+The context given to QCoreApplication::translate() or QT_TRANSLATE_NOOP()
+must be a string literal too: lupdate can't follow a variable, and the
+strings would silently never be offered for translation.
+
 Only app/ and core/ are checked: tests and tools may print plain text.
 
 Usage: check_translatable.py [files...]
@@ -61,6 +65,10 @@ WRAPPERS = re.compile(
 LITERAL = re.compile(r'(?:QStringLiteral|QLatin1String|QLatin1StringView|'
                      r'QString::fromUtf8|QString::fromLatin1|u8|u|L)?\s*\(?\s*'
                      r'"((?:\\.|[^"\\])*)"')
+# Calls whose first argument is a translation context.
+CONTEXT_CALL = re.compile(
+    r"(?:\bQCoreApplication::translate|\bQT_TRANSLATE_NOOP3?|"
+    r"\bQT_TRANSLATE_N_NOOP3?)\s*\(")
 # Option names, object names and other identifiers are not user text.
 IDENTIFIER_ARGS = {"QCommandLineOption": 0}
 
@@ -127,6 +135,16 @@ def check_file(path):
                     f'{path}:{line}: "{literal.group(1)}" passed to '
                     f"{match.group(1)}() is not wrapped in tr() or "
                     "QCoreApplication::translate()")
+    for match in CONTEXT_CALL.finditer(code):
+        open_paren = match.end() - 1
+        close = matching_paren(code, open_paren)
+        context = split_top_level(code[open_paren + 1:close])[0].strip()
+        if not context.startswith('"'):
+            line = code.count("\n", 0, open_paren) + 1
+            errors.append(
+                f"{path}:{line}: the context of "
+                f"{match.group(0).rstrip('( ')}() must be a string literal "
+                "(lupdate can't read a variable)")
     return errors
 
 

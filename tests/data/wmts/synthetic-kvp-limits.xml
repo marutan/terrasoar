@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic, for tests/wmts: valid but unusual WMTS 1.0.0. -->
+<Capabilities xmlns="http://www.opengis.net/wmts/1.0"
+              xmlns:ows="http://www.opengis.net/ows/1.1"
+              xmlns:xlink="http://www.w3.org/1999/xlink" version="1.0.0">
+  <ows:ServiceIdentification>
+    <ows:Title>Synthetic KVP service</ows:Title>
+    <ows:Abstract>Limits, dimensions and axis-order mistakes.</ows:Abstract>
+    <ows:ServiceType>OGC WMTS</ows:ServiceType>
+    <ows:ServiceTypeVersion>1.0.0</ows:ServiceTypeVersion>
+    <ows:Fees>none</ows:Fees>
+    <ows:AccessConstraints>Attribution required.</ows:AccessConstraints>
+    <ows:AccessConstraints>No bulk downloads.</ows:AccessConstraints>
+  </ows:ServiceIdentification>
+  <ows:ServiceProvider>
+    <ows:ProviderName>Example Mapping Agency</ows:ProviderName>
+    <ows:ProviderSite xlink:href="https://maps.example.org/"/>
+    <ows:ServiceContact><ows:IndividualName>Removed</ows:IndividualName></ows:ServiceContact>
+  </ows:ServiceProvider>
+  <ows:OperationsMetadata>
+    <ows:Operation name="GetCapabilities">
+      <ows:DCP><ows:HTTP><ows:Get xlink:href="https://maps.example.org/wmts?map=base&amp;"/></ows:HTTP></ows:DCP>
+    </ows:Operation>
+    <ows:Operation name="GetTile">
+      <ows:DCP><ows:HTTP>
+        <ows:Get xlink:href="https://maps.example.org/rest/">
+          <ows:Constraint name="GetEncoding"><ows:AllowedValues><ows:Value>RESTful</ows:Value></ows:AllowedValues></ows:Constraint>
+        </ows:Get>
+        <ows:Get xlink:href="https://maps.example.org/wmts?map=base&amp;">
+          <ows:Constraint name="GetEncoding"><ows:AllowedValues><ows:Value>KVP</ows:Value></ows:AllowedValues></ows:Constraint>
+        </ows:Get>
+      </ows:HTTP></ows:DCP>
+    </ows:Operation>
+  </ows:OperationsMetadata>
+  <Contents>
+    <!-- KVP only (no ResourceURL); limits list matrices 1 and 2 only. -->
+    <Layer>
+      <ows:Title>Limited</ows:Title>
+      <ows:Abstract>Only part of the world, from matrix 1.</ows:Abstract>
+      <ows:WGS84BoundingBox crs="urn:ogc:def:crs:OGC:2:84">
+        <ows:LowerCorner>-10 40</ows:LowerCorner>
+        <ows:UpperCorner>20 60</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <ows:Identifier>limited</ows:Identifier>
+      <Style><ows:Title>Plain</ows:Title><ows:Identifier>plain</ows:Identifier></Style>
+      <Style isDefault="true">
+        <ows:Title>Night</ows:Title><ows:Identifier>night</ows:Identifier>
+        <LegendURL format="image/png" xlink:href="https://maps.example.org/legend/night.png"/>
+      </Style>
+      <Format>image/jpeg</Format>
+      <Format>image/png</Format>
+      <Dimension>
+        <ows:Identifier>elevation</ows:Identifier>
+        <ows:Title>Height</ows:Title>
+        <ows:UOM>m</ows:UOM>
+        <Default>0</Default>
+        <Value>0</Value>
+        <Value>500</Value>
+        <Value>1000</Value>
+      </Dimension>
+      <TileMatrixSetLink>
+        <TileMatrixSet>LonFirst4326</TileMatrixSet>
+        <TileMatrixSetLimits>
+          <TileMatrixLimits>
+            <TileMatrix>1</TileMatrix>
+            <MinTileRow>0</MinTileRow><MaxTileRow>0</MaxTileRow>
+            <MinTileCol>1</MinTileCol><MaxTileCol>2</MaxTileCol>
+          </TileMatrixLimits>
+          <TileMatrixLimits>
+            <TileMatrix>2</TileMatrix>
+            <MinTileRow>0</MinTileRow><MaxTileRow>1</MaxTileRow>
+            <MinTileCol>3</MinTileCol><MaxTileCol>4</MaxTileCol>
+          </TileMatrixLimits>
+          <!-- Broken: ignored. -->
+          <TileMatrixLimits>
+            <TileMatrix>0</TileMatrix>
+            <MinTileRow>1</MinTileRow><MaxTileRow>0</MaxTileRow>
+            <MinTileCol>0</MinTileCol><MaxTileCol>0</MaxTileCol>
+          </TileMatrixLimits>
+        </TileMatrixSetLimits>
+      </TileMatrixSetLink>
+      <ResourceURL format="application/json" resourceType="FeatureInfo"
+                   template="https://maps.example.org/info/{TileMatrix}/{TileRow}/{TileCol}/{J}/{I}.json"/>
+    </Layer>
+    <!-- Only a national grid: not drawn yet. -->
+    <Layer>
+      <ows:Title>Grid only</ows:Title>
+      <ows:Identifier>gridonly</ows:Identifier>
+      <Style isDefault="true"><ows:Identifier>default</ows:Identifier></Style>
+      <Format>image/png</Format>
+      <TileMatrixSetLink><TileMatrixSet>BritishNationalGrid</TileMatrixSet></TileMatrixSetLink>
+    </Layer>
+    <!-- A link to a set that doesn't exist, then a usable one; no styles. -->
+    <Layer>
+      <ows:Title>Odd links</ows:Title>
+      <ows:Identifier>oddlinks</ows:Identifier>
+      <Format>image/png8</Format>
+      <TileMatrixSetLink><TileMatrixSet>Missing</TileMatrixSet></TileMatrixSetLink>
+      <TileMatrixSetLink><TileMatrixSet>Mercator900913</TileMatrixSet></TileMatrixSetLink>
+    </Layer>
+    <!-- No identifier: dropped. -->
+    <Layer><ows:Title>Anonymous</ows:Title><Format>image/png</Format></Layer>
+    <!-- EPSG:4326 but the corner written longitude first; matrices out
+         of order, and one broken (TileWidth 0, dropped). -->
+    <TileMatrixSet>
+      <ows:Identifier>LonFirst4326</ows:Identifier>
+      <ows:SupportedCRS>http://www.opengis.net/def/crs/EPSG/0/4326</ows:SupportedCRS>
+      <TileMatrix>
+        <ows:Identifier>2</ows:Identifier>
+        <ScaleDenominator>69885283.003589725</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>8</MatrixWidth><MatrixHeight>4</MatrixHeight>
+      </TileMatrix>
+      <TileMatrix>
+        <ows:Identifier>0</ows:Identifier>
+        <ScaleDenominator>279541132.01435894</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>2</MatrixWidth><MatrixHeight>1</MatrixHeight>
+      </TileMatrix>
+      <TileMatrix>
+        <ows:Identifier>1</ows:Identifier>
+        <ScaleDenominator>139770566.00717947</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>4</MatrixWidth><MatrixHeight>2</MatrixHeight>
+      </TileMatrix>
+      <TileMatrix>
+        <ows:Identifier>broken</ows:Identifier>
+        <ScaleDenominator>1</ScaleDenominator>
+        <TopLeftCorner>-180 90</TopLeftCorner>
+        <TileWidth>0</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight>
+      </TileMatrix>
+    </TileMatrixSet>
+    <TileMatrixSet>
+      <ows:Identifier>BritishNationalGrid</ows:Identifier>
+      <ows:SupportedCRS>urn:ogc:def:crs:EPSG::27700</ows:SupportedCRS>
+      <TileMatrix>
+        <ows:Identifier>0</ows:Identifier>
+        <ScaleDenominator>3276800</ScaleDenominator>
+        <TopLeftCorner>-238375.0 1376256.0</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>5</MatrixWidth><MatrixHeight>7</MatrixHeight>
+      </TileMatrix>
+    </TileMatrixSet>
+    <!-- Web Mercator under an old code, with a well-known scale set. -->
+    <TileMatrixSet>
+      <ows:Identifier>Mercator900913</ows:Identifier>
+      <ows:SupportedCRS>EPSG:900913</ows:SupportedCRS>
+      <WellKnownScaleSet>urn:ogc:def:wkss:OGC:1.0:GoogleMapsCompatible</WellKnownScaleSet>
+      <TileMatrix>
+        <ows:Identifier>z0</ows:Identifier>
+        <ScaleDenominator>559082264.0287178</ScaleDenominator>
+        <TopLeftCorner>-20037508.3427892 20037508.3427892</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>1</MatrixWidth><MatrixHeight>1</MatrixHeight>
+      </TileMatrix>
+      <TileMatrix>
+        <ows:Identifier>z1</ows:Identifier>
+        <ScaleDenominator>279541132.0143589</ScaleDenominator>
+        <TopLeftCorner>-20037508.3427892 20037508.3427892</TopLeftCorner>
+        <TileWidth>256</TileWidth><TileHeight>256</TileHeight>
+        <MatrixWidth>2</MatrixWidth><MatrixHeight>2</MatrixHeight>
+      </TileMatrix>
+    </TileMatrixSet>
+  </Contents>
+</Capabilities>
