@@ -237,6 +237,20 @@ public:
   IdleWitness(IdleWitness&&) = delete;
   IdleWitness& operator=(IdleWitness&&) = delete;
 
+  /**
+   * Returns how often the main window was activated or deactivated. The
+   * window system does that (another window taking the focus); each time
+   * Qt repaints the whole window, the globe view included.
+   */
+  int32_t activationChanges() const
+  {
+    return static_cast<int32_t>(std::count_if(
+        m_entries.begin(), m_entries.end(), [](const Entry& entry) {
+          return entry.kind == Entry::Event &&
+                 entry.event == QEvent::ActivationChange && !entry.onGlobe;
+        }));
+  }
+
   /** Returns the record, one line per entry, ending with the state now. */
   QString report()
   {
@@ -1634,14 +1648,17 @@ private slots:
     QVERIFY(QTest::qWaitFor(
         [&]() { return !globeOf(window)->isLoadingTiles(); }, 20000));
     QVERIFY2(waitUntilQuiet(globeOf(window)), "the view kept drawing");
-    // As in idleViewStopsDrawing: a late repaint or two from the window
-    // system is not drawing continuously.
+    // As in idleViewStopsDrawing: repaints the window system asks for are
+    // not the view drawing by itself.
     const int32_t frames = globeOf(window)->framesRendered();
     IdleWitness witness(window, *globeOf(window));
     QTest::qWait(1000);
-    QVERIFY2(globeOf(window)->framesRendered() <= frames + 2,
-             qPrintable(QStringLiteral("%1 frames drawn while idle:\n%2")
+    const int32_t allowed = 2 + witness.activationChanges();
+    QVERIFY2(globeOf(window)->framesRendered() <= frames + allowed,
+             qPrintable(QStringLiteral("%1 frames drawn while idle (%2 "
+                                       "allowed):\n%3")
                             .arg(globeOf(window)->framesRendered() - frames)
+                            .arg(allowed)
                             .arg(witness.report())));
     // Removing the layer forgets its status.
     model->removeNode(offline);
@@ -2081,15 +2098,20 @@ private slots:
         },
         20000));
     QVERIFY2(waitUntilQuiet(globe), "the view kept drawing");
-    // Drawing continuously would be dozens of frames a second; a late
-    // repaint or two (the window system exposing it again, a status bar
-    // change resizing it, both seen on slow Windows runners) is not that.
+    // Drawing continuously would be dozens of frames a second. Repaints the
+    // window system asks for are not that: a late one or two (exposing the
+    // window again, a status bar change resizing it), and one each time
+    // the window is activated or deactivated (on Windows runners focus has
+    // been seen to go back and forth every 50-250 ms, a frame each time).
     const int32_t frames = globe->framesRendered();
     IdleWitness witness(window, *globe);
     QTest::qWait(1000);
-    QVERIFY2(globe->framesRendered() <= frames + 2,
-             qPrintable(QStringLiteral("%1 frames drawn while idle:\n%2")
+    const int32_t allowed = 2 + witness.activationChanges();
+    QVERIFY2(globe->framesRendered() <= frames + allowed,
+             qPrintable(QStringLiteral("%1 frames drawn while idle (%2 "
+                                       "allowed):\n%3")
                             .arg(globe->framesRendered() - frames)
+                            .arg(allowed)
                             .arg(witness.report())));
   }
 };
