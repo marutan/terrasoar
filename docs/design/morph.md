@@ -171,9 +171,26 @@ mostly triangles (see Measurements).
   latitudes. Its screen-space error is the size of a texel along a
   meridian of the map, which depends on the latitude and the zoom, not on
   the distance from the centre.
-- **0 < t < 1.** A tile is drawn if *either* view would show it, without
-  the globe's horizon test (the far side unrolls into view), at the
-  larger of the two errors.
+- **0 < t < 1.** A tile is judged where it is drawn at that moment.
+  Every vertex is at mix(globe position, map position, t), so the tile
+  lies inside the sphere centred at the mix of its two centres (on the
+  globe and on the map, in each copy of the world it is drawn in) whose
+  radius is the mix of its two radii. The tile is drawn if that sphere
+  meets the frustum, without the globe's horizon test (the far side
+  unrolls into view). Its error is a texel there: the mix of its sizes on
+  the globe and on the map, seen from the nearest point of the sphere
+  (straight-line distance turning into depth along the view as the map
+  takes over, which is exact for the map seen straight down). Both ends
+  of the change agree with t = 0 and t = 1.
+
+  An earlier version kept a tile if *either* view would show it, at the
+  larger of the two errors. Zoomed in, that asked for every tile in the
+  globe's frustum, the far side included, at the map's detail: about
+  3 000 tiles for a view the size of the United Kingdom, against 30 at
+  either end. That is far more than the GPU keeps (`gpuBytes`), so tiles
+  were thrown away and fetched again from frame to frame and the detail
+  flickered while the view changed. `tests/tiling`
+  (`morphSelectionStaysSmallZoomedIn`) keeps the count down.
 
 Vector sources use the same selector.
 

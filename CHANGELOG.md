@@ -17,6 +17,12 @@ All notable changes to Terra Soar. The format follows
   Regions, New Offline Region, Data Packs and Elevation Profile windows
   opens the guide at their section, and the About window links to it.
 
+### Fixed
+
+- Changing between the globe and the map while zoomed in no longer makes
+  the detail of the map flicker during the change: the tiles picked on
+  the way are the ones actually in view, not thousands more.
+
 ## [0.0.1] – 2026-11-14
 
 The first public build: everything below is new.

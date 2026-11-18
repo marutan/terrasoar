@@ -110,9 +110,11 @@ struct TileSelection {
  * copy of the world, is outside the view or it lies beyond the
  * projection's latitude limits, and its screen-space error is the size of
  * a texel on the map, which grows with the projection's stretching. While
- * the view changes between the two, a tile is kept if either view would
- * show it (ignoring the horizon, since the far side unrolls into view),
- * with the larger of the two errors. See docs/design/morph.md.
+ * the view changes between the two, a tile is judged where it is drawn at
+ * that moment, part of the way between globe and map: it is kept if a
+ * sphere bounding it there meets the frustum (ignoring the horizon, since
+ * the far side unrolls into view), and its error is that of a texel there.
+ * See docs/design/morph.md.
  *
  * @reentrant
  */
@@ -163,6 +165,7 @@ public:
 
 private:
   struct View;
+  double screenSpaceErrorPx(const View& view, TileKey key) const;
   bool wantsRefinement(const View& view, TileKey key) const;
   bool refine(const View& view, TileKey key, bool renderable,
               const std::function<bool(const TileKey&)>& isRenderable,

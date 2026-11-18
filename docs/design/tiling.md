@@ -106,9 +106,11 @@ within the limit, and fixed cameras select fixed tile sets.
   rows, is more than half a pixel from the projection's curve
   (`mapGeometryErrorPx()`), whatever the deepest level of the data.
 
-While the view changes between the two (0 < morph < 1) a tile is drawn
-if either view would show it, without the horizon test, at the larger
-error, and never coarser than level 2. The same tests run for maps in all
+While the view changes between the two (0 < morph < 1) a tile is judged
+where it is drawn at that moment, part of the way between globe and map:
+it is drawn if a sphere bounding it there meets the frustum, without the
+horizon test, its error is that of a texel there, and it is never coarser
+than level 2 (see [morph.md](morph.md)). The same tests run for maps in all
 three projections, across the wrap and at the edges of the map.
 
 ## Geometry and imagery
