@@ -151,6 +151,11 @@ struct WmtsSource {
   QUrl url;
   /** RESTful template ({TileMatrix}, {TileRow}, …); empty for KVP. */
   QString urlTemplate;
+  /**
+   * The service's address as the user gave it (its capabilities), for the
+   * catalogue's terms of use; not part of the id.
+   */
+  QUrl service;
   /** The layer's identifier. */
   QString layer;
   /** The style's identifier. */

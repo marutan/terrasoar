@@ -26,7 +26,7 @@
 
 #include <QCoreApplication>
 
-#include "ts/wms/wmsimageryprovider.h"
+#include "ts/network/regiontilesource.h"
 
 namespace ts
 {
@@ -39,7 +39,7 @@ constexpr int32_t unreachableAttempts = 2;
 
 } // namespace
 
-RegionDownload::RegionDownload(std::shared_ptr<WmsImageryProvider> provider,
+RegionDownload::RegionDownload(std::shared_ptr<RegionTileSource> provider,
                                int64_t region, const RegionGeometry& geometry,
                                int32_t minimumLevel, int32_t maximumLevel,
                                RegionDownloadSettings settings)
@@ -66,7 +66,7 @@ bool RegionDownload::start(const std::vector<WmsCatalogueEntry>& catalogue,
   if (m_progress.state != RegionDownloadProgress::State::Ready) {
     return m_progress.state != RegionDownloadProgress::State::Refused;
   }
-  const QUrl url = m_provider->source().url;
+  const QUrl url = m_provider->serviceUrl();
   if (bulkDownloadPolicy(url, catalogue) == BulkDownloadPolicy::Forbidden) {
     const WmsCatalogueEntry* entry = findWmsCatalogueEntry(url, catalogue);
     m_progress.state = RegionDownloadProgress::State::Refused;
@@ -235,23 +235,9 @@ void RegionDownload::work()
   m_changed.notify_all();
 }
 
-int64_t typicalTileBytes(const WmsImageryProvider& provider)
-{
-  // Rough sizes of 256-pixel map tiles: JPEG photographs about 20 KB,
-  // PNG maps about 25 KB; scaled by area for other tile sizes.
-  const WmsSource& source = provider.source();
-  const double perPixel =
-      source.format.contains(QLatin1String("jpeg"), Qt::CaseInsensitive)
-          ? 20000.0 / 65536.0
-          : 25000.0 / 65536.0;
-  const double pixels =
-      static_cast<double>(source.tileSizePx) * source.tileSizePx;
-  return static_cast<int64_t>(perPixel * pixels);
-}
-
 // NOLINTBEGIN(bugprone-easily-swappable-parameters): as in the header.
 RegionEstimate
-estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
+estimateRegionSize(RegionTileSource& provider, const RegionGeometry& geometry,
                    int32_t minimumLevel, int32_t maximumLevel, int32_t samples,
                    const std::atomic<bool>& cancelled, std::uint64_t seed)
 // NOLINTEND(bugprone-easily-swappable-parameters)
@@ -304,7 +290,7 @@ estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
   estimate.sampledTiles = sampled;
   const double perTile = sampled > 0
                              ? static_cast<double>(sampledBytes) / sampled
-                             : static_cast<double>(typicalTileBytes(provider));
+                             : static_cast<double>(provider.typicalTileBytes());
   estimate.bytes =
       static_cast<int64_t>(perTile * static_cast<double>(estimate.tiles));
   return estimate;

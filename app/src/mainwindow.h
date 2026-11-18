@@ -125,6 +125,12 @@ public:
   void addWmsLayer(const QString& address = QString());
 
   /**
+   * Opens the Add WMTS Layer dialog and adds what the user chooses. With
+   * @p address, connects to it at once (tests).
+   */
+  void addWmtsLayer(const QString& address = QString());
+
+  /**
    * Asks for a DEM file and what its heights are measured from, and adds
    * it as an elevation layer.
    */
@@ -293,6 +299,7 @@ private:
   LayerTreeModel* m_layers = nullptr;
   std::unique_ptr<ProviderRegistry> m_registry;
   QAction* m_addWmsAction = nullptr;
+  QAction* m_addWmtsAction = nullptr;
   QAction* m_offlineRegionsAction = nullptr;
   /** Destroyed before the registry. */
   std::unique_ptr<OfflineRegionManager> m_offlineRegions;

@@ -2,13 +2,15 @@
 
 Terra Soar works without a network. The built-in layers (Blue Marble, the
 shoreline, the graticule) are always on your computer. Layers from web map
-servers (WMS) need the server, but you can download an area of one in
-advance as an **offline region** and view it later on a plane, at sea or
+servers (WMS and WMTS) need the server, but you can download an area of
+one in advance as an **offline region** and view it later on a plane, at sea or
 in the field.
 
 ## Downloading a region
 
-1. Add the WMS layer you want to keep (see [Adding WMS layers](adding-wms-layers.md)).
+1. Add the WMS or WMTS layer you want to keep (see
+   [Adding WMS layers](adding-wms-layers.md) and
+   [Adding WMTS layers](adding-wmts-layers.md)).
 2. Choose **File → Offline Regions…** and press **New Region…**.
 3. Give the region a **name** and pick the **layer**.
 4. Choose the **area**:
@@ -133,5 +135,5 @@ and `%LOCALAPPDATA%\Terra Soar\terrasoar\packs` on Windows.
 
 ## Limits
 
-- Only WMS layers can be kept this way. The built-in layers need no
+- Only WMS and WMTS layers can be kept this way. The built-in layers need no
   download; for more detail in them, install a data pack (below).

@@ -177,6 +177,10 @@ void LayerTreeDock::rebuildAddLayerMenu()
   QAction* wms = m_addLayerMenu->addAction(tr("WMS Layer…"));
   wms->setObjectName(QStringLiteral("addWmsLayerAction"));
   connect(wms, &QAction::triggered, this, &LayerTreeDock::addWmsLayerRequested);
+  QAction* wmts = m_addLayerMenu->addAction(tr("WMTS Layer…"));
+  wmts->setObjectName(QStringLiteral("addWmtsLayerAction"));
+  connect(wmts, &QAction::triggered, this,
+          &LayerTreeDock::addWmtsLayerRequested);
   QAction* elevation = m_addLayerMenu->addAction(tr("Elevation File…"));
   elevation->setObjectName(QStringLiteral("addElevationFileAction"));
   connect(elevation, &QAction::triggered, this,

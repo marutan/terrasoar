@@ -20,7 +20,7 @@
 
 /**
  * @file
- * Where the application keeps its copy of the WMS catalogue.
+ * Where the application keeps its copies of the WMS and WMTS catalogues.
  */
 #ifndef TS_APP_WMSCATALOGUEFILE_H
 #define TS_APP_WMSCATALOGUEFILE_H
@@ -52,6 +52,30 @@ std::vector<WmsCatalogueEntry> readWmsCatalogueFile(const QString& path);
  * the terms of offline regions (bulkDownloadPolicy()).
  */
 std::vector<WmsCatalogueEntry> currentWmsCatalogue();
+
+/**
+ * Returns the path of the copy of the WMTS catalogue last fetched (in the
+ * cache directory).
+ */
+QString wmtsCatalogueCachePath();
+
+/**
+ * Returns the WMTS catalogue in the file at @p path, or an empty list if
+ * it can't be read.
+ */
+std::vector<WmsCatalogueEntry> readWmtsCatalogueFile(const QString& path);
+
+/**
+ * Returns the newest WMTS catalogue at hand: the copy last fetched, else
+ * the one built into the program.
+ */
+std::vector<WmsCatalogueEntry> currentWmtsCatalogue();
+
+/**
+ * Returns both catalogues, WMS then WMTS: for the terms of offline
+ * regions, which may be of either kind (their addresses tell them apart).
+ */
+std::vector<WmsCatalogueEntry> currentServiceCatalogues();
 
 } // namespace ts
 

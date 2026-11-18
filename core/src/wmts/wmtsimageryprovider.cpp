@@ -19,6 +19,7 @@
  */
 #include "ts/wmts/wmtsimageryprovider.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 
@@ -241,6 +242,90 @@ WmtsImageryProvider::loadTileImage(TileKey key,
   result.outcome = ImageLoadResult::Outcome::Image;
   result.image = std::move(image);
   return result;
+}
+
+QUrl WmtsImageryProvider::serviceUrl() const
+{
+  if (!m_source.service.isEmpty()) {
+    return m_source.service;
+  }
+  if (!m_source.url.isEmpty()) {
+    return m_source.url;
+  }
+  QUrl host(m_source.urlTemplate);
+  host.setPath(QString());
+  host.setQuery(QString());
+  return host;
+}
+
+int64_t WmtsImageryProvider::typicalTileBytes() const
+{
+  const WmtsMatrix& finest = m_source.matrices.back();
+  return typicalImageBytes(m_source.format,
+                           std::max(finest.tileWidth, finest.tileHeight));
+}
+
+RegionTileResult
+WmtsImageryProvider::fetchForRegion(TileKey key, int64_t region,
+                                    const std::atomic<bool>& cancelled)
+{
+  using Outcome = RegionTileResult::Outcome;
+  const int32_t matrix = wmtsMatrixFor(m_source, key);
+  const std::optional<WmtsTileWindow> window =
+      wmtsTileWindow(m_source, key, matrix);
+  RegionTileResult total;
+  total.outcome = Outcome::NoData;
+  if (!window) {
+    return total;
+  }
+  bool anyDownloaded = false;
+  bool anyRevalidated = false;
+  bool anyStored = false;
+  for (int32_t r = 0; r < window->rows; ++r) {
+    for (int32_t c = 0; c < window->columns; ++c) {
+      const WmtsTileIndex tile{matrix, window->firstColumn + c,
+                               window->firstRow + r};
+      if (!wmtsTileExists(m_source, tile)) {
+        continue;
+      }
+      const RegionTileResult result = m_fetcher->fetchForRegion(
+          TileKey{matrix, static_cast<int32_t>(tile.column),
+                  static_cast<int32_t>(tile.row)},
+          getTileUrl(m_source, tile), region,
+          [](const QByteArray& data) {
+            QImage image;
+            return image.loadFromData(data);
+          },
+          cancelled);
+      switch (result.outcome) {
+      case Outcome::Cancelled:
+      case Outcome::Failed:
+        return result;
+      case Outcome::NoData:
+        break;
+      case Outcome::Downloaded:
+        anyDownloaded = true;
+        break;
+      case Outcome::Revalidated:
+        anyRevalidated = true;
+        break;
+      case Outcome::AlreadyCached:
+        break;
+      }
+      if (result.outcome != Outcome::NoData) {
+        anyStored = true;
+        total.bytes += result.bytes;
+      }
+    }
+  }
+  if (anyDownloaded) {
+    total.outcome = Outcome::Downloaded;
+  } else if (anyRevalidated) {
+    total.outcome = Outcome::Revalidated;
+  } else if (anyStored) {
+    total.outcome = Outcome::AlreadyCached;
+  }
+  return total;
 }
 
 std::optional<GeoRect> WmtsImageryProvider::dataBounds() const

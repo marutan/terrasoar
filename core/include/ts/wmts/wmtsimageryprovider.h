@@ -33,6 +33,7 @@
 #include <QString>
 
 #include "ts/network/cachedtilefetcher.h"
+#include "ts/network/regiontilesource.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/wmts/wmtssource.h"
 
@@ -66,7 +67,7 @@ class TileDiskCache;
  *
  * @threadsafe
  */
-class WmtsImageryProvider : public ImageryProvider
+class WmtsImageryProvider : public ImageryProvider, public RegionTileSource
 {
 public:
   /** Requests @p source's tiles through @p network. */
@@ -103,13 +104,37 @@ public:
   const WmtsSource& source() const { return m_source; }
 
   /**
+   * Returns the service's address (WmtsSource::service), else the KVP
+   * address, else the template's host.
+   */
+  QUrl serviceUrl() const override;
+
+  /**
    * Returns where the source has tiles (its bounds, and for Web Mercator
    * the latitudes the projection reaches), or nothing for everywhere.
    */
-  std::optional<GeoRect> dataBounds() const;
+  std::optional<GeoRect> dataBounds() const override;
+
+  /**
+   * Returns typicalImageBytes() for the format and the size of a WMTS
+   * tile of the finest matrix.
+   */
+  int64_t typicalTileBytes() const override;
+
+  /**
+   * Makes sure the WMTS tiles that quadtree tile @p key is made from are
+   * in the disk cache and fresh, and pins them for @p region (see
+   * CachedTileFetcher::fetchForRegion()). The result adds up theirs: no
+   * data if none of them exist or all are missing, failed or cancelled
+   * if any was, else downloaded, revalidated or already stored, with
+   * their bytes. A WMTS tile shared by neighbouring quadtree tiles is
+   * fetched once and counted again (already stored) for each.
+   */
+  RegionTileResult fetchForRegion(TileKey key, int64_t region,
+                                  const std::atomic<bool>& cancelled) override;
 
   /** Returns the disk cache, or null without one. */
-  TileDiskCache* diskCache() const { return m_fetcher->diskCache(); }
+  TileDiskCache* diskCache() const override { return m_fetcher->diskCache(); }
 
   /** Returns what it has done so far (counted per WMTS tile). */
   WebTileStatistics statistics() const;

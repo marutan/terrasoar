@@ -44,7 +44,7 @@
 namespace ts
 {
 
-class WmsImageryProvider;
+class RegionTileSource;
 
 /** Behaviour of a RegionDownload. */
 struct RegionDownloadSettings {
@@ -108,8 +108,9 @@ struct RegionDownloadProgress {
 };
 
 /**
- * Downloads the tiles of an offline region into a WMS source's disk
- * cache and pins them there (WmsImageryProvider::fetchForRegion()).
+ * Downloads the tiles of an offline region into a web source's disk
+ * cache and pins them there (RegionTileSource::fetchForRegion(): WMS or
+ * WMTS).
  *
  * Tiles go level by level from the coarsest (RegionTileIterator) on a few
  * threads of its own, through the provider's network client. Tiles
@@ -137,7 +138,7 @@ public:
    * @p minimumLevel to @p maximumLevel of @p provider's source for the
    * region @p region (an id, not 0). Counts the tiles at once.
    */
-  RegionDownload(std::shared_ptr<WmsImageryProvider> provider, int64_t region,
+  RegionDownload(std::shared_ptr<RegionTileSource> provider, int64_t region,
                  const RegionGeometry& geometry, int32_t minimumLevel,
                  int32_t maximumLevel, RegionDownloadSettings settings = {});
 
@@ -173,7 +174,7 @@ public:
   int64_t region() const { return m_region; }
 
   /** Returns the provider. */
-  const std::shared_ptr<WmsImageryProvider>& provider() const
+  const std::shared_ptr<RegionTileSource>& provider() const
   {
     return m_provider;
   }
@@ -189,7 +190,7 @@ private:
   bool takeTile(std::unique_lock<std::mutex>& lock, TileKey& key,
                 int32_t& attempts);
 
-  const std::shared_ptr<WmsImageryProvider> m_provider;
+  const std::shared_ptr<RegionTileSource> m_provider;
   const int64_t m_region;
   const RegionDownloadSettings m_settings;
   RegionTileIterator m_tiles;
@@ -216,20 +217,13 @@ struct RegionEstimate {
 };
 
 /**
- * Returns a guess of the size of one tile of @p provider's source, from
- * its image format and tile size alone (before any samples).
- *
- * @reentrant
- */
-int64_t typicalTileBytes(const WmsImageryProvider& provider);
-
-/**
  * Estimates the size of a region: counts its tiles exactly, then fetches
  * up to @p samples of them at random (sampleRegionTiles(), seeded with
  * @p seed) on a few threads, and multiplies their mean size by the count.
  * The samples stay in the disk cache (not pinned), so they aren't fetched
  * again by the download. Without any sample (no network, or cancelled
- * through @p cancelled) the size is typicalTileBytes() per tile. Blocks;
+ * through @p cancelled) the size is RegionTileSource::typicalTileBytes()
+ * per tile. Blocks;
  * call it off the GUI thread.
  *
  * @threadsafe
@@ -237,7 +231,7 @@ int64_t typicalTileBytes(const WmsImageryProvider& provider);
 // The levels come in the same order as everywhere (countRegionTiles()).
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 RegionEstimate
-estimateRegionSize(WmsImageryProvider& provider, const RegionGeometry& geometry,
+estimateRegionSize(RegionTileSource& provider, const RegionGeometry& geometry,
                    int32_t minimumLevel, int32_t maximumLevel, int32_t samples,
                    const std::atomic<bool>& cancelled, std::uint64_t seed = 1);
 // NOLINTEND(bugprone-easily-swappable-parameters)

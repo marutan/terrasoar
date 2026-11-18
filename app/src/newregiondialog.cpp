@@ -45,9 +45,10 @@
 #include "helpwindow.h"
 #include "offlineregionmanager.h"
 #include "ts/geo/geoformat.h"
+#include "ts/network/regiontilesource.h"
+#include "ts/providers/tileprovider.h"
 #include "ts/regions/countryareas.h"
 #include "ts/wms/wmscatalogue.h"
-#include "ts/wms/wmsimageryprovider.h"
 
 namespace ts
 {
@@ -346,12 +347,15 @@ void NewRegionDialog::layerChanged()
 {
   const int32_t index = m_layerBox->currentIndex();
   m_provider.reset();
+  m_imagery.reset();
   if (index >= 0 && index < static_cast<int32_t>(m_layers.size())) {
     QString error;
     m_provider = m_manager.providerFor(
         m_layers[static_cast<std::size_t>(index)].source, &error);
+    // The same provider seen as imagery, for its levels and tile size.
+    m_imagery = std::dynamic_pointer_cast<ImageryProvider>(m_provider);
   }
-  const int32_t deepest = m_provider ? m_provider->maximumLevel() : 0;
+  const int32_t deepest = m_imagery ? m_imagery->maximumLevel() : 0;
   m_minimumBox->setRange(0, deepest);
   m_maximumBox->setRange(0, deepest);
   // A sensible start: the whole pyramid down to about 150 m per pixel.
@@ -435,7 +439,7 @@ void NewRegionDialog::refresh()
   if (m_maximumBox->value() < m_minimumBox->value()) {
     m_maximumBox->setValue(m_minimumBox->value());
   }
-  const int32_t tileSize = m_provider ? m_provider->tileSizePx() : 256;
+  const int32_t tileSize = m_imagery ? m_imagery->tileSizePx() : 256;
   m_detailLabel->setText(
       tr("Down to about %1 per pixel")
           .arg(formatDistance(metresPerPixel(m_maximumBox->value(), tileSize),
@@ -453,7 +457,7 @@ void NewRegionDialog::refresh()
   QString terms;
   if (m_provider) {
     const std::vector<WmsCatalogueEntry> catalogue = m_manager.catalogue();
-    const QUrl url = m_provider->source().url;
+    const QUrl url = m_provider->serviceUrl();
     const WmsCatalogueEntry* entry = findWmsCatalogueEntry(url, catalogue);
     const QString termsLink =
         entry && entry->termsUrl.isValid()

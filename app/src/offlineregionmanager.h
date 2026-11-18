@@ -44,7 +44,7 @@ namespace ts
 {
 
 class ProviderRegistry;
-class WmsImageryProvider;
+class RegionTileSource;
 
 /**
  * Keeps the list of offline regions (an OfflineRegionStore) and runs
@@ -128,9 +128,12 @@ public:
    */
   QString statusText() const;
 
-  /** Returns the WMS provider for @p source, or null and @p errorString. */
-  std::shared_ptr<WmsImageryProvider> providerFor(const QJsonObject& source,
-                                                  QString* errorString);
+  /**
+   * Returns the provider for @p source as a region tile source (WMS or
+   * WMTS), or null and @p errorString.
+   */
+  std::shared_ptr<RegionTileSource> providerFor(const QJsonObject& source,
+                                                QString* errorString);
 
 signals:
   /** Regions were added, removed or finished downloading. */

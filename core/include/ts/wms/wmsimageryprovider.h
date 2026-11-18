@@ -36,6 +36,7 @@
 #include <QString>
 
 #include "ts/network/cachedtilefetcher.h"
+#include "ts/network/regiontilesource.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/wms/wmssource.h"
 
@@ -50,27 +51,6 @@ using WmsProviderSettings = WebTileSettings;
 
 /** What a WmsImageryProvider has done (see WebTileStatistics). */
 using WmsStatistics = WebTileStatistics;
-
-/** What became of one tile of an offline region (fetchForRegion()). */
-struct RegionTileResult {
-  /** What happened. */
-  enum class Outcome {
-    Downloaded,    ///< Fetched and stored.
-    Revalidated,   ///< Stored but stale; the server confirmed it (304).
-    AlreadyCached, ///< Stored and fresh; nothing fetched.
-    NoData,        ///< The source has nothing there.
-    Failed,        ///< Not stored (see errorString).
-    Cancelled,     ///< Cancelled while fetching.
-  };
-  /** What happened. */
-  Outcome outcome = Outcome::Failed;
-  /** The tile's size on disk, when stored. */
-  int64_t bytes = 0;
-  /** True if it failed because the server couldn't be reached. */
-  bool unreachable = false;
-  /** Why it failed (translated), or empty. */
-  QString errorString;
-};
 
 /**
  * Imagery from one or more layers of a WMS server.
@@ -95,7 +75,7 @@ struct RegionTileResult {
  *
  * @threadsafe
  */
-class WmsImageryProvider : public ImageryProvider
+class WmsImageryProvider : public ImageryProvider, public RegionTileSource
 {
 public:
   /** Requests @p source's tiles through @p network. */
@@ -131,26 +111,29 @@ public:
   /** Returns the source. */
   const WmsSource& source() const { return m_source; }
 
+  /** Returns the server's address. */
+  QUrl serviceUrl() const override { return m_source.url; }
+
   /**
    * Returns where the source has tiles (its bounds, and for Web Mercator
    * the latitudes the projection reaches), or nothing for everywhere.
    */
-  std::optional<GeoRect> dataBounds() const;
+  std::optional<GeoRect> dataBounds() const override;
+
+  /** Returns typicalImageBytes() for the source's format and tile size. */
+  int64_t typicalTileBytes() const override;
 
   /**
-   * Makes sure tile @p key is in the disk cache and fresh, and pins it
-   * for the offline region @p region (unless 0, as for the samples of a
-   * size estimate). A fresh stored tile isn't fetched again; a stale one
-   * is revalidated. The tile isn't decoded for the view, only checked to
-   * be an image. Doesn't change status(): a failing download is reported
-   * to its caller. Fails without a disk cache, and for responses the
-   * server forbids storing (no-store). Called on download threads.
+   * Makes sure the GetMap image of tile @p key is in the disk cache and
+   * fresh, and pins it for @p region (see
+   * CachedTileFetcher::fetchForRegion()). The image is only checked to be
+   * one, not decoded for the view.
    */
   RegionTileResult fetchForRegion(TileKey key, int64_t region,
-                                  const std::atomic<bool>& cancelled);
+                                  const std::atomic<bool>& cancelled) override;
 
   /** Returns the disk cache, or null without one. */
-  TileDiskCache* diskCache() const { return m_fetcher->diskCache(); }
+  TileDiskCache* diskCache() const override { return m_fetcher->diskCache(); }
 
   /** Returns what it has done so far. */
   WmsStatistics statistics() const;

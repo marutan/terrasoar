@@ -5,12 +5,13 @@ maps: the capabilities model, tile matrix sets and how their tiles are
 fitted to the quadtree, axis order, dimensions, requests and the cache.
 Code: `core/include/ts/wmts/`. It shares the network client, the disk
 cache, revalidation and the offline state with WMS ([wms.md](wms.md),
-[network-and-cache.md](network-and-cache.md)).
+[network-and-cache.md](network-and-cache.md)). The dialog is described
+for users in [adding-wmts-layers.md](../user/adding-wmts-layers.md).
 
-Phase 10 delivers WMTS in three parts: **10a** (this document: the engine,
-EPSG:4326 and Web Mercator tile matrix sets), 10b (the Add WMTS Layer
-dialog, the catalogue and offline regions) and 10c (other CRSs through
-PROJ, such as British National Grid).
+Phase 10 delivers WMTS in three parts: **10a**, the engine (EPSG:4326 and
+Web Mercator tile matrix sets); **10b**, the Add WMTS Layer dialog, the
+catalogue and offline regions; and 10c, other CRSs through PROJ (such as
+British National Grid).
 
 ## From an address to tiles
 
@@ -168,7 +169,7 @@ asking for `GetCapabilities`, as it is, and otherwise makes a KVP
 ## Choices
 
 `ts::wmtsSourceFor()` makes a source from capabilities, a layer and the
-user's choices (10b's dialog offers them):
+user's choices (`ts::WmtsChoices`, which the dialog fills in):
 
 - **Style:** the given one, or the layer's default (`isDefault`, else the
   first). A layer without styles uses `default`.
@@ -181,6 +182,78 @@ user's choices (10b's dialog offers them):
   first value. TIME takes the service's default until the program has a
   clock (Phase 15).
 - **Attribution:** the provider's name, else the service's title.
+
+## The dialog
+
+`AddWmtsDialog` (in `app/`) follows Add WMS Layer
+([wms.md](wms.md)):
+
+- **Service:** a catalogue entry, or any address. `wmtsCapabilitiesUrl()`
+  leaves a `WMTSCapabilities.xml` (RESTful) as it is and asks a KVP
+  address for `GetCapabilities`. A WMS document says to use Add WMS Layer
+  instead.
+- **Layers:** a flat list (WMTS has no groups), the identifier and abstract
+  as the tooltip.
+- **Choices:** style (the default selected), format (PNG first),
+  tile matrix set (`usableTileMatrixSets()`, each with its CRS), and one
+  editable box per dimension, the default first and the other values
+  offered (up to 500); any value may be typed, as TIME takes dates no list
+  holds. The boxes share one grid with the other choices, so they line up.
+- **Before adding:** which tiles will be drawn (and whether reprojected),
+  the credit, the service's fees and access constraints, and a link to the
+  chosen style's legend.
+- **Credit:** the catalogue entry's when the service is in the catalogue
+  (the wording the provider asks for, such as "Datenquelle: basemap.at"),
+  else the provider's name from the capabilities.
+- **Add:** a layer definition with the source, its `service` set to the
+  address the user connected to (for the catalogue's terms, see below).
+
+F1 opens [the user guide](../user/adding-wmts-layers.md#adding-a-layer).
+File → Add WMTS Layer… (Alt+M in the File menu) and Add Layer → WMTS
+Layer… in the Layers panel open it.
+
+## The catalogue
+
+`data/wmts-catalogue.json` lists open WMTS services, read by
+`ts::parseWmtsCatalogue()`: the same entries as the WMS catalogue
+([wms.md](wms.md#the-catalogue)), with the format name
+`terrasoar-wmts-catalogue`. Each entry's `url` is the service's
+capabilities address.
+
+It is a **file of its own**, fetched from the repository's main branch
+(`wmtsCatalogueUrl`, or `TS_WMTS_CATALOGUE_URL` for tests) with the copy
+built into the program as the fallback and the last fetched copy kept in
+the cache directory, as for WMS. Entries can't go into the WMS catalogue:
+programs released before WMTS fetch that file and would offer a WMTS
+service in their Add WMS dialog. Each parser refuses the other's file.
+
+The shipped catalogue, with each provider's terms as they stated them on
+2026-11-18:
+
+| Service | Credit | Bulk download |
+| --- | --- | --- |
+| NASA GIBS (EPSG:4326 and Web Mercator) | NASA EOSDIS GIBS | Allowed (as the WMS entry) |
+| basemap.at | Datenquelle: basemap.at (CC BY 4.0) | Not stated: warn |
+| swisstopo | © swisstopo | Forbidden: fair use, bulk data from the download service |
+| PDOK BRT background map | Kadaster / PDOK (CC BY 4.0) | Not stated: warn |
+| EMODnet Bathymetry | EMODnet Bathymetry Consortium (CC BY 4.0) | Not stated: warn |
+| USGS The National Map | USGS The National Map | Allowed (public domain, as the WMS entry) |
+
+## Offline regions
+
+A WMTS layer can be kept as an offline region like a WMS one
+([offline-regions.md](offline-regions.md)). Regions count and download
+quadtree tiles; `WmtsImageryProvider` implements `ts::RegionTileSource`,
+and its `fetchForRegion()` fetches and pins each WMTS tile the quadtree
+tile is made from (the same matrix and window as drawing it), through
+`CachedTileFetcher::fetchForRegion()`. So an offline region holds exactly
+the tiles drawing it needs, and drawing it offline makes no request.
+
+The terms are checked against the WMS and WMTS catalogues together, by the
+source's `serviceUrl()`: the capabilities address the user connected to,
+which is what the catalogue lists. A RESTful template's path is full of
+`{variables}` and matches no entry, so without it a listed service could
+only ever be found by host, which can forbid but not allow.
 
 ## Caching and dimensions
 
@@ -215,6 +288,18 @@ A quadtree tile is:
 - **cancelled** at once when the tile leaves the view.
 
 ## Tests
+
+Besides the parts above (10a), 10b adds: the shipped catalogue and each
+catalogue format refusing the other's file; the service address for the
+terms; `fetchForRegion()` (one WMTS tile pinned when lined up, four from
+the unaligned grid, stored ones only pinned, no data, failures, no disk
+cache); a whole region downloaded through `RegionDownload` and drawn with
+the server gone, and a forbidden one refused before any request
+(`tests/wmts`); the dialog against the mock server, KVP and RESTful, with
+its choices, the catalogue's credit, a typed date and a WMS address told
+apart (`tests/ui`); and F1 in the dialog (`tests/ui`, `tests/help`).
+
+10a's:
 
 - `tests/wmts`: seven real capabilities documents (basemap.at, EMODnet,
   NASA GIBS in both CRSs, PDOK, swisstopo, USGS ArcGIS; contact details

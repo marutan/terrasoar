@@ -4,8 +4,9 @@ How an area chosen by the user becomes a set of quadtree tiles, how big it
 will be, how the tiles are downloaded and kept from eviction, and where it
 is all stored. Code: `core/include/ts/regions/`, with the pins in
 `ts::TileDiskCache` ([network-and-cache.md](network-and-cache.md)) and the
-download of one tile in `ts::WmsImageryProvider::fetchForRegion()`
-([wms.md](wms.md)). For users: [offline-use.md](../user/offline-use.md).
+download of one tile in `ts::RegionTileSource::fetchForRegion()`, which
+the WMS and WMTS providers implement ([wms.md](wms.md),
+[wmts.md](wmts.md)). For users: [offline-use.md](../user/offline-use.md).
 
 ```
 New Offline Region dialog                 region manager (GUI thread)
@@ -18,11 +19,38 @@ New Offline Region dialog                 region manager (GUI thread)
                                               └─ progress polled 4× a second
 ```
 
-Only WMS layers can be kept: the base pack is on disk already, and they
-are the only network sources so far. A region belongs to one source (a
-`{"kind": "wms", …}` object, as in a layer definition); two layers showing
-the same source share its regions, since they share the provider and the
-disk cache.
+Only WMS and WMTS layers can be kept: the base pack is on disk already,
+and they are the network imagery sources. A region belongs to one source
+(a `{"kind": "wms", …}` or `{"kind": "wmts", …}` object, as in a layer
+definition); two layers showing the same source share its regions, since
+they share the provider and the disk cache.
+
+## The source: RegionTileSource
+
+Regions count, sample and download **quadtree tiles** whatever the
+source. What a source does for one is behind `ts::RegionTileSource`
+(`core/include/ts/network/regiontilesource.h`), which
+`WmsImageryProvider` and `WmtsImageryProvider` implement besides
+`ImageryProvider`:
+
+| Member | WMS | WMTS |
+| --- | --- | --- |
+| `serviceUrl()` (for the terms) | The GetMap address | The address the user connected to (`WmtsSource::service`), else the KVP address, else the template's server |
+| `dataBounds()` | The layer's bounds (and the Mercator limit) | The same |
+| `typicalTileBytes()` (estimate before samples) | By format and tile size | By format and the finest matrix's tile size |
+| `fetchForRegion(key, region)` | The GetMap image of the tile | Each WMTS tile the quadtree tile is made from ([wmts.md](wmts.md#fitting-tiles-to-the-quadtree)) |
+| `diskCache()` | The source's cache | The same |
+
+Fetching and pinning one stored item (below) is
+`ts::CachedTileFetcher::fetchForRegion()`, shared by both. For WMTS, the
+quadtree tile's result adds up its WMTS tiles': no data if none exist or
+all are missing, failed or cancelled if any was, else downloaded,
+revalidated or already stored. A WMTS tile shared by neighbouring quadtree
+tiles (when the matrix doesn't line up with the quadtree) is fetched once
+and found stored for the next, so its bytes count once in the cache but
+in the progress of each quadtree tile that uses it. The interface lives
+in the network module so that the providers don't depend on the regions
+module, which depends on them for the catalogue.
 
 ## Geometry
 
@@ -186,8 +214,8 @@ For each tile, `fetchForRegion()`:
 
 1. Requests nothing outside the source's data (NoData).
 2. Pins a stored tile that is still fresh, and fetches nothing.
-3. Otherwise sends GetMap, with If-None-Match / If-Modified-Since for a
-   stale stored tile: 304 renews it; 200 is checked to be an image and
+3. Otherwise sends the request (GetMap, or GetTile for each WMTS tile),
+   with If-None-Match / If-Modified-Since for a stale stored tile: 304 renews it; 200 is checked to be an image and
    stored with its pin in one call.
 4. Fails on server errors, non-images and `no-store` responses (the
    server forbids keeping the tile, so it can't be offline), and without
@@ -215,7 +243,9 @@ finished, and Resume carries on.
 
 Many map servers allow viewing but not bulk downloading; the
 OpenStreetMap tile servers are the best-known example. Each catalogue
-entry ([wms.md](wms.md#the-catalogue)) may say so:
+entry ([wms.md](wms.md#the-catalogue), [wmts.md](wmts.md#the-catalogue))
+may say so. The application checks a region against both catalogues
+together; their entries are told apart by address:
 
 ```json
 {"title": "OpenStreetMap (terrestris)", "url": "https://ows.terrestris.de/osm/service",
@@ -235,7 +265,9 @@ An entry found by host alone can forbid but not allow: another service on
 the same host may have other terms. The flag is optional, so older
 programs read the catalogue as before. The shipped catalogue sets it for
 NASA GIBS and USGS (allowed: public data) and terrestris (forbidden:
-OpenStreetMap data served for viewing); the others don't say yet.
+OpenStreetMap data served for viewing); the others don't say yet. The
+WMTS catalogue allows GIBS and USGS and forbids swisstopo, whose fair-use
+terms ask for its download service instead of automated bulk access.
 
 ## Storage
 

@@ -40,7 +40,11 @@
 #include "mockwmts.h"
 #include "ts/geo/wgs84.h"
 #include "ts/network/networkclient.h"
+#include "ts/network/tilediskcache.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/regions/regiondownload.h"
+#include "ts/regions/regiongeometry.h"
+#include "ts/wms/wmscatalogue.h"
 #include "ts/wmts/wmtscapabilities.h"
 #include "ts/wmts/wmtsimageryprovider.h"
 #include "ts/wmts/wmtssource.h"
@@ -1209,6 +1213,229 @@ private slots:
     QCOMPARE(result.outcome, ts::ImageLoadResult::Outcome::Cancelled);
     QVERIFY2(clock.elapsed() < 2000,
              qPrintable(QString::number(clock.elapsed())));
+  }
+
+  void catalogues()
+  {
+    // The WMTS catalogue that comes with the program reads, and each kind
+    // of catalogue refuses the other's file: programs from before WMTS
+    // fetch the WMS one and must never see a WMTS service in it.
+    QFile file(QStringLiteral(TS_SOURCE_DIR "/data/wmts-catalogue.json"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QByteArray wmtsJson = file.readAll();
+    QString error;
+    const std::optional<std::vector<ts::WmsCatalogueEntry>> entries =
+        ts::parseWmtsCatalogue(wmtsJson, &error);
+    if (!entries) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(entries->size() >= 5);
+    for (const ts::WmsCatalogueEntry& entry : *entries) {
+      QVERIFY(!entry.title.isEmpty());
+      QVERIFY(!entry.attribution.isEmpty());
+      QVERIFY(entry.termsUrl.isValid());
+      QCOMPARE(entry.url.scheme(), QStringLiteral("https"));
+      // Every address is one the dialog can ask for capabilities.
+      QVERIFY(ts::wmtsCapabilitiesUrl(entry.url).isValid());
+    }
+    // swisstopo's fair-use terms ask for its download service instead.
+    QCOMPARE(ts::bulkDownloadPolicy(
+                 QUrl(QStringLiteral("https://wmts.geo.admin.ch/EPSG/3857/"
+                                     "1.0.0/WMTSCapabilities.xml")),
+                 *entries),
+             ts::BulkDownloadPolicy::Forbidden);
+    QVERIFY(!ts::parseWmsCatalogue(wmtsJson, &error));
+    QFile wms(QStringLiteral(TS_SOURCE_DIR "/data/wms-catalogue.json"));
+    QVERIFY(wms.open(QIODevice::ReadOnly));
+    QVERIFY(!ts::parseWmtsCatalogue(wms.readAll(), &error));
+    QVERIFY(error.contains(QLatin1String("WMTS")));
+  }
+
+  void serviceAddress()
+  {
+    // The address for the catalogue's terms: the one the user connected
+    // to, else the KVP address, else the template's server.
+    ts::WmtsSource source = alignedSource();
+    const std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(testNetwork());
+    QCOMPARE(ts::WmtsImageryProvider(source, network).serviceUrl(),
+             QUrl(QStringLiteral("https://example.org/wmts")));
+    source.url = QUrl();
+    source.urlTemplate = QStringLiteral(
+        "https://tiles.example.org/a/{TileMatrix}/{TileRow}/{TileCol}.png");
+    QCOMPARE(ts::WmtsImageryProvider(source, network).serviceUrl(),
+             QUrl(QStringLiteral("https://tiles.example.org")));
+    source.service =
+        QUrl(QStringLiteral("https://tiles.example.org/WMTSCapabilities.xml"));
+    QCOMPARE(ts::WmtsImageryProvider(source, network).serviceUrl(),
+             source.service);
+    // Kept in projects, but not part of the id (the same tiles).
+    QString error;
+    const std::optional<ts::WmtsSource> back =
+        ts::WmtsSource::fromJson(source.toJson(), &error);
+    if (!back) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(back->service, source.service);
+    ts::WmtsSource other = source;
+    other.service = QUrl();
+    QCOMPARE(other.id(), source.id());
+    QVERIFY(ts::WmtsImageryProvider(source, network).typicalTileBytes() > 0);
+  }
+
+  void fetchForRegion()
+  {
+    // A region keeps the WMTS tiles each quadtree tile is made from: one
+    // when lined up, four from the unaligned grid; stored ones are only
+    // pinned; failures and no data are told apart.
+    std::shared_ptr<MockWmtsBehaviour> behaviour =
+        std::make_shared<MockWmtsBehaviour>();
+    behaviour->wms.maxAgeS = 3600;
+    MockHttpServer server;
+    server.setHandler(ts::test::mockWmtsHandler(behaviour, server.url()));
+    QTemporaryDir cache;
+    ts::WebTileSettings settings;
+    settings.cacheDirectory = cache.path();
+    const std::atomic<bool> cancelled{false};
+    QString error;
+    using Outcome = ts::RegionTileResult::Outcome;
+
+    const std::optional<ts::WmtsSource> aligned = ts::wmtsSourceFor(
+        mockCapabilities(server.url()), QStringLiteral("pattern"),
+        ts::WmtsChoices{
+            QString(), QString(), QStringLiteral("WorldCRS84Quad"), {}},
+        &error);
+    if (!aligned) {
+      QFAIL(qPrintable(error));
+    }
+    ts::WmtsImageryProvider quad(
+        *aligned, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+    ts::RegionTileResult result =
+        quad.fetchForRegion(ts::TileKey{3, 9, 2}, 7, cancelled);
+    QCOMPARE(result.outcome, Outcome::Downloaded);
+    QVERIFY(result.bytes > 0);
+    if (quad.diskCache() == nullptr) {
+      QFAIL("no disk cache");
+    }
+    QCOMPARE(quad.diskCache()->regionUsage(7).tiles, int64_t{1});
+    result = quad.fetchForRegion(ts::TileKey{3, 9, 2}, 7, cancelled);
+    QCOMPARE(result.outcome, Outcome::AlreadyCached);
+    QCOMPARE(
+        static_cast<int32_t>(ts::test::mockWmtsTileRequests(server).size()), 1);
+    // The tile is drawn from what the region stored.
+    QCOMPARE(quad.loadTileImage(ts::TileKey{3, 9, 2}, cancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QCOMPARE(
+        static_cast<int32_t>(ts::test::mockWmtsTileRequests(server).size()), 1);
+
+    const std::optional<ts::WmtsSource> offset = ts::wmtsSourceFor(
+        mockCapabilities(server.url()), QStringLiteral("pattern"),
+        ts::WmtsChoices{QString(), QString(), QStringLiteral("Offset4326"), {}},
+        &error);
+    if (!offset) {
+      QFAIL(qPrintable(error));
+    }
+    ts::WmtsImageryProvider grid(
+        *offset, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+    result = grid.fetchForRegion(ts::TileKey{1, 1, 0}, 8, cancelled);
+    QCOMPARE(result.outcome, Outcome::Downloaded);
+    if (grid.diskCache() == nullptr) {
+      QFAIL("no disk cache");
+    }
+    QCOMPARE(grid.diskCache()->regionUsage(8).tiles, int64_t{4});
+
+    // Outside the bounds: nothing asked, no data.
+    ts::WmtsSource bounded = *aligned;
+    bounded.bounds = ts::GeoRect{0.0, 0.0, 10.0, 10.0};
+    ts::WmtsImageryProvider small(
+        bounded, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+    QCOMPARE(small.fetchForRegion(ts::TileKey{4, 2, 2}, 9, cancelled).outcome,
+             Outcome::NoData);
+    // 404: no data. A server error: failed, with its reason.
+    behaviour->notFound = true;
+    QCOMPARE(quad.fetchForRegion(ts::TileKey{3, 10, 2}, 7, cancelled).outcome,
+             Outcome::NoData);
+    behaviour->notFound = false;
+    behaviour->wms.failStatus = 500;
+    result = quad.fetchForRegion(ts::TileKey{3, 11, 2}, 7, cancelled);
+    QCOMPARE(result.outcome, Outcome::Failed);
+    QVERIFY(!result.errorString.isEmpty());
+    QVERIFY(!result.unreachable);
+    behaviour->wms.failStatus = 0;
+    // Without a disk cache there is nowhere to keep them.
+    ts::WmtsImageryProvider uncached(
+        *aligned, std::make_shared<ts::NetworkClient>(testNetwork()));
+    result = uncached.fetchForRegion(ts::TileKey{3, 9, 3}, 7, cancelled);
+    QCOMPARE(result.outcome, Outcome::Failed);
+    QVERIFY(result.errorString.contains(QLatin1String("disk cache")));
+  }
+
+  void regionDownloadThenOffline()
+  {
+    // A whole region downloaded through RegionDownload, then drawn with
+    // the server gone; a service whose terms forbid it is refused.
+    QTemporaryDir cache;
+    ts::WebTileSettings settings;
+    settings.cacheDirectory = cache.path();
+    std::optional<ts::WmtsSource> source;
+    int64_t tiles = 0;
+    {
+      std::shared_ptr<MockWmtsBehaviour> behaviour =
+          std::make_shared<MockWmtsBehaviour>();
+      behaviour->wms.maxAgeS = 3600;
+      MockHttpServer server;
+      server.setHandler(ts::test::mockWmtsHandler(behaviour, server.url()));
+      QString error;
+      source = ts::wmtsSourceFor(
+          mockCapabilities(server.url()), QStringLiteral("pattern"),
+          ts::WmtsChoices{
+              QString(), QString(), QStringLiteral("GoogleMapsCompatible"), {}},
+          &error);
+      if (!source) {
+        QFAIL(qPrintable(error));
+      }
+      source->service = server.url(QStringLiteral("/WMTSCapabilities.xml"));
+      std::shared_ptr<ts::WmtsImageryProvider> provider =
+          std::make_shared<ts::WmtsImageryProvider>(
+              *source, std::make_shared<ts::NetworkClient>(testNetwork()),
+              settings);
+      const ts::RegionGeometry area =
+          ts::RegionGeometry::rectangle(-5.0, 50.0, 2.0, 56.0);
+      ts::RegionDownload download(provider, 11, area, 0, 6);
+      QVERIFY(download.progress().totalTiles > 0);
+      QVERIFY2(download.start({}, &error), qPrintable(error));
+      QVERIFY(download.waitUntilSettled(std::chrono::seconds(60)));
+      const ts::RegionDownloadProgress progress = download.progress();
+      QCOMPARE(progress.state, ts::RegionDownloadProgress::State::Finished);
+      QCOMPARE(progress.failedTiles, int64_t{0});
+      QVERIFY(progress.downloadedTiles > 0);
+      QVERIFY(progress.bytes > 0);
+      tiles = provider->diskCache()->regionUsage(11).tiles;
+      QVERIFY(tiles > 0);
+
+      // Terms that forbid it: refused before anything is asked.
+      ts::WmsCatalogueEntry entry;
+      entry.title = QStringLiteral("Mock tiles");
+      entry.url = source->service;
+      entry.allowBulkDownload = false;
+      const int32_t before = server.requestCount();
+      ts::RegionDownload refused(provider, 12, area, 0, 3);
+      QVERIFY(!refused.start({entry}, &error));
+      QVERIFY(error.contains(QLatin1String("Mock tiles")));
+      QCOMPARE(refused.progress().state,
+               ts::RegionDownloadProgress::State::Refused);
+      QCOMPARE(server.requestCount(), before);
+    }
+    // The server is gone: the region's tiles are drawn from the disk.
+    ts::WmtsImageryProvider offline(
+        *source, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+    const std::atomic<bool> cancelled{false};
+    const ts::TileKey london =
+        ts::TileKey::containing(5, ts::Geodetic{51.5, -0.1, 0.0});
+    QCOMPARE(offline.loadTileImage(london, cancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QCOMPARE(offline.statistics().requests, 0);
+    QCOMPARE(offline.diskCache()->regionUsage(11).tiles, tiles);
   }
 
   void registryCreatesWmts()

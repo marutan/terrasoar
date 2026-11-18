@@ -432,6 +432,10 @@ QJsonObject WmtsSource::toJson() const
   } else {
     json.insert(QStringLiteral("template"), urlTemplate);
   }
+  if (!service.isEmpty()) {
+    json.insert(QStringLiteral("service"),
+                service.toString(QUrl::FullyEncoded));
+  }
   json.insert(QStringLiteral("layer"), layer);
   json.insert(QStringLiteral("style"), style);
   json.insert(QStringLiteral("format"), format);
@@ -489,6 +493,7 @@ std::optional<WmtsSource> WmtsSource::fromJson(const QJsonObject& json,
   if (rest) {
     source.url = QUrl();
   }
+  source.service = QUrl(json.value(QStringLiteral("service")).toString());
   source.layer = json.value(QStringLiteral("layer")).toString();
   source.style = json.value(QStringLiteral("style")).toString();
   source.format = json.value(QStringLiteral("format")).toString(source.format);

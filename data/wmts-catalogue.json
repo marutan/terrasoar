@@ -1,0 +1,59 @@
+{
+    "format": "terrasoar-wmts-catalogue",
+    "version": 1,
+    "services": [
+        {
+            "title": "NASA GIBS: satellite imagery",
+            "url": "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/1.0.0/WMTSCapabilities.xml",
+            "description": "Daily and historical satellite imagery of the whole Earth (MODIS, VIIRS, Landsat and more) from NASA's Global Imagery Browse Services, in tiles that line up with the globe's own.",
+            "attribution": "NASA EOSDIS GIBS",
+            "terms": "https://nasa-gibs.github.io/gibs-api-docs/",
+            "allowBulkDownload": true
+        },
+        {
+            "title": "NASA GIBS: satellite imagery (Web Mercator)",
+            "url": "https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/1.0.0/WMTSCapabilities.xml",
+            "description": "The same imagery in Web Mercator tiles, as web maps use. Nothing within 5° of the poles.",
+            "attribution": "NASA EOSDIS GIBS",
+            "terms": "https://nasa-gibs.github.io/gibs-api-docs/",
+            "allowBulkDownload": true
+        },
+        {
+            "title": "basemap.at (Austria)",
+            "url": "https://basemap.at/wmts/1.0.0/WMTSCapabilities.xml",
+            "description": "The official base map of Austria: streets, buildings, terrain and aerial photographs, from the Austrian federal states and partners. Open Government Data, CC BY 4.0.",
+            "attribution": "Datenquelle: basemap.at",
+            "terms": "https://basemap.at/"
+        },
+        {
+            "title": "swisstopo (Switzerland)",
+            "url": "https://wmts.geo.admin.ch/EPSG/3857/1.0.0/WMTSCapabilities.xml",
+            "description": "Maps and aerial photographs of Switzerland from the Federal Office of Topography and other federal offices. Free under fair use; for bulk data the terms ask for the download service instead.",
+            "attribution": "© swisstopo",
+            "terms": "https://www.geo.admin.ch/en/general-terms-of-use-fsdi",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "PDOK: BRT background map (Netherlands)",
+            "url": "https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0?request=GetCapabilities&service=WMTS",
+            "description": "The Dutch government's topographic background map (BRT-Achtergrondkaart) from the Kadaster, in several styles. CC BY 4.0.",
+            "attribution": "Kadaster / PDOK",
+            "terms": "https://www.pdok.nl/copyright"
+        },
+        {
+            "title": "EMODnet Bathymetry",
+            "url": "https://ows.emodnet-bathymetry.eu/wmts/1.0.0/WMTSCapabilities.xml",
+            "description": "Depths of the European seas and the oceans from the European Marine Observation and Data Network. CC BY 4.0. Not for navigation.",
+            "attribution": "EMODnet Bathymetry Consortium",
+            "terms": "https://emodnet.ec.europa.eu/en/terms-use-emodnet-online-services-data-and-data-products"
+        },
+        {
+            "title": "USGS The National Map: topographic",
+            "url": "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS/1.0.0/WMTSCapabilities.xml",
+            "description": "Topographic maps of the United States from the US Geological Survey. Public domain.",
+            "attribution": "USGS The National Map",
+            "terms": "https://www.usgs.gov/information-policies-and-instructions/copyrights-and-credits",
+            "allowBulkDownload": true
+        }
+    ]
+}
