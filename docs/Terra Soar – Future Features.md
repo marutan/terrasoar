@@ -45,6 +45,8 @@ The phases are mostly independent. Phase 9 (the user guide in the program) depen
 
 Goal: the user guide in `docs/user/` can be read inside Terra Soar, offline, from the Help menu, so it matches the installed version.
 
+**Status (2026-11-18)**: delivered. Help → User Guide (F1) opens the guide in a window of its own, built in from `docs/user/`, with links, anchors, Back/Forward/Contents, search and find in page, and saved window state. Context help (F1) works in six dialogs, and the About window links to the guide. `check_user_guide.py` is in CI. See `docs/design/help.md`.
+
 **Deliverables**
 
 - **Help → User Guide (F1)** opens a help window. It is non-modal, so the guide can stay open beside the globe.

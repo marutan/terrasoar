@@ -31,9 +31,11 @@
 #include <QEvent>
 #include <QFormLayout>
 #include <QJsonObject>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QShortcut>
 #include <QSpinBox>
 #include <QUrl>
 #include <QUuid>
@@ -42,6 +44,7 @@
 #include <cpl_string.h>
 #include <cpl_vsi.h>
 
+#include "helpwindow.h"
 #include "ts/elevation/webterrainprovider.h"
 
 namespace ts
@@ -73,6 +76,11 @@ constexpr int32_t presetCount = static_cast<int32_t>(presets.size());
 
 } // namespace
 
+QString AddWebTerrainDialog::helpTarget()
+{
+  return QStringLiteral("terrain.md#terrain-from-the-web");
+}
+
 AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent,
                                          std::vector<VerticalDatum> datums)
     : QDialog(parent), m_presetBox(new QComboBox(this)),
@@ -84,6 +92,9 @@ AddWebTerrainDialog::AddWebTerrainDialog(QWidget* parent,
       m_buttons(new QDialogButtonBox(
           QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this))
 {
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
   setObjectName(QStringLiteral("addWebTerrainDialog"));
   m_presetBox->setObjectName(QStringLiteral("webTerrainPresetBox"));
   m_kindBox->setObjectName(QStringLiteral("webTerrainKindBox"));

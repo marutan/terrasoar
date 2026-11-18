@@ -32,16 +32,19 @@
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QSaveFile>
+#include <QShortcut>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QTreeWidget>
 #include <QUuid>
 #include <QVBoxLayout>
 
+#include "helpwindow.h"
 #include "ts/network/networkclient.h"
 #include "ts/wms/wmssource.h"
 #include "wmscataloguefile.h"
@@ -99,6 +102,11 @@ QTreeWidgetItem* addLayerItems(const WmsLayer& layer, QTreeWidgetItem* parent,
 
 } // namespace
 
+QString AddWmsDialog::helpTarget()
+{
+  return QStringLiteral("adding-wms-layers.md#adding-a-layer");
+}
+
 AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
                            QWidget* parent)
     : QDialog(parent), m_network(std::move(network)),
@@ -110,6 +118,9 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
       m_formatBox(new QComboBox(this)), m_detailsLabel(new QLabel(this)),
       m_buttons(new QDialogButtonBox(this)), m_pollTimer(new QTimer(this))
 {
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
   setObjectName(QStringLiteral("addWmsDialog"));
   m_serviceBox->setObjectName(QStringLiteral("wmsServiceBox"));
   m_serviceBox->setEditable(true);

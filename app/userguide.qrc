@@ -1,0 +1,37 @@
+<!DOCTYPE RCC>
+<!-- SPDX-License-Identifier: GPL-2.0-or-later -->
+<!--
+  Terra Soar - A virtual globe
+
+  Copyright (C) 2026 Peter Howkins
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, see <https://www.gnu.org/licenses/>.
+ -->
+
+<RCC version="1.0">
+    <!-- The user guide (docs/user/), read in Help > User Guide. The
+         resources mirror docs/: pages under /guide/user/, the images they
+         use under /guide/images/, so the pages' relative links work as on
+         GitHub. tools/checks/check_user_guide.py checks that every page and
+         image is listed here, and nothing else. -->
+    <qresource prefix="/guide">
+        <file alias="user/README.md">../docs/user/README.md</file>
+        <file alias="user/adding-wms-layers.md">../docs/user/adding-wms-layers.md</file>
+        <file alias="user/getting-around.md">../docs/user/getting-around.md</file>
+        <file alias="user/installation.md">../docs/user/installation.md</file>
+        <file alias="user/layers.md">../docs/user/layers.md</file>
+        <file alias="user/offline-use.md">../docs/user/offline-use.md</file>
+        <file alias="user/terrain.md">../docs/user/terrain.md</file>
+    </qresource>
+</RCC>

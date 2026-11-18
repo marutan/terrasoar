@@ -32,6 +32,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QHBoxLayout>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
@@ -39,7 +40,10 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPushButton>
+#include <QShortcut>
 #include <QVBoxLayout>
+
+#include "helpwindow.h"
 
 namespace ts
 {
@@ -235,12 +239,20 @@ void ElevationProfileChart::leaveEvent(QEvent* event)
 
 // --- ElevationProfileDialog ---------------------------------------------
 
+QString ElevationProfileDialog::helpTarget()
+{
+  return QStringLiteral("terrain.md#elevation-profiles");
+}
+
 ElevationProfileDialog::ElevationProfileDialog(QWidget* parent)
     : QDialog(parent), m_chart(new ElevationProfileChart(this)),
       m_summaryLabel(new QLabel(this)), m_statusLabel(new QLabel(this)),
       m_drawButton(new QPushButton(this)), m_saveButton(new QPushButton(this)),
       m_closeButton(new QPushButton(this))
 {
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
   setObjectName(QStringLiteral("elevationProfileDialog"));
   m_summaryLabel->setObjectName(QStringLiteral("profileSummaryLabel"));
   m_statusLabel->setObjectName(QStringLiteral("profileStatusLabel"));

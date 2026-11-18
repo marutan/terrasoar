@@ -20,6 +20,8 @@
 
 #include <cstdint>
 #include <functional>
+#include <utility>
+#include <vector>
 
 #include <QAction>
 #include <QApplication>
@@ -40,6 +42,7 @@
 #include <QNetworkProxy>
 #include <QPointer>
 #include <QPushButton>
+#include <QShortcut>
 #include <QSignalSpy>
 #include <QSlider>
 #include <QStandardPaths>
@@ -55,9 +58,11 @@
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
+#include "appsettings.h"
 #include "elevationprofiledialog.h"
 #include "fixturepack.h"
 #include "globeview.h"
+#include "helpwindow.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
 #include "mockpacks.h"
@@ -76,6 +81,7 @@
 #include "ts/providers/providerregistry.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
+#include "userguide.h"
 
 namespace
 {
@@ -207,6 +213,30 @@ bool waitUntilQuiet(const ts::GlobeView* globe)
         return quiet.elapsed() >= 300;
       },
       10000);
+}
+
+/**
+ * Presses @p dialog's F1 shortcut and returns true if the user guide opens
+ * at @p target, in a window of the dialog's.
+ */
+bool helpKeyOpens(QDialog* dialog, const QString& target)
+{
+  QShortcut* f1 = nullptr;
+  for (QShortcut* shortcut : dialog->findChildren<QShortcut*>()) {
+    if (shortcut->key() == QKeySequence(QKeySequence::HelpContents)) {
+      f1 = shortcut;
+    }
+  }
+  if (f1 == nullptr) {
+    return false;
+  }
+  dialog->show();
+  emit f1->activated();
+  const ts::HelpWindow* shown = dialog->findChild<ts::HelpWindow*>();
+  const bool opened = shown != nullptr &&
+                      shown->currentPage() == ts::userguide::pageUrl(target);
+  dialog->hide();
+  return opened;
 }
 
 } // namespace
@@ -357,6 +387,61 @@ private slots:
     QCOMPARE(file->title(), QStringLiteral("&File"));
     QAction* about = window.findChild<QAction*>(QStringLiteral("aboutAction"));
     QCOMPARE(about->text(), QStringLiteral("&About Terra Soar"));
+  }
+
+  void userGuideFromTheProgram()
+  {
+    // Help > User Guide (F1), above About, opens the guide at its contents.
+    QFile::remove(ts::settingsFilePath());
+    ts::MainWindow window;
+    QAction* guide =
+        window.findChild<QAction*>(QStringLiteral("userGuideAction"));
+    QMenu* help = window.findChild<QMenu*>(QStringLiteral("helpMenu"));
+    if (guide == nullptr || help == nullptr) {
+      QFAIL("Help menu controls missing");
+    }
+    QCOMPARE(guide->text(), QStringLiteral("&User Guide"));
+    QCOMPARE(guide->shortcut(), QKeySequence(QKeySequence::HelpContents));
+    const QList<QAction*> actions = help->actions();
+    QVERIFY(actions.indexOf(guide) < actions.indexOf(window.findChild<QAction*>(
+                                         QStringLiteral("aboutAction"))));
+    guide->trigger();
+    ts::HelpWindow* guideWindow = window.findChild<ts::HelpWindow*>();
+    if (guideWindow == nullptr) {
+      QFAIL("guideWindow missing");
+    }
+    QVERIFY(guideWindow->isVisible());
+    QVERIFY(guideWindow->isWindow());
+    QCOMPARE(guideWindow->currentPage().fileName(),
+             QStringLiteral("README.md"));
+    guideWindow->close();
+
+    // The About tab links to it; the link closes the (modal) About window
+    // for the main window to open the guide.
+    ts::AboutDialog about(&window, {});
+    QLabel* label = about.findChild<QLabel*>(QStringLiteral("aboutLabel"));
+    if (label == nullptr) {
+      QFAIL("label missing");
+    }
+    QVERIFY(label->text().contains(ts::AboutDialog::userGuideLink()));
+    QVERIFY(!about.userGuideRequested());
+    emit label->linkActivated(ts::AboutDialog::userGuideLink());
+    QVERIFY(about.userGuideRequested());
+    QCOMPARE(about.result(), static_cast<int32_t>(QDialog::Accepted));
+
+    // F1 in a dialog opens the guide at that dialog's section.
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::AddWmsDialog wms(std::make_shared<ts::NetworkClient>(settings),
+                         nullptr);
+    ts::AddWebTerrainDialog terrain(nullptr);
+    const std::vector<std::pair<QDialog*, QString>> dialogs{
+        {&wms, ts::AddWmsDialog::helpTarget()},
+        {&terrain, ts::AddWebTerrainDialog::helpTarget()}};
+    for (const std::pair<QDialog*, QString>& entry : dialogs) {
+      QVERIFY2(helpKeyOpens(entry.first, entry.second),
+               qPrintable(entry.second));
+    }
   }
 
   void aboutDialog()

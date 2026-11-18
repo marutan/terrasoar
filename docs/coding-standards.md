@@ -17,6 +17,7 @@ python3 tools/checks/check_format.py --fix # reformat in place
 | Fixed-width integers | `check_int_types.py` | `short`, `int`, `long`, `long long` (signed or unsigned), or an `L`/`LL` literal |
 | Translatable strings | `check_translatable.py` | A literal passed to a user-visible API without `tr()` |
 | Licence audit | `check_notices.py` | A Qt module, linked library or data source missing from `THIRD_PARTY_NOTICES` |
+| User guide built in | `check_user_guide.py` | A `docs/user/` page or image missing from `app/userguide.qrc`, a broken link or heading anchor in the guide, or a page the contents don't list |
 | Translations up to date | `tools/i18n/update_translations.py --check` | `terrasoar_en.ts` out of step with the code |
 | API docs | `check_doxygen.py` | Any Doxygen warning, including undocumented public items |
 

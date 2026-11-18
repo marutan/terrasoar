@@ -40,6 +40,7 @@ def main(argv):
         [sys.executable, os.path.join(HERE, "check_int_types.py")],
         [sys.executable, os.path.join(HERE, "check_translatable.py")],
         [sys.executable, os.path.join(HERE, "check_notices.py")],
+        [sys.executable, os.path.join(HERE, "check_user_guide.py")],
     ]
     if "--skip-translations" not in argv:
         checks.append([sys.executable,

@@ -24,10 +24,13 @@ QT += widgets $$TS_QT_OPENGLWIDGETS
 
 INCLUDEPATH += $$PWD/src
 
-RESOURCES += $$PWD/app.qrc
+RESOURCES += $$PWD/app.qrc $$PWD/userguide.qrc
 
 HEADERS += \
     $$PWD/src/aboutdialog.h \
+    $$PWD/src/appsettings.h \
+    $$PWD/src/helpbrowser.h \
+    $$PWD/src/helpwindow.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/elevationprofiledialog.h \
@@ -40,10 +43,14 @@ HEADERS += \
     $$PWD/src/packmanagerdialog.h \
     $$PWD/src/offlineregionsdialog.h \
     $$PWD/src/startupmeasurement.h \
+    $$PWD/src/userguide.h \
     $$PWD/src/wmscataloguefile.h
 
 SOURCES += \
     $$PWD/src/aboutdialog.cpp \
+    $$PWD/src/appsettings.cpp \
+    $$PWD/src/helpbrowser.cpp \
+    $$PWD/src/helpwindow.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
@@ -56,6 +63,7 @@ SOURCES += \
     $$PWD/src/packmanagerdialog.cpp \
     $$PWD/src/offlineregionsdialog.cpp \
     $$PWD/src/startupmeasurement.cpp \
+    $$PWD/src/userguide.cpp \
     $$PWD/src/wmscataloguefile.cpp
 
 # Translations: compiled by lrelease during the build and embedded as

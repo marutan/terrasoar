@@ -28,14 +28,17 @@
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QShortcut>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
 #include "globeview.h"
+#include "helpwindow.h"
 #include "offlineregionmanager.h"
 
 namespace ts
@@ -59,6 +62,11 @@ enum Column {
 
 } // namespace
 
+QString OfflineRegionsDialog::helpTarget()
+{
+  return QStringLiteral("offline-use.md#managing-regions");
+}
+
 OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
                                            GlobeView* view, QWidget* parent)
     : QDialog(parent), m_manager(manager), m_view(view),
@@ -67,6 +75,9 @@ OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
       m_deleteButton(new QPushButton(this)),
       m_closeButton(new QPushButton(this))
 {
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
   setObjectName(QStringLiteral("offlineRegionsDialog"));
   m_list->setObjectName(QStringLiteral("regionList"));
   m_newButton->setObjectName(QStringLiteral("newRegionButton"));

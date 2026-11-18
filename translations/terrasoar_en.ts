@@ -109,8 +109,8 @@
             <translation>Close</translation>
         </message>
         <message>
-            <source>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</source>
-            <translation>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</translation>
+            <source>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%6"&gt;Read the user guide&lt;/a&gt; (Help → User Guide, F1).&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</source>
+            <translation>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%6"&gt;Read the user guide&lt;/a&gt; (Help → User Guide, F1).&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</translation>
         </message>
     </context>
     <context>
@@ -579,6 +579,93 @@
         </message>
     </context>
     <context>
+        <name>ts::HelpWindow</name>
+        <message>
+            <source>Continued from the end</source>
+            <translation>Continued from the end</translation>
+        </message>
+        <message>
+            <source>Continued from the start</source>
+            <translation>Continued from the start</translation>
+        </message>
+        <message>
+            <source>Not found</source>
+            <translation>Not found</translation>
+        </message>
+        <message>
+            <source>Navigation</source>
+            <translation>Navigation</translation>
+        </message>
+        <message>
+            <source>Back</source>
+            <translation>Back</translation>
+        </message>
+        <message>
+            <source>Back to the previous page</source>
+            <translation>Back to the previous page</translation>
+        </message>
+        <message>
+            <source>Forward</source>
+            <translation>Forward</translation>
+        </message>
+        <message>
+            <source>Forward to the next page</source>
+            <translation>Forward to the next page</translation>
+        </message>
+        <message>
+            <source>Contents</source>
+            <translation>Contents</translation>
+        </message>
+        <message>
+            <source>The guide's contents</source>
+            <translation>The guide's contents</translation>
+        </message>
+        <message>
+            <source>Find</source>
+            <translation>Find</translation>
+        </message>
+        <message>
+            <source>Find text in this page</source>
+            <translation>Find text in this page</translation>
+        </message>
+        <message>
+            <source>Search the guide</source>
+            <translation>Search the guide</translation>
+        </message>
+        <message>
+            <source>List the pages that contain every word typed</source>
+            <translation>List the pages that contain every word typed</translation>
+        </message>
+        <message>
+            <source>Find:</source>
+            <translation>Find:</translation>
+        </message>
+        <message>
+            <source>Previous match</source>
+            <translation>Previous match</translation>
+        </message>
+        <message>
+            <source>Next match</source>
+            <translation>Next match</translation>
+        </message>
+        <message>
+            <source>Close the find bar</source>
+            <translation>Close the find bar</translation>
+        </message>
+        <message>
+            <source>Terra Soar User Guide</source>
+            <translation>Terra Soar User Guide</translation>
+        </message>
+        <message>
+            <source>%1 – Terra Soar User Guide</source>
+            <translation>%1 – Terra Soar User Guide</translation>
+        </message>
+        <message>
+            <source>No pages match</source>
+            <translation>No pages match</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::LayerDefinition</name>
         <message>
             <source>A layer definition has no id.</source>
@@ -964,6 +1051,14 @@
         <message>
             <source>Show the sources of the layers drawn in the corner of the view</source>
             <translation>Show the sources of the layers drawn in the corner of the view</translation>
+        </message>
+        <message>
+            <source>&amp;User Guide</source>
+            <translation>&amp;User Guide</translation>
+        </message>
+        <message>
+            <source>Read the user guide, built into the program</source>
+            <translation>Read the user guide, built into the program</translation>
         </message>
     </context>
     <context>

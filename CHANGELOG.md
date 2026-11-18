@@ -7,6 +7,16 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- The user guide inside the program: Help → User Guide (F1) opens it in a
+  window of its own, offline and matching the installed version, with the
+  pages down the side, search across the pages, find in page, Back and
+  Forward, and links to other documents opened on GitHub at this
+  version's tag. F1 in the Add WMS Layer, Add Web Terrain, Offline
+  Regions, New Offline Region, Data Packs and Elevation Profile windows
+  opens the guide at their section, and the About window links to it.
+
 ## [0.0.1] – 2026-11-14
 
 The first public build: everything below is new.

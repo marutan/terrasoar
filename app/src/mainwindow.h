@@ -285,6 +285,7 @@ private:
   QAction* m_saveAsAction = nullptr;
   LayerTreeDock* m_layerDock = nullptr;
   QString m_projectPath;
+  QAction* m_userGuideAction = nullptr;
   QAction* m_aboutAction = nullptr;
   QLabel* m_statusLabel = nullptr;
   QLabel* m_pointerLabel = nullptr;

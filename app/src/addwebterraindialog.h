@@ -59,6 +59,12 @@ class AddWebTerrainDialog : public QDialog
   Q_DISABLE_COPY_MOVE(AddWebTerrainDialog)
 
 public:
+  /**
+   * The user guide's section on this window
+   * (`terrain.md#terrain-from-the-web`), opened by F1.
+   */
+  static QString helpTarget();
+
   /** What kind of source. */
   enum class Kind {
     /** Terrarium-encoded tiles. */

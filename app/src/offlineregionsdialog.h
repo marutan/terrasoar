@@ -58,6 +58,12 @@ class OfflineRegionsDialog : public QDialog
 
 public:
   /**
+   * The user guide's section on this window
+   * (`offline-use.md#managing-regions`), opened by F1.
+   */
+  static QString helpTarget();
+
+  /**
    * Shows @p manager's regions.
    * @param manager The regions.
    * @param view Where the selected region's outline is drawn; may be null.
