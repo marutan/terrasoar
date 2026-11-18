@@ -38,6 +38,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMetaEnum>
 #include <QMouseEvent>
 #include <QNetworkProxy>
 #include <QPointer>
@@ -46,6 +47,7 @@
 #include <QSignalSpy>
 #include <QSlider>
 #include <QStandardPaths>
+#include <QStatusBar>
 #include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -193,6 +195,174 @@ ts::GlobeView* globeOf(ts::MainWindow& window)
 {
   return window.findChild<ts::GlobeView*>(QStringLiteral("globeView"));
 }
+
+/**
+ * Records what reaches a main window and its globe view while the view
+ * should be idle (events that can make it draw, status bar messages, the
+ * base pack check and tile loading), with the time and the frame count,
+ * for a test to print when frames were drawn anyway.
+ *
+ * Recording must not change what it records: a slow call here would let
+ * several update requests merge into one frame. So each entry is only a
+ * few numbers, taken with cheap getters; the text is made at the end.
+ */
+class IdleWitness : public QObject
+{
+  Q_OBJECT
+
+public:
+  IdleWitness(ts::MainWindow& window, ts::GlobeView& globe)
+      : m_window(window), m_globe(globe)
+  {
+    m_entries.reserve(256);
+    m_clock.start();
+    note(Entry::Start, QEvent::None, false);
+    m_window.installEventFilter(this);
+    m_globe.installEventFilter(this);
+    connect(m_window.statusBar(), &QStatusBar::messageChanged, this,
+            [this](const QString& message) {
+              m_messages << message;
+              note(Entry::StatusMessage, QEvent::None, false);
+            });
+  }
+
+  ~IdleWitness() override
+  {
+    m_window.removeEventFilter(this);
+    m_globe.removeEventFilter(this);
+  }
+
+  IdleWitness(const IdleWitness&) = delete;
+  IdleWitness& operator=(const IdleWitness&) = delete;
+  IdleWitness(IdleWitness&&) = delete;
+  IdleWitness& operator=(IdleWitness&&) = delete;
+
+  /**
+   * Returns how often the main window was activated or deactivated. The
+   * window system does that (another window taking the focus); each time
+   * Qt repaints the whole window, the globe view included.
+   */
+  int32_t activationChanges() const
+  {
+    return static_cast<int32_t>(std::count_if(
+        m_entries.begin(), m_entries.end(), [](const Entry& entry) {
+          return entry.kind == Entry::Event &&
+                 entry.event == QEvent::ActivationChange && !entry.onGlobe;
+        }));
+  }
+
+  /** Returns the record, one line per entry, ending with the state now. */
+  QString report()
+  {
+    note(Entry::End, QEvent::None, false);
+    QStringList lines;
+    int32_t message = 0;
+    for (const Entry& entry : m_entries) {
+      QString what;
+      switch (entry.kind) {
+      case Entry::Start:
+        what = QStringLiteral("start");
+        break;
+      case Entry::End:
+        what = QStringLiteral("end");
+        break;
+      case Entry::StatusMessage:
+        what = QStringLiteral("status bar message \"%1\"")
+                   .arg(m_messages.value(message++));
+        break;
+      case Entry::Event:
+        what = QStringLiteral("%1 on %2")
+                   .arg(QString::fromLatin1(
+                            QMetaEnum::fromType<QEvent::Type>().valueToKey(
+                                entry.event)),
+                        entry.onGlobe ? QStringLiteral("globe view")
+                                      : QStringLiteral("main window"));
+        break;
+      }
+      lines << QStringLiteral("  %1 ms, frame %2, %3 (base pack %4, %5)")
+                   .arg(entry.ms, 5)
+                   .arg(entry.frames)
+                   .arg(what, basePackName(entry.basePack),
+                        entry.loading ? QStringLiteral("loading tiles")
+                                      : QStringLiteral("not loading"));
+    }
+    return lines.join(QLatin1Char('\n'));
+  }
+
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override
+  {
+    switch (event->type()) {
+    case QEvent::Paint:
+    case QEvent::UpdateRequest:
+    case QEvent::UpdateLater:
+    case QEvent::Resize:
+    case QEvent::Move:
+    case QEvent::Show:
+    case QEvent::Hide:
+    case QEvent::Expose:
+    case QEvent::WindowActivate:
+    case QEvent::WindowDeactivate:
+    case QEvent::ActivationChange:
+    case QEvent::PaletteChange:
+    case QEvent::StyleChange:
+    case QEvent::FontChange:
+    case QEvent::LayoutRequest:
+    case QEvent::WindowStateChange:
+    case QEvent::Enter:
+    case QEvent::Leave:
+    case QEvent::HoverMove:
+    case QEvent::MouseMove:
+    case QEvent::Timer:
+      note(Entry::Event, event->type(), watched == &m_globe);
+      break;
+    default:
+      break;
+    }
+    return false;
+  }
+
+private:
+  /** One thing that happened. */
+  struct Entry {
+    enum Kind { Start, End, StatusMessage, Event };
+    Kind kind;
+    QEvent::Type event;
+    bool onGlobe;
+    int64_t ms;
+    int32_t frames;
+    ts::MainWindow::BasePackState basePack;
+    bool loading;
+  };
+
+  static QString basePackName(ts::MainWindow::BasePackState state)
+  {
+    switch (state) {
+    case ts::MainWindow::BasePackState::Missing:
+      return QStringLiteral("missing");
+    case ts::MainWindow::BasePackState::Checking:
+      return QStringLiteral("checking");
+    case ts::MainWindow::BasePackState::Ok:
+      return QStringLiteral("ok");
+    case ts::MainWindow::BasePackState::Damaged:
+      return QStringLiteral("damaged");
+    }
+    return QString();
+  }
+
+  void note(Entry::Kind kind, QEvent::Type event, bool onGlobe)
+  {
+    m_entries.push_back(
+        Entry{kind, event, onGlobe, m_clock.elapsed(), m_globe.framesRendered(),
+              m_window.basePackState(), m_globe.isLoadingTiles()});
+  }
+
+  ts::MainWindow& m_window;
+  ts::GlobeView& m_globe;
+  QElapsedTimer m_clock;
+  std::vector<Entry> m_entries;
+  QStringList m_messages;
+};
 
 /**
  * Waits until @p globe has drawn no frame for 300 ms (the frame for the last
@@ -1478,13 +1648,18 @@ private slots:
     QVERIFY(QTest::qWaitFor(
         [&]() { return !globeOf(window)->isLoadingTiles(); }, 20000));
     QVERIFY2(waitUntilQuiet(globeOf(window)), "the view kept drawing");
-    // As in idleViewStopsDrawing: a late repaint or two from the window
-    // system is not drawing continuously.
+    // As in idleViewStopsDrawing: repaints the window system asks for are
+    // not the view drawing by itself.
     const int32_t frames = globeOf(window)->framesRendered();
+    IdleWitness witness(window, *globeOf(window));
     QTest::qWait(1000);
-    QVERIFY2(globeOf(window)->framesRendered() <= frames + 2,
-             qPrintable(QStringLiteral("%1 frames drawn while idle")
-                            .arg(globeOf(window)->framesRendered() - frames)));
+    const int32_t allowed = 2 + witness.activationChanges();
+    QVERIFY2(globeOf(window)->framesRendered() <= frames + allowed,
+             qPrintable(QStringLiteral("%1 frames drawn while idle (%2 "
+                                       "allowed):\n%3")
+                            .arg(globeOf(window)->framesRendered() - frames)
+                            .arg(allowed)
+                            .arg(witness.report())));
     // Removing the layer forgets its status.
     model->removeNode(offline);
   }
@@ -1923,14 +2098,21 @@ private slots:
         },
         20000));
     QVERIFY2(waitUntilQuiet(globe), "the view kept drawing");
-    // Drawing continuously would be dozens of frames a second; a late
-    // repaint or two (the window system exposing it again, a status bar
-    // change resizing it, both seen on slow Windows runners) is not that.
+    // Drawing continuously would be dozens of frames a second. Repaints the
+    // window system asks for are not that: a late one or two (exposing the
+    // window again, a status bar change resizing it), and one each time
+    // the window is activated or deactivated (on Windows runners focus has
+    // been seen to go back and forth every 50-250 ms, a frame each time).
     const int32_t frames = globe->framesRendered();
+    IdleWitness witness(window, *globe);
     QTest::qWait(1000);
-    QVERIFY2(globe->framesRendered() <= frames + 2,
-             qPrintable(QStringLiteral("%1 frames drawn while idle")
-                            .arg(globe->framesRendered() - frames)));
+    const int32_t allowed = 2 + witness.activationChanges();
+    QVERIFY2(globe->framesRendered() <= frames + allowed,
+             qPrintable(QStringLiteral("%1 frames drawn while idle (%2 "
+                                       "allowed):\n%3")
+                            .arg(globe->framesRendered() - frames)
+                            .arg(allowed)
+                            .arg(witness.report())));
   }
 };
 
