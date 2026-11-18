@@ -7,6 +7,8 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+## [0.0.2] – 2026-11-18
+
 ### Added
 
 - WMTS layers: File → Add WMTS Layer… (or Add Layer → WMTS Layer… in the
@@ -17,9 +19,9 @@ All notable changes to Terra Soar. The format follows
   the service's terms and credit are shown before adding. Tile matrix sets
   in latitude/longitude, in Web Mercator and in national grids (any
   coordinate system with an EPSG code, such as the British National Grid)
-  are drawn, on the globe, the maps and through the change between them. WMTS layers cache their tiles,
-  work offline from saved tiles and can be kept as offline regions, like
-  WMS layers.
+  are drawn, on the globe, the maps and through the change between them.
+  WMTS layers cache their tiles, work offline from saved tiles and can be
+  kept as offline regions, like WMS layers.
 - The user guide inside the program: Help → User Guide (F1) opens it in a
   window of its own, offline and matching the installed version, with the
   pages down the side, search across the pages, find in page, Back and
@@ -27,6 +29,14 @@ All notable changes to Terra Soar. The format follows
   version's tag. F1 in the Add WMS Layer, Add Web Terrain, Offline
   Regions, New Offline Region, Data Packs and Elevation Profile windows
   opens the guide at their section, and the About window links to it.
+- View → Attributions shows or hides the credits in the bottom-right
+  corner of the view (shown by default), next to View → Scale Bar.
+
+### Changed
+
+- The About window shows the copyright notice under the version. The
+  separate Help → About Qt entry is gone; Qt's licence is with the other
+  third-party notices in the About window.
 
 ### Fixed
 
@@ -100,5 +110,6 @@ The first public build: everything below is new.
   and the third-party notices.
 - English text throughout, ready for translation (Qt Linguist).
 
-[Unreleased]: https://github.com/marutan/terrasoar/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/marutan/terrasoar/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/marutan/terrasoar/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/marutan/terrasoar/releases/tag/v0.0.1
