@@ -15,8 +15,9 @@ All notable changes to Terra Soar. The format follows
   of open services or any address (KVP or `WMTSCapabilities.xml`). Choose
   the style, image format, tile matrix set and dates or other dimensions;
   the service's terms and credit are shown before adding. Tile matrix sets
-  in latitude/longitude and in Web Mercator are drawn, on the globe, the
-  maps and through the change between them. WMTS layers cache their tiles,
+  in latitude/longitude, in Web Mercator and in national grids (any
+  coordinate system with an EPSG code, such as the British National Grid)
+  are drawn, on the globe, the maps and through the change between them. WMTS layers cache their tiles,
   work offline from saved tiles and can be kept as offline regions, like
   WMS layers.
 - The user guide inside the program: Help → User Guide (F1) opens it in a

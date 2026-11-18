@@ -83,11 +83,15 @@ allow that; Terra Soar then says so and doesn't download.
 ## Things to know
 
 - **Coordinate systems.** Terra Soar draws tile matrix sets in plain
-  latitude and longitude (EPSG:4326 or CRS:84) and in Web Mercator
-  (EPSG:3857, the system of web maps). Web Mercator layers have no data
-  within about 5° of the poles, which Web Mercator can't show. Layers only
-  available in other systems (national grids such as the British National
-  Grid or the Dutch RD) can't be added yet.
+  latitude and longitude (EPSG:4326 or CRS:84), in Web Mercator
+  (EPSG:3857, the system of web maps), and in national and regional grids
+  such as the British National Grid, the Dutch RD New or LAEA Europe: any
+  coordinate system with an EPSG code. When a layer comes in several, the
+  dialog suggests latitude and longitude first, then Web Mercator, then the
+  others; all look the same once drawn. Web Mercator layers have no data
+  within about 5° of the poles, which Web Mercator can't show. A layer in a
+  national grid is drawn only over the area the grid is made for (Great
+  Britain for the British National Grid).
 - **Detail.** Terra Soar uses the server's tiles as they are where they
   line up with its own, and cuts and combines them where they don't, so
   any tile grid works. Zoomed in past a layer's finest tiles, the finest

@@ -28,8 +28,12 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
+#include <utility>
+#include <vector>
 
+#include <QImage>
 #include <QString>
 
 #include "ts/network/cachedtilefetcher.h"
@@ -42,6 +46,7 @@ namespace ts
 
 class NetworkClient;
 class TileDiskCache;
+class WmtsCrsTransform;
 
 /**
  * Imagery from one layer of a WMTS server.
@@ -53,6 +58,13 @@ class TileDiskCache;
  * the quadtree (WorldCRS84Quad, GoogleMapsCompatible). Tiles of matrix
  * sets in Web Mercator make Web Mercator images, reprojected when drawn,
  * as for WMS.
+ *
+ * Tile matrix sets in other CRSs (projected ones such as British National
+ * Grid, see isProjectedWmtsCrs()) are reprojected on the CPU: a grid of the
+ * quadtree tile's points (inside the source's bounds) goes through PROJ
+ * (WmtsCrsTransform), its extent picks the block of tiles, and each pixel
+ * of the geographic image is placed in the CRS by interpolating the grid
+ * and coloured from the block, bilinear.
  *
  * Each WMTS tile is fetched through a CachedTileFetcher and kept in the
  * disk cache under its own key (matrix, column, row), so neighbouring
@@ -140,8 +152,45 @@ public:
   WebTileStatistics statistics() const;
 
 private:
+  /**
+   * A window's WMTS tiles side by side, and what became of them. Drawn
+   * smaller (by scale) when the block would be over 2048 pixels across.
+   */
+  struct Mosaic {
+    QImage image;
+    ImageLoadResult::Outcome outcome = ImageLoadResult::Outcome::NoData;
+    /** The mosaic's pixels per WMTS tile pixel (1, or less). */
+    double scale = 1.0;
+  };
+
+  /**
+   * For a projected CRS: the part of a quadtree tile inside the source's
+   * bounds, a grid of its points in the CRS, and their extent there.
+   */
+  struct ProjectedGrid {
+    /** Cells along each side of the grid. */
+    static constexpr int32_t cells = 16;
+    GeoRect clip;
+    /** (cells + 1)², row by row from the north-west; NaN where PROJ fails. */
+    std::vector<std::pair<double, double>> points;
+    GeoRect extent;
+  };
+
+  Mosaic fetchMosaic(const WmtsTileWindow& window,
+                     const std::atomic<bool>& cancelled) const;
+  std::optional<ProjectedGrid> projectedGrid(TileKey key) const;
+  ImageLoadResult loadReprojected(TileKey key,
+                                  const std::atomic<bool>& cancelled);
+  QImage resample(TileKey key, const ProjectedGrid& grid,
+                  const WmtsTileWindow& window, const Mosaic& mosaic) const;
+  std::unique_ptr<WmtsCrsTransform> takeTransform() const;
+  void returnTransform(std::unique_ptr<WmtsCrsTransform> transform) const;
+
   const WmtsSource m_source;
   const std::unique_ptr<CachedTileFetcher> m_fetcher;
+  /** PROJ transformations not in use (each used by one thread at a time). */
+  mutable std::mutex m_transformMutex;
+  mutable std::vector<std::unique_ptr<WmtsCrsTransform>> m_transforms;
 };
 
 } // namespace ts

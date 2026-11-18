@@ -109,6 +109,7 @@ HEADERS += \
     include/ts/wms/wmsimageryprovider.h \
     include/ts/wms/wmssource.h \
     include/ts/wmts/wmtscapabilities.h \
+    include/ts/wmts/wmtscrs.h \
     include/ts/wmts/wmtsimageryprovider.h \
     include/ts/wmts/wmtssource.h \
     src/globe/globeuniforms.h \
@@ -185,5 +186,6 @@ SOURCES += \
     src/wms/wmsimageryprovider.cpp \
     src/wms/wmssource.cpp \
     src/wmts/wmtscapabilities.cpp \
+    src/wmts/wmtscrs.cpp \
     src/wmts/wmtsimageryprovider.cpp \
     src/wmts/wmtssource.cpp
