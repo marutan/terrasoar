@@ -74,6 +74,7 @@ HEADERS += \
     include/ts/network/cachedtilefetcher.h \
     include/ts/network/httpcache.h \
     include/ts/network/networkclient.h \
+    include/ts/network/regiontilesource.h \
     include/ts/network/tilediskcache.h \
     include/ts/packs/basepack.h \
     include/ts/packs/packindex.h \
@@ -150,6 +151,7 @@ SOURCES += \
     src/network/cachedtilefetcher.cpp \
     src/network/httpcache.cpp \
     src/network/networkclient.cpp \
+    src/network/regiontilesource.cpp \
     src/network/tilediskcache.cpp \
     src/packs/basepack.cpp \
     src/packs/packindex.cpp \

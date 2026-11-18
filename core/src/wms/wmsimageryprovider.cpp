@@ -220,98 +220,24 @@ std::optional<GeoRect> WmsImageryProvider::dataBounds() const
   return bounds;
 }
 
+int64_t WmsImageryProvider::typicalTileBytes() const
+{
+  return typicalImageBytes(m_source.format, m_source.tileSizePx);
+}
+
 RegionTileResult
 WmsImageryProvider::fetchForRegion(TileKey key, int64_t region,
                                    const std::atomic<bool>& cancelled)
 {
-  using Outcome = RegionTileResult::Outcome;
-  RegionTileResult result;
   const QUrl url = getMapUrl(m_source, key);
   if (url.isEmpty()) {
-    result.outcome = Outcome::NoData;
+    RegionTileResult result;
+    result.outcome = RegionTileResult::Outcome::NoData;
     return result;
   }
-  TileDiskCache* const cache = m_fetcher->diskCache();
-  if (cache == nullptr) {
-    result.errorString = QCoreApplication::translate(
-        "ts::WmsImageryProvider", "There is no disk cache to keep tiles in.");
-    return result;
-  }
-  const int64_t nowS = m_fetcher->now();
-  const std::optional<CachedTile> cached = cache->find(key);
-  if (cached && nowS < cached->expiresS &&
-      (region == 0 || cache->pin(region, key))) {
-    result.outcome = Outcome::AlreadyCached;
-    result.bytes = cached->data.size();
-    return result;
-  }
-
-  HttpRequest request;
-  request.url = url;
-  if (cached) {
-    request.headers = revalidationHeaders(cached->etag, cached->lastModified);
-  }
-  m_fetcher->countRequest();
-  const HttpResponse response = m_fetcher->network()->fetch(request, cancelled);
-  if (response.error == NetworkError::Cancelled || cancelled.load()) {
-    result.outcome = Outcome::Cancelled;
-    return result;
-  }
-  if (response.error == NetworkError::TooLarge) {
-    result.errorString = QCoreApplication::translate(
-        "ts::WmsImageryProvider",
-        "The server sent a tile that is far too large.");
-    return result;
-  }
-  if (response.error != NetworkError::None) {
-    result.unreachable = true;
-    result.errorString = QCoreApplication::translate("ts::WmsImageryProvider",
-                                                     "Can't reach %1 (%2).")
-                             .arg(m_source.url.host(), response.errorString);
-    return result;
-  }
-  if (response.status == 304 && cached) {
-    const HttpFreshness renewed = revalidatedFreshness(
-        HttpFreshness{true, cached->expiresS, cached->etag,
-                      cached->lastModified},
-        response, nowS, m_fetcher->settings().defaultLifetimeS);
-    cache->refresh(key, renewed.expiresS, renewed.etag, renewed.lastModified);
-    if (region == 0 || cache->pin(region, key)) {
-      result.outcome = Outcome::Revalidated;
-      result.bytes = cached->data.size();
-    }
-    return result;
-  }
-  if (response.status < 200 || response.status >= 300) {
-    result.errorString = statusErrorMessage(response);
-    return result;
-  }
-  if (decode(response.body).isNull()) {
-    result.errorString = notAnImageMessage(response);
-    return result;
-  }
-  const HttpFreshness freshness =
-      httpFreshness(response, nowS, m_fetcher->settings().defaultLifetimeS);
-  if (!freshness.storable) {
-    result.errorString = QCoreApplication::translate(
-        "ts::WmsImageryProvider",
-        "The server doesn't allow its tiles to be kept (no-store).");
-    return result;
-  }
-  if (!cache->store(key,
-                    CachedTile{response.body, response.header("content-type"),
-                               freshness.expiresS, freshness.etag,
-                               freshness.lastModified},
-                    region)) {
-    result.errorString =
-        QCoreApplication::translate("ts::WmsImageryProvider",
-                                    "The tile could not be saved: %1")
-            .arg(cache->errorString());
-    return result;
-  }
-  result.outcome = Outcome::Downloaded;
-  result.bytes = response.body.size();
-  return result;
+  return m_fetcher->fetchForRegion(
+      key, url, region,
+      [](const QByteArray& data) { return !decode(data).isNull(); }, cancelled);
 }
 
 } // namespace ts

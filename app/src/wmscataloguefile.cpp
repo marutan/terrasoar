@@ -55,4 +55,40 @@ std::vector<WmsCatalogueEntry> currentWmsCatalogue()
   return catalogue;
 }
 
+QString wmtsCatalogueCachePath()
+{
+  return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+      .filePath(QStringLiteral("wmts-catalogue.json"));
+}
+
+std::vector<WmsCatalogueEntry> readWmtsCatalogueFile(const QString& path)
+{
+  QFile file(path);
+  if (!file.open(QIODevice::ReadOnly)) {
+    return {};
+  }
+  QString error;
+  return parseWmtsCatalogue(file.readAll(), &error)
+      .value_or(std::vector<WmsCatalogueEntry>{});
+}
+
+std::vector<WmsCatalogueEntry> currentWmtsCatalogue()
+{
+  std::vector<WmsCatalogueEntry> catalogue =
+      readWmtsCatalogueFile(wmtsCatalogueCachePath());
+  if (catalogue.empty()) {
+    catalogue =
+        readWmtsCatalogueFile(QStringLiteral(":/data/wmts-catalogue.json"));
+  }
+  return catalogue;
+}
+
+std::vector<WmsCatalogueEntry> currentServiceCatalogues()
+{
+  std::vector<WmsCatalogueEntry> catalogues = currentWmsCatalogue();
+  const std::vector<WmsCatalogueEntry> wmts = currentWmtsCatalogue();
+  catalogues.insert(catalogues.end(), wmts.begin(), wmts.end());
+  return catalogues;
+}
+
 } // namespace ts

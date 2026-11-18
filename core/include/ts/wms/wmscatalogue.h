@@ -20,7 +20,8 @@
 
 /**
  * @file
- * The catalogue of open WMS services offered in the Add WMS dialog.
+ * The catalogues of open WMS and WMTS services offered in the Add WMS
+ * and Add WMTS dialogs (one entry type for both).
  */
 #ifndef TS_WMS_WMSCATALOGUE_H
 #define TS_WMS_WMSCATALOGUE_H
@@ -97,6 +98,35 @@ inline constexpr const char* wmsCatalogueUrl =
  */
 std::optional<std::vector<WmsCatalogueEntry>>
 parseWmsCatalogue(const QByteArray& json, QString* errorString);
+
+/** Format name in every WMTS catalogue file. */
+inline constexpr const char* wmtsCatalogueFormatName =
+    "terrasoar-wmts-catalogue";
+
+/** Version of the WMTS catalogue format this build reads. */
+inline constexpr int32_t wmtsCatalogueFormatVersion = 1;
+
+/**
+ * Where the application fetches the current WMTS catalogue: the file
+ * `data/wmts-catalogue.json` on the main branch of the repository. It is
+ * a file of its own, not entries in the WMS catalogue, so that programs
+ * from before WMTS (which fetch that one) never offer a WMTS service in
+ * their Add WMS dialog.
+ */
+inline constexpr const char* wmtsCatalogueUrl =
+    "https://raw.githubusercontent.com/marutan/terrasoar/main/data/"
+    "wmts-catalogue.json";
+
+/**
+ * Reads a WMTS catalogue document: the same as a WMS one
+ * (parseWmsCatalogue()) with the format name
+ * "terrasoar-wmts-catalogue". An entry's url is the service's
+ * capabilities address (KVP, or a RESTful WMTSCapabilities.xml).
+ *
+ * @reentrant
+ */
+std::optional<std::vector<WmsCatalogueEntry>>
+parseWmtsCatalogue(const QByteArray& json, QString* errorString);
 
 /**
  * Returns the catalogue entry for the service at @p url (a GetMap or

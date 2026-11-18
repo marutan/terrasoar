@@ -56,7 +56,8 @@ namespace ts
 class CountryAreas;
 class GlobeView;
 class OfflineRegionManager;
-class WmsImageryProvider;
+class ImageryProvider;
+class RegionTileSource;
 
 /** A layer that can be kept for offline use: its name and source. */
 struct RegionLayerChoice {
@@ -167,7 +168,8 @@ private:
   OfflineRegionManager& m_manager;
   const std::vector<RegionLayerChoice> m_layers;
   QPointer<GlobeView> m_view;
-  std::shared_ptr<WmsImageryProvider> m_provider;
+  std::shared_ptr<RegionTileSource> m_provider;
+  std::shared_ptr<ImageryProvider> m_imagery;
   std::optional<RegionGeometry> m_area;
   std::shared_ptr<const CountryAreas> m_countries;
   /** The country the area is, if chosen by country. */

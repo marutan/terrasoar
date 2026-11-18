@@ -56,6 +56,7 @@
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
+#include "addwmtsdialog.h"
 #include "elevationprofiledialog.h"
 #include "globeview.h"
 #include "helpwindow.h"
@@ -189,6 +190,8 @@ MainWindow::MainWindow(QWidget* parent)
   addDockWidget(Qt::LeftDockWidgetArea, m_layerDock);
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
+          [this]() { addWmtsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
           [this]() { addElevationFile(); });
   connect(m_layerDock, &LayerTreeDock::addWebTerrainRequested, this,
@@ -509,6 +512,11 @@ void MainWindow::createActions()
   connect(m_addWmsAction, &QAction::triggered, this,
           [this]() { addWmsLayer(); });
 
+  m_addWmtsAction = new QAction(this);
+  m_addWmtsAction->setObjectName(QStringLiteral("addWmtsAction"));
+  connect(m_addWmtsAction, &QAction::triggered, this,
+          [this]() { addWmtsLayer(); });
+
   m_addWebTerrainAction = new QAction(this);
   m_addWebTerrainAction->setObjectName(QStringLiteral("addWebTerrainAction"));
   connect(m_addWebTerrainAction, &QAction::triggered, this,
@@ -712,6 +720,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_saveAsAction);
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
+  m_fileMenu->addAction(m_addWmtsAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
@@ -807,10 +816,13 @@ void MainWindow::retranslateUi()
   m_addWmsAction->setText(tr("Add &WMS Layer…"));
   m_addWmsAction->setStatusTip(
       tr("Add a layer from a web map server (WMS) to the layer tree"));
+  m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
+  m_addWmtsAction->setStatusTip(
+      tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
   m_offlineRegionsAction->setText(tr("Offline &Regions…"));
   m_offlineRegionsAction->setStatusTip(
-      tr("Keep areas of WMS layers on this computer for use without a "
-         "network"));
+      tr("Keep areas of WMS and WMTS layers on this computer for use "
+         "without a network"));
   m_dataPacksAction->setText(tr("&Data Packs…"));
   m_dataPacksAction->setStatusTip(
       tr("Install more detailed imagery and shorelines, or remove them"));
@@ -992,6 +1004,21 @@ void MainWindow::addWmsLayer(const QString& address)
   }
 }
 
+void MainWindow::addWmtsLayer(const QString& address)
+{
+  AddWmtsDialog dialog(m_registry->network(), this);
+  if (!address.isEmpty()) {
+    dialog.connectTo(address);
+  }
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
+  }
+}
+
 ElevationProfileDialog* MainWindow::showElevationProfile()
 {
   if (m_globeView == nullptr) {
@@ -1123,13 +1150,14 @@ NewRegionDialog* MainWindow::newOfflineRegion()
     m_newRegionDialog->raise();
     return m_newRegionDialog;
   }
-  // The WMS layers of the project, each source once, top first.
+  // The WMS and WMTS layers of the project, each source once, top first.
   std::vector<RegionLayerChoice> layers;
   const LayerStack stack = m_layers->layerStack();
   for (std::size_t i = stack.imagery.size(); i-- > 0;) {
     const LayerDefinition& definition = stack.imagery[i].definition;
-    if (definition.source.value(QStringLiteral("kind")).toString() !=
-        QLatin1String("wms")) {
+    const QString kind =
+        definition.source.value(QStringLiteral("kind")).toString();
+    if (kind != QLatin1String("wms") && kind != QLatin1String("wmts")) {
       continue;
     }
     const bool seen = std::any_of(layers.begin(), layers.end(),
@@ -1143,8 +1171,9 @@ NewRegionDialog* MainWindow::newOfflineRegion()
   if (layers.empty()) {
     QMessageBox::information(
         this, tr("New Offline Region"),
-        tr("Only layers from WMS servers can be kept for offline use. Add a "
-           "WMS layer first (File → Add WMS Layer…)."));
+        tr("Only layers from WMS and WMTS servers can be kept for offline "
+           "use. Add one first (File → Add WMS Layer… or Add WMTS "
+           "Layer…)."));
     return nullptr;
   }
   if (!m_countries && !m_countriesFile.isEmpty()) {

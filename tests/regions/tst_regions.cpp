@@ -1050,7 +1050,7 @@ private slots:
     const ts::RegionEstimate guess =
         ts::estimateRegionSize(offline, wide, 0, 3, 8, notCancelled);
     QCOMPARE(guess.sampledTiles, 0);
-    QCOMPARE(guess.bytes, guess.tiles * ts::typicalTileBytes(offline));
+    QCOMPARE(guess.bytes, guess.tiles * offline.typicalTileBytes());
   }
 
   void webMercatorSourcesSkipThePoles()

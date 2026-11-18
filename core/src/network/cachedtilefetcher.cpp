@@ -81,6 +81,100 @@ WebTileStatistics CachedTileFetcher::statistics() const
   return m_statistics;
 }
 
+RegionTileResult CachedTileFetcher::fetchForRegion(
+    TileKey key, const QUrl& url, int64_t region,
+    const std::function<bool(const QByteArray&)>& isTile,
+    const std::atomic<bool>& cancelled)
+{
+  using Outcome = RegionTileResult::Outcome;
+  RegionTileResult result;
+  if (!m_cache) {
+    result.errorString = QCoreApplication::translate(
+        "ts::CachedTileFetcher", "There is no disk cache to keep tiles in.");
+    return result;
+  }
+  const int64_t nowS = now();
+  const std::optional<CachedTile> cached = m_cache->find(key);
+  if (cached && nowS < cached->expiresS &&
+      (region == 0 || m_cache->pin(region, key))) {
+    result.outcome = Outcome::AlreadyCached;
+    result.bytes = cached->data.size();
+    return result;
+  }
+
+  HttpRequest request;
+  request.url = url;
+  if (cached) {
+    request.headers = revalidationHeaders(cached->etag, cached->lastModified);
+  }
+  countRequest();
+  const HttpResponse response = m_network->fetch(request, cancelled);
+  if (response.error == NetworkError::Cancelled || cancelled.load()) {
+    result.outcome = Outcome::Cancelled;
+    return result;
+  }
+  if (response.error == NetworkError::TooLarge) {
+    result.errorString = QCoreApplication::translate(
+        "ts::CachedTileFetcher",
+        "The server sent a tile that is far too large.");
+    return result;
+  }
+  if (response.error != NetworkError::None) {
+    result.unreachable = true;
+    result.errorString = QCoreApplication::translate("ts::CachedTileFetcher",
+                                                     "Can't reach %1 (%2).")
+                             .arg(m_host, response.errorString);
+    return result;
+  }
+  if (response.status == 304 && cached) {
+    const HttpFreshness renewed =
+        revalidatedFreshness(HttpFreshness{true, cached->expiresS, cached->etag,
+                                           cached->lastModified},
+                             response, nowS, m_settings.defaultLifetimeS);
+    m_cache->refresh(key, renewed.expiresS, renewed.etag, renewed.lastModified);
+    if (region == 0 || m_cache->pin(region, key)) {
+      result.outcome = Outcome::Revalidated;
+      result.bytes = cached->data.size();
+    }
+    return result;
+  }
+  if (m_messages.notFoundIsNoData &&
+      (response.status == 404 || response.status == 204)) {
+    result.outcome = Outcome::NoData;
+    return result;
+  }
+  if (response.status < 200 || response.status >= 300) {
+    result.errorString = m_messages.statusError(response);
+    return result;
+  }
+  if (!isTile(response.body)) {
+    result.errorString = m_messages.notATile(response);
+    return result;
+  }
+  const HttpFreshness freshness =
+      httpFreshness(response, nowS, m_settings.defaultLifetimeS);
+  if (!freshness.storable) {
+    result.errorString = QCoreApplication::translate(
+        "ts::CachedTileFetcher",
+        "The server doesn't allow its tiles to be kept (no-store).");
+    return result;
+  }
+  if (!m_cache->store(key,
+                      CachedTile{response.body, response.header("content-type"),
+                                 freshness.expiresS, freshness.etag,
+                                 freshness.lastModified},
+                      region)) {
+    result.errorString =
+        QCoreApplication::translate("ts::CachedTileFetcher",
+                                    "The tile could not be saved: %1")
+            .arg(m_cache->errorString());
+    return result;
+  }
+  result.outcome = Outcome::Downloaded;
+  result.bytes = response.body.size();
+  return result;
+}
+
 void CachedTileFetcher::countRequest()
 {
   const std::lock_guard<std::mutex> lock(m_mutex);

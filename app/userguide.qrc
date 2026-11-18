@@ -28,6 +28,7 @@
     <qresource prefix="/guide">
         <file alias="user/README.md">../docs/user/README.md</file>
         <file alias="user/adding-wms-layers.md">../docs/user/adding-wms-layers.md</file>
+        <file alias="user/adding-wmts-layers.md">../docs/user/adding-wmts-layers.md</file>
         <file alias="user/getting-around.md">../docs/user/getting-around.md</file>
         <file alias="user/installation.md">../docs/user/installation.md</file>
         <file alias="user/layers.md">../docs/user/layers.md</file>

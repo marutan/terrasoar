@@ -27,9 +27,9 @@
 #include <QDateTime>
 #include <QStringList>
 
+#include "ts/network/regiontilesource.h"
 #include "ts/network/tilediskcache.h"
 #include "ts/providers/providerregistry.h"
-#include "ts/wms/wmsimageryprovider.h"
 #include "wmscataloguefile.h"
 
 namespace ts
@@ -47,7 +47,7 @@ OfflineRegionManager::OfflineRegionManager(ProviderRegistry& registry,
                                            const QString& storePath,
                                            QObject* parent)
     : QObject(parent), m_registry(registry), m_store(storePath),
-      m_catalogue(&currentWmsCatalogue)
+      m_catalogue(&currentServiceCatalogues)
 {
   if (!m_store.load(&m_loadError)) {
     qWarning("Offline regions %s: %s", qUtf8Printable(storePath),
@@ -83,18 +83,18 @@ std::vector<WmsCatalogueEntry> OfflineRegionManager::catalogue() const
   return m_catalogue ? m_catalogue() : std::vector<WmsCatalogueEntry>{};
 }
 
-std::shared_ptr<WmsImageryProvider>
+std::shared_ptr<RegionTileSource>
 OfflineRegionManager::providerFor(const QJsonObject& source,
                                   QString* errorString)
 {
   QString error;
-  std::shared_ptr<WmsImageryProvider> provider =
-      std::dynamic_pointer_cast<WmsImageryProvider>(
+  std::shared_ptr<RegionTileSource> provider =
+      std::dynamic_pointer_cast<RegionTileSource>(
           m_registry.imagery(source, &error));
   if (!provider && errorString) {
     *errorString = error.isEmpty()
-                       ? tr("Only layers from WMS servers can be kept for "
-                            "offline use.")
+                       ? tr("Only layers from WMS and WMTS servers can be "
+                            "kept for offline use.")
                        : error;
   }
   if (provider && !provider->diskCache() && errorString) {
@@ -107,7 +107,7 @@ OfflineRegionManager::providerFor(const QJsonObject& source,
 bool OfflineRegionManager::startDownload(OfflineRegion& region,
                                          QString* errorString)
 {
-  std::shared_ptr<WmsImageryProvider> provider =
+  std::shared_ptr<RegionTileSource> provider =
       providerFor(region.source, errorString);
   if (!provider) {
     return false;
@@ -181,7 +181,7 @@ void OfflineRegionManager::remove(int64_t id)
   }
   m_downloads.erase(id); // cancels and waits
   QString error;
-  std::shared_ptr<WmsImageryProvider> provider =
+  std::shared_ptr<RegionTileSource> provider =
       providerFor(region->source, &error);
   if (provider) {
     provider->diskCache()->unpinRegion(id);

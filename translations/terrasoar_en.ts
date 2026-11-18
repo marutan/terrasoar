@@ -307,6 +307,108 @@
         </message>
     </context>
     <context>
+        <name>ts::AddWmtsDialog</name>
+        <message>
+            <source>Add WMTS Layer</source>
+            <translation>Add WMTS Layer</translation>
+        </message>
+        <message>
+            <source>&amp;Service (choose one or type its address):</source>
+            <translation>&amp;Service (choose one or type its address):</translation>
+        </message>
+        <message>
+            <source>&amp;Connect</source>
+            <translation>&amp;Connect</translation>
+        </message>
+        <message>
+            <source>&amp;Layers:</source>
+            <translation>&amp;Layers:</translation>
+        </message>
+        <message>
+            <source>S&amp;tyle:</source>
+            <translation>S&amp;tyle:</translation>
+        </message>
+        <message>
+            <source>&amp;Format:</source>
+            <translation>&amp;Format:</translation>
+        </message>
+        <message>
+            <source>Tile &amp;matrix set:</source>
+            <translation>Tile &amp;matrix set:</translation>
+        </message>
+        <message>
+            <source>&amp;Add</source>
+            <translation>&amp;Add</translation>
+        </message>
+        <message>
+            <source>https://example.org/wmts/1.0.0/WMTSCapabilities.xml</source>
+            <translation>https://example.org/wmts/1.0.0/WMTSCapabilities.xml</translation>
+        </message>
+        <message>
+            <source>Connect to see the layers the server offers.</source>
+            <translation>Connect to see the layers the server offers.</translation>
+        </message>
+        <message>
+            <source>Credit: %1</source>
+            <translation>Credit: %1</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>Enter the address of a WMTS service, starting with https:// or http://.</source>
+            <translation>Enter the address of a WMTS service, starting with https:// or http://.</translation>
+        </message>
+        <message>
+            <source>Connecting to %1…</source>
+            <translation>Connecting to %1…</translation>
+        </message>
+        <message>
+            <source>Can't reach %1: %2</source>
+            <translation>Can't reach %1: %2</translation>
+        </message>
+        <message>
+            <source>The server answered: %1</source>
+            <translation>The server answered: %1</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n layer(s).</source>
+            <translation>
+                <numerusform>%1: %n layer.</numerusform>
+                <numerusform>%1: %n layers.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>%1:</source>
+            <translation>%1:</translation>
+        </message>
+        <message>
+            <source>%1 (%2):</source>
+            <translation>%1 (%2):</translation>
+        </message>
+        <message>
+            <source>Drawn from Web Mercator tiles (%1), reprojected.</source>
+            <translation>Drawn from Web Mercator tiles (%1), reprojected.</translation>
+        </message>
+        <message>
+            <source>Drawn from %1 tiles in %2.</source>
+            <translation>Drawn from %1 tiles in %2.</translation>
+        </message>
+        <message>
+            <source>Fees: %1</source>
+            <translation>Fees: %1</translation>
+        </message>
+        <message>
+            <source>The server's terms: %1</source>
+            <translation>The server's terms: %1</translation>
+        </message>
+        <message>
+            <source>Legend</source>
+            <translation>Legend</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BuiltinLayers</name>
         <message>
             <source>Checkerboard</source>
@@ -346,6 +448,22 @@
         <message>
             <source>The server sent a tile that is far too large.</source>
             <translation>The server sent a tile that is far too large.</translation>
+        </message>
+        <message>
+            <source>There is no disk cache to keep tiles in.</source>
+            <translation>There is no disk cache to keep tiles in.</translation>
+        </message>
+        <message>
+            <source>Can't reach %1 (%2).</source>
+            <translation>Can't reach %1 (%2).</translation>
+        </message>
+        <message>
+            <source>The server doesn't allow its tiles to be kept (no-store).</source>
+            <translation>The server doesn't allow its tiles to be kept (no-store).</translation>
+        </message>
+        <message>
+            <source>The tile could not be saved: %1</source>
+            <translation>The tile could not be saved: %1</translation>
         </message>
     </context>
     <context>
@@ -758,6 +876,10 @@
             <source>Web Terrain…</source>
             <translation>Web Terrain…</translation>
         </message>
+        <message>
+            <source>WMTS Layer…</source>
+            <translation>WMTS Layer…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -925,16 +1047,8 @@
             <translation>Offline &amp;Regions…</translation>
         </message>
         <message>
-            <source>Keep areas of WMS layers on this computer for use without a network</source>
-            <translation>Keep areas of WMS layers on this computer for use without a network</translation>
-        </message>
-        <message>
             <source>New Offline Region</source>
             <translation>New Offline Region</translation>
-        </message>
-        <message>
-            <source>Only layers from WMS servers can be kept for offline use. Add a WMS layer first (File → Add WMS Layer…).</source>
-            <translation>Only layers from WMS servers can be kept for offline use. Add a WMS layer first (File → Add WMS Layer…).</translation>
         </message>
         <message>
             <source>&amp;Data Packs…</source>
@@ -1059,6 +1173,22 @@
         <message>
             <source>Read the user guide, built into the program</source>
             <translation>Read the user guide, built into the program</translation>
+        </message>
+        <message>
+            <source>Add W&amp;MTS Layer…</source>
+            <translation>Add W&amp;MTS Layer…</translation>
+        </message>
+        <message>
+            <source>Add a layer from a web map tile server (WMTS) to the layer tree</source>
+            <translation>Add a layer from a web map tile server (WMTS) to the layer tree</translation>
+        </message>
+        <message>
+            <source>Keep areas of WMS and WMTS layers on this computer for use without a network</source>
+            <translation>Keep areas of WMS and WMTS layers on this computer for use without a network</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</source>
+            <translation>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</translation>
         </message>
     </context>
     <context>
@@ -1201,16 +1331,16 @@
     <context>
         <name>ts::OfflineRegionManager</name>
         <message>
-            <source>Only layers from WMS servers can be kept for offline use.</source>
-            <translation>Only layers from WMS servers can be kept for offline use.</translation>
-        </message>
-        <message>
             <source>There is no disk cache to keep tiles in.</source>
             <translation>There is no disk cache to keep tiles in.</translation>
         </message>
         <message>
             <source>Downloading “%1”: %2 %</source>
             <translation>Downloading “%1”: %2 %</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS and WMTS servers can be kept for offline use.</source>
+            <translation>Only layers from WMS and WMTS servers can be kept for offline use.</translation>
         </message>
     </context>
     <context>
@@ -1682,13 +1812,17 @@
             <source>The WMS catalogue is of a newer format than this program reads.</source>
             <translation>The WMS catalogue is of a newer format than this program reads.</translation>
         </message>
+        <message>
+            <source>This is not a WMTS catalogue.</source>
+            <translation>This is not a WMTS catalogue.</translation>
+        </message>
+        <message>
+            <source>The WMTS catalogue is of a newer format than this program reads.</source>
+            <translation>The WMTS catalogue is of a newer format than this program reads.</translation>
+        </message>
     </context>
     <context>
         <name>ts::WmsImageryProvider</name>
-        <message>
-            <source>The server sent a tile that is far too large.</source>
-            <translation>The server sent a tile that is far too large.</translation>
-        </message>
         <message>
             <source>The server answered %1.</source>
             <translation>The server answered %1.</translation>
@@ -1700,22 +1834,6 @@
         <message>
             <source>The server sent something that isn't an image (%1).</source>
             <translation>The server sent something that isn't an image (%1).</translation>
-        </message>
-        <message>
-            <source>There is no disk cache to keep tiles in.</source>
-            <translation>There is no disk cache to keep tiles in.</translation>
-        </message>
-        <message>
-            <source>Can't reach %1 (%2).</source>
-            <translation>Can't reach %1 (%2).</translation>
-        </message>
-        <message>
-            <source>The server doesn't allow its tiles to be kept (no-store).</source>
-            <translation>The server doesn't allow its tiles to be kept (no-store).</translation>
-        </message>
-        <message>
-            <source>The tile could not be saved: %1</source>
-            <translation>The tile could not be saved: %1</translation>
         </message>
     </context>
     <context>

@@ -31,30 +31,12 @@
 namespace ts
 {
 
-std::optional<std::vector<WmsCatalogueEntry>>
-parseWmsCatalogue(const QByteArray& json, QString* errorString)
+namespace
 {
-  QJsonParseError parseError{};
-  const QJsonDocument document = QJsonDocument::fromJson(json, &parseError);
-  const QJsonObject root = document.object();
-  if (parseError.error != QJsonParseError::NoError || !document.isObject() ||
-      root.value(QStringLiteral("format")).toString() !=
-          QLatin1String(wmsCatalogueFormatName)) {
-    if (errorString) {
-      *errorString = QCoreApplication::translate(
-          "ts::WmsCatalogue", "This is not a WMS catalogue.");
-    }
-    return std::nullopt;
-  }
-  if (root.value(QStringLiteral("version")).toInt(0) >
-      wmsCatalogueFormatVersion) {
-    if (errorString) {
-      *errorString = QCoreApplication::translate(
-          "ts::WmsCatalogue",
-          "The WMS catalogue is of a newer format than this program reads.");
-    }
-    return std::nullopt;
-  }
+
+/** The services of a catalogue document, skipping unusable entries. */
+std::vector<WmsCatalogueEntry> catalogueEntries(const QJsonObject& root)
+{
   std::vector<WmsCatalogueEntry> entries;
   const QJsonArray services = root.value(QStringLiteral("services")).toArray();
   // NOLINTNEXTLINE(modernize-loop-convert)
@@ -80,6 +62,73 @@ parseWmsCatalogue(const QByteArray& json, QString* errorString)
     }
   }
   return entries;
+}
+
+/** The document's root if it is a catalogue of @p format, else nothing. */
+// The document, then the format name it must have.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::optional<QJsonObject> catalogueRoot(const QByteArray& json,
+                                         const char* format)
+{
+  QJsonParseError parseError{};
+  const QJsonDocument document = QJsonDocument::fromJson(json, &parseError);
+  QJsonObject root = document.object();
+  if (parseError.error != QJsonParseError::NoError || !document.isObject() ||
+      root.value(QStringLiteral("format")).toString() !=
+          QLatin1String(format)) {
+    return std::nullopt;
+  }
+  return root;
+}
+
+} // namespace
+
+std::optional<std::vector<WmsCatalogueEntry>>
+parseWmsCatalogue(const QByteArray& json, QString* errorString)
+{
+  const std::optional<QJsonObject> root =
+      catalogueRoot(json, wmsCatalogueFormatName);
+  if (!root) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+          "ts::WmsCatalogue", "This is not a WMS catalogue.");
+    }
+    return std::nullopt;
+  }
+  if (root->value(QStringLiteral("version")).toInt(0) >
+      wmsCatalogueFormatVersion) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+          "ts::WmsCatalogue",
+          "The WMS catalogue is of a newer format than this program reads.");
+    }
+    return std::nullopt;
+  }
+  return catalogueEntries(*root);
+}
+
+std::optional<std::vector<WmsCatalogueEntry>>
+parseWmtsCatalogue(const QByteArray& json, QString* errorString)
+{
+  const std::optional<QJsonObject> root =
+      catalogueRoot(json, wmtsCatalogueFormatName);
+  if (!root) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+          "ts::WmsCatalogue", "This is not a WMTS catalogue.");
+    }
+    return std::nullopt;
+  }
+  if (root->value(QStringLiteral("version")).toInt(0) >
+      wmtsCatalogueFormatVersion) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+          "ts::WmsCatalogue",
+          "The WMTS catalogue is of a newer format than this program reads.");
+    }
+    return std::nullopt;
+  }
+  return catalogueEntries(*root);
 }
 
 namespace

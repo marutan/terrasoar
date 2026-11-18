@@ -17,7 +17,9 @@
   You should have received a copy of the GNU General Public License
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
+#include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <vector>
 
 #include <QAction>
@@ -41,6 +43,7 @@
 
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
+#include "addwmtsdialog.h"
 #include "appsettings.h"
 #include "elevationprofiledialog.h"
 #include "helpbrowser.h"
@@ -244,6 +247,7 @@ private slots:
                                  QStringLiteral("getting-around.md"),
                                  QStringLiteral("layers.md"),
                                  QStringLiteral("adding-wms-layers.md"),
+                                 QStringLiteral("adding-wmts-layers.md"),
                                  QStringLiteral("terrain.md"),
                                  QStringLiteral("offline-use.md")}));
     QCOMPARE(pages.front().title, QStringLiteral("Terra Soar user guide"));
@@ -318,6 +322,7 @@ private slots:
   void dialogHelpTargetsExist()
   {
     const QStringList targets{ts::AddWmsDialog::helpTarget(),
+                              ts::AddWmtsDialog::helpTarget(),
                               ts::AddWebTerrainDialog::helpTarget(),
                               ts::OfflineRegionsDialog::helpTarget(),
                               ts::NewRegionDialog::helpTarget(),
@@ -398,12 +403,19 @@ private slots:
     if (list == nullptr) {
       QFAIL("list missing");
     }
-    QCOMPARE(list->count(), 7);
+    QCOMPARE(list->count(), static_cast<int32_t>(guide::pages().size()));
     QCOMPARE(list->currentRow(), 0);
     // A second request reuses the window.
     QCOMPARE(ts::showUserGuide(nullptr, QStringLiteral("terrain.md")), window);
     QCOMPARE(window->currentPage().fileName(), QStringLiteral("terrain.md"));
-    QCOMPARE(list->currentRow(), 5);
+    // The page's place in the contents.
+    const std::vector<guide::Page> pages = guide::pages();
+    const std::vector<guide::Page>::const_iterator terrain =
+        std::find_if(pages.begin(), pages.end(), [](const guide::Page& page) {
+          return page.url.fileName() == QLatin1String("terrain.md");
+        });
+    QCOMPARE(list->currentRow(),
+             static_cast<int32_t>(std::distance(pages.begin(), terrain)));
     // For the docs and for looking at: set TS_UI_SCREENSHOTS to a directory.
     const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
     if (!shots.isEmpty()) {
@@ -505,7 +517,7 @@ private slots:
     QCOMPARE(list->item(0)->flags(), Qt::NoItemFlags);
     // Clearing the search shows the contents again.
     window.setSearchText(QString());
-    QCOMPARE(list->count(), 7);
+    QCOMPARE(list->count(), static_cast<int32_t>(guide::pages().size()));
   }
 
   void findInPage()

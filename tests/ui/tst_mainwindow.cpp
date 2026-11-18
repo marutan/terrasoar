@@ -60,6 +60,7 @@
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
+#include "addwmtsdialog.h"
 #include "appsettings.h"
 #include "elevationprofiledialog.h"
 #include "fixturepack.h"
@@ -69,6 +70,7 @@
 #include "mockhttpserver.h"
 #include "mockpacks.h"
 #include "mockwms.h"
+#include "mockwmts.h"
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
 #include "offlineregionsdialog.h"
@@ -78,6 +80,7 @@
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
+#include "ts/network/regiontilesource.h"
 #include "ts/network/tilediskcache.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
@@ -604,9 +607,12 @@ private slots:
     settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
     ts::AddWmsDialog wms(std::make_shared<ts::NetworkClient>(settings),
                          nullptr);
+    ts::AddWmtsDialog wmts(std::make_shared<ts::NetworkClient>(settings),
+                           nullptr);
     ts::AddWebTerrainDialog terrain(nullptr);
     const std::vector<std::pair<QDialog*, QString>> dialogs{
         {&wms, ts::AddWmsDialog::helpTarget()},
+        {&wmts, ts::AddWmtsDialog::helpTarget()},
         {&terrain, ts::AddWebTerrainDialog::helpTarget()}};
     for (const std::pair<QDialog*, QString>& entry : dialogs) {
       QVERIFY2(helpKeyOpens(entry.first, entry.second),
@@ -1538,6 +1544,155 @@ private slots:
     QCOMPARE(added.attribution, QStringLiteral("Mock Agency"));
   }
 
+  void addWmtsDialog()
+  {
+    // The whole dialog against the mock WMTS: the current catalogue
+    // arrives, the server's layers are listed, style, format, tile matrix
+    // set and the Time dimension follow the layer, the catalogue's credit
+    // is used, and Add makes the layer's definition.
+    std::shared_ptr<ts::test::MockWmtsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmtsBehaviour>();
+    ts::test::MockHttpServer server;
+    const QUrl capabilitiesUrl =
+        server.url(QStringLiteral("/WMTSCapabilities.xml"));
+    const ts::test::MockHttpServer::Handler wmts =
+        ts::test::mockWmtsHandler(behaviour, server.url());
+    server.setHandler(
+        [wmts, capabilitiesUrl](const ts::test::MockHttpRequest& request) {
+          if (request.url.path() == QLatin1String("/catalogue.json")) {
+            return ts::test::mockResponse(
+                200,
+                "{\"format\": \"terrasoar-wmts-catalogue\", \"version\": "
+                "1, \"services\": [{\"title\": \"Mock tiles\", \"url\": \"" +
+                    capabilitiesUrl.toString().toUtf8() +
+                    "\", \"description\": \"Circles and lines\", "
+                    "\"attribution\": \"Mock Mapping Agency\", \"terms\": "
+                    "\"https://example.invalid/terms\"}]}",
+                "application/json");
+          }
+          return wmts(request);
+        });
+    qputenv("TS_WMTS_CATALOGUE_URL",
+            server.url(QStringLiteral("/catalogue.json")).toString().toUtf8());
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    ts::AddWmtsDialog dialog(network, nullptr);
+    qputenv("TS_WMTS_CATALOGUE_URL", QByteArray());
+    // Built in until the current catalogue arrives.
+    QVERIFY(!dialog.catalogue().empty());
+    QSignalSpy catalogueUpdated(&dialog, &ts::AddWmtsDialog::catalogueUpdated);
+    QVERIFY(catalogueUpdated.wait(5000));
+    QCOMPARE(dialog.catalogue().size(), std::size_t{1});
+    QComboBox* services =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmtsServiceBox"));
+    if (services == nullptr) {
+      QFAIL("wmtsServiceBox missing");
+    }
+    QCOMPARE(services->itemText(0), QStringLiteral("Mock tiles"));
+    services->setCurrentIndex(0);
+    emit services->activated(0);
+    QCOMPARE(services->currentText(), capabilitiesUrl.toString());
+    QLabel* about = dialog.findChild<QLabel*>(QStringLiteral("wmtsAboutLabel"));
+    if (about == nullptr) {
+      QFAIL("wmtsAboutLabel missing");
+    }
+    QVERIFY(about->text().contains(QStringLiteral("Mock Mapping Agency")));
+
+    QSignalSpy loaded(&dialog, &ts::AddWmtsDialog::capabilitiesLoaded);
+    QPushButton* connectButton =
+        dialog.findChild<QPushButton*>(QStringLiteral("wmtsConnectButton"));
+    if (connectButton == nullptr) {
+      QFAIL("wmtsConnectButton missing");
+    }
+    connectButton->click();
+    QVERIFY(dialog.isBusy());
+    QVERIFY(loaded.wait(5000));
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("1 layer")),
+             qPrintable(dialog.statusText()));
+    QVERIFY(dialog.selectLayer(QStringLiteral("pattern")));
+
+    // The layer's choices.
+    QComboBox* formats =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmtsFormatBox"));
+    QComboBox* sets =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmtsSetBox"));
+    QComboBox* time =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmtsDimension_Time"));
+    if (formats == nullptr || sets == nullptr || time == nullptr) {
+      QFAIL("choice boxes missing");
+    }
+    QCOMPARE(formats->currentText(), QStringLiteral("image/png"));
+    QCOMPARE(formats->count(), 2);
+    QCOMPARE(sets->count(), 3);
+    // Geographic first: it needs no reprojection.
+    QVERIFY(sets->currentData().toString() !=
+            QLatin1String("GoogleMapsCompatible"));
+    QCOMPARE(time->currentText(), QStringLiteral("2026-01-01"));
+    QVERIFY2(dialog.detailsText().contains(
+                 QStringLiteral("Credit: Mock Mapping Agency")),
+             qPrintable(dialog.detailsText()));
+    QVERIFY(dialog.detailsText().contains(QStringLiteral("Tests only")));
+
+    // Another set and a typed date.
+    sets->setCurrentIndex(
+        sets->findData(QStringLiteral("GoogleMapsCompatible")));
+    QVERIFY(dialog.setDimension(QStringLiteral("time"),
+                                QStringLiteral("2026-02-01")));
+    QVERIFY2(dialog.detailsText().contains(QStringLiteral("Web Mercator")),
+             qPrintable(dialog.detailsText()));
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      dialog.show();
+      dialog.grab().save(
+          QDir(shots).filePath(QStringLiteral("add-wmts-dialog.png")));
+    }
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("wmtsAddButton"));
+    if (add == nullptr) {
+      QFAIL("wmtsAddButton missing");
+    }
+    QVERIFY(add->isEnabled());
+    add->click();
+    const std::optional<ts::LayerDefinition>& definition =
+        dialog.layerDefinition();
+    if (!definition) {
+      QFAIL("no layer definition");
+    }
+    QCOMPARE(definition->type, ts::LayerType::Imagery);
+    QCOMPARE(definition->name, QStringLiteral("Test pattern"));
+    QString error;
+    const std::optional<ts::WmtsSource> source =
+        ts::WmtsSource::fromJson(definition->source, &error);
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(source->tileMatrixSet, QStringLiteral("GoogleMapsCompatible"));
+    QCOMPARE(source->service, capabilitiesUrl);
+    QCOMPARE(source->attribution, QStringLiteral("Mock Mapping Agency"));
+    QCOMPARE(source->dimensions.size(), std::size_t{1});
+    QCOMPARE(source->dimensions.front().second, QStringLiteral("2026-02-01"));
+
+    // A KVP address works too: GetCapabilities is asked for.
+    qputenv("TS_WMTS_CATALOGUE_URL", QByteArray());
+    ts::AddWmtsDialog kvp(network, nullptr);
+    QSignalSpy kvpLoaded(&kvp, &ts::AddWmtsDialog::capabilitiesLoaded);
+    kvp.connectTo(server.url(QStringLiteral("/kvp")).toString());
+    QVERIFY(kvpLoaded.wait(5000));
+    QVERIFY(kvp.selectLayer(QStringLiteral("pattern")));
+
+    // A WMS server is told apart, with a pointer to the right dialog.
+    ts::test::MockHttpServer wmsServer(ts::test::mockWmsHandler(
+        std::make_shared<ts::test::MockWmsBehaviour>()));
+    ts::AddWmtsDialog wrong(network, nullptr);
+    QSignalSpy failed(&wrong, &ts::AddWmtsDialog::connectionFailed);
+    wrong.connectTo(wmsServer.url(QStringLiteral("/wms")).toString());
+    QVERIFY(failed.wait(5000));
+    QVERIFY2(wrong.statusText().contains(QStringLiteral("Add WMS Layer")),
+             qPrintable(wrong.statusText()));
+  }
+
   void addWmsDialogErrors()
   {
     std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
@@ -1815,7 +1970,7 @@ private slots:
       list->grab().save(
           QDir(shots).filePath(QStringLiteral("offline-regions-dialog.png")));
     }
-    std::shared_ptr<ts::WmsImageryProvider> provider =
+    std::shared_ptr<ts::RegionTileSource> provider =
         regions.providerFor(source.toJson(), nullptr);
     QCOMPARE(provider->diskCache()->regionUsage(id).tiles, region->tiles);
 

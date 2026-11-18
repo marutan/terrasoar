@@ -25,3 +25,6 @@ include($$PWD/../tests.pri)
 
 TARGET = tst_wmts
 SOURCES += tst_wmts.cpp
+
+# The repository, for the catalogue in data/.
+DEFINES += TS_SOURCE_DIR=\\\"$$TS_ROOT\\\"

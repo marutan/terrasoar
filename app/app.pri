@@ -33,6 +33,7 @@ HEADERS += \
     $$PWD/src/helpwindow.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/addwmsdialog.h \
+    $$PWD/src/addwmtsdialog.h \
     $$PWD/src/elevationprofiledialog.h \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
@@ -53,6 +54,7 @@ SOURCES += \
     $$PWD/src/helpwindow.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
+    $$PWD/src/addwmtsdialog.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
