@@ -204,6 +204,8 @@ ts::GlobeView* globeOf(ts::MainWindow& window)
  */
 class IdleWitness : public QObject
 {
+  Q_OBJECT
+
 public:
   IdleWitness(ts::MainWindow& window, ts::GlobeView& globe)
       : m_window(window), m_globe(globe)
@@ -226,6 +228,8 @@ public:
 
   IdleWitness(const IdleWitness&) = delete;
   IdleWitness& operator=(const IdleWitness&) = delete;
+  IdleWitness(IdleWitness&&) = delete;
+  IdleWitness& operator=(IdleWitness&&) = delete;
 
   /** Returns the record, one line per entry, ending with the state now. */
   QString report()
