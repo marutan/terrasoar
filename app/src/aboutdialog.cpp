@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <utility>
 
+#include <QDesktopServices>
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QFile>
@@ -33,6 +34,7 @@
 #include <QPushButton>
 #include <QTabWidget>
 #include <QTreeWidget>
+#include <QUrl>
 #include <QVBoxLayout>
 
 #include "ts/base/buildinfo.h"
@@ -72,7 +74,10 @@ AboutDialog::AboutDialog(QWidget* parent, std::vector<AboutDataRow> rows)
   m_tabs->setObjectName(QStringLiteral("aboutTabs"));
   m_aboutLabel->setObjectName(QStringLiteral("aboutLabel"));
   m_aboutLabel->setWordWrap(true);
-  m_aboutLabel->setOpenExternalLinks(true);
+  // Web links open in the browser; the user guide link closes the window
+  // (see userGuideLink()).
+  m_aboutLabel->setOpenExternalLinks(false);
+  connect(m_aboutLabel, &QLabel::linkActivated, this, &AboutDialog::openLink);
   m_aboutLabel->setTextInteractionFlags(Qt::TextBrowserInteraction);
   m_aboutLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
   m_aboutLabel->setMargin(12);
@@ -132,6 +137,21 @@ QString AboutDialog::homePage()
   return QStringLiteral("https://github.com/marutan/terrasoar");
 }
 
+QString AboutDialog::userGuideLink()
+{
+  return QStringLiteral("terrasoar-guide:contents");
+}
+
+void AboutDialog::openLink(const QString& link)
+{
+  if (link == userGuideLink()) {
+    m_userGuideRequested = true;
+    accept();
+    return;
+  }
+  QDesktopServices::openUrl(QUrl(link));
+}
+
 void AboutDialog::changeEvent(QEvent* event)
 {
   if (event->type() == QEvent::LanguageChange) {
@@ -157,9 +177,11 @@ void AboutDialog::retranslateUi()
          "<p>It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and "
          "data from NASA, NOAA, NGA, Natural Earth and others: see the Data "
          "and Third-Party Notices tabs.</p>"
+         "<p><a href=\"%6\">Read the user guide</a> (Help → User Guide, "
+         "F1).</p>"
          "<p><a href=\"%5\">%5</a></p>")
           .arg(info.version, info.qtCompileVersion, info.qtRuntimeVersion,
-               info.compiler, homePage()));
+               info.compiler, homePage(), userGuideLink()));
   m_tabs->setTabText(0, tr("About"));
   m_tabs->setTabText(1, tr("Data"));
   m_tabs->setTabText(2, tr("Third-Party Notices"));

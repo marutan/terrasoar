@@ -28,13 +28,16 @@
 #include <QEvent>
 #include <QHBoxLayout>
 #include <QHeaderView>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLocale>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QShortcut>
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include "helpwindow.h"
 #include "packmanager.h"
 
 namespace ts
@@ -59,6 +62,11 @@ qint64 installedBytes(const InstalledPack& pack)
 
 } // namespace
 
+QString PackManagerDialog::helpTarget()
+{
+  return QStringLiteral("offline-use.md#extra-data-packs");
+}
+
 PackManagerDialog::PackManagerDialog(PackManager& manager, QWidget* parent)
     : QDialog(parent), m_manager(manager), m_list(new QTreeWidget(this)),
       m_detailsLabel(new QLabel(this)), m_indexLabel(new QLabel(this)),
@@ -67,6 +75,9 @@ PackManagerDialog::PackManagerDialog(PackManager& manager, QWidget* parent)
       m_refreshButton(new QPushButton(this)),
       m_closeButton(new QPushButton(this))
 {
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
   setObjectName(QStringLiteral("packManagerDialog"));
   m_list->setObjectName(QStringLiteral("packList"));
   m_actionButton->setObjectName(QStringLiteral("packActionButton"));

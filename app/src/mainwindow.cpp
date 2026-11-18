@@ -58,6 +58,7 @@
 #include "addwmsdialog.h"
 #include "elevationprofiledialog.h"
 #include "globeview.h"
+#include "helpwindow.h"
 #include "layertreedock.h"
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
@@ -552,6 +553,12 @@ void MainWindow::createActions()
   connect(m_saveAsAction, &QAction::triggered, this,
           [this]() { saveProjectDialog(true); });
 
+  m_userGuideAction = new QAction(this);
+  m_userGuideAction->setObjectName(QStringLiteral("userGuideAction"));
+  m_userGuideAction->setShortcut(QKeySequence::HelpContents);
+  connect(m_userGuideAction, &QAction::triggered, this,
+          [this]() { showUserGuide(this); });
+
   m_aboutAction = new QAction(this);
   m_aboutAction->setObjectName(QStringLiteral("aboutAction"));
   m_aboutAction->setMenuRole(QAction::AboutRole);
@@ -738,6 +745,8 @@ void MainWindow::createMenus()
 
   m_helpMenu = menuBar()->addMenu(QString());
   m_helpMenu->setObjectName(QStringLiteral("helpMenu"));
+  m_helpMenu->addAction(m_userGuideAction);
+  m_helpMenu->addSeparator();
   m_helpMenu->addAction(m_aboutAction);
 }
 
@@ -815,6 +824,9 @@ void MainWindow::retranslateUi()
   m_debugOverlayAction->setText(tr("&Debug Overlay"));
   m_debugOverlayAction->setStatusTip(
       tr("Show frame times and the camera position over the globe"));
+  m_userGuideAction->setText(tr("&User Guide"));
+  m_userGuideAction->setStatusTip(
+      tr("Read the user guide, built into the program"));
   m_aboutAction->setText(tr("&About %1").arg(programName()));
   m_aboutAction->setStatusTip(tr("Show the program version and licence"));
   switch (m_basePackState) {
@@ -1283,6 +1295,9 @@ void MainWindow::showAbout()
 {
   AboutDialog dialog(this, aboutData());
   dialog.exec();
+  if (dialog.userGuideRequested()) {
+    showUserGuide(this);
+  }
 }
 
 } // namespace ts

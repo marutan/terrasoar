@@ -85,6 +85,12 @@ class NewRegionDialog : public QDialog
   Q_DISABLE_COPY_MOVE(NewRegionDialog)
 
 public:
+  /**
+   * The user guide's section on this window
+   * (`offline-use.md#downloading-a-region`), opened by F1.
+   */
+  static QString helpTarget();
+
   /** Most tiles in one region. */
   static constexpr int64_t maximumTiles = 1000000;
 

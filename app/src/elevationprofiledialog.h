@@ -105,6 +105,12 @@ class ElevationProfileDialog : public QDialog
   Q_DISABLE_COPY_MOVE(ElevationProfileDialog)
 
 public:
+  /**
+   * The user guide's section on this window (`terrain.md#elevation-profiles`),
+   * opened by F1.
+   */
+  static QString helpTarget();
+
   /** Creates the window, waiting for a line. */
   explicit ElevationProfileDialog(QWidget* parent);
   ~ElevationProfileDialog() override;

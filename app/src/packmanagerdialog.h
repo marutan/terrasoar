@@ -54,6 +54,12 @@ class PackManagerDialog : public QDialog
   Q_DISABLE_COPY_MOVE(PackManagerDialog)
 
 public:
+  /**
+   * The user guide's section on this window
+   * (`offline-use.md#extra-data-packs`), opened by F1.
+   */
+  static QString helpTarget();
+
   /** What the main button does for a pack. */
   enum class Action {
     None,      ///< Nothing to do (disabled).

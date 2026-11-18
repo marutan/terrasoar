@@ -78,6 +78,12 @@ class AddWmsDialog : public QDialog
   Q_DISABLE_COPY_MOVE(AddWmsDialog)
 
 public:
+  /**
+   * The user guide's section on this window
+   * (`adding-wms-layers.md#adding-a-layer`), opened by F1.
+   */
+  static QString helpTarget();
+
   /** Creates the dialog; requests go through @p network. */
   AddWmsDialog(std::shared_ptr<NetworkClient> network, QWidget* parent);
 

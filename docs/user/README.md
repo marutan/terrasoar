@@ -18,6 +18,12 @@ web map servers (WMS), your own elevation files and web terrain services.
 6. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
    disk space.
 
+You can read this guide inside Terra Soar too, offline: **Help → User
+Guide** (F1). F1 in a dialog opens the guide at the part about that
+dialog. The window has the pages down the side, a search box that lists
+the pages containing what you type, Back and Forward, and Ctrl+F to find
+text on a page.
+
 Help → About Terra Soar shows the version, the data in use with its
 sources, licences and credits, and the licences of the libraries Terra
 Soar is built on.

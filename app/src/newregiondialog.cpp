@@ -31,15 +31,18 @@
 #include <QEvent>
 #include <QGridLayout>
 #include <QHBoxLayout>
+#include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
 #include <QPushButton>
+#include <QShortcut>
 #include <QSpinBox>
 #include <QTimer>
 #include <QVBoxLayout>
 
 #include "globeview.h"
+#include "helpwindow.h"
 #include "offlineregionmanager.h"
 #include "ts/geo/geoformat.h"
 #include "ts/regions/countryareas.h"
@@ -70,6 +73,11 @@ double metresPerPixel(int32_t level, int32_t tileSizePx)
 
 } // namespace
 
+QString NewRegionDialog::helpTarget()
+{
+  return QStringLiteral("offline-use.md#downloading-a-region");
+}
+
 NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
                                  std::vector<RegionLayerChoice> layers,
                                  GlobeView* view,
@@ -90,6 +98,9 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
       m_buttons(new QDialogButtonBox(QDialogButtonBox::Cancel, this)),
       m_estimateDelay(new QTimer(this)), m_estimatePoll(new QTimer(this))
 {
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
   setObjectName(QStringLiteral("newRegionDialog"));
   m_nameEdit->setObjectName(QStringLiteral("regionNameEdit"));
   m_layerBox->setObjectName(QStringLiteral("regionLayerBox"));

@@ -80,12 +80,23 @@ public:
   /** The project's home page. */
   static QString homePage();
 
+  /**
+   * The link on the About tab that opens the user guide. The window can't
+   * open it itself while modal, so following it closes the window and
+   * userGuideRequested() returns true.
+   */
+  static QString userGuideLink();
+
+  /** Returns true if the window was closed to open the user guide. */
+  bool userGuideRequested() const { return m_userGuideRequested; }
+
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;
 
 private:
   void retranslateUi();
+  void openLink(const QString& link);
 
   std::vector<AboutDataRow> m_data;
   QTabWidget* m_tabs = nullptr;
@@ -94,6 +105,7 @@ private:
   QPlainTextEdit* m_noticesText = nullptr;
   QPlainTextEdit* m_licenceText = nullptr;
   QPushButton* m_closeButton = nullptr;
+  bool m_userGuideRequested = false;
 };
 
 } // namespace ts
