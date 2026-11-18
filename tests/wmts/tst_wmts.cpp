@@ -1598,7 +1598,13 @@ private slots:
     }
     QVERIFY(rd->bounds->contains(52.0, 5.0));
     QVERIFY(!rd->bounds->contains(48.5, 0.0));
-    QVERIFY(rd->bounds->westDeg > 3.0 && rd->bounds->eastDeg < 7.5);
+    // Narrower than the layer's own box (-1.66° to 12.43° E) on both
+    // sides. (The exact area depends on the version of PROJ's database:
+    // onshore only, about 3.2° to 7.2° E, or with the offshore zone.)
+    QVERIFY2(rd->bounds->westDeg > 0.0 && rd->bounds->eastDeg < 8.0,
+             qPrintable(QStringLiteral("%1° to %2° E")
+                            .arg(rd->bounds->westDeg)
+                            .arg(rd->bounds->eastDeg)));
     QVERIFY(rd->maximumLevel >= 14);
 
     // The synthetic layer in British National Grid only is drawable.
