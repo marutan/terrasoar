@@ -24,6 +24,8 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
+#include <vector>
 
 #include "ts/camera/camera.h"
 #include "ts/geo/geodetic.h"
@@ -161,6 +163,72 @@ bool rectOnMap(const MapFrame& frame, TileKey key, double halfWidthM,
   });
 }
 
+/**
+ * A bounding sphere of a tile where it is drawn part of the way between
+ * globe and map, relative to the eye.
+ */
+struct MorphSphere {
+  /** Centre, ECEF axes, metres from the eye. */
+  Vec3 offsetM{};
+  /** Radius, metres. */
+  double radiusM = 0.0;
+};
+
+/**
+ * Returns the spheres bounding @p key while the camera's morph factor is
+ * between 0 and 1, one for each copy of the world it is drawn in.
+ *
+ * Each vertex is drawn at mix(globe position, map position, t), so the
+ * tile lies within mix(globe centre, map centre, t), radius
+ * mix(globe radius, map radius, t): the distance of a mixed point from
+ * the mixed centre is at most the mix of the two distances.
+ */
+std::vector<MorphSphere> morphSpheres(const Camera& camera,
+                                      const MapFrame& frame, TileKey key,
+                                      const TileBounds& globe, double raiseM)
+{
+  if (frame.projection == nullptr) {
+    return {};
+  }
+  const double t = camera.morph();
+  const Projection& projection = *frame.projection;
+  const GeoRect rect = key.bounds();
+  // Beyond the projection's latitudes the tile is squashed onto its edge,
+  // as the renderer draws it.
+  const double southDeg = std::clamp(rect.southDeg, projection.minimumLatDeg(),
+                                     projection.maximumLatDeg());
+  const double northDeg = std::clamp(rect.northDeg, projection.minimumLatDeg(),
+                                     projection.maximumLatDeg());
+  const double southM = projection.forward(southDeg, 0.0).yM - frame.centreYM;
+  const double northM = projection.forward(northDeg, 0.0).yM - frame.centreYM;
+  const double middleXM =
+      frame
+          .offsetOf(projection.forward(frame.centreLatDeg, rect.centreLonDeg()))
+          .xM;
+  const double halfSpanM = 0.5 * rect.widthDeg() / 360.0 * frame.worldWidthM;
+  const double mapRadiusM =
+      frame.planeScale * std::hypot(halfSpanM, 0.5 * (northM - southM)) +
+      raiseM;
+  const Vec3 globeOffset = globe.centreEcef - camera.eyeEcef();
+  const double radiusM = (1.0 - t) * (globe.radiusM + raiseM) + t * mapRadiusM;
+  std::vector<MorphSphere> spheres;
+  for (const double shiftM :
+       frame.copyShiftsM(rect.westDeg, rect.eastDeg, true)) {
+    const Vec3 mapOffset = camera.mapPlanePoint(
+        MapPoint{middleXM + shiftM, 0.5 * (southM + northM)});
+    spheres.push_back(
+        MorphSphere{globeOffset * (1.0 - t) + mapOffset * t, radiusM});
+  }
+  return spheres;
+}
+
+/** Returns true if @p sphere is inside the view frustum of @p camera. */
+bool sphereInFrustum(const Camera& camera, const MorphSphere& sphere)
+{
+  return sphereInFrustum(
+      camera, TileBounds{camera.eyeEcef() + sphere.offsetM, sphere.radiusM});
+}
+
 } // namespace
 
 /** The camera and, when the map is involved, how it lies. */
@@ -184,11 +252,6 @@ struct TileSelector::View {
       frame = viewCamera.mapFrame();
       halfWidthM = frame.halfWidthM;
       halfHeightM = frame.halfHeightM;
-      if (morph < 1.0) {
-        // The view may still be turned: take its diagonal both ways.
-        halfWidthM = std::hypot(frame.halfWidthM, frame.halfHeightM);
-        halfHeightM = halfWidthM;
-      }
     }
   }
 
@@ -201,12 +264,17 @@ struct TileSelector::View {
       return sphereInFrustum(*camera, raised) &&
              !samplesBehindHorizon(*camera, key, samples, terrainHeightM);
     }
-    if (rectOnMap(frame, key, halfWidthM, halfHeightM)) {
-      return true;
+    if (morph >= 1.0) {
+      return rectOnMap(frame, key, halfWidthM, halfHeightM);
     }
-    // Changing view: also what the globe shows, the far side included (it
-    // unrolls into view).
-    return morph < 1.0 && sphereInFrustum(*camera, raised);
+    // Changing view: where the tile is drawn now, between globe and map.
+    // No horizon test: the far side unrolls into view.
+    const std::vector<MorphSphere> spheres =
+        morphSpheres(*camera, frame, key, bounds, terrainHeightM);
+    return std::any_of(spheres.begin(), spheres.end(),
+                       [this](const MorphSphere& sphere) {
+                         return sphereInFrustum(*camera, sphere);
+                       });
   }
 
   bool isVisible(TileKey key) const
@@ -253,30 +321,58 @@ bool TileSelector::isVisibleOnMap(const Camera& camera, TileKey key)
 
 double TileSelector::screenSpaceErrorPx(const Camera& camera, TileKey key) const
 {
-  double mapErrorPx = 0.0;
-  if (camera.morph() > 0.0) {
-    // One texel of the tile along a meridian of the map, where the
-    // projection stretches most.
-    const MapFrame frame = camera.mapFrame();
+  View view(camera);
+  view.terrainHeightM = m_settings.terrainHeightM;
+  return screenSpaceErrorPx(view, key);
+}
+
+double TileSelector::screenSpaceErrorPx(const View& view, TileKey key) const
+{
+  const Camera& camera = *view.camera;
+  const double tileSizePx = std::max(m_settings.tileSizePx, 1);
+  // One texel of the tile along a meridian of the map, on the plane it is
+  // drawn on, metres: where the projection stretches most.
+  double mapTexelM = 0.0;
+  if (view.morph > 0.0) {
     const GeoRect rect = key.bounds();
-    const double heightM = frame.projection->forward(rect.northDeg, 0.0).yM -
-                           frame.projection->forward(rect.southDeg, 0.0).yM;
-    mapErrorPx = heightM / (2.0 * frame.halfHeightM) *
-                 camera.viewportHeightPx() / std::max(m_settings.tileSizePx, 1);
-    if (camera.morph() >= 1.0) {
-      return mapErrorPx;
+    const Projection& projection = *view.frame.projection;
+    const double heightM = projection.forward(rect.northDeg, 0.0).yM -
+                           projection.forward(rect.southDeg, 0.0).yM;
+    if (view.morph >= 1.0) {
+      // Looking straight down at the plane every texel of the map is the
+      // same size on screen, wherever it is.
+      return heightM / (2.0 * view.frame.halfHeightM) *
+             camera.viewportHeightPx() / tileSizePx;
     }
+    mapTexelM = heightM * view.frame.planeScale / tileSizePx;
   }
-  // One texel of the tile, in metres along a meridian (the largest
-  // extent: east-west texels shrink towards the poles).
-  const double texelM = wgs84::semiMajorAxisM *
-                        degToRad(TileKey::sizeDeg(key.level)) /
-                        std::max(m_settings.tileSizePx, 1);
+  // One texel of the tile on the globe, in metres along a meridian (the
+  // largest extent: east-west texels shrink towards the poles).
+  const double globeTexelM = wgs84::semiMajorAxisM *
+                             degToRad(TileKey::sizeDeg(key.level)) / tileSizePx;
   const TileBounds bounds = tileBounds(key);
-  const double distanceM = std::max(
-      distance(bounds.centreEcef, camera.eyeEcef()) - bounds.radiusM, 1e-3);
-  return std::max(mapErrorPx, texelM * camera.viewportHeightPx() /
-                                  (2.0 * distanceM * camera.tanHalfFovY()));
+  const double pixelsPerRadian =
+      camera.viewportHeightPx() / (2.0 * camera.tanHalfFovY());
+  if (view.morph <= 0.0) {
+    const double distanceM = std::max(
+        distance(bounds.centreEcef, camera.eyeEcef()) - bounds.radiusM, 1e-3);
+    return globeTexelM * pixelsPerRadian / distanceM;
+  }
+  // Changing view: a texel where the tile is drawn now. Its size there is
+  // at most the mix of its sizes on the globe and on the map, and it is
+  // no nearer than the nearest point of the tile's sphere. The distance
+  // goes over from straight-line (as on the globe) to depth along the view
+  // (exact for the map, seen straight down) as the map takes over.
+  const double t = view.morph;
+  const double texelM = (1.0 - t) * globeTexelM + t * mapTexelM;
+  double nearestM = std::numeric_limits<double>::max();
+  for (const MorphSphere& sphere :
+       morphSpheres(camera, view.frame, key, bounds, view.terrainHeightM)) {
+    const double depthM = dot(sphere.offsetM, camera.forwardEcef());
+    const double centreM = (1.0 - t) * length(sphere.offsetM) + t * depthM;
+    nearestM = std::min(nearestM, centreM - sphere.radiusM);
+  }
+  return texelM * pixelsPerRadian / std::max(nearestM, 1e-3);
 }
 
 double TileSelector::mapGeometryErrorPx(const Camera& camera, TileKey key) const
@@ -365,8 +461,7 @@ bool TileSelector::wantsRefinement(const View& view, TileKey key) const
     return true;
   }
   return key.level < m_settings.maximumLevel &&
-         screenSpaceErrorPx(*view.camera, key) >
-             m_settings.maximumScreenSpaceErrorPx;
+         screenSpaceErrorPx(view, key) > m_settings.maximumScreenSpaceErrorPx;
 }
 
 bool TileSelector::refine(

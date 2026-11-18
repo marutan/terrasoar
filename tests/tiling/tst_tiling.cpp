@@ -37,6 +37,7 @@
 
 #include "concurrency.h"
 #include "ts/camera/camera.h"
+#include "ts/camera/cameracontroller.h"
 #include "ts/elevation/heightgrid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/maths/angles.h"
@@ -784,15 +785,65 @@ private slots:
       areaDeg2 += key.bounds().widthDeg() * key.bounds().heightDeg();
     }
     QCOMPARE(areaDeg2, 360.0 * 180.0);
-    // The error is the larger of the two views'.
+    // The error is that of the tile where it is drawn: it goes over
+    // smoothly from the globe's to the map's.
     const ts::TileKey near =
-        ts::TileKey::containing(4, ts::Geodetic{60.0, 1.0, 0.0});
-    const double morphing = selector.screenSpaceErrorPx(camera, near);
+        ts::TileKey::containing(4, ts::Geodetic{0.0, 1.0, 0.0});
     camera.setMorph(0.0);
     const double onGlobe = selector.screenSpaceErrorPx(camera, near);
     camera.setMorph(1.0);
-    QVERIFY(morphing >= onGlobe);
-    QVERIFY(morphing >= selector.screenSpaceErrorPx(camera, near) * 0.99);
+    const double onMap = selector.screenSpaceErrorPx(camera, near);
+    camera.setMorph(1e-6);
+    QVERIFY(std::abs(selector.screenSpaceErrorPx(camera, near) / onGlobe -
+                     1.0) < 0.01);
+    camera.setMorph(1.0 - 1e-6);
+    QVERIFY(std::abs(selector.screenSpaceErrorPx(camera, near) / onMap - 1.0) <
+            0.05);
+  }
+
+  void morphSelectionStaysSmallZoomedIn()
+  {
+    // Zoomed in on a country, changing view moves little, and the tiles
+    // picked on the way are not many more than at either end. (Picking
+    // everything either view might show, at the finer of the two errors,
+    // asked for thousands: more than the GPU keeps, so tiles were thrown
+    // away and fetched again every frame and the detail flickered.)
+    ts::CameraController controller;
+    controller.setPose(ts::CameraPose{54.0, -3.0, 1.5e6, 0.0, 0.0});
+    const ts::TileSelector selector;
+    const std::size_t onGlobe =
+        selector.select(controller.camera(), everythingRenderable)
+            .render.size();
+    controller.setViewMode(ts::ViewMode::Map, 1.0);
+    std::size_t most = 0;
+    int32_t deepest = 0;
+    while (controller.advance(1.0 / 30.0)) {
+      const ts::TileSelection selection =
+          selector.select(controller.camera(), everythingRenderable);
+      QVERIFY(!overlaps(selection.render));
+      most = std::max(most, selection.render.size());
+      for (const ts::TileKey& key : selection.render) {
+        deepest = std::max(deepest, key.level);
+      }
+    }
+    const std::size_t onMap =
+        selector.select(controller.camera(), everythingRenderable)
+            .render.size();
+    // Coarse tiles of the far side are kept too (it unrolls into view), so
+    // a few times as many; never near the ~380 that the GPU keeps.
+    QVERIFY2(most <= 4 * std::max(onGlobe, onMap) && most <= 150,
+             qPrintable(QStringLiteral("%1 tiles while changing, %2 and %3 "
+                                       "at the ends")
+                            .arg(most)
+                            .arg(onGlobe)
+                            .arg(onMap)));
+    // And no finer than the view needs at either end.
+    int32_t deepestAtEnds = 0;
+    for (const ts::TileKey& key :
+         selector.select(controller.camera(), everythingRenderable).render) {
+      deepestAtEnds = std::max(deepestAtEnds, key.level);
+    }
+    QVERIFY(deepest <= deepestAtEnds + 1);
   }
 
   void refinementWaitsForChildren()
