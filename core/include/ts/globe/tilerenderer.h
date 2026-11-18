@@ -227,6 +227,13 @@ public:
   double exaggeration() const { return m_exaggeration; }
 
   /**
+   * Returns how far below the ellipsoid the tiles chosen by the last
+   * prepare() can lie, in metres: their meshes are flat between grid
+   * lines (see tileSurfaceSagM()). 0 when no tile is drawn.
+   */
+  double surfaceSagM() const;
+
+  /**
    * Returns the height above the ellipsoid the surface is drawn at, at
    * (@p latDeg, @p lonDeg) on the globe (exaggerated, the sea floor at sea
    * level), from the finest heights loaded there; 0 without terrain;

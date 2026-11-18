@@ -99,6 +99,16 @@ double tileSkirtDepthM(int32_t level, int32_t segments)
   return 2.0 * sagM + 1.0;
 }
 
+double tileSurfaceSagM(int32_t level, int32_t segments)
+{
+  const double segmentRad = degToRad(TileKey::sizeDeg(level)) /
+                            static_cast<double>(clampSegments(segments));
+  // A cell spans at most segmentRad in each direction (less east-west
+  // away from the equator), so its diagonal at most √2 times that.
+  const double diagonalRad = std::sqrt(2.0) * segmentRad;
+  return wgs84::semiMajorAxisM * (1.0 - std::cos(0.5 * diagonalRad));
+}
+
 namespace
 {
 

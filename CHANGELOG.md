@@ -19,6 +19,8 @@ All notable changes to Terra Soar. The format follows
 
 ### Fixed
 
+- Close to the ground and looking towards the horizon (terrain off), the
+  globe's plain blue no longer shows through the imagery in the distance.
 - Changing between the globe and the map while zoomed in no longer makes
   the detail of the map flicker during the change: the tiles picked on
   the way are the ones actually in view, not thousands more.

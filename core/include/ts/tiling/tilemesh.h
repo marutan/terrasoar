@@ -140,6 +140,16 @@ std::vector<std::uint16_t> tileMeshStripIndices(int32_t segments);
  */
 double tileSkirtDepthM(int32_t level, int32_t segments);
 
+/**
+ * Returns how far, in metres, the flat triangles of a tile's mesh at
+ * @p level with @p segments segments can lie below the ellipsoid they
+ * approximate: the gap under the chord across a grid cell's diagonal, the
+ * longest straight line in a cell.
+ *
+ * @threadsafe
+ */
+double tileSurfaceSagM(int32_t level, int32_t segments);
+
 } // namespace ts
 
 #endif // TS_TILING_TILEMESH_H
