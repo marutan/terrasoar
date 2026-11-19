@@ -193,7 +193,7 @@ struct ProbeExpectation {
  */
 ProbeExpectation
 expectedProbeOffset(const ts::Projection& projection, double referenceLat,
-                    const ts::MapPoint& reference,
+                    ts::MapPoint reference,
                     // Longitude then latitude, as the
                     // probe's offsets.
                     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
