@@ -905,10 +905,10 @@ private slots:
     QVERIFY(std::abs(back[1] - lon) < 1e-13);
 
     // Outside: the Helmert transform; across the blended edge, no jump.
-    const std::array<double, 2> far =
+    const std::array<double, 2> outside =
         datum.fromWgs84(ts::degToRad(45.0), ts::degToRad(-3.0));
-    QCOMPARE(far, ts::Osgb36Datum::helmertFromWgs84(ts::degToRad(45.0),
-                                                    ts::degToRad(-3.0)));
+    QCOMPARE(outside, ts::Osgb36Datum::helmertFromWgs84(ts::degToRad(45.0),
+                                                        ts::degToRad(-3.0)));
     QCOMPARE(helmert.fromWgs84(lat, lon),
              ts::Osgb36Datum::helmertFromWgs84(lat, lon));
     const double step = ts::degToRad(1e-7);
