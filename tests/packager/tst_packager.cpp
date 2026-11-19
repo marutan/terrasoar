@@ -43,6 +43,7 @@
 #include <ogr_api.h>
 
 #include "imagerytiler.h"
+#include "nationalgriddata.h"
 #include "packbuilder.h"
 #include "shorelinebuilder.h"
 #include "ts/deps/dependencies.h"
@@ -51,6 +52,8 @@
 #include "ts/elevation/heightgrid.h"
 #include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/packs/packmanifest.h"
+#include "ts/projection/datumshift.h"
+#include "ts/projection/nationalgrid.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/regions/countryareas.h"
@@ -572,6 +575,36 @@ void checkGeoidPack(const QString& directory,
 }
 
 /**
+ * Checks a pack's datum shift grids: each is listed in the manifest, and
+ * OSTN15 gives the Ordnance Survey's test points within a centimetre.
+ */
+void checkDatumShifts(const QString& directory,
+                      const ts::packager::PackConfig& config,
+                      const ts::PackManifest& manifest)
+{
+  QCOMPARE(manifest.datumShifts.size(), config.datumShifts.size());
+  for (const ts::packager::DatumShiftSpec& spec : config.datumShifts) {
+    QString error;
+    const std::shared_ptr<const ts::HorizontalShiftGrid> grid =
+        ts::HorizontalShiftGrid::load(
+            QDir(directory).filePath(spec.dataset + QStringLiteral(".tif")),
+            &error);
+    QVERIFY2(grid != nullptr, qPrintable(error));
+    if (spec.dataset != QLatin1String("ostn15")) {
+      QFAIL(qPrintable(
+          QStringLiteral("No check for the datum shift %1").arg(spec.dataset)));
+    }
+    const ts::NationalGridProjection nationalGrid(grid);
+    for (const ts::test::Ostn15TestPoint& point :
+         ts::test::ostn15TestPoints()) {
+      const ts::MapPoint p = nationalGrid.forward(point.latDeg, point.lonDeg);
+      QVERIFY2(std::hypot(p.xM - point.eastingM, p.yM - point.northingM) < 0.01,
+               point.name);
+    }
+  }
+}
+
+/**
  * Checks the real DEM and geoid grids: every tile decodes, neighbours
  * share their edges, heights at known places are plausible for a 5 km
  * grid, the geoids match published values.
@@ -1086,6 +1119,70 @@ private slots:
     QVERIFY(!ts::packager::buildCountries(options, &stats, &error));
   }
 
+  void buildDatumShiftPack()
+  {
+    // A datum shift grid is copied as it is and listed in the manifest's
+    // "datumShifts", not among its datasets.
+    const QTemporaryDir dir;
+    const QDir root(dir.path());
+    root.mkpath(QStringLiteral("sources"));
+    QVERIFY(ts::test::writeFixtureShiftGrid(
+        root.filePath(QStringLiteral("sources/grid.tif"))));
+    const QByteArray configJson =
+        "{"
+        "\"id\": \"grids\", \"version\": \"1\","
+        "\"sizeLimitBytes\": 10000000, \"reservedBytes\": 0,"
+        "\"sources\": [{\"id\": \"grid\", \"file\": \"grid.tif\", "
+        "\"url\": \"https://example.org/grid.tif\", \"sha256\": "
+        "\"0000000000000000000000000000000000000000000000000000000000000000\","
+        "\"name\": \"Fixture grid\", \"version\": \"1\"}],"
+        "\"datumShifts\": [{\"dataset\": \"ostn15\", \"source\": \"grid\","
+        "\"name\": \"Fixture\", \"licence\": \"CC0-1.0\","
+        "\"attribution\": \"Fixture\"}]"
+        "}";
+    QString error;
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::fromJson(
+            QJsonDocument::fromJson(configJson).object(), &error);
+    if (!config) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(config->datumShifts.size(), std::size_t{1});
+    ts::packager::BuildOptions options;
+    options.sourcesDirectory = root.filePath(QStringLiteral("sources"));
+    options.configDirectory = root.path();
+    options.outputDirectory = root.filePath(QStringLiteral("pack"));
+    options.verifySources = false;
+    ts::packager::BuildReport report;
+    QVERIFY2(ts::packager::buildPack(*config, options, &report, &error),
+             qPrintable(error));
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(options.outputDirectory, &error);
+    if (!manifest) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(manifest->datasets.empty());
+    QCOMPARE(manifest->datumShifts.size(), std::size_t{1});
+    QCOMPARE(manifest->datumShifts.at(0).id, QStringLiteral("ostn15"));
+    QCOMPARE(manifest->datumShifts.at(0).file, QStringLiteral("ostn15.tif"));
+    QCOMPARE(manifest->datumShifts.at(0).source.name,
+             QStringLiteral("Fixture grid"));
+    QVERIFY(manifest->verify(options.outputDirectory, notCancelled).ok);
+    QVERIFY(ts::HorizontalShiftGrid::load(
+                QDir(options.outputDirectory)
+                    .filePath(QStringLiteral("ostn15.tif")),
+                &error) != nullptr);
+
+    // An entry naming a source the pack doesn't have is refused.
+    QJsonObject json = QJsonDocument::fromJson(configJson).object();
+    json.insert(QStringLiteral("datumShifts"),
+                QJsonArray{QJsonObject{
+                    {QStringLiteral("dataset"), QStringLiteral("ostn15")},
+                    {QStringLiteral("source"), QStringLiteral("none")}}});
+    QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+    QVERIFY(error.contains(QLatin1String("datum shift")));
+  }
+
   void configErrors()
   {
     QString error;
@@ -1228,6 +1325,7 @@ private slots:
     } else {
       checkGeoidPack(directory, *config);
     }
+    checkDatumShifts(directory, *config, *manifest);
     if (config->countries) {
       checkCountries(
           pack.filePath(config->countries->dataset + QStringLiteral(".gpkg")));

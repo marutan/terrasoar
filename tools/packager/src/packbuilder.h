@@ -146,6 +146,23 @@ struct GeoidSpec {
   bool copy = false;
 };
 
+/**
+ * A horizontal datum shift grid of the pack (PROJ GeoTIFF, such as
+ * OSTN15), copied as it is and listed in the manifest's "datumShifts".
+ */
+struct DatumShiftSpec {
+  /** Its id for the projections (e.g. "ostn15"); the file is <id>.tif. */
+  QString dataset;
+  /** Source id. */
+  QString source;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+};
+
 /** The country outlines of the pack. */
 struct CountriesSpec {
   /** Dataset id in the manifest. */
@@ -188,6 +205,8 @@ struct PackConfig {
   std::optional<ElevationSpec> elevation;
   /** Geoid grids. */
   std::vector<GeoidSpec> geoids;
+  /** Datum shift grids. */
+  std::vector<DatumShiftSpec> datumShifts;
 
   /** Parses the configuration; nothing and @p errorString on failure. */
   static std::optional<PackConfig> fromJson(const QJsonObject& json,

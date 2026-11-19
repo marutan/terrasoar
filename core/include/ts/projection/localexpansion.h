@@ -117,6 +117,16 @@ protected:
   /** Returns p0 and p1 of the GLSL forward. */
   virtual std::array<std::array<float, 4>, 2> glslParameters() const = 0;
 
+  /**
+   * Returns p0 and p1 of the GLSL forward for a large tile about latitude
+   * @p latRad, @p dLonRad east of the central meridian (radians). The
+   * default is glslParameters(); a projection whose forward depends on
+   * the place (a datum shift computed approximately in the shader, made
+   * exact at the reference) gives its corrections here.
+   */
+  virtual std::array<std::array<float, 4>, 2>
+  glslParametersAt(double latRad, double dLonRad) const;
+
 private:
   /** The expansion's coefficients about a point (radians). */
   struct Expansion {

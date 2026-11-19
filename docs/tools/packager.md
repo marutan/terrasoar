@@ -190,6 +190,7 @@ area and GSHHG's area.
 | `shoreline` | `dataset`, `source`, `name`, `licence`, `attribution`, `replaces` (extra packs), `minimumAreaKm2` (drop smaller polygons; 0 keeps all), `lods[]` with `resolution`, `storageLevel`, `minLevel`, `maxLevel` (−1: every deeper level) |
 | `countries` | `dataset`, `source` (Natural Earth admin-0 countries, with `ADM0_A3`, `ADMIN`, `ISO_A2_EH`, `ISO_A3_EH`), `name`, `licence`, `attribution`, `bufferDeg` (0.05), `simplifyDeg` (0.02; must be smaller), `exclude` (`ADM0_A3` codes left out: `ATA`) |
 | `geoids[]` | `dataset`, `source` (a PROJ GeoTIFF geoid grid), `name`, `licence`, `attribution`, `step` (keep every step-th sample), `replaces` (extra packs: the base pack geoid it is a finer grid of), `copy` (true: ship the grid as it is, for small regional grids with no-data cells; otherwise it is written as 16-bit centimetres) |
+| `datumShifts[]` | `dataset` (the id projections ask for, e.g. `ostn15`; the file is `<dataset>.tif`), `source` (a PROJ GeoTIFF horizontal offset grid, shipped as it is), `name`, `licence`, `attribution`; listed in the manifest's `datumShifts` |
 | `elevation` | `dataset`, `source` (a global geographic DEM), `name`, `licence`, `attribution`, `maxLevel` (6), `samples` (65 per tile side), `verticalDatum` (a geoid dataset of `geoids`, written to the store) |
 
 ### Changing a source

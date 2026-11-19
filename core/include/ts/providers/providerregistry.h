@@ -158,7 +158,10 @@ public:
    * "basepack", "dataset": "<id>"}`, with their own attribution. Damaged
    * packs are left out; if two packs replace one dataset, the first in
    * @p packs wins. Replaces the previous set; affects providers handed out
-   * afterwards (refresh the layers). See docs/design/packs.md.
+   * afterwards (refresh the layers). Also makes the packs' datum shift
+   * grids (PackManifest::datumShifts) the process's (ts::setDatumShiftGrids();
+   * choose the projection again with ts::projectionWith() to use them).
+   * See docs/design/packs.md.
    */
   void setInstalledPacks(const std::vector<InstalledPack>& packs);
 

@@ -152,7 +152,8 @@ std::optional<SourceSpec> readSource(const QJsonObject& entry)
   return source;
 }
 
-/** Reads the optional "geoids" and "elevation" entries into @p config. */
+/** Reads the optional "geoids", "datumShifts" and "elevation" entries into
+ *  @p config. */
 bool readElevation(const QJsonObject& json, PackConfig* config,
                    QString* errorString)
 {
@@ -174,6 +175,22 @@ bool readElevation(const QJsonObject& json, PackConfig* config,
       return fail(errorString, QStringLiteral("Bad geoid entry %1").arg(i));
     }
     config->geoids.push_back(spec);
+  }
+  const QJsonArray shifts = json.value(QStringLiteral("datumShifts")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < shifts.size(); ++i) {
+    const QJsonObject entry = shifts.at(i).toObject();
+    DatumShiftSpec spec;
+    spec.dataset = text(entry, "dataset");
+    spec.source = text(entry, "source");
+    spec.name = text(entry, "name");
+    spec.licence = text(entry, "licence");
+    spec.attribution = text(entry, "attribution");
+    if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty()) {
+      return fail(errorString,
+                  QStringLiteral("Bad datum shift entry %1").arg(i));
+    }
+    config->datumShifts.push_back(spec);
   }
   const QJsonObject elevation =
       json.value(QStringLiteral("elevation")).toObject();
@@ -414,8 +431,8 @@ public:
   {
     return checkSources() && prepareOutput() && buildImagery() &&
            buildShoreline() && buildCountries() && buildGeoids() &&
-           buildElevation() && copyNotices() && writeManifest() &&
-           checkBudget();
+           buildDatumShifts() && buildElevation() && copyNotices() &&
+           writeManifest() && checkBudget();
   }
 
 private:
@@ -585,6 +602,30 @@ private:
       dataset.licence = spec.licence;
       dataset.attribution = spec.attribution;
       dataset.replaces = spec.replaces;
+    }
+    return true;
+  }
+
+  bool buildDatumShifts()
+  {
+    for (const DatumShiftSpec& spec : m_config->datumShifts) {
+      const SourceSpec& source = *findSource(*m_config, spec.source);
+      const QString file = spec.dataset + QStringLiteral(".tif");
+      m_progress(QStringLiteral("Copying the datum shift grid %1").arg(file));
+      if (!QFile::copy(m_sources.filePath(source.file),
+                       m_output.filePath(file))) {
+        return fail(
+            m_error,
+            QStringLiteral("Cannot copy %1 into the pack").arg(source.file));
+      }
+      PackDataset shift;
+      shift.id = spec.dataset;
+      shift.file = file;
+      shift.name = spec.name;
+      shift.licence = spec.licence;
+      shift.attribution = spec.attribution;
+      shift.source = packSource(source);
+      m_manifest.datumShifts.push_back(shift);
     }
     return true;
   }

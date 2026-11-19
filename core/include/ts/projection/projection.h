@@ -167,6 +167,27 @@ public:
   /** Returns this instance's value of each of parameters(). */
   virtual ProjectionParameterValues parameterValues() const { return {}; }
 
+  /**
+   * Returns the id of the datum shift grid this projection uses when a
+   * pack provides it (ts::datumShiftGrid(), e.g. "ostn15"), or empty.
+   * projectionWith() makes an instance with the grid when there is one.
+   */
+  virtual QString datumShiftGridId() const { return QString(); }
+
+  /**
+   * Returns latitude @p latDeg, longitude @p lonDeg in this projection's
+   * own grid system for the status bar (e.g. "TQ 30080 80729"), or empty
+   * if it has none or the point is outside it.
+   */
+  // Latitude then longitude, as everywhere in Projection.
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  virtual QString gridReference(double latDeg, double lonDeg) const
+  {
+    Q_UNUSED(latDeg)
+    Q_UNUSED(lonDeg)
+    return QString();
+  }
+
   /** Returns the longitude that maps to x = 0, degrees. */
   double centralMeridianDeg() const { return m_centralMeridianDeg; }
 
@@ -293,9 +314,11 @@ const std::vector<const Projection*>& projections();
  * Returns the projection @p id with @p values for its parameters (missing
  * ones take their defaults; values are clamped to their ranges), or null
  * for an id this build doesn't know. Projections without parameters, and
- * values equal to the defaults, give the instance of projections(). Every
- * instance made lives for the whole run, so the same id and values give
- * the same pointer.
+ * values equal to the defaults, give the instance of projections(),
+ * unless a pack provides the projection's datum shift grid
+ * (Projection::datumShiftGridId()): then an instance with the grid. Every
+ * instance made lives for the whole run, so the same id, values and grid
+ * give the same pointer.
  *
  * @threadsafe
  */

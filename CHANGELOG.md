@@ -19,6 +19,11 @@ All notable changes to Terra Soar. The format follows
   Cassini–Soldner, with their central meridian, scale factor or zone in
   Projection Settings. These maps end at the edge of the area they show
   (40° or 30° from the central meridian) instead of wrapping round.
+- The UK National Grid (Ordnance Survey, OSGB36) as a map projection,
+  with the grid reference under the pointer in the status bar. Positions
+  convert from WGS 84 to within a few metres, or about 10 cm with the
+  OSTN15 transformation, which the updated "UK grids" data pack
+  (formerly the OSGM15 geoid pack) now includes.
 
 ### Fixed
 

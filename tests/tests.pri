@@ -40,6 +40,7 @@ HEADERS += \
     $$PWD/support/goldenimage.h \
     $$PWD/support/mockhttpserver.h \
     $$PWD/support/mockwms.h \
+    $$PWD/support/nationalgriddata.h \
     $$PWD/support/offscreengl.h
 
 # Absolute path of tests/data, for sample files.

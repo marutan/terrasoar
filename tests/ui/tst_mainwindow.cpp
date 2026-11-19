@@ -1406,7 +1406,7 @@ private slots:
     QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
     const QList<QAction*> actions = menu->actions();
     // The projections, a separator and Projection Settings.
-    QCOMPARE(actions.size(), 11);
+    QCOMPARE(actions.size(), 12);
     QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
     QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
     QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
@@ -1419,11 +1419,13 @@ private slots:
     QCOMPARE(actions.at(7)->text(),
              QStringLiteral("Universal Transverse Mercator (UTM)"));
     QCOMPARE(actions.at(8)->text(), QStringLiteral("Cassini–Soldner"));
-    QVERIFY(actions.at(9)->isSeparator());
-    QCOMPARE(actions.at(10)->objectName(),
+    QCOMPARE(actions.at(9)->text(),
+             QStringLiteral("UK National Grid (OSGB36)"));
+    QVERIFY(actions.at(10)->isSeparator());
+    QCOMPARE(actions.at(11)->objectName(),
              QStringLiteral("projectionSettingsAction"));
     // Mercator has no settings.
-    QVERIFY(!actions.at(10)->isEnabled());
+    QVERIFY(!actions.at(11)->isEnabled());
     QVERIFY(actions.at(0)->isChecked());
     ts::GlobeView* globe = globeOf(window);
     if (globe == nullptr) {
@@ -1455,6 +1457,44 @@ private slots:
       globe->grabFramebuffer().save(
           QDir(shots).filePath(QStringLiteral("map-miller-world.png")));
     }
+  }
+
+  void nationalGridReadout()
+  {
+    // On the UK National Grid map the status bar gives the grid reference
+    // beside the latitude and longitude; on the globe it doesn't.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QAction* nationalGrid = window.findChild<QAction*>(
+        QStringLiteral("projectionAction_uk-national-grid"));
+    QAction* settings =
+        window.findChild<QAction*>(QStringLiteral("projectionSettingsAction"));
+    QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
+    if (nationalGrid == nullptr || settings == nullptr || pointer == nullptr) {
+      QFAIL("missing actions or labels");
+    }
+    nationalGrid->trigger();
+    QCOMPARE(globe->mapProjection()->id(), QStringLiteral("uk-national-grid"));
+    QVERIFY(!settings->isEnabled()); // nothing to set
+    // Westminster, on the globe: no grid reference.
+    globe->setPose(ts::CameraPose{51.5007, -0.1246, 2.0e4, 0.0, 0.0});
+    const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
+    sendMouse(globe, QEvent::MouseMove, centre, Qt::NoButton, Qt::NoButton);
+    QVERIFY2(!pointer->text().contains(QStringLiteral("TQ")),
+             qPrintable(pointer->text()));
+    globe->setViewMode(ts::ViewMode::Map, false);
+    globe->setPose(ts::CameraPose{51.5007, -0.1246, 2.0e4, 0.0, 0.0});
+    sendMouse(globe, QEvent::MouseMove, centre + QPointF(1.0, 0.0),
+              Qt::NoButton, Qt::NoButton);
+    QVERIFY2(pointer->text().contains(QStringLiteral("TQ 30")),
+             qPrintable(pointer->text()));
+    QVERIFY2(pointer->text().startsWith(QStringLiteral("51.50")),
+             qPrintable(pointer->text()));
   }
 
   void projectionSettings()

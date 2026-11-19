@@ -797,6 +797,13 @@ private slots:
     QTest::newRow("map-transverse-mercator-30e")
         << QStringLiteral("transverse-mercator@30") << 1.0 << 30.0 << 30.0
         << 1.0e7 << 0.0 << 0.0;
+    // Phase 11b-2's UK National Grid: its whole domain about 2° W, and
+    // half way there from the globe.
+    const QString nationalGrid = QStringLiteral("uk-national-grid");
+    QTest::newRow("map-national-grid")
+        << nationalGrid << 1.0 << 0.0 << -2.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half-national-grid")
+        << nationalGrid << 0.5 << 50.0 << -2.0 << 1.2e7 << 0.0 << 0.0;
   }
 
   void morphGolden()
@@ -1601,6 +1608,14 @@ private slots:
         << -75.0 << 0.0 << 6.0e6 << 0.0 << miller << 1.0 << 0.0;
     QTest::newRow("base-morph-half")
         << 30.0 << 20.0 << 1.6e7 << 0.0 << mercator << 0.5 << 0.0;
+    // Great Britain on the National Grid, the shoreline on the imagery
+    // (the Helmert datum: no OSTN15 pack here), and close in on the
+    // Thames estuary.
+    const QString nationalGrid = QStringLiteral("uk-national-grid");
+    QTest::newRow("base-map-national-grid-uk")
+        << 54.5 << -3.0 << 2.0e6 << 0.0 << nationalGrid << 1.0 << 0.0;
+    QTest::newRow("base-map-national-grid-thames")
+        << 51.5 << 0.6 << 1.5e5 << 0.0 << nationalGrid << 1.0 << 0.0;
     // Terrain from the base pack's DEM, looking across mountains.
     QTest::newRow("base-terrain-alps")
         << 46.0 << 8.0 << 2.0e5 << 65.0 << none << 0.0 << 3.0;

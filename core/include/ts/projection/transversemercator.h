@@ -25,11 +25,14 @@
 #define TS_PROJECTION_TRANSVERSEMERCATOR_H
 
 #include <cstdint>
+#include <memory>
 
 #include "ts/projection/localexpansion.h"
 
 namespace ts
 {
+
+struct KruegerSeries;
 
 /**
  * Transverse Mercator (Gauss–Krüger) on the WGS 84 ellipsoid, by Krüger's
@@ -63,13 +66,31 @@ public:
   double scaleFactor() const { return m_scaleFactor; }
 
 protected:
+  /**
+   * Creates the projection on the ellipsoid with semi-major axis
+   * @p semiMajorAxisM and semi-minor axis @p semiMinorAxisM (metres)
+   * instead of WGS 84's. project() then takes latitudes and longitudes on
+   * that ellipsoid.
+   */
+  TransverseMercatorProjection(double centralMeridianDeg, double scaleFactor,
+                               double semiMajorAxisM, double semiMinorAxisM);
+
   std::optional<std::array<double, 2>>
   approximateInverse(MapPoint point) const override;
   QByteArray glslForwardSource() const override;
   std::array<std::array<float, 4>, 2> glslParameters() const override;
 
+  /**
+   * Returns GLSL statements put at the start of the forward function,
+   * which may change its `lonLatRad` (longitude east of the central
+   * meridian, latitude; radians) before the projection: a datum shift.
+   * p0.x is the scale; p0.yzw and p1 are free for them. None by default.
+   */
+  virtual QByteArray glslForwardPrologue() const;
+
 private:
   double m_scaleFactor;
+  std::shared_ptr<const KruegerSeries> m_series;
 };
 
 /**

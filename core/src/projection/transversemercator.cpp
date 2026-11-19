@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 
 #include <QCoreApplication>
 
@@ -33,12 +34,14 @@
 namespace ts
 {
 
-namespace
-{
-
-/** WGS 84's eccentricity e and third flattening n. */
-struct Ellipsoid {
+/** Krüger's and Helmert's series for one ellipsoid. */
+struct KruegerSeries {
+  /** Semi-major axis, metres. */
+  double a = 0.0;
+  /** Eccentricity e and its square. */
   double e = 0.0;
+  double e2 = 0.0;
+  /** Third flattening n. */
   double n = 0.0;
   /** a / (1 + n) (1 + n²/4 + n⁴/64 + n⁶/256): the rectifying radius. */
   double rectifyingRadius = 0.0;
@@ -51,58 +54,73 @@ struct Ellipsoid {
   std::array<double, 4> footpoint{};
 };
 
-const Ellipsoid& wgs84Series()
+namespace
 {
-  static const Ellipsoid series = []() {
-    Ellipsoid s;
-    s.e = std::sqrt(wgs84::eccentricitySquared);
-    const double f = 1.0 - wgs84::semiMinorAxisM / wgs84::semiMajorAxisM;
-    const double n = f / (2.0 - f);
-    s.n = n;
-    const double n2 = n * n;
-    const double n3 = n2 * n;
-    const double n4 = n3 * n;
-    const double n5 = n4 * n;
-    const double n6 = n5 * n;
-    s.rectifyingRadius = wgs84::semiMajorAxisM / (1.0 + n) *
-                         (1.0 + n2 / 4.0 + n4 / 64.0 + n6 / 256.0);
-    // Karney (2011), eqs. 35 and 36.
-    s.alpha = {n / 2.0 - 2.0 / 3.0 * n2 + 5.0 / 16.0 * n3 + 41.0 / 180.0 * n4 -
-                   127.0 / 288.0 * n5 + 7891.0 / 37800.0 * n6,
-               13.0 / 48.0 * n2 - 3.0 / 5.0 * n3 + 557.0 / 1440.0 * n4 +
-                   281.0 / 630.0 * n5 - 1983433.0 / 1935360.0 * n6,
-               61.0 / 240.0 * n3 - 103.0 / 140.0 * n4 + 15061.0 / 26880.0 * n5 +
-                   167603.0 / 181440.0 * n6,
-               49561.0 / 161280.0 * n4 - 179.0 / 168.0 * n5 +
-                   6601661.0 / 7257600.0 * n6,
-               34729.0 / 80640.0 * n5 - 3418889.0 / 1995840.0 * n6,
-               212378941.0 / 319334400.0 * n6};
-    s.beta = {n / 2.0 - 2.0 / 3.0 * n2 + 37.0 / 96.0 * n3 - 1.0 / 360.0 * n4 -
-                  81.0 / 512.0 * n5 + 96199.0 / 604800.0 * n6,
-              1.0 / 48.0 * n2 + 1.0 / 15.0 * n3 - 437.0 / 1440.0 * n4 +
-                  46.0 / 105.0 * n5 - 1118711.0 / 3870720.0 * n6,
-              17.0 / 480.0 * n3 - 37.0 / 840.0 * n4 - 209.0 / 4480.0 * n5 +
-                  5569.0 / 90720.0 * n6,
-              4397.0 / 161280.0 * n4 - 11.0 / 504.0 * n5 -
-                  830251.0 / 7257600.0 * n6,
-              4583.0 / 161280.0 * n5 - 108847.0 / 3991680.0 * n6,
-              20648693.0 / 638668800.0 * n6};
-    // The meridian arc M = A (φ + Σ arc_j sin 2jφ), and the footpoint
-    // φ = μ + Σ footpoint_j sin 2jμ with μ = M / A (Helmert's series).
-    s.arc = {-(1.5 * n - 9.0 / 16.0 * n3), 15.0 / 16.0 * n2 - 15.0 / 32.0 * n4,
-             -35.0 / 48.0 * n3, 315.0 / 512.0 * n4};
-    s.footpoint = {1.5 * n - 27.0 / 32.0 * n3,
-                   21.0 / 16.0 * n2 - 55.0 / 32.0 * n4, 151.0 / 96.0 * n3,
-                   1097.0 / 512.0 * n4};
-    return s;
-  }();
+
+/** The series of the ellipsoid with axes @p semiMajorM and @p semiMinorM. */
+std::shared_ptr<const KruegerSeries> makeSeries(double semiMajorM,
+                                                double semiMinorM)
+{
+  KruegerSeries s;
+  s.a = semiMajorM;
+  const double f = 1.0 - semiMinorM / semiMajorM;
+  s.e2 = f * (2.0 - f);
+  s.e = std::sqrt(s.e2);
+  const double n = f / (2.0 - f);
+  s.n = n;
+  const double n2 = n * n;
+  const double n3 = n2 * n;
+  const double n4 = n3 * n;
+  const double n5 = n4 * n;
+  const double n6 = n5 * n;
+  s.rectifyingRadius =
+      semiMajorM / (1.0 + n) * (1.0 + n2 / 4.0 + n4 / 64.0 + n6 / 256.0);
+  // Karney (2011), eqs. 35 and 36.
+  s.alpha = {n / 2.0 - 2.0 / 3.0 * n2 + 5.0 / 16.0 * n3 + 41.0 / 180.0 * n4 -
+                 127.0 / 288.0 * n5 + 7891.0 / 37800.0 * n6,
+             13.0 / 48.0 * n2 - 3.0 / 5.0 * n3 + 557.0 / 1440.0 * n4 +
+                 281.0 / 630.0 * n5 - 1983433.0 / 1935360.0 * n6,
+             61.0 / 240.0 * n3 - 103.0 / 140.0 * n4 + 15061.0 / 26880.0 * n5 +
+                 167603.0 / 181440.0 * n6,
+             49561.0 / 161280.0 * n4 - 179.0 / 168.0 * n5 +
+                 6601661.0 / 7257600.0 * n6,
+             34729.0 / 80640.0 * n5 - 3418889.0 / 1995840.0 * n6,
+             212378941.0 / 319334400.0 * n6};
+  s.beta = {n / 2.0 - 2.0 / 3.0 * n2 + 37.0 / 96.0 * n3 - 1.0 / 360.0 * n4 -
+                81.0 / 512.0 * n5 + 96199.0 / 604800.0 * n6,
+            1.0 / 48.0 * n2 + 1.0 / 15.0 * n3 - 437.0 / 1440.0 * n4 +
+                46.0 / 105.0 * n5 - 1118711.0 / 3870720.0 * n6,
+            17.0 / 480.0 * n3 - 37.0 / 840.0 * n4 - 209.0 / 4480.0 * n5 +
+                5569.0 / 90720.0 * n6,
+            4397.0 / 161280.0 * n4 - 11.0 / 504.0 * n5 -
+                830251.0 / 7257600.0 * n6,
+            4583.0 / 161280.0 * n5 - 108847.0 / 3991680.0 * n6,
+            20648693.0 / 638668800.0 * n6};
+  // The meridian arc M = A (φ + Σ arc_j sin 2jφ), and the footpoint
+  // φ = μ + Σ footpoint_j sin 2jμ with μ = M / A (Helmert's series).
+  s.arc = {-(1.5 * n - 9.0 / 16.0 * n3), 15.0 / 16.0 * n2 - 15.0 / 32.0 * n4,
+           -35.0 / 48.0 * n3, 315.0 / 512.0 * n4};
+  s.footpoint = {1.5 * n - 27.0 / 32.0 * n3,
+                 21.0 / 16.0 * n2 - 55.0 / 32.0 * n4, 151.0 / 96.0 * n3,
+                 1097.0 / 512.0 * n4};
+  return std::make_shared<const KruegerSeries>(s);
+}
+
+const std::shared_ptr<const KruegerSeries>& wgs84SeriesPointer()
+{
+  static const std::shared_ptr<const KruegerSeries> series =
+      makeSeries(wgs84::semiMajorAxisM, wgs84::semiMinorAxisM);
   return series;
 }
 
-/** The meridian arc from the equator to @p latRad, metres. */
-double meridianArcM(double latRad)
+const KruegerSeries& wgs84Series()
 {
-  const Ellipsoid& s = wgs84Series();
+  return *wgs84SeriesPointer();
+}
+
+/** The meridian arc from the equator to @p latRad, metres. */
+double meridianArcM(double latRad, const KruegerSeries& s = wgs84Series())
+{
   double sum = latRad;
   for (std::size_t j = 0; j < s.arc.size(); ++j) {
     sum += s.arc.at(j) * std::sin(2.0 * static_cast<double>(j + 1) * latRad);
@@ -111,9 +129,8 @@ double meridianArcM(double latRad)
 }
 
 /** The latitude whose meridian arc is @p arcM (the footpoint), radians. */
-double footpointLatRad(double arcM)
+double footpointLatRad(double arcM, const KruegerSeries& s = wgs84Series())
 {
-  const Ellipsoid& s = wgs84Series();
   const double mu = arcM / s.rectifyingRadius;
   double lat = mu;
   for (std::size_t j = 0; j < s.footpoint.size(); ++j) {
@@ -123,9 +140,9 @@ double footpointLatRad(double arcM)
 }
 
 /** The tangent of the conformal latitude for tan φ = @p tau. */
-double conformalTau(double tau)
+double conformalTau(double tau, const KruegerSeries& s)
 {
-  const double e = wgs84Series().e;
+  const double e = s.e;
   const double sigma =
       std::sinh(e * std::atanh(e * tau / std::sqrt(1.0 + tau * tau)));
   return tau * std::sqrt(1.0 + sigma * sigma) -
@@ -133,12 +150,12 @@ double conformalTau(double tau)
 }
 
 /** tan φ from the tangent of the conformal latitude (Karney, eq. 19–21). */
-double geographicTau(double taup)
+double geographicTau(double taup, const KruegerSeries& s)
 {
-  const double e2 = wgs84::eccentricitySquared;
+  const double e2 = s.e2;
   double tau = taup;
   for (int32_t i = 0; i < 6; ++i) {
-    const double taupi = conformalTau(tau);
+    const double taupi = conformalTau(tau, s);
     const double dtau = (taup - taupi) / std::sqrt(1.0 + taupi * taupi) *
                         (1.0 + (1.0 - e2) * tau * tau) /
                         ((1.0 - e2) * std::sqrt(1.0 + tau * tau));
@@ -175,7 +192,18 @@ TransverseMercatorProjection::TransverseMercatorProjection(
     // An angle, then a factor: they can't be mixed up meaningfully.
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     double centralMeridianDeg, double scaleFactor)
-    : LocalExpansionProjection(centralMeridianDeg), m_scaleFactor(scaleFactor)
+    : LocalExpansionProjection(centralMeridianDeg), m_scaleFactor(scaleFactor),
+      m_series(wgs84SeriesPointer())
+{
+}
+
+TransverseMercatorProjection::TransverseMercatorProjection(
+    // An angle, a factor and the axes: they can't be mixed up meaningfully.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    double centralMeridianDeg, double scaleFactor, double semiMajorAxisM,
+    double semiMinorAxisM)
+    : LocalExpansionProjection(centralMeridianDeg), m_scaleFactor(scaleFactor),
+      m_series(makeSeries(semiMajorAxisM, semiMinorAxisM))
 {
 }
 
@@ -226,8 +254,8 @@ MapPoint TransverseMercatorProjection::project(double latRad,
 {
   // Karney (2011): the conformal latitude, the spherical transverse
   // Mercator of it (ξ', η'), then Krüger's series.
-  const Ellipsoid& s = wgs84Series();
-  const double taup = conformalTau(std::tan(latRad));
+  const KruegerSeries& s = *m_series;
+  const double taup = conformalTau(std::tan(latRad), s);
   const double cosLon = std::cos(dLonRad);
   const double xip = std::atan2(taup, cosLon);
   const double etap = std::asinh(std::sin(dLonRad) / std::hypot(taup, cosLon));
@@ -245,7 +273,7 @@ MapPoint TransverseMercatorProjection::project(double latRad,
 std::optional<std::array<double, 2>>
 TransverseMercatorProjection::approximateInverse(MapPoint point) const
 {
-  const Ellipsoid& s = wgs84Series();
+  const KruegerSeries& s = *m_series;
   const double scale = m_scaleFactor * s.rectifyingRadius;
   const double xi = point.yM / scale;
   const double eta = point.xM / scale;
@@ -263,7 +291,7 @@ TransverseMercatorProjection::approximateInverse(MapPoint point) const
   const double cosXi = std::cos(xip);
   const double taup = std::sin(xip) / std::hypot(sinhEta, cosXi);
   const double lon = std::atan2(sinhEta, cosXi);
-  return std::array<double, 2>{std::atan(geographicTau(taup)), lon};
+  return std::array<double, 2>{std::atan(geographicTau(taup, s)), lon};
 }
 
 QByteArray TransverseMercatorProjection::glslForwardSource() const
@@ -271,9 +299,10 @@ QByteArray TransverseMercatorProjection::glslForwardSource() const
   // Float: three terms of Krüger's series are plenty. cos φ is held off
   // zero so that the poles stay finite. tsAtan2 and tsAsinh: GLSL's own
   // can be out by tens of metres here.
-  const Ellipsoid& s = wgs84Series();
+  const KruegerSeries& s = *m_series;
   return "\nvec2 " + glslFunction() +
-         "Forward(vec2 lonLatRad, vec4 p0, vec4 p1)\n{\n"
+         "Forward(vec2 lonLatRad, vec4 p0, vec4 p1)\n{\n" +
+         glslForwardPrologue() +
          "  float s = sin(lonLatRad.y);\n"
          "  float c = max(cos(lonLatRad.y), 1e-6);\n"
          "  float tau = s / c;\n"
@@ -302,14 +331,18 @@ QByteArray TransverseMercatorProjection::glslForwardSource() const
          "}\n";
 }
 
+QByteArray TransverseMercatorProjection::glslForwardPrologue() const
+{
+  return QByteArray();
+}
+
 std::array<std::array<float, 4>, 2>
 TransverseMercatorProjection::glslParameters() const
 {
-  return {
-      std::array<float, 4>{
-          static_cast<float>(m_scaleFactor * wgs84Series().rectifyingRadius),
-          0.0F, 0.0F, 0.0F},
-      std::array<float, 4>{}};
+  return {std::array<float, 4>{
+              static_cast<float>(m_scaleFactor * m_series->rectifyingRadius),
+              0.0F, 0.0F, 0.0F},
+          std::array<float, 4>{}};
 }
 
 // --- UTM
@@ -450,7 +483,7 @@ CassiniProjection::approximateInverse(MapPoint point) const
 
 QByteArray CassiniProjection::glslForwardSource() const
 {
-  const Ellipsoid& s = wgs84Series();
+  const KruegerSeries& s = wgs84Series();
   const double es = wgs84::eccentricitySquared;
   return "\nvec2 " + glslFunction() +
          "Forward(vec2 lonLatRad, vec4 p0, vec4 p1)\n{\n"
