@@ -345,6 +345,46 @@ their own).
   the meridians fold over each other near the poles and no inverse is
   unique.
 
+## Azimuthals: Azimuthal Equidistant, Gnomonic, Polar Stereographic
+
+`azimuthal.h`. The two centred on any point derive from
+`CentredAzimuthalProjection`: parameters the centre's latitude and
+longitude, a domain of their own within `domainLimitDeg()` of the centre
+(the great-circle angle through the geodetic latitudes, the same test in
+GLSL with the cosine of the limit), and `clampToDomain()` along the great
+circle from the centre.
+
+- **Azimuthal Equidistant** (`azimuthal-equidistant`) is PROJ's `aeqd`
+  on WGS 84, by GeographicLib's own `AzimuthalEquidistant` (geodesics;
+  PROJ's algorithm): the map's distance and direction from the centre
+  are the geodesic's length and azimuth. The North Pole by default (the
+  polar case); the settings dialog has presets for both poles. Its domain
+  reaches 175°: the antipode is a circle. On the GPU large tiles use
+  Vincenty's inverse geodesic in float (ten iterations, `tsAtan2`), about
+  a metre at the far side of the Earth.
+- **Gnomonic** (`gnomonic`) is on the sphere of radius a, as PROJ's
+  `gnom +R=6378137`: there the great circles through the geodetic
+  coordinates are straight lines, which is what the map is for (route
+  planning). No map of an ellipsoid has every geodesic straight; PROJ's
+  ellipsoidal `gnom` only nearly does. Its domain reaches 80°: at 90° the
+  map runs to infinity. As near a cone's apex, 1 / cos c curves ever
+  faster towards 90°, so tiles there use the formula unless they are
+  small beside their distance from it.
+- **Polar Stereographic** (`polar-stereographic-north`, `-south`) is
+  PROJ's `stere` with a latitude of true scale (variant B), Snyder
+  21-33/34: EPSG:3413 and EPSG:3031 by default (checked against them).
+  Each is a box over its hemisphere and 30° beyond; the map goes all the
+  way round the pole without a cut, so its longitudes are the whole 360°
+  with no domain of its own.
+
+The shared WGS 84 functions (`tsfn`, `msfn`, the latitude from `tsfn`,
+and their GLSL) are in `core/src/projection/ellipsoidal.h`.
+
+The GPU test (`glslMatchesCpp`) allows a hundredth of a texel as drawn on
+the map: the ground's texel times the scale at the reference (the
+gnomonic's edge is stretched 33 times), and holds its references inside
+the domain as the renderers do.
+
 ## Domains of their own: Rotated Mercator
 
 `ts::RotatedMercatorProjection` (`rotatedmercator.h`, id
@@ -391,10 +431,11 @@ reference points, a drag past the edge), `inverse()` (nothing outside),
 `bounds()` (the domain is a rectangle in Hotine's u and v: its turned
 corners) and the tile selector, which samples a tile's margin (centre
 first) and leaves out tiles certainly outside. With a longitude box of
-the whole 360°, a tile can meet it both where it is and a turn to the
-west, one of them a sliver at the far side; the selector takes the wider
-part (taking the sliver once culled the western half of a Lambert map
-with its children). The camera holds the map's centre within the
+the whole 360°, the selector takes the whole tile, its longitudes
+counted on from the central meridian's −180° (cutting it there once
+culled the western half of a Lambert map, a level-0 tile being taken for
+the sliver at the far side; and an azimuthal map, continuous there,
+mustn't be measured by half a tile). The camera holds the map's centre within the
 latitude limits as they are, not ± the smaller of them, as a cone's
 aren't symmetric. Outside the box a
 projection squashes geometry onto the edge, which only works when the

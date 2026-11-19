@@ -27,14 +27,26 @@
 
 #include <QCoreApplication>
 
+#include "ellipsoidal.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
 
 namespace ts
 {
 
+using ellipsoidal::eccentricity;
+using ellipsoidal::glslTsfn;
+using ellipsoidal::msfn;
+using ellipsoidal::phiOfTs;
+using ellipsoidal::tsfn;
+
 namespace
 {
+
+QByteArray number(double value)
+{
+  return ellipsoidal::glslNumber(value);
+}
 
 /** PROJ's tolerance for the poles. */
 constexpr double poleEpsilon = 1e-10;
@@ -42,47 +54,6 @@ constexpr double poleEpsilon = 1e-10;
 double halfPi()
 {
   return 0.5 * pi;
-}
-
-double eccentricity()
-{
-  return std::sqrt(wgs84::eccentricitySquared);
-}
-
-/** Snyder's t(φ) = exp(−ψ), ψ the isometric latitude (PROJ's pj_tsfn). */
-double tsfn(double phi)
-{
-  const double e = eccentricity();
-  const double s = std::sin(phi);
-  const double c = std::cos(phi);
-  return std::exp(e * std::atanh(e * s)) *
-         (s > 0.0 ? c / (1.0 + s) : (1.0 - s) / c);
-}
-
-/** cos φ / √(1 − e² sin² φ) (PROJ's pj_msfn). */
-double msfn(double phi)
-{
-  const double s = std::sin(phi);
-  return std::cos(phi) / std::sqrt(1.0 - wgs84::eccentricitySquared * s * s);
-}
-
-/** The latitude whose tsfn() is @p ts (PROJ's pj_phi2). */
-double phiOfTs(double ts)
-{
-  const double e = eccentricity();
-  double phi = halfPi() - 2.0 * std::atan(ts);
-  for (int32_t i = 0; i < 15; ++i) {
-    const double con = e * std::sin(phi);
-    const double next =
-        halfPi() -
-        2.0 * std::atan(ts * std::pow((1.0 - con) / (1.0 + con), 0.5 * e));
-    const bool done = std::abs(next - phi) < 1e-15;
-    phi = next;
-    if (done) {
-      break;
-    }
-  }
-  return phi;
 }
 
 /** Helmert's series for WGS 84's meridian arc: A and the sin 2jφ
@@ -125,20 +96,6 @@ double meridianArcM(double latRad)
 double sinc(double z)
 {
   return std::abs(z) < 1e-4 ? 1.0 - z * z / 6.0 : std::sin(z) / z;
-}
-
-QByteArray number(double value)
-{
-  return QByteArray::number(value, 'g', 9);
-}
-
-/** GLSL of Snyder's t(φ) in float, as tsfn(), for latitude `phi`, sine
- *  `s` and cosine `c`. */
-QByteArray glslTsfn()
-{
-  return "exp(" + number(eccentricity()) + " * tsAtanh(" +
-         number(eccentricity()) +
-         " * s)) * (s > 0.0 ? c / (1.0 + s) : (1.0 - s) / c)";
 }
 
 } // namespace

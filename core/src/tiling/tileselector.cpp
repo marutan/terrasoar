@@ -178,22 +178,31 @@ std::optional<GeoRect> domainPart(const Projection& projection,
   const double limit = projection.maximumLonOffsetDeg();
   const double centre = projection.centralMeridianDeg();
   const double west = normaliseLonDeg(rect.westDeg - centre);
-  // The tile, or its copy a turn to the west, meets −limit…limit. With a
-  // limit of 180° both may: the wider part, the other being a sliver at
-  // the far side (which a whole tile of level 0 must not be taken for).
-  std::optional<GeoRect> best;
+  if (limit >= 180.0) {
+    // Every longitude: the whole tile, its longitudes counted on from the
+    // central meridian's −180°. A map that is cut there (a cone's fan)
+    // discards around the cut through a domain of its own; one that isn't
+    // (an azimuthal) mustn't be measured by half a tile.
+    const GeoRect whole{west + centre, southDeg,
+                        west + rect.widthDeg() + centre, northDeg};
+    if (projection.hasOwnDomain() && !meetsOwnDomain(projection, whole)) {
+      return std::nullopt;
+    }
+    return whole;
+  }
+  // The tile, or its copy a turn to the west, meets −limit…limit.
   for (const double shift : {0.0, -360.0}) {
     const double w = std::max(west + shift, -limit);
     const double e = std::min(west + shift + rect.widthDeg(), limit);
-    if (!(w < e) || (best && e - w <= best->widthDeg())) {
-      continue;
-    }
-    const GeoRect part{w + centre, southDeg, e + centre, northDeg};
-    if (!projection.hasOwnDomain() || meetsOwnDomain(projection, part)) {
-      best = part;
+    if (w < e) {
+      const GeoRect part{w + centre, southDeg, e + centre, northDeg};
+      if (projection.hasOwnDomain() && !meetsOwnDomain(projection, part)) {
+        return std::nullopt;
+      }
+      return part;
     }
   }
-  return best;
+  return std::nullopt;
 }
 
 /** Points sampled along each edge of a tile for its extent on a map that

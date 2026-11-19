@@ -74,6 +74,16 @@ chooses how it is flattened:
 - **American Polyconic**: the projection of older US topographic maps:
   every parallel is true to scale, as is the central meridian. It shows
   75° either side of that meridian.
+- **Azimuthal Equidistant**: distances and directions from the centre
+  are true, as on radio and great-circle range maps. It starts centred on
+  the North Pole and shows nearly the whole Earth (the far side's edge is
+  the point opposite the centre).
+- **Gnomonic**: every great circle is a straight line, so the shortest
+  routes plan as straight lines. It shows up to 80° from its centre.
+- **Polar Stereographic (North)** and **(South)**: the map of the polar
+  regions, as used for sea ice and Antarctic maps; shapes are true.
+  They start as the standard Arctic (EPSG:3413) and Antarctic
+  (EPSG:3031) maps.
 - **UK National Grid (OSGB36)**: the Ordnance Survey's grid of Great
   Britain, as on OS maps. The status bar gives the grid reference under
   the pointer (such as TQ 30080 80729). Positions are converted from GPS
@@ -106,6 +116,12 @@ the settings with the projection.
   **central meridian**.
 - **American Polyconic**: the **central meridian** and the **origin
   latitude**.
+- **Azimuthal Equidistant** and **Gnomonic**: the **centre** (latitude and
+  longitude). The Azimuthal Equidistant also has **North Pole** and
+  **South Pole** presets.
+- **Polar Stereographic**: the **latitude of true scale** and the
+  **central meridian** (the one straight down from the north pole, or up
+  from the south pole).
 - **Rotated Mercator**: the **centre** (latitude and longitude), the
   **azimuth** of the centre line there (its direction, clockwise from
   north) and the **scale factor** along it. Or give two places under

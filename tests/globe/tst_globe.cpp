@@ -844,6 +844,19 @@ private slots:
         << lambert << 0.5 << 52.0 << 10.0 << 1.2e7 << 0.0 << 0.0;
     QTest::newRow("map-polyconic") << QStringLiteral("polyconic") << 1.0 << 20.0
                                    << 0.0 << 4.0e7 << 0.0 << 0.0;
+    // Phase 11c-2's azimuthals: the polar Azimuthal Equidistant (nearly
+    // the whole Earth, the antipode left out), half way there, the
+    // Gnomonic's hemisphere and the Arctic on Polar Stereographic.
+    const QString equidistant = QStringLiteral("azimuthal-equidistant");
+    QTest::newRow("map-azimuthal-equidistant")
+        << equidistant << 1.0 << 90.0 << 0.0 << 9.0e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half-azimuthal-equidistant")
+        << equidistant << 0.5 << 60.0 << 0.0 << 1.2e7 << 0.0 << 0.0;
+    QTest::newRow("map-gnomonic") << QStringLiteral("gnomonic") << 1.0 << 45.0
+                                  << 0.0 << 6.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-polar-stereographic-north")
+        << QStringLiteral("polar-stereographic-north") << 1.0 << 80.0 << -45.0
+        << 2.0e7 << 0.0 << 0.0;
   }
 
   void morphGolden()
@@ -1649,6 +1662,14 @@ private slots:
         << 54.5 << -3.0 << 2.0e6 << 0.0 << nationalGrid << 1.0 << 0.0;
     QTest::newRow("base-map-national-grid-thames")
         << 51.5 << 0.6 << 1.5e5 << 0.0 << nationalGrid << 1.0 << 0.0;
+    // Antarctica on Polar Stereographic (EPSG:3031), and the world about
+    // London on the Azimuthal Equidistant.
+    QTest::newRow("base-map-polar-south")
+        << -90.0 << 0.0 << 1.2e7 << 0.0
+        << QStringLiteral("polar-stereographic-south") << 1.0 << 0.0;
+    QTest::newRow("base-map-azimuthal-london")
+        << 51.5 << -0.1 << 6.0e7 << 0.0
+        << QStringLiteral("azimuthal-equidistant@51.5,-0.1") << 1.0 << 0.0;
     // Europe on Lambert Conformal Conic (EPSG:3034).
     QTest::newRow("base-map-lambert-europe")
         << 52.0 << 10.0 << 5.0e6 << 0.0

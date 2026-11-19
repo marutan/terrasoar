@@ -42,6 +42,7 @@
 #include "ts/geo/geodetic.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
+#include "ts/projection/azimuthal.h"
 #include "ts/projection/conic.h"
 #include "ts/projection/cylindricalprojection.h"
 #include "ts/projection/datumshift.h"
@@ -306,10 +307,12 @@ expectedProbeOffset(const ts::Projection& projection, double referenceLat,
   result.xM = expected.xM - reference.xM;
   result.yM = expected.yM - reference.yM;
   // The expansion (small spans) or the float formula (large ones): within
-  // a hundredth of a texel of a 256-pixel tile of this span, and a
-  // millimetre.
-  const double texelM =
-      ts::degToRad(spanDeg) * ts::wgs84::semiMajorAxisM / 256.0;
+  // a hundredth of a texel of a 256-pixel tile of this span as drawn on
+  // the map (the ground's texel times the scale at the reference: the
+  // gnomonic's edge is stretched 33 times), and a millimetre.
+  const ts::MapScale scale = projection.scaleAtPoint(referenceLat, 0.0);
+  const double texelM = ts::degToRad(spanDeg) * ts::wgs84::semiMajorAxisM /
+                        256.0 * std::max({1.0, scale.parallel, scale.meridian});
   result.allowedXM = 1e-3 + 0.01 * texelM;
   result.allowedYM = result.allowedXM;
   return result;
@@ -326,7 +329,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{13});
+    QCOMPARE(all.size(), std::size_t{17});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -346,11 +349,14 @@ private slots:
         centre = -2.0;
       } else if (projection->id() == QLatin1String("lambert-conformal-conic")) {
         centre = 10.0; // EPSG:3034's
+      } else if (projection->id() ==
+                 QLatin1String("polar-stereographic-north")) {
+        centre = -45.0; // EPSG:3413's
       }
       QCOMPARE(projection->centralMeridianDeg(), centre);
     }
-    QCOMPARE(ids.size(), 13);
-    QCOMPARE(functions.size(), 13);
+    QCOMPARE(ids.size(), 17);
+    QCOMPARE(functions.size(), 17);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -380,6 +386,10 @@ private slots:
     QTest::newRow("rotated-mercator") << 10;
     QTest::newRow("lambert-conformal-conic") << 11;
     QTest::newRow("polyconic") << 12;
+    QTest::newRow("azimuthal-equidistant") << 13;
+    QTest::newRow("gnomonic") << 14;
+    QTest::newRow("polar-stereographic-north") << 15;
+    QTest::newRow("polar-stereographic-south") << 16;
   }
 
   void againstProj()
@@ -553,8 +563,9 @@ private slots:
     QVERIFY(std::abs(mercator.maximumLatDeg() - 85.0840590501) < 1e-6);
     QCOMPARE(miller.maximumLatDeg(), 90.0);
     for (const ts::Projection* projection : ts::projections()) {
-      // Symmetric about the equator, but for a cone's.
-      if (projection->id() != QLatin1String("lambert-conformal-conic")) {
+      // Symmetric about the equator, but for a cone's and the polar maps'.
+      if (projection->id() != QLatin1String("lambert-conformal-conic") &&
+          !projection->id().startsWith(QLatin1String("polar-"))) {
         QCOMPARE(projection->minimumLatDeg(), -projection->maximumLatDeg());
       }
       QVERIFY(projection->containsLatitude(0.0));
@@ -604,8 +615,12 @@ private slots:
       }
       const double limit = projection->maximumLonOffsetDeg();
       if (limit >= 180.0) {
-        QVERIFY(projection->repeats());
-        QVERIFY(projection->contains(0.0, 179.9));
+        // Every longitude: the cylindricals, which repeat, or the polar
+        // maps, which go all the way round the pole.
+        QVERIFY(projection->repeats() ||
+                projection->id().startsWith(QLatin1String("polar-")));
+        QVERIFY(projection->contains(10.0, 179.9) ||
+                projection->contains(-10.0, 179.9));
         continue;
       }
       ++limited;
@@ -780,16 +795,17 @@ private slots:
     for (std::size_t p = 0; p < all.size(); ++p) {
       const ts::Projection& projection = *all[p];
       for (const double referenceLat : referenceLats) {
+        // Held inside the domain, as the renderers hold their references
+        // (for a domain of its own, along the way towards it).
         const double clampedReference =
-            std::clamp(referenceLat, projection.minimumLatDeg(),
-                       projection.maximumLatDeg());
+            projection.clampToDomain(referenceLat, 0.0).latDeg;
         const ts::MapPoint reference =
             projection.forward(clampedReference, 0.0);
         for (const double span : spans) {
           ProbeBlock block;
           // As the renderers ask: the samples reach half the span.
           const ts::ProjectionShaderReference shaderReference =
-              projection.shaderReferenceFor(referenceLat, 0.0,
+              projection.shaderReferenceFor(clampedReference, 0.0,
                                             0.5 * ts::degToRad(span));
           block.r0 = shaderReference.r0;
           block.r1 = shaderReference.r1;
@@ -1445,6 +1461,130 @@ void main()
     // The origin.
     const ts::MapPoint origin = projection.forward(30.0, -96.0);
     QVERIFY(std::hypot(origin.xM, origin.yM) < 1e-6);
+  }
+
+  void azimuthalEquidistant()
+  {
+    // Distances and directions from the centre are true: the map's polar
+    // coordinates are the geodesic's length and azimuth. The polar case
+    // (the default) and an oblique one.
+    for (const std::array<double, 2>& centre :
+         {std::array<double, 2>{90.0, 0.0}, std::array<double, 2>{51.5, -0.1},
+          std::array<double, 2>{-33.9, 151.2}}) {
+      const ts::AzimuthalEquidistantProjection projection(centre[0], centre[1]);
+      for (const std::array<double, 2>& place :
+           {std::array<double, 2>{40.6, -73.8},
+            std::array<double, 2>{-1.3, 36.8},
+            std::array<double, 2>{35.7, 139.7}, std::array<double, 2>{0.0, 0.0},
+            std::array<double, 2>{-60.0, -60.0}}) {
+        if (!projection.contains(place[0], place[1])) {
+          continue;
+        }
+        const ts::MapPoint p = projection.forward(place[0], place[1]);
+        const ts::GeodesicInverse line =
+            ts::geodesicInverse(centre[0], centre[1], place[0], place[1]);
+        QVERIFY2(std::abs(std::hypot(p.xM, p.yM) - line.distanceM) < 1e-6,
+                 qPrintable(
+                     QString::number(std::hypot(p.xM, p.yM) - line.distanceM)));
+        if (std::abs(centre[0]) < 90.0) {
+          QVERIFY(std::abs(
+                      ts::normaliseLonDeg(ts::radToDeg(std::atan2(p.xM, p.yM)) -
+                                          line.azimuth1Deg)) < 1e-9);
+        }
+      }
+      // The antipode's surroundings are outside.
+      QVERIFY(!projection.contains(-centre[0], centre[1] + 180.0));
+      QVERIFY(projection.angleFromCentreDeg(centre[0], centre[1]) < 1e-9);
+    }
+  }
+
+  void gnomonic()
+  {
+    // Great circles are straight lines; beyond 80° from the centre is
+    // outside, clamped back onto the edge.
+    const ts::GnomonicProjection projection(40.0, -30.0);
+    // A great circle through two places: points along it on the sphere.
+    const double lat1 = ts::degToRad(51.5);
+    const double lon1 = ts::degToRad(-0.1);
+    const double lat2 = ts::degToRad(40.6);
+    const double lon2 = ts::degToRad(-73.8);
+    const ts::MapPoint a = projection.forward(51.5, -0.1);
+    const ts::MapPoint b = projection.forward(40.6, -73.8);
+    for (int32_t i = 1; i < 10; ++i) {
+      // Slerp between the unit vectors.
+      const double f = i / 10.0;
+      const std::array<double, 3> p1 = {std::cos(lat1) * std::cos(lon1),
+                                        std::cos(lat1) * std::sin(lon1),
+                                        std::sin(lat1)};
+      const std::array<double, 3> p2 = {std::cos(lat2) * std::cos(lon2),
+                                        std::cos(lat2) * std::sin(lon2),
+                                        std::sin(lat2)};
+      std::array<double, 3> q{};
+      for (std::size_t k = 0; k < 3; ++k) {
+        q.at(k) = (1.0 - f) * p1.at(k) + f * p2.at(k);
+      }
+      const double lat = ts::radToDeg(std::atan2(q[2], std::hypot(q[0], q[1])));
+      const double lon = ts::radToDeg(std::atan2(q[1], q[0]));
+      const ts::MapPoint p = projection.forward(lat, lon);
+      // Distance from the line ab.
+      const double cross =
+          (b.xM - a.xM) * (p.yM - a.yM) - (b.yM - a.yM) * (p.xM - a.xM);
+      QVERIFY2(std::abs(cross) / std::hypot(b.xM - a.xM, b.yM - a.yM) < 1e-6,
+               qPrintable(QString::number(i)));
+    }
+    QVERIFY(!projection.contains(-40.0, 150.0));
+    const ts::Geodetic edge = projection.clampToDomain(-40.0, 150.0);
+    QVERIFY(std::abs(projection.angleFromCentreDeg(edge.latDeg, edge.lonDeg) -
+                     80.0) < 1e-6);
+  }
+
+  void polarStereographic()
+  {
+    // Conformal, true to scale on its latitude, the pole at the centre;
+    // north as EPSG:3413, south as EPSG:3031 against PROJ's own codes.
+    const ts::Projection* north =
+        ts::projectionById(QStringLiteral("polar-stereographic-north"));
+    const ts::Projection* south =
+        ts::projectionById(QStringLiteral("polar-stereographic-south"));
+    if (north == nullptr || south == nullptr) {
+      QFAIL("no polar stereographic projections");
+    }
+    QVERIFY(std::abs(north->scaleAtPoint(70.0, 10.0).parallel - 1.0) < 1e-6);
+    QVERIFY(std::abs(south->scaleAtPoint(-71.0, 10.0).parallel - 1.0) < 1e-6);
+    for (const double lat : {80.0, 60.0, 30.0, 0.0}) {
+      const ts::MapScale s = north->scaleAtPoint(lat, 100.0);
+      QVERIFY(std::abs(s.parallel / s.meridian - 1.0) < 1e-6);
+    }
+    QVERIFY(std::hypot(north->forward(90.0, 0.0).xM,
+                       north->forward(90.0, 0.0).yM) < 1e-6);
+    // Straight down from the pole along 45° W; 0° up from the south pole.
+    QVERIFY(north->forward(80.0, -45.0).yM < 0.0);
+    QVERIFY(std::abs(north->forward(80.0, -45.0).xM) < 1e-6);
+    QVERIFY(south->forward(-80.0, 0.0).yM > 0.0);
+    struct Code {
+      const ts::Projection* projection;
+      const char* epsg;
+    };
+    for (const Code& code :
+         {Code{north, "EPSG:3413"}, Code{south, "EPSG:3031"}}) {
+      const ts::Projection* projection = code.projection;
+      const char* epsg = code.epsg;
+      ts::ProjContext context;
+      PJ* transform =
+          proj_create_crs_to_crs(context.get(), "EPSG:4326", epsg, nullptr);
+      QVERIFY(transform != nullptr);
+      for (const double lat : {75.0, 65.0, -65.0, -75.0}) {
+        if (!projection->contains(lat, 20.0) || std::abs(lat) < 60.0) {
+          continue;
+        }
+        const PJ_COORD out =
+            proj_trans(transform, PJ_FWD, proj_coord(lat, 20.0, 0.0, 0.0));
+        const ts::MapPoint ours = projection->forward(lat, 20.0);
+        QVERIFY2(std::hypot(ours.xM - out.xy.x, ours.yM - out.xy.y) < 1e-3,
+                 epsg);
+      }
+      proj_destroy(transform);
+    }
   }
 
   void concurrentSharedInstances()

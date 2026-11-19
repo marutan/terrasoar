@@ -84,6 +84,10 @@ private:
   void addTwoPoints();
   /** Fills the centre and azimuth from the two places. */
   void useTwoPoints();
+  /** Azimuthal Equidistant: the polar presets. */
+  void addPolarPresets();
+  /** Sets the centre to latitude @p latDeg, longitude 0. */
+  void setCentre(double latDeg);
 
   const Projection* m_projection;
   std::vector<ProjectionParameter> m_parameters;
@@ -98,6 +102,10 @@ private:
   std::array<QDoubleSpinBox*, 4> m_pointBoxes{};
   QPushButton* m_usePointsButton = nullptr;
   QLabel* m_pointsMessage = nullptr;
+  /** Azimuthal Equidistant's presets (null otherwise). */
+  QGroupBox* m_presetsGroup = nullptr;
+  QPushButton* m_northPoleButton = nullptr;
+  QPushButton* m_southPoleButton = nullptr;
 };
 
 } // namespace ts
