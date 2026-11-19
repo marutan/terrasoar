@@ -186,6 +186,80 @@ struct ProbeBlock {
   std::array<float, 4> which{};
 };
 
+/**
+ * Returns whichever of PROJ's position @p theirs and its copies a turn of
+ * the centre line away is nearest @p ours: Rotated Mercator runs on
+ * across PROJ's cut. Others' positions as they are.
+ */
+ts::MapPoint nearestCopy(const ts::Projection& projection,
+                         // Ours, then PROJ's.
+                         // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                         ts::MapPoint ours, ts::MapPoint theirs)
+{
+  const ts::RotatedMercatorProjection* rotated =
+      dynamic_cast<const ts::RotatedMercatorProjection*>(&projection);
+  if (rotated == nullptr) {
+    return theirs;
+  }
+  const ts::MapPoint turn = rotated->alongTurnM();
+  ts::MapPoint best = theirs;
+  for (const double k : {-1.0, 1.0}) {
+    const ts::MapPoint shifted{theirs.xM + k * turn.xM,
+                               theirs.yM + k * turn.yM};
+    if (std::hypot(shifted.xM - ours.xM, shifted.yM - ours.yM) <
+        std::hypot(best.xM - ours.xM, best.yM - ours.yM)) {
+      best = shifted;
+    }
+  }
+  return best;
+}
+
+/** True unless the point is outside @p projection's own domain, where
+ *  the map draws nothing. */
+// Latitude then longitude, as everywhere.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool drawnAt(const ts::Projection& projection, double latDeg, double lonDeg)
+{
+  return !projection.hasOwnDomain() || projection.contains(latDeg, lonDeg);
+}
+
+/**
+ * Draws the probe of glslMatchesCpp() for @p block (its steps' component
+ * is set here) and returns each of the @p samples offsets, x and y, as the
+ * shader computed them.
+ */
+std::vector<std::array<float, 2>> runProbe(ts::RenderDevice& device,
+                                           ts::Pipeline& pipeline,
+                                           ts::RenderTarget& target,
+                                           ts::GpuBuffer& uniforms,
+                                           ProbeBlock block, int32_t samples)
+{
+  std::array<QImage, 2> images;
+  for (std::size_t component = 0; component < images.size(); ++component) {
+    block.steps[3] = static_cast<float>(component);
+    uniforms.update(0, &block, sizeof(block));
+    ts::PassDesc pass;
+    pass.target = &target;
+    pass.viewportPx = QRect(0, 0, samples, 1);
+    device.beginPass(pass);
+    device.setPipeline(pipeline);
+    device.setUniformBuffer(0, uniforms, 0, sizeof(block));
+    device.draw(3, 0, 1);
+    device.endPass();
+    images.at(component) = device.readPixels(target);
+  }
+  std::vector<std::array<float, 2>> values(static_cast<std::size_t>(samples));
+  for (std::size_t i = 0; i < values.size(); ++i) {
+    for (std::size_t component = 0; component < images.size(); ++component) {
+      std::memcpy(&values.at(i).at(component),
+                  images.at(component).constScanLine(0) +
+                      4 * static_cast<std::ptrdiff_t>(i),
+                  4);
+    }
+  }
+  return values;
+}
+
 /** What the probe should read back for one offset, and the allowance. */
 struct ProbeExpectation {
   /** The offset from the reference, metres. */
@@ -325,21 +399,7 @@ private slots:
         if (lon == -180.0 && projection.repeats()) {
           theirs.xM = -std::abs(theirs.xM);
         }
-        // Rotated Mercator runs on across PROJ's cut, a turn of the line
-        // from PROJ there.
-        if (const ts::RotatedMercatorProjection* rotated =
-                dynamic_cast<const ts::RotatedMercatorProjection*>(
-                    &projection)) {
-          const ts::MapPoint turn = rotated->alongTurnM();
-          for (const double k : {-1.0, 1.0}) {
-            const ts::MapPoint shifted{theirs.xM + k * turn.xM,
-                                       theirs.yM + k * turn.yM};
-            if (std::hypot(shifted.xM - ours.xM, shifted.yM - ours.yM) <
-                std::hypot(theirs.xM - ours.xM, theirs.yM - ours.yM)) {
-              theirs = shifted;
-            }
-          }
-        }
+        theirs = nearestCopy(projection, ours, theirs);
         worstForwardM = std::max({worstForwardM, std::abs(ours.xM - theirs.xM),
                                   std::abs(ours.yM - theirs.yM)});
         const ts::Geodetic back = projection.inverse(theirs).value_or(nowhere);
@@ -732,39 +792,20 @@ private slots:
           const float stepLon = 0.5F * stepLat;
           const float first = -0.5F * samples;
           block.which = {static_cast<float>(p), 0.0F, 0.0F, 0.0F};
-          std::array<QImage, 2> images;
-          for (int32_t component = 0; component < 2; ++component) {
-            block.steps = {stepLon, stepLat, first,
-                           static_cast<float>(component)};
-            uniforms->update(0, &block, sizeof(block));
-            ts::PassDesc pass;
-            pass.target = target.get();
-            pass.viewportPx = QRect(0, 0, samples, 1);
-            device.beginPass(pass);
-            device.setPipeline(*pipeline);
-            device.setUniformBuffer(0, *uniforms, 0, sizeof(block));
-            device.draw(3, 0, 1);
-            device.endPass();
-            images.at(static_cast<std::size_t>(component)) =
-                device.readPixels(*target);
-          }
+          block.steps = {stepLon, stepLat, first, 0.0F};
+          const std::vector<std::array<float, 2>> values =
+              runProbe(device, *pipeline, *target, *uniforms, block, samples);
           QCOMPARE(device.takeErrors(), QString());
           for (int32_t i = 0; i < samples; ++i) {
-            std::array<float, 2> gpu{};
-            for (std::size_t component = 0; component < 2; ++component) {
-              std::memcpy(&gpu.at(component),
-                          images.at(component).constScanLine(0) +
-                              4 * static_cast<std::ptrdiff_t>(i),
-                          4);
-            }
+            const std::array<float, 2> gpu =
+                values.at(static_cast<std::size_t>(i));
             // The same offsets the shader used, as the floats it saw.
             const float index = static_cast<float>(i) + first;
             const double dLonRad = static_cast<double>(stepLon * index);
             const double dLatRad = static_cast<double>(stepLat * index);
             ++compared;
-            if (projection.hasOwnDomain() &&
-                !projection.contains(clampedReference + ts::radToDeg(dLatRad),
-                                     ts::radToDeg(dLonRad))) {
+            if (!drawnAt(projection, clampedReference + ts::radToDeg(dLatRad),
+                         ts::radToDeg(dLonRad))) {
               continue; // discarded on screen
             }
             const ProbeExpectation expected =

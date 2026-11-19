@@ -55,6 +55,8 @@ double wrapRad(double angleRad)
 }
 
 /** Snyder's t(φ) = exp(−ψ), ψ the isometric latitude (PROJ's pj_tsfn). */
+// A latitude, then the eccentricity.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 double tsfn(double phi, double e)
 {
   const double s = std::sin(phi);
@@ -93,12 +95,13 @@ double eccentricity()
 
 } // namespace
 
-// Latitude, longitude, azimuth and scale: the order of PROJ's parameters.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-RotatedMercatorProjection::RotatedMercatorProjection(double centreLatDeg,
-                                                     double centreLonDeg,
-                                                     double azimuthDeg,
-                                                     double scaleFactor)
+RotatedMercatorProjection::RotatedMercatorProjection(
+    // Latitude, longitude, azimuth and scale: the order of PROJ's.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    double centreLatDeg, double centreLonDeg,
+    // An angle, then a factor.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    double azimuthDeg, double scaleFactor)
     : LocalExpansionProjection(centreLonDeg), m_centreLatDeg(centreLatDeg),
       m_azimuthDeg(azimuthDeg), m_scaleFactor(scaleFactor)
 {
@@ -275,7 +278,7 @@ RotatedMercatorProjection::approximateInverse(MapPoint point) const
   const double u = y * m_cosrot + x * m_sinrot + m_u0;
   const double bra = 1.0 / m_arb;
   const double q = std::exp(-bra * v);
-  if (!(q > 0.0 && std::isfinite(q))) {
+  if (!std::isfinite(q) || q <= 0.0) {
     return std::nullopt;
   }
   const double sp = 0.5 * (q - 1.0 / q);
@@ -493,8 +496,8 @@ RotatedMercatorProjection::throughPoints(double lat1Deg, double lon1Deg,
   const GeodesicInverse line =
       geodesicInverse(lat1Deg, lon1Deg, lat2Deg, lon2Deg);
   // Coincident points have no line; nearly antipodal ones no single one.
-  if (!(line.distanceM > 1.0 &&
-        line.distanceM < 0.99 * pi * wgs84::semiMinorAxisM)) {
+  if (!std::isfinite(line.distanceM) || line.distanceM <= 1.0 ||
+      line.distanceM >= 0.99 * pi * wgs84::semiMinorAxisM) {
     return std::nullopt;
   }
   const GeodesicDirect middle =
