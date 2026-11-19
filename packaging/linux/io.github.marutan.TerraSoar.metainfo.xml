@@ -77,6 +77,14 @@
     <category>Geography</category>
   </categories>
   <releases>
+    <release version="0.0.2" date="2026-11-19">
+      <description>
+        <p>WMTS layers, including national grids such as the British
+        National Grid; the user guide inside the program (Help → User
+        Guide, F1); and fixes to flickering detail when moving the view
+        and changing between the globe and the map.</p>
+      </description>
+    </release>
     <release version="0.0.1" date="2026-11-14">
       <description>
         <p>The first release.</p>

@@ -168,5 +168,5 @@ coverage {
 
 # --- Version -----------------------------------------------------------------
 
-TS_VERSION = 0.0.1
+TS_VERSION = 0.0.2
 DEFINES += TS_VERSION_STRING=\\\"$$TS_VERSION\\\"
