@@ -30,6 +30,7 @@
 #include <mutex>
 #include <tuple>
 
+#include "ts/projection/arc.h"
 #include "ts/projection/azimuthal.h"
 #include "ts/projection/conic.h"
 #include "ts/projection/cylindricalprojection.h"
@@ -201,6 +202,9 @@ const std::vector<const Projection*>& projections()
   static const RobinsonProjection robinson;
   static const MollweideProjection mollweide;
   static const WinkelTripelProjection winkelTripel;
+  static const ArcZoneProjection arcZones;
+  static const ArcPolarProjection arcNorth(true);
+  static const ArcPolarProjection arcSouth(false);
   static const std::vector<const Projection*> all = {&mercator,
                                                      &webMercator,
                                                      &miller,
@@ -220,7 +224,10 @@ const std::vector<const Projection*>& projections()
                                                      &polarSouth,
                                                      &robinson,
                                                      &mollweide,
-                                                     &winkelTripel};
+                                                     &winkelTripel,
+                                                     &arcZones,
+                                                     &arcNorth,
+                                                     &arcSouth};
   return all;
 }
 
@@ -254,6 +261,22 @@ makeProjection(const QString& id, const ProjectionParameterValues& values,
         values.at(QStringLiteral("standardParallel2")),
         values.at(QStringLiteral("originLatitude")),
         values.at(QStringLiteral("centralMeridian")));
+  }
+  if (id == QLatin1String("rpf-arc")) {
+    // Zones 9 and 18 are the polar ones, of their own kind.
+    const int32_t zone =
+        static_cast<int32_t>(std::lround(values.at(QStringLiteral("zone"))));
+    const double scale = values.at(QStringLiteral("scale"));
+    if (arc::isPolar(zone)) {
+      return std::make_unique<ArcPolarProjection>(zone == 9, scale);
+    }
+    return std::make_unique<ArcZoneProjection>(zone, scale);
+  }
+  if (id == QLatin1String("rpf-arc-north") ||
+      id == QLatin1String("rpf-arc-south")) {
+    return std::make_unique<ArcPolarProjection>(
+        id == QLatin1String("rpf-arc-north"),
+        values.at(QStringLiteral("scale")));
   }
   if (id == QLatin1String("azimuthal-equidistant")) {
     return std::make_unique<AzimuthalEquidistantProjection>(

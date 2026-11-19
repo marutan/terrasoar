@@ -82,6 +82,7 @@ HEADERS += \
     include/ts/packs/packlibrary.h \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
+    include/ts/projection/arc.h \
     include/ts/projection/azimuthal.h \
     include/ts/projection/conic.h \
     include/ts/projection/cylindricalprojection.h \
@@ -169,6 +170,7 @@ SOURCES += \
     src/packs/packlibrary.cpp \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
+    src/projection/arc.cpp \
     src/projection/azimuthal.cpp \
     src/projection/conic.cpp \
     src/projection/ellipsoidal.h \

@@ -185,11 +185,21 @@ public:
    */
   bool isMap() const { return m_morph >= 0.5; }
 
-  /** Sets the projection of the flat map; null is ignored. */
+  /**
+   * Sets the projection of the flat map; null is ignored. The map is drawn
+   * in its Projection::effectiveAt() the view's centre, which changes as
+   * the view moves (ARC's zones when following the view).
+   */
   void setMapProjection(const Projection* projection);
 
-  /** Returns the projection of the flat map; never null. */
+  /** Returns the projection the map is drawn in now; never null. */
   const Projection* mapProjection() const { return m_projection; }
+
+  /** Returns the projection set with setMapProjection(); never null. */
+  const Projection* requestedMapProjection() const
+  {
+    return m_requestedProjection;
+  }
 
   /** Returns how the flat map lies in front of the camera. */
   MapFrame mapFrame() const;
@@ -346,6 +356,7 @@ private:
   CameraPose m_pose;
   double m_morph = 0.0;
   const Projection* m_projection;
+  const Projection* m_requestedProjection;
   double m_widthPx = 800.0;
   double m_heightPx = 600.0;
   double m_fovYDeg = 45.0;

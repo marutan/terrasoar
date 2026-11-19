@@ -76,13 +76,23 @@ double authalicQ(double latRad)
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 NormalCylindricalProjection::NormalCylindricalProjection(double xScale,
                                                          double maximumLatDeg)
-    : Projection(0.0), m_xScale(xScale), m_maximumLatDeg(maximumLatDeg)
+    : Projection(0.0), m_xScale(xScale), m_minimumLatDeg(-maximumLatDeg),
+      m_maximumLatDeg(maximumLatDeg)
+{
+}
+
+NormalCylindricalProjection::NormalCylindricalProjection(
+    // The x scale, then the latitude limits, as documented.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    double xScale, double minimumLatDeg, double maximumLatDeg)
+    : Projection(0.0), m_xScale(xScale), m_minimumLatDeg(minimumLatDeg),
+      m_maximumLatDeg(maximumLatDeg)
 {
 }
 
 double NormalCylindricalProjection::minimumLatDeg() const
 {
-  return -m_maximumLatDeg;
+  return m_minimumLatDeg;
 }
 
 double NormalCylindricalProjection::maximumLatDeg() const

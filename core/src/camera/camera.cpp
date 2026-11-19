@@ -158,7 +158,9 @@ std::vector<double> MapFrame::copyShiftsM(double westDeg, double eastDeg,
   return shifts;
 }
 
-Camera::Camera() : m_projection(projections().front())
+Camera::Camera()
+    : m_projection(projections().front()),
+      m_requestedProjection(projections().front())
 {
   update();
 }
@@ -173,7 +175,9 @@ void Camera::setMorph(double morph)
 void Camera::setMapProjection(const Projection* projection)
 {
   if (projection != nullptr) {
-    m_projection = projection;
+    m_requestedProjection = projection;
+    m_projection =
+        projection->effectiveAt(m_pose.targetLatDeg, m_pose.targetLonDeg);
     setPose(m_pose);
   }
 }
@@ -229,6 +233,10 @@ void Camera::setPose(const CameraPose& pose)
   clamped.headingDeg = normaliseHeadingDeg(pose.headingDeg);
   clamped.tiltDeg = std::clamp(pose.tiltDeg, 0.0, maximumTiltDeg);
   clamped.rangeM = std::min(pose.rangeM, maximumRangeM);
+  // The projection for the new centre (another ARC zone, for one): first,
+  // as its limits hold the centre.
+  m_projection = m_requestedProjection->effectiveAt(clamped.targetLatDeg,
+                                                    clamped.targetLonDeg);
   if (m_morph >= 1.0) {
     // The flat map: straight down, north up, inside the map, and never
     // wider than the world.
