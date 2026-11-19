@@ -27,6 +27,7 @@
 #include <QEvent>
 #include <QFormLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QKeySequence>
 #include <QLabel>
 #include <QPushButton>
@@ -83,6 +84,10 @@ ProjectionSettingsDialog::ProjectionSettingsDialog(QWidget* parent,
     addTwoPoints();
     layout->addWidget(m_twoPointsGroup);
   }
+  if (projection->id() == QLatin1String("azimuthal-equidistant")) {
+    addPolarPresets();
+    layout->addWidget(m_presetsGroup);
+  }
   layout->addWidget(m_buttons);
   retranslateUi();
 }
@@ -138,6 +143,34 @@ void ProjectionSettingsDialog::addTwoPoints()
   form->addRow(m_pointsMessage);
   connect(m_usePointsButton, &QPushButton::clicked, this,
           &ProjectionSettingsDialog::useTwoPoints);
+}
+
+void ProjectionSettingsDialog::addPolarPresets()
+{
+  m_presetsGroup = new QGroupBox(this);
+  m_presetsGroup->setObjectName(QStringLiteral("projectionPresets"));
+  QHBoxLayout* row = new QHBoxLayout(m_presetsGroup);
+  m_northPoleButton = new QPushButton(m_presetsGroup);
+  m_northPoleButton->setObjectName(QStringLiteral("projectionNorthPole"));
+  m_southPoleButton = new QPushButton(m_presetsGroup);
+  m_southPoleButton->setObjectName(QStringLiteral("projectionSouthPole"));
+  row->addWidget(m_northPoleButton);
+  row->addWidget(m_southPoleButton);
+  connect(m_northPoleButton, &QPushButton::clicked, this,
+          [this]() { setCentre(90.0); });
+  connect(m_southPoleButton, &QPushButton::clicked, this,
+          [this]() { setCentre(-90.0); });
+}
+
+void ProjectionSettingsDialog::setCentre(double latDeg)
+{
+  for (std::size_t i = 0; i < m_parameters.size(); ++i) {
+    if (m_parameters[i].key == QLatin1String("centreLatitude")) {
+      m_boxes[i]->setValue(latDeg);
+    } else if (m_parameters[i].key == QLatin1String("centreLongitude")) {
+      m_boxes[i]->setValue(0.0);
+    }
+  }
 }
 
 void ProjectionSettingsDialog::useTwoPoints()
@@ -199,6 +232,11 @@ void ProjectionSettingsDialog::retranslateUi()
       }
     }
     m_usePointsButton->setText(tr("&Use These Places"));
+  }
+  if (m_presetsGroup != nullptr) {
+    m_presetsGroup->setTitle(tr("Polar Presets"));
+    m_northPoleButton->setText(tr("&North Pole"));
+    m_southPoleButton->setText(tr("&South Pole"));
   }
 }
 

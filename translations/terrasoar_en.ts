@@ -1794,6 +1794,26 @@
             <source>American Polyconic</source>
             <translation>American Polyconic</translation>
         </message>
+        <message>
+            <source>Azimuthal Equidistant</source>
+            <translation>Azimuthal Equidistant</translation>
+        </message>
+        <message>
+            <source>Gnomonic</source>
+            <translation>Gnomonic</translation>
+        </message>
+        <message>
+            <source>Polar Stereographic (North)</source>
+            <translation>Polar Stereographic (North)</translation>
+        </message>
+        <message>
+            <source>Polar Stereographic (South)</source>
+            <translation>Polar Stereographic (South)</translation>
+        </message>
+        <message>
+            <source>Latitude of true scale</source>
+            <translation>Latitude of true scale</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>
@@ -1832,6 +1852,18 @@
         <message>
             <source>&amp;Use These Places</source>
             <translation>&amp;Use These Places</translation>
+        </message>
+        <message>
+            <source>Polar Presets</source>
+            <translation>Polar Presets</translation>
+        </message>
+        <message>
+            <source>&amp;North Pole</source>
+            <translation>&amp;North Pole</translation>
+        </message>
+        <message>
+            <source>&amp;South Pole</source>
+            <translation>&amp;South Pole</translation>
         </message>
     </context>
     <context>

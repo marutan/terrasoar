@@ -26,6 +26,7 @@
 
 #include <QCoreApplication>
 
+#include "ellipsoidal.h"
 #include "ts/geo/geodesic.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
@@ -54,43 +55,9 @@ double wrapRad(double angleRad)
   return std::remainder(angleRad, 2.0 * pi);
 }
 
-/** Snyder's t(φ) = exp(−ψ), ψ the isometric latitude (PROJ's pj_tsfn). */
-// A latitude, then the eccentricity.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-double tsfn(double phi, double e)
-{
-  const double s = std::sin(phi);
-  const double c = std::cos(phi);
-  return std::exp(e * std::atanh(e * s)) *
-         (s > 0.0 ? c / (1.0 + s) : (1.0 - s) / c);
-}
-
-/** The latitude whose tsfn() is @p ts (PROJ's pj_phi2). */
-double phiOfTs(double ts, double e)
-{
-  double phi = halfPi() - 2.0 * std::atan(ts);
-  for (int32_t i = 0; i < 15; ++i) {
-    const double con = e * std::sin(phi);
-    const double next =
-        halfPi() -
-        2.0 * std::atan(ts * std::pow((1.0 - con) / (1.0 + con), 0.5 * e));
-    const bool done = std::abs(next - phi) < 1e-15;
-    phi = next;
-    if (done) {
-      break;
-    }
-  }
-  return phi;
-}
-
 QByteArray number(double value)
 {
   return QByteArray::number(value, 'g', 9);
-}
-
-double eccentricity()
-{
-  return std::sqrt(wgs84::eccentricitySquared);
 }
 
 } // namespace
@@ -108,7 +75,6 @@ RotatedMercatorProjection::RotatedMercatorProjection(
   // PROJ's omerc set-up, with alpha and lonc given (gamma = alpha, the
   // u offset kept), on the unit ellipsoid.
   const double es = wgs84::eccentricitySquared;
-  const double e = eccentricity();
   const double com = std::sqrt(1.0 - es);
   const double phi0 = degToRad(centreLatDeg);
   const double alpha = degToRad(azimuthDeg);
@@ -131,7 +97,7 @@ RotatedMercatorProjection::RotatedMercatorProjection(
       }
     }
     f += d;
-    m_e = f * std::pow(tsfn(phi0, e), m_b);
+    m_e = f * std::pow(ellipsoidal::tsfn(phi0), m_b);
   } else {
     m_b = 1.0 / com;
     m_a = scaleFactor;
@@ -234,7 +200,7 @@ RotatedMercatorProjection::native(double latRad, double dLonRad) const
   }
   const double phi = latRad;
   const double lam = wrapRad(dLonRad - m_lam0OffsetRad);
-  const double w = m_e / std::pow(tsfn(phi, eccentricity()), m_b);
+  const double w = m_e / std::pow(ellipsoidal::tsfn(phi), m_b);
   const double s = 0.5 * (w - 1.0 / w);
   const double t = 0.5 * (w + 1.0 / w);
   const double v = std::sin(m_b * lam);
@@ -289,7 +255,7 @@ RotatedMercatorProjection::approximateInverse(MapPoint point) const
     return std::array<double, 2>{up < 0.0 ? -halfPi() : halfPi(), 0.0};
   }
   const double ts = m_e / std::sqrt((1.0 + up) / (1.0 - up));
-  const double lat = phiOfTs(std::pow(ts, 1.0 / m_b), eccentricity());
+  const double lat = ellipsoidal::phiOfTs(std::pow(ts, 1.0 / m_b));
   const double lam =
       -std::atan2(sp * m_cosgam - vp * m_singam, std::cos(bra * u)) / m_b;
   return std::array<double, 2>{lat, wrapRad(lam + m_lam0OffsetRad)};
@@ -413,10 +379,10 @@ QByteArray RotatedMercatorProjection::glslDomainSource() const
          "  float s = sin(phi);\n"
          "  float c = cos(phi);\n"
          "  float es = " +
-         number(eccentricity()) +
+         number(ellipsoidal::eccentricity()) +
          " * s;\n"
          "  float ts = exp(" +
-         number(0.5 * eccentricity()) +
+         number(0.5 * ellipsoidal::eccentricity()) +
          " * log((1.0 + es) / (1.0 - es)))\n"
          "           * (s > 0.0 ? c / (1.0 + s) : (1.0 - s) / c);\n"
          "  float w = d0.y / pow(max(ts, 1e-20), d0.x);\n"
@@ -449,7 +415,8 @@ QByteArray RotatedMercatorProjection::glslForwardSource() const
          "  float s = sin(phi);\n"
          "  float c = cos(phi);\n"
          "  float ts = exp(" +
-         number(eccentricity()) + " * tsAtanh(" + number(eccentricity()) +
+         number(ellipsoidal::eccentricity()) + " * tsAtanh(" +
+         number(ellipsoidal::eccentricity()) +
          " * s))\n"
          "           * (s > 0.0 ? c / (1.0 + s) : (1.0 - s) / c);\n"
          "  float w = p0.y / pow(max(ts, 1e-20), p0.x);\n"

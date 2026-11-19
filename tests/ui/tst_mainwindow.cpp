@@ -1406,7 +1406,7 @@ private slots:
     QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
     const QList<QAction*> actions = menu->actions();
     // The projections, a separator and Projection Settings.
-    QCOMPARE(actions.size(), 15);
+    QCOMPARE(actions.size(), 19);
     QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
     QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
     QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
@@ -1425,11 +1425,17 @@ private slots:
              QStringLiteral("Rotated Mercator (Oblique Mercator)"));
     QCOMPARE(actions.at(11)->text(), QStringLiteral("Lambert Conformal Conic"));
     QCOMPARE(actions.at(12)->text(), QStringLiteral("American Polyconic"));
-    QVERIFY(actions.at(13)->isSeparator());
-    QCOMPARE(actions.at(14)->objectName(),
+    QCOMPARE(actions.at(13)->text(), QStringLiteral("Azimuthal Equidistant"));
+    QCOMPARE(actions.at(14)->text(), QStringLiteral("Gnomonic"));
+    QCOMPARE(actions.at(15)->text(),
+             QStringLiteral("Polar Stereographic (North)"));
+    QCOMPARE(actions.at(16)->text(),
+             QStringLiteral("Polar Stereographic (South)"));
+    QVERIFY(actions.at(17)->isSeparator());
+    QCOMPARE(actions.at(18)->objectName(),
              QStringLiteral("projectionSettingsAction"));
     // Mercator has no settings.
-    QVERIFY(!actions.at(14)->isEnabled());
+    QVERIFY(!actions.at(18)->isEnabled());
     QVERIFY(actions.at(0)->isChecked());
     ts::GlobeView* globe = globeOf(window);
     if (globe == nullptr) {
@@ -1544,6 +1550,32 @@ private slots:
         nullptr, ts::projectionById(QStringLiteral("transverse-mercator")));
     QVERIFY(other.findChild<QPushButton*>(
                 QStringLiteral("projectionUsePoints")) == nullptr);
+  }
+
+  void azimuthalPolarPresets()
+  {
+    // Azimuthal Equidistant's polar presets set the centre on a pole.
+    ts::ProjectionSettingsDialog dialog(
+        nullptr,
+        ts::projectionWith(QStringLiteral("azimuthal-equidistant"),
+                           {{QStringLiteral("centreLatitude"), 30.0},
+                            {QStringLiteral("centreLongitude"), 20.0}}));
+    QPushButton* south =
+        dialog.findChild<QPushButton*>(QStringLiteral("projectionSouthPole"));
+    QDoubleSpinBox* lat = dialog.findChild<QDoubleSpinBox*>(
+        QStringLiteral("projectionParameter_centreLatitude"));
+    QDoubleSpinBox* lon = dialog.findChild<QDoubleSpinBox*>(
+        QStringLiteral("projectionParameter_centreLongitude"));
+    if (south == nullptr || lat == nullptr || lon == nullptr) {
+      QFAIL("missing preset controls");
+    }
+    QCOMPARE(lat->value(), 30.0);
+    south->click();
+    QCOMPARE(lat->value(), -90.0);
+    QCOMPARE(lon->value(), 0.0);
+    QCOMPARE(dialog.projection()->parameterValues().at(
+                 QStringLiteral("centreLatitude")),
+             -90.0);
   }
 
   void projectionSettings()

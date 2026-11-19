@@ -30,6 +30,7 @@
 #include <mutex>
 #include <tuple>
 
+#include "ts/projection/azimuthal.h"
 #include "ts/projection/conic.h"
 #include "ts/projection/cylindricalprojection.h"
 #include "ts/projection/datumshift.h"
@@ -192,6 +193,10 @@ const std::vector<const Projection*>& projections()
   static const RotatedMercatorProjection rotatedMercator;
   static const LambertConformalConicProjection lambertConformalConic;
   static const PolyconicProjection polyconic;
+  static const AzimuthalEquidistantProjection azimuthalEquidistant;
+  static const GnomonicProjection gnomonic;
+  static const PolarStereographicProjection polarNorth(true, 70.0, -45.0);
+  static const PolarStereographicProjection polarSouth(false, -71.0, 0.0);
   static const std::vector<const Projection*> all = {&mercator,
                                                      &webMercator,
                                                      &miller,
@@ -204,7 +209,11 @@ const std::vector<const Projection*>& projections()
                                                      &nationalGrid,
                                                      &rotatedMercator,
                                                      &lambertConformalConic,
-                                                     &polyconic};
+                                                     &polyconic,
+                                                     &azimuthalEquidistant,
+                                                     &gnomonic,
+                                                     &polarNorth,
+                                                     &polarSouth};
   return all;
 }
 
@@ -237,6 +246,23 @@ makeProjection(const QString& id, const ProjectionParameterValues& values,
         values.at(QStringLiteral("standardParallel1")),
         values.at(QStringLiteral("standardParallel2")),
         values.at(QStringLiteral("originLatitude")),
+        values.at(QStringLiteral("centralMeridian")));
+  }
+  if (id == QLatin1String("azimuthal-equidistant")) {
+    return std::make_unique<AzimuthalEquidistantProjection>(
+        values.at(QStringLiteral("centreLatitude")),
+        values.at(QStringLiteral("centreLongitude")));
+  }
+  if (id == QLatin1String("gnomonic")) {
+    return std::make_unique<GnomonicProjection>(
+        values.at(QStringLiteral("centreLatitude")),
+        values.at(QStringLiteral("centreLongitude")));
+  }
+  if (id == QLatin1String("polar-stereographic-north") ||
+      id == QLatin1String("polar-stereographic-south")) {
+    return std::make_unique<PolarStereographicProjection>(
+        id == QLatin1String("polar-stereographic-north"),
+        values.at(QStringLiteral("trueScaleLatitude")),
         values.at(QStringLiteral("centralMeridian")));
   }
   if (id == QLatin1String("polyconic")) {
