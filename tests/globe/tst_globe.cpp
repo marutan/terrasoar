@@ -333,11 +333,10 @@ const ts::Projection* projectionFromSpec(const QString& spec)
       standard->parameters();
   const QStringList values = idAndValues.back().split(QLatin1Char(','));
   ts::ProjectionParameterValues chosen;
-  for (qsizetype i = 0;
-       i < values.size() && i < static_cast<qsizetype>(parameters.size());
-       ++i) {
-    chosen[parameters.at(static_cast<std::size_t>(i)).key] =
-        values.at(i).toDouble();
+  const std::size_t count =
+      std::min(static_cast<std::size_t>(values.size()), parameters.size());
+  for (std::size_t i = 0; i < count; ++i) {
+    chosen[parameters.at(i).key] = values.at(static_cast<int>(i)).toDouble();
   }
   return ts::projectionWith(idAndValues.front(), chosen);
 }
