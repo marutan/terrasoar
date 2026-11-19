@@ -385,6 +385,40 @@ the map: the ground's texel times the scale at the reference (the
 gnomonic's edge is stretched 33 times), and holds its references inside
 the domain as the renderers do.
 
+## World maps: Robinson, Mollweide, Winkel Tripel
+
+`worldmaps.h`, `WorldMapProjection`s: PROJ's `robin`, `moll` and `wintri`,
+which are spherical (they ignore the ellipsoid; radius a). They are
+centred on Greenwich: their edge is the antimeridian, where tiles end, so
+nothing is drawn across the map. Another central meridian would put the
+edge through tiles, which would need cutting there (two draws of such a
+tile, each held to its side by `r3`); not done. No settings.
+
+- **Robinson**'s table: PROJ's float coefficients step by up to 2.5 m at
+  the 5° nodes (an interval's cubic doesn't quite end at the next one's
+  start), which breaks the derivatives the renderer and the inverse take
+  there. Each interval's linear term takes up its step, so it is
+  continuous: within 2.5 m of PROJ, at the nodes (the tests allow 3 m
+  for it). PROJ's inverse is the first guess.
+- **Mollweide**: θ by Newton's method on 2θ + sin 2θ = π sin φ, started
+  near the poles at π − ∛(6(π − |k|)), where it is otherwise slow; PROJ's
+  own stops short of 90° at the poles (112 m in x at 180°, where the pole
+  is a point). In the shader, within 26° of a pole, sin φ rounds to 1:
+  there it solves u − sin u = 2π sin²(δ/2) for u = π − |2θ| from the
+  distance to the pole δ. y goes as δ^(4/3) near a pole, so tiles there
+  use the formula unless they are small beside δ. Its edge meridian's x goes as δ^(2/3): a
+  mesh spaced evenly in latitude draws the ellipse's top as long chords,
+  and the map's geometry error there falls only slowly with the level.
+  So it lets geometry refine at most two levels beyond what the texels
+  need (`geometryLevelsBeyondTexels()`; else a world view took 404 tiles,
+  176 of level 6 at the poles; now 44, the cusp about a pixel at the
+  coarsest levels). Elsewhere, and on the other projections, the limit
+  would cost: Mercator's poles need the geometry beyond the texels.
+- **Winkel Tripel**: Aitoff averaged with the equirectangular
+  (cos φ1 = 2/π), d by its half-angle, sin²(d/2) = a + b − 2ab: PROJ's
+  acos rounds to 0 for offsets of 1e-8, which gives the wrong slope at
+  the centre.
+
 ## Domains of their own: Rotated Mercator
 
 `ts::RotatedMercatorProjection` (`rotatedmercator.h`, id

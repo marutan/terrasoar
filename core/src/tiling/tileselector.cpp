@@ -685,9 +685,19 @@ bool TileSelector::wantsRefinement(const View& view, TileKey key) const
   if (view.morph > 0.0 && key.level < m_settings.minimumMapLevel) {
     return true;
   }
+  // A projection that isn't smooth at a pole (Mollweide's x goes as the
+  // distance to the power 2/3) may limit how far beyond its texels'
+  // needs the geometry refines: there its error falls only slowly with
+  // the level, and would call for hundreds of tiles.
   if (view.morph >= 1.0 && mapGeometryErrorPx(*view.camera, key) >
                                m_settings.maximumMapGeometryErrorPx) {
-    return true;
+    const int32_t beyond =
+        view.camera->mapFrame().projection->geometryLevelsBeyondTexels();
+    if (beyond < 0 ||
+        screenSpaceErrorPx(view, key) >
+            m_settings.maximumScreenSpaceErrorPx / std::pow(2.0, beyond)) {
+      return true;
+    }
   }
   return key.level < m_settings.maximumLevel &&
          screenSpaceErrorPx(view, key) > m_settings.maximumScreenSpaceErrorPx;

@@ -38,6 +38,7 @@
 #include "ts/projection/normalcylindrical.h"
 #include "ts/projection/rotatedmercator.h"
 #include "ts/projection/transversemercator.h"
+#include "ts/projection/worldmaps.h"
 
 namespace ts
 {
@@ -197,6 +198,9 @@ const std::vector<const Projection*>& projections()
   static const GnomonicProjection gnomonic;
   static const PolarStereographicProjection polarNorth(true, 70.0, -45.0);
   static const PolarStereographicProjection polarSouth(false, -71.0, 0.0);
+  static const RobinsonProjection robinson;
+  static const MollweideProjection mollweide;
+  static const WinkelTripelProjection winkelTripel;
   static const std::vector<const Projection*> all = {&mercator,
                                                      &webMercator,
                                                      &miller,
@@ -213,7 +217,10 @@ const std::vector<const Projection*>& projections()
                                                      &azimuthalEquidistant,
                                                      &gnomonic,
                                                      &polarNorth,
-                                                     &polarSouth};
+                                                     &polarSouth,
+                                                     &robinson,
+                                                     &mollweide,
+                                                     &winkelTripel};
   return all;
 }
 

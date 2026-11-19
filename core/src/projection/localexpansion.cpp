@@ -65,8 +65,13 @@ MapPoint LocalExpansionProjection::forward(double latDeg, double lonDeg) const
 {
   const double lat = std::clamp(latDeg, minimumLatDeg(), maximumLatDeg());
   const double limit = maximumLonOffsetDeg();
-  const double dLon =
-      std::clamp(normaliseLonDeg(lonDeg - centralMeridianDeg()), -limit, limit);
+  // Wrapped only when more than a half turn away: ±180° keep their sides,
+  // the two edges of a world map (normaliseLonDeg() makes +180° −180°).
+  double offset = lonDeg - centralMeridianDeg();
+  if (offset > 180.0 || offset < -180.0) {
+    offset = normaliseLonDeg(offset);
+  }
+  const double dLon = std::clamp(offset, -limit, limit);
   return project(degToRad(lat), degToRad(dLon));
 }
 

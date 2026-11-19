@@ -19,6 +19,7 @@ All notable changes to Terra Soar. The format follows
   Cassini–Soldner, with their central meridian, scale factor or zone in
   Projection Settings. These maps end at the edge of the area they show
   (40° or 30° from the central meridian) instead of wrapping round.
+- Robinson, Mollweide and Winkel Tripel world maps.
 - Azimuthal Equidistant (centred on any point, with polar presets),
   Gnomonic, and Polar Stereographic for the Arctic and Antarctic (as
   EPSG:3413 and EPSG:3031).

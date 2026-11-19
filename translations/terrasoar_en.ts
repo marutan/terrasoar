@@ -1814,6 +1814,18 @@
             <source>Latitude of true scale</source>
             <translation>Latitude of true scale</translation>
         </message>
+        <message>
+            <source>Robinson</source>
+            <translation>Robinson</translation>
+        </message>
+        <message>
+            <source>Mollweide</source>
+            <translation>Mollweide</translation>
+        </message>
+        <message>
+            <source>Winkel Tripel</source>
+            <translation>Winkel Tripel</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>

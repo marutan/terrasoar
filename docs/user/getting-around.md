@@ -84,6 +84,11 @@ chooses how it is flattened:
   regions, as used for sea ice and Antarctic maps; shapes are true.
   They start as the standard Arctic (EPSG:3413) and Antarctic
   (EPSG:3031) maps.
+- **Robinson**, **Mollweide** and **Winkel Tripel**: maps of the whole
+  world in one piece, with curved edges. Robinson and Winkel Tripel are
+  compromises (Winkel Tripel is the one many atlases use); Mollweide is
+  equal-area, so countries can be compared by size. They are centred on
+  Greenwich and have no settings.
 - **UK National Grid (OSGB36)**: the Ordnance Survey's grid of Great
   Britain, as on OS maps. The status bar gives the grid reference under
   the pointer (such as TQ 30080 80729). Positions are converted from GPS
