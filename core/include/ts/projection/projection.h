@@ -42,9 +42,9 @@ namespace ts
 
 /** A point on the map plane, metres. */
 struct MapPoint {
-  /** Easting from the central meridian. */
+  /** Easting: from the central meridian, or a grid's false origin. */
   double xM = 0.0;
-  /** Northing from the equator. */
+  /** Northing: from the equator, or a grid's false origin. */
   double yM = 0.0;
 };
 

@@ -396,9 +396,9 @@ QByteArray NationalGridProjection::glslForwardPrologue() const
          "  }\n";
 }
 
+std::array<std::array<float, 4>, 2>
 // Latitude then longitude, as everywhere in Projection.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::array<std::array<float, 4>, 2>
 NationalGridProjection::glslParametersAt(double latRad, double dLonRad) const
 {
   std::array<std::array<float, 4>, 2> parameters = glslParameters();
@@ -417,9 +417,10 @@ NationalGridProjection::glslParametersAt(double latRad, double dLonRad) const
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 QString formatGridReference(double eastingM, double northingM, int32_t digits)
 {
-  if (!(eastingM >= 0.0 && eastingM < squaresEast * squareM &&
-        northingM >= 0.0 && northingM < squaresNorth * squareM) ||
-      digits < 0 || digits > 10 || digits % 2 != 0) {
+  if (!std::isfinite(eastingM) || !std::isfinite(northingM) || eastingM < 0.0 ||
+      eastingM >= squaresEast * squareM || northingM < 0.0 ||
+      northingM >= squaresNorth * squareM || digits < 0 || digits > 10 ||
+      digits % 2 != 0) {
     return QString();
   }
   const int32_t east = static_cast<int32_t>(std::floor(eastingM / squareM));

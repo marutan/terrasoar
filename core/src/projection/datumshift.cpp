@@ -169,7 +169,8 @@ HorizontalShiftGrid::offsetRad(double latRad, double lonRad) const
   const double y = (radToDeg(latRad) - m_southDeg) / m_latStepDeg;
   const double lastColumn = static_cast<double>(m_columns - 1);
   const double lastRow = static_cast<double>(m_rows - 1);
-  if (!(x >= 0.0 && x <= lastColumn && y >= 0.0 && y <= lastRow)) {
+  if (!std::isfinite(x) || !std::isfinite(y) || x < 0.0 || x > lastColumn ||
+      y < 0.0 || y > lastRow) {
     return std::nullopt;
   }
   const double column = std::min(std::floor(x), lastColumn - 1.0);

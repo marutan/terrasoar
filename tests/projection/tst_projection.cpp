@@ -98,6 +98,12 @@ private:
   PJ* m_transform = nullptr;
 };
 
+/** Stands in for offsets a grid didn't give. */
+constexpr std::array<double, 2> noOffset{1e9, 1e9};
+
+/** Stands in for a grid reference that didn't parse. */
+constexpr ts::MapPoint noPoint{-1.0, -1.0};
+
 /** Latitudes of the global grid inside @p projection's domain. */
 std::vector<double> gridLatitudes(const ts::Projection& projection)
 {
@@ -257,10 +263,12 @@ private slots:
       QCOMPARE(ts::projectionIndex(projection), static_cast<int32_t>(i));
       // UTM's default zone (30) is the one west of Greenwich; the
       // National Grid's origin is at 2° W.
-      const double centre =
-          projection->id() == QLatin1String("utm")                ? -3.0
-          : projection->id() == QLatin1String("uk-national-grid") ? -2.0
-                                                                  : 0.0;
+      double centre = 0.0;
+      if (projection->id() == QLatin1String("utm")) {
+        centre = -3.0;
+      } else if (projection->id() == QLatin1String("uk-national-grid")) {
+        centre = -2.0;
+      }
       QCOMPARE(projection->centralMeridianDeg(), centre);
     }
     QCOMPARE(ids.size(), 10);
@@ -839,9 +847,10 @@ private slots:
       const std::optional<std::array<double, 2>> offset =
           grid->offsetRad(ts::degToRad(node[0]), ts::degToRad(node[1]));
       QVERIFY(offset.has_value());
-      QVERIFY(std::abs((*offset)[0] / second -
+      const std::array<double, 2> at = offset.value_or(noOffset);
+      QVERIFY(std::abs(at[0] / second -
                        ts::test::fixtureLatOffsetSec(node[0], node[1])) < 1e-5);
-      QVERIFY(std::abs((*offset)[1] / second -
+      QVERIFY(std::abs(at[1] / second -
                        ts::test::fixtureLonOffsetSec(node[0], node[1])) < 1e-5);
       QCOMPARE(
           westGrid->offsetRad(ts::degToRad(node[0]), ts::degToRad(node[1])),
@@ -857,7 +866,7 @@ private slots:
         mean += 0.25 * ts::test::fixtureLatOffsetSec(lat, lon);
       }
     }
-    QVERIFY(std::abs((*middle)[0] / second - mean) < 1e-5);
+    QVERIFY(std::abs(middle.value_or(noOffset)[0] / second - mean) < 1e-5);
     QVERIFY(!grid->offsetRad(ts::degToRad(48.99), 0.0).has_value());
     QVERIFY(
         !grid->offsetRad(ts::degToRad(50.0), ts::degToRad(2.01)).has_value());
@@ -865,7 +874,8 @@ private slots:
     QVERIFY(grid->insideDeg(48.0, 0.0) < 0.0);
     // Outside, the nearest edge's offsets.
     QCOMPARE(grid->clampedOffsetRad(ts::degToRad(70.0), ts::degToRad(1.0)),
-             grid->offsetRad(ts::degToRad(61.0), ts::degToRad(1.0)).value());
+             grid->offsetRad(ts::degToRad(61.0), ts::degToRad(1.0))
+                 .value_or(noOffset));
     // Not a horizontal offset grid.
     const QString other = dir.filePath(QStringLiteral("other.tif"));
     QFile text(other);
@@ -897,7 +907,7 @@ private slots:
     const double lon = ts::degToRad(-3.1);
     const std::array<double, 2> osgb = datum.fromWgs84(lat, lon);
     const std::array<double, 2> offset =
-        grid.offsetRad(osgb[0], osgb[1]).value();
+        grid.offsetRad(osgb[0], osgb[1]).value_or(noOffset);
     QVERIFY(std::abs(osgb[0] + offset[0] - lat) < 1e-14);
     QVERIFY(std::abs(osgb[1] + offset[1] - lon) < 1e-14);
     const std::array<double, 2> back = datum.toWgs84(osgb[0], osgb[1]);
@@ -955,23 +965,23 @@ private slots:
     const std::optional<ts::MapPoint> tq =
         ts::parseGridReference(QStringLiteral("TQ 30080 80729"));
     QVERIFY(tq.has_value());
-    QCOMPARE(tq->xM, 530080.0);
-    QCOMPARE(tq->yM, 180729.0);
+    QCOMPARE(tq.value_or(noPoint).xM, 530080.0);
+    QCOMPARE(tq.value_or(noPoint).yM, 180729.0);
     const std::optional<ts::MapPoint> packed =
         ts::parseGridReference(QStringLiteral(" tq3008080729 "));
     QVERIFY(packed.has_value());
-    QCOMPARE(packed->xM, 530080.0);
-    QCOMPARE(packed->yM, 180729.0);
+    QCOMPARE(packed.value_or(noPoint).xM, 530080.0);
+    QCOMPARE(packed.value_or(noPoint).yM, 180729.0);
     const std::optional<ts::MapPoint> su =
         ts::parseGridReference(QStringLiteral("SU 387 147"));
     QVERIFY(su.has_value());
-    QCOMPARE(su->xM, 438700.0);
-    QCOMPARE(su->yM, 114700.0);
+    QCOMPARE(su.value_or(noPoint).xM, 438700.0);
+    QCOMPARE(su.value_or(noPoint).yM, 114700.0);
     const std::optional<ts::MapPoint> nn =
         ts::parseGridReference(QStringLiteral("NN"));
     QVERIFY(nn.has_value());
-    QCOMPARE(nn->xM, 200000.0);
-    QCOMPARE(nn->yM, 700000.0);
+    QCOMPARE(nn.value_or(noPoint).xM, 200000.0);
+    QCOMPARE(nn.value_or(noPoint).yM, 700000.0);
     for (const char* bad : {"", "TQ 123 45", "TQ 12345", "IQ 1 1", "ZZ", "AA",
                             "TQ 123456 123456", "T 1 1", "TQ 1a 1"}) {
       QVERIFY2(!ts::parseGridReference(QString::fromLatin1(bad)).has_value(),
@@ -985,8 +995,8 @@ private slots:
       const std::optional<ts::MapPoint> parsed =
           ts::parseGridReference(reference);
       QVERIFY2(parsed.has_value(), qPrintable(reference));
-      QCOMPARE(parsed->xM, std::floor(point.eastingM));
-      QCOMPARE(parsed->yM, std::floor(point.northingM));
+      QCOMPARE(parsed.value_or(noPoint).xM, std::floor(point.eastingM));
+      QCOMPARE(parsed.value_or(noPoint).yM, std::floor(point.northingM));
     }
   }
 

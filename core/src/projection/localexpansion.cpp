@@ -314,9 +314,9 @@ LocalExpansionProjection::shaderReferenceFor(double latDeg, double lonDeg,
   return reference;
 }
 
+std::array<std::array<float, 4>, 2>
 // Latitude then longitude, as everywhere in Projection.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-std::array<std::array<float, 4>, 2>
 LocalExpansionProjection::glslParametersAt(double latRad, double dLonRad) const
 {
   Q_UNUSED(latRad)

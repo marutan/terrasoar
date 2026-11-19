@@ -109,6 +109,53 @@ std::optional<PackManifest> PackManifest::read(const QString& directory,
   return fromJson(document.object(), errorString);
 }
 
+namespace
+{
+
+/**
+ * Reads the optional "datumShifts" of @p json into @p manifest, whose files
+ * are already read; false and @p errorString if one is malformed.
+ */
+bool readDatumShifts(const QJsonObject& json, PackManifest* manifest,
+                     QString* errorString)
+{
+  // Datum shift grids: apart from the datasets, which versions 0.0.2
+  // and earlier reject when they don't know the kind.
+  const QJsonArray shifts = json.value(QStringLiteral("datumShifts")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < shifts.size(); ++i) {
+    const QJsonObject entry = shifts.at(i).toObject();
+    PackDataset shift;
+    shift.id = text(entry, "id");
+    shift.file = text(entry, "file");
+    shift.name = text(entry, "name");
+    shift.licence = text(entry, "licence");
+    shift.attribution = text(entry, "attribution");
+    const QJsonObject source = entry.value(QStringLiteral("source")).toObject();
+    shift.source.name = text(source, "name");
+    shift.source.version = text(source, "version");
+    shift.source.url = text(source, "url");
+    shift.source.sha256 = text(source, "sha256");
+    const bool listed =
+        std::any_of(manifest->files.begin(), manifest->files.end(),
+                    [&shift](const PackFile& packFile) {
+                      return packFile.path == shift.file;
+                    });
+    if (shift.id.isEmpty() || !listed) {
+      fail(errorString,
+           QStringLiteral("Datum shift %1 in the pack manifest has no id or "
+                          "its file is not listed")
+               .arg(i));
+      return false;
+    }
+    manifest->datumShifts.push_back(shift);
+  }
+
+  return true;
+}
+
+} // namespace
+
 std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
                                                    QString* errorString)
 {
@@ -192,36 +239,8 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
     manifest.datasets.push_back(dataset);
   }
 
-  // Datum shift grids: apart from the datasets, which versions 0.0.2
-  // and earlier reject when they don't know the kind.
-  const QJsonArray shifts = json.value(QStringLiteral("datumShifts")).toArray();
-  // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int32_t i = 0; i < shifts.size(); ++i) {
-    const QJsonObject entry = shifts.at(i).toObject();
-    PackDataset shift;
-    shift.id = text(entry, "id");
-    shift.file = text(entry, "file");
-    shift.name = text(entry, "name");
-    shift.licence = text(entry, "licence");
-    shift.attribution = text(entry, "attribution");
-    const QJsonObject source = entry.value(QStringLiteral("source")).toObject();
-    shift.source.name = text(source, "name");
-    shift.source.version = text(source, "version");
-    shift.source.url = text(source, "url");
-    shift.source.sha256 = text(source, "sha256");
-    const bool listed =
-        std::any_of(manifest.files.begin(), manifest.files.end(),
-                    [&shift](const PackFile& packFile) {
-                      return packFile.path == shift.file;
-                    });
-    if (shift.id.isEmpty() || !listed) {
-      fail(errorString,
-           QStringLiteral("Datum shift %1 in the pack manifest has no id or "
-                          "its file is not listed")
-               .arg(i));
-      return std::nullopt;
-    }
-    manifest.datumShifts.push_back(shift);
+  if (!readDatumShifts(json, &manifest, errorString)) {
+    return std::nullopt;
   }
 
   const QJsonArray notices = json.value(QStringLiteral("notices")).toArray();
