@@ -340,7 +340,7 @@ public:
 
 private:
   void update();
-  double mapRangeLimitM(double latDeg) const;
+  double mapRangeLimitM(double latDeg, double lonDeg) const;
   std::optional<ScreenPoint> projectOffset(const Vec3& offset) const;
 
   CameraPose m_pose;

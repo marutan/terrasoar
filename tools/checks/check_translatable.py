@@ -28,8 +28,11 @@ reported. Mark a deliberate exception with `// ts-notr: <reason>` on the
 same line.
 
 The context given to QCoreApplication::translate() or QT_TRANSLATE_NOOP()
-must be a string literal too: lupdate can't follow a variable, and the
-strings would silently never be offered for translation.
+must be a string literal too, and so must the source text: lupdate can't
+follow a variable (or a helper's parameter), and the strings would
+silently never be offered for translation. A deliberate exception (text
+marked with QT_TRANSLATE_NOOP elsewhere) carries `// ts-notr: <reason>`
+on the line of the call or the line above.
 
 Only app/ and core/ are checked: tests and tools may print plain text.
 
@@ -138,11 +141,20 @@ def check_file(path):
     for match in CONTEXT_CALL.finditer(code):
         open_paren = match.end() - 1
         close = matching_paren(code, open_paren)
-        context = split_top_level(code[open_paren + 1:close])[0].strip()
+        arguments = split_top_level(code[open_paren + 1:close])
+        context = arguments[0].strip()
+        line = code.count("\n", 0, open_paren) + 1
         if not context.startswith('"'):
-            line = code.count("\n", 0, open_paren) + 1
             errors.append(
                 f"{path}:{line}: the context of "
+                f"{match.group(0).rstrip('( ')}() must be a string literal "
+                "(lupdate can't read a variable)")
+        source = arguments[1].strip() if len(arguments) > 1 else '"'
+        marked = any("ts-notr" in original_lines[n]
+                     for n in (line - 1, line - 2) if n >= 0)
+        if not source.startswith('"') and not marked:
+            errors.append(
+                f"{path}:{line}: the source text of "
                 f"{match.group(0).rstrip('( ')}() must be a string literal "
                 "(lupdate can't read a variable)")
     return errors

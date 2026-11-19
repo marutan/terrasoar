@@ -15,6 +15,10 @@ All notable changes to Terra Soar. The format follows
 - View → Map Projection → Projection Settings…: a projection's settings,
   such as Equidistant Cylindrical's standard parallel. Projects remember
   them.
+- Transverse Mercator, Universal Transverse Mercator (any zone) and
+  Cassini–Soldner, with their central meridian, scale factor or zone in
+  Projection Settings. These maps end at the edge of the area they show
+  (40° or 30° from the central meridian) instead of wrapping round.
 
 ### Fixed
 

@@ -59,7 +59,7 @@ ProjectionSettingsDialog::ProjectionSettingsDialog(QWidget* parent,
   for (const ProjectionParameter& parameter : m_parameters) {
     QDoubleSpinBox* box = new QDoubleSpinBox(this);
     box->setObjectName(QStringLiteral("projectionParameter_") + parameter.key);
-    box->setDecimals(4);
+    box->setDecimals(parameter.decimals);
     box->setRange(parameter.minimum, parameter.maximum);
     box->setSuffix(parameter.suffix);
     const ProjectionParameterValues::const_iterator value =

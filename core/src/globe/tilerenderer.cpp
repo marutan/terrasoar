@@ -82,14 +82,16 @@ struct TileBlock {
   std::array<Float4, 2> layerAlpha{};
   /**
    * The map reference point (the tile's centre, held inside the
-   * projection's latitude limits) relative to the centre of the view, in
-   * metres on the map's plane (xy); the latitude of the tile's centre
-   * minus the reference point's, radians (z).
+   * projection's domain) relative to the centre of the view, in metres on
+   * the map's plane (xy); the latitude (z) and longitude (w) of the
+   * tile's centre minus the reference point's, radians.
    */
   Float4 mapOrigin{};
   /** The projection's reference values for the reference point. */
   Float4 projR0{};
   Float4 projR1{};
+  Float4 projR2{};
+  Float4 projR3{};
   /** Tile width and height, radians; centre longitude and latitude,
    *  degrees. */
   Float4 tileGeo{};
@@ -108,7 +110,7 @@ struct TileBlock {
   std::array<Float4, layersPerDraw> mercatorR1{};
 };
 
-static_assert(sizeof(TileBlock) == 656, "std140 layout of Tile");
+static_assert(sizeof(TileBlock) == 688, "std140 layout of Tile");
 
 /** On the map a tile is drawn this much larger about its centre, so that
  *  rounding never leaves a crack between neighbours (their shared edge is
@@ -125,6 +127,8 @@ layout(std140) uniform Tile {
   vec4 mapOrigin;
   vec4 projR0;
   vec4 projR1;
+  vec4 projR2;
+  vec4 projR3;
   vec4 tileGeo;
   vec4 mercatorInfo[8];
   vec4 mercatorR0[8];
@@ -158,8 +162,8 @@ void main()
   vLonLatDeg = tileGeo.zw + degrees(dLonLat);
   if (morph.x > 0.0) {
     position = tsMorph(position,
-                       dLonLat * MAP_OVERLAP + vec2(0.0, mapOrigin.z),
-                       mapOrigin, projR0, projR1);
+                       dLonLat * MAP_OVERLAP + mapOrigin.wz,
+                       mapOrigin, projR0, projR1, projR2, projR3);
   }
   vec4 clip = viewProjection * vec4(position, 1.0);
   vUv = uv;
@@ -365,6 +369,8 @@ struct TileRenderer::DrawTile {
   Float4 mapOrigin{};
   Float4 projR0{};
   Float4 projR1{};
+  Float4 projR2{};
+  Float4 projR3{};
   Float4 tileGeo{};
 };
 
@@ -1114,21 +1120,29 @@ void TileRenderer::prepare(const Camera& camera)
     mesh->lastUsedFrame = m_frame;
     m_statistics.deepestLevel = std::max(m_statistics.deepestLevel, key.level);
     if (m_morph <= 0.0) {
-      m_drawTiles.push_back(DrawTile{key, mesh, {}, {}, {}, {}, {}});
+      m_drawTiles.push_back(DrawTile{key, mesh, {}, {}, {}, {}, {}, {}, {}});
       continue;
     }
     // On the map: where the tile's centre lies, once for each copy of the
     // world it shows in.
     const Projection& projection = *frame.projection;
     const GeoRect rect = key.bounds();
+    // The reference point: the tile's centre, held inside the domain.
     const double referenceLatDeg =
         std::clamp(rect.centreLatDeg(), projection.minimumLatDeg(),
                    projection.maximumLatDeg());
-    const MapPoint offset =
-        frame.offsetOf(referenceLatDeg, rect.centreLonDeg());
-    const ProjectionShaderReference reference =
-        projection.shaderReference(referenceLatDeg, rect.centreLonDeg());
-    DrawTile tile{key, mesh, {}, {}, reference.r0, reference.r1, {}};
+    const double referenceLonDeg = projection.clampLonDeg(rect.centreLonDeg());
+    const double dLatRad = degToRad(rect.centreLatDeg() - referenceLatDeg);
+    const double dLonRad =
+        degToRad(normaliseLonDeg(rect.centreLonDeg() - referenceLonDeg));
+    const MapPoint offset = frame.offsetOf(referenceLatDeg, referenceLonDeg);
+    const double halfSpanRad =
+        0.5 * degToRad(std::max(rect.widthDeg(), rect.heightDeg())) +
+        std::max(std::abs(dLatRad), std::abs(dLonRad));
+    const ProjectionShaderReference reference = projection.shaderReferenceFor(
+        referenceLatDeg, referenceLonDeg, halfSpanRad);
+    DrawTile tile{key,          mesh,         {},           {}, reference.r0,
+                  reference.r1, reference.r2, reference.r3, {}};
     tile.tileGeo = {static_cast<float>(degToRad(rect.widthDeg())),
                     static_cast<float>(degToRad(rect.heightDeg())),
                     static_cast<float>(rect.centreLonDeg()),
@@ -1138,8 +1152,7 @@ void TileRenderer::prepare(const Camera& camera)
       tile.mapOrigin = {
           static_cast<float>((offset.xM + shiftM) * frame.planeScale),
           static_cast<float>(offset.yM * frame.planeScale),
-          static_cast<float>(degToRad(rect.centreLatDeg() - referenceLatDeg)),
-          0.0F};
+          static_cast<float>(dLatRad), static_cast<float>(dLonRad)};
       m_drawTiles.push_back(tile);
     }
   }
@@ -1206,6 +1219,8 @@ std::vector<bool> TileRenderer::writeBatchUniforms(LayerRange batch, bool base)
     block.mapOrigin = tile.mapOrigin;
     block.projR0 = tile.projR0;
     block.projR1 = tile.projR1;
+    block.projR2 = tile.projR2;
+    block.projR3 = tile.projR3;
     block.tileGeo = tile.tileGeo;
     visible[t] = base;
     for (std::size_t slot = 0; slot < count; ++slot) {

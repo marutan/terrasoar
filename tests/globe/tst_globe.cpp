@@ -781,6 +781,22 @@ private slots:
     QTest::newRow("map-gall-peters-north")
         << QStringLiteral("gall-peters") << 1.0 << 80.0 << 30.0 << 2.0e6 << 0.0
         << 0.0;
+    // Phase 11b's maps that don't repeat: Transverse Mercator's whole
+    // domain (curved meridians and parallels, the edge at ±40°), half way
+    // there from the globe, UTM close in, Cassini over a pole, and
+    // Transverse Mercator centred on 30° E.
+    const QString tm = QStringLiteral("transverse-mercator");
+    QTest::newRow("map-transverse-mercator")
+        << tm << 1.0 << 0.0 << 0.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half-transverse-mercator")
+        << tm << 0.5 << 20.0 << 10.0 << 2.6e7 << 0.0 << 0.0;
+    QTest::newRow("map-utm-close") << QStringLiteral("utm@36") << 1.0 << 40.0
+                                   << 30.0 << 4.0e6 << 0.0 << 0.0;
+    QTest::newRow("map-cassini-pole") << QStringLiteral("cassini") << 1.0
+                                      << 80.0 << 0.0 << 6.0e6 << 0.0 << 0.0;
+    QTest::newRow("map-transverse-mercator-30e")
+        << QStringLiteral("transverse-mercator@30") << 1.0 << 30.0 << 30.0
+        << 1.0e7 << 0.0 << 0.0;
   }
 
   void morphGolden()

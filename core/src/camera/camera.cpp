@@ -119,6 +119,10 @@ Vec3 eyeEcefForPose(const CameraPose& pose)
 
 MapPoint MapFrame::offsetOf(MapPoint point) const
 {
+  if (!(worldWidthM > 0.0)) {
+    // A map that doesn't repeat: there is only one copy.
+    return MapPoint{point.xM - centreXM, point.yM - centreYM};
+  }
   double dx = std::fmod(point.xM - centreXM, worldWidthM);
   if (dx >= 0.5 * worldWidthM) {
     dx -= worldWidthM;
@@ -136,6 +140,9 @@ MapPoint MapFrame::offsetOf(double latDeg, double lonDeg) const
 std::vector<double> MapFrame::copyShiftsM(double westDeg, double eastDeg,
                                           bool wholeWorld) const
 {
+  if (!(worldWidthM > 0.0)) {
+    return {0.0}; // one copy; whether it is in view is the caller's test
+  }
   const double middleXM =
       offsetOf(projection->forward(centreLatDeg, 0.5 * (westDeg + eastDeg))).xM;
   const double halfSpanM = 0.5 * (eastDeg - westDeg) / 360.0 * worldWidthM;
@@ -173,14 +180,24 @@ void Camera::setMapProjection(const Projection* projection)
 
 double Camera::maximumMapRangeM() const
 {
-  return mapRangeLimitM(m_pose.targetLatDeg);
+  return mapRangeLimitM(m_pose.targetLatDeg, m_pose.targetLonDeg);
 }
 
-double Camera::mapRangeLimitM(double latDeg) const
+double Camera::mapRangeLimitM(double latDeg, double lonDeg) const
 {
-  const double planeScale = 1.0 / m_projection->scaleAt(latDeg).parallel;
-  return std::min(maximumRangeM, 0.5 * m_projection->bounds().widthM() *
-                                     planeScale / tanHalfFovX());
+  const double planeScale =
+      1.0 / m_projection->scaleAtPoint(latDeg, lonDeg).parallel;
+  const MapRect bounds = m_projection->bounds();
+  if (m_projection->repeats()) {
+    // Never wider than the world.
+    return std::min(maximumRangeM,
+                    0.5 * bounds.widthM() * planeScale / tanHalfFovX());
+  }
+  // The whole map in view, and no further out.
+  return std::min(maximumRangeM,
+                  0.5 * planeScale *
+                      std::max(bounds.widthM() / tanHalfFovX(),
+                               bounds.heightM() / tanHalfFovY()));
 }
 
 MapFrame Camera::mapFrame() const
@@ -193,10 +210,13 @@ MapFrame Camera::mapFrame() const
       m_projection->forward(m_pose.targetLatDeg, m_pose.targetLonDeg);
   frame.centreXM = centre.xM;
   frame.centreYM = centre.yM;
-  frame.planeScale = 1.0 / m_projection->scaleAt(m_pose.targetLatDeg).parallel;
+  frame.planeScale =
+      1.0 / m_projection->scaleAtPoint(m_pose.targetLatDeg, m_pose.targetLonDeg)
+                .parallel;
   frame.halfWidthM = m_pose.rangeM * tanHalfFovX() / frame.planeScale;
   frame.halfHeightM = m_pose.rangeM * tanHalfFovY() / frame.planeScale;
-  frame.worldWidthM = m_projection->bounds().widthM();
+  frame.worldWidthM =
+      m_projection->repeats() ? m_projection->bounds().widthM() : 0.0;
   return frame;
 }
 
@@ -217,10 +237,13 @@ void Camera::setPose(const CameraPose& pose)
                   maximumMapCentreLatDeg});
     clamped.targetLatDeg =
         std::clamp(clamped.targetLatDeg, -latLimit, latLimit);
+    clamped.targetLonDeg =
+        normaliseLonDeg(m_projection->clampLonDeg(clamped.targetLonDeg));
     clamped.headingDeg = 0.0;
     clamped.tiltDeg = 0.0;
     clamped.rangeM =
-        std::min(clamped.rangeM, mapRangeLimitM(clamped.targetLatDeg));
+        std::min(clamped.rangeM,
+                 mapRangeLimitM(clamped.targetLatDeg, clamped.targetLonDeg));
   }
   if (!(clamped.rangeM > 0.0) || eyeHeightM(clamped) < minimumEyeHeightM) {
     clamped.rangeM = rangeForEyeHeight(clamped, minimumEyeHeightM);
@@ -342,7 +365,8 @@ Ray Camera::rayThroughPixel(double xPx, double yPx) const
 Vec3 Camera::mapPlanePoint(MapPoint offset) const
 {
   const double scale =
-      1.0 / m_projection->scaleAt(m_pose.targetLatDeg).parallel;
+      1.0 / m_projection->scaleAtPoint(m_pose.targetLatDeg, m_pose.targetLonDeg)
+                .parallel;
   return (m_targetEcef - m_eyeEcef) + m_local.eastEcef * (offset.xM * scale) +
          m_local.northEcef * (offset.yM * scale);
 }
@@ -416,11 +440,13 @@ std::optional<Geodetic> Camera::pickGeodetic(double xPx, double yPx) const
         frame.centreXM + dot(onPlane, m_local.eastEcef) / frame.planeScale;
     const double yM =
         frame.centreYM + dot(onPlane, m_local.northEcef) / frame.planeScale;
-    // The map repeats in x.
-    xM = bounds.westM +
-         std::fmod(std::fmod(xM - bounds.westM, frame.worldWidthM) +
-                       frame.worldWidthM,
-                   frame.worldWidthM);
+    if (frame.worldWidthM > 0.0) {
+      // The map repeats in x.
+      xM = bounds.westM +
+           std::fmod(std::fmod(xM - bounds.westM, frame.worldWidthM) +
+                         frame.worldWidthM,
+                     frame.worldWidthM);
+    }
     return m_projection->inverse(MapPoint{xM, yM});
   }
   const std::optional<Vec3> hit =

@@ -830,6 +830,89 @@ private slots:
     }
   }
 
+  void mapThatDoesNotRepeat()
+  {
+    // Transverse Mercator, UTM and Cassini end at the edge of their
+    // domain: one copy of the world, the centre held inside the domain,
+    // zoomed out no further than the whole map, pixels and points round
+    // trip, and a pan slides along the edge instead of sticking.
+    for (const char* id : {"transverse-mercator", "utm", "cassini"}) {
+      const ts::Projection* projection = ts::projectionById(QLatin1String(id));
+      if (projection == nullptr) {
+        QFAIL(id);
+      }
+      const double centre = projection->centralMeridianDeg();
+      const double limit = projection->maximumLonOffsetDeg();
+      ts::Camera camera = makeMapCamera(
+          id, ts::CameraPose{40.0, centre + limit + 50.0, 1.0e6, 0.0, 0.0});
+      QCOMPARE(camera.pose().targetLonDeg, centre + limit);
+      const ts::MapFrame frame = camera.mapFrame();
+      QCOMPARE(frame.worldWidthM, 0.0);
+      QCOMPARE(frame.copyShiftsM(-10.0, 10.0, true), std::vector<double>{0.0});
+      // Far from the centre: no wrapping round.
+      const ts::MapPoint far = frame.offsetOf(0.0, centre - limit);
+      QVERIFY(far.xM < -1e6);
+      // Zoomed out: the whole map and no further.
+      camera.setPose(ts::CameraPose{0.0, centre, 1.0e9, 0.0, 0.0});
+      const ts::MapRect bounds = projection->bounds();
+      const ts::MapFrame wide = camera.mapFrame();
+      // The map fits by its tighter dimension, exactly.
+      const double fit = std::min(2.0 * wide.halfWidthM / bounds.widthM(),
+                                  2.0 * wide.halfHeightM / bounds.heightM());
+      QVERIFY2(std::abs(fit - 1.0) < 1e-9, qPrintable(QString::number(fit)));
+      // Pixel → point → pixel inside the domain.
+      camera.setPose(ts::CameraPose{52.0, centre + 5.0, 8.0e5, 0.0, 0.0});
+      for (const QPointF pixel :
+           {QPointF(0.5, 0.5), QPointF(123.25, 456.75), QPointF(799.5, 300.0),
+            QPointF(400.0, 300.0)}) {
+        const std::optional<ts::Geodetic> point =
+            camera.pickGeodetic(pixel.x(), pixel.y());
+        if (!point) {
+          QFAIL("pick: no value");
+        }
+        const std::optional<ts::ScreenPoint> back =
+            camera.projectGeodetic(point->latDeg, point->lonDeg);
+        if (!back) {
+          QFAIL("back: no value");
+        }
+        QVERIFY2(std::abs(back->xPx - pixel.x()) < 1e-6 &&
+                     std::abs(back->yPx - pixel.y()) < 1e-6,
+                 id);
+      }
+      // The grabbed point stays under the cursor; dragged far past the
+      // east edge, the view stops at it but still moves north.
+      ts::CameraController controller = makeMapController(
+          id, ts::CameraPose{20.0, centre + limit - 12.0, 2.0e6, 0.0, 0.0});
+      const QPointF from(400.0, 300.0);
+      const std::optional<ts::Geodetic> grabbed =
+          controller.camera().pickGeodetic(from.x(), from.y());
+      if (!grabbed) {
+        QFAIL("grabbed: no value");
+      }
+      QVERIFY(controller.beginPan(from, 0.0));
+      controller.dragTo(QPointF(300.0, 330.0), 0.05);
+      const std::optional<ts::Geodetic> under =
+          controller.camera().pickGeodetic(300.0, 330.0);
+      if (!under) {
+        QFAIL("under: no value");
+      }
+      QVERIFY2(groundDistanceM(*under, *grabbed) < 1e-3, id);
+      // Far past the east edge: the centre stops on it.
+      controller.dragTo(QPointF(-20000.0, 330.0), 0.1);
+      QVERIFY2(std::abs(controller.camera().pose().targetLonDeg -
+                        (centre + limit)) < 1e-6,
+               id);
+      // Then north and further east: it slides north along the edge.
+      const double latBefore = controller.camera().pose().targetLatDeg;
+      controller.dragTo(QPointF(-20100.0, 600.0), 0.2);
+      controller.endDrag(1.0);
+      QVERIFY2(std::abs(controller.camera().pose().targetLonDeg -
+                        (centre + limit)) < 1e-6,
+               id);
+      QVERIFY2(controller.camera().pose().targetLatDeg > latBefore + 1.0, id);
+    }
+  }
+
   void mapNorthUpAndTrueScaleAtCentre()
   {
     // North is up, east is right, and a short distance at the centre has

@@ -137,14 +137,16 @@ about a metre, so a projection's GLSL function does not project a
 position. It projects a **difference from a reference point**:
 
 ```glsl
-vec2 tsProjectMercator(vec2 dLonLatRad, vec4 r0, vec4 r1)
+vec2 tsProjectMercator(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)
 ```
 
 returns, in metres, `forward(reference + d) − forward(reference)` for an
 offset d in longitude and latitude (radians) from a reference point. The
 reference point is a tile's centre; what the function needs to know about
-it comes from `shaderReference(lat, lon)`, computed in double precision
-and passed as two `vec4` uniforms whose meaning is the projection's own.
+it comes from `shaderReferenceFor(lat, lon, halfSpan)` (halfSpan: how
+far the tile reaches from it), computed in double precision and passed as
+four `vec4` uniforms whose meaning is the projection's own (the
+cylindrical ones use two).
 Near the reference the result is as precise as the offset, so a tile a
 few metres across is placed to micrometres.
 
@@ -173,7 +175,7 @@ is 1.6 × 10⁻⁷ of the radius), so `tsAtanh()` uses the series below
 projection's function, and the dispatcher shaders call:
 
 ```glsl
-vec2 tsProject(int index, vec2 dLonLatRad, vec4 r0, vec4 r1)
+vec2 tsProject(int index, vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)
 ```
 
 with `index` the projection's `projectionIndex()`, a uniform. All
@@ -188,14 +190,81 @@ rising to 3 × 10⁻⁵ for points tens of degrees away (which only the
 coarsest tiles have, where a pixel is kilometres); the worst case measured
 on Mesa llvmpipe uses 17 % of it.
 
+## Maps that don't repeat: Transverse Mercator, UTM, Cassini
+
+Projections whose x and y both depend on both coordinates derive from
+`ts::LocalExpansionProjection` (`localexpansion.h`). Writing a careful
+difference formula for each would be long and error-prone, so the GPU
+places their vertices in one of two ways, chosen per tile by its
+half-span:
+
+- **Small tiles** (half-span under `localExpansionLimitRad()`, 0.01 rad,
+  about 64 km): the second-order Taylor expansion about the reference,
+  `F(ref + d) − F(ref) ≈ J d + ½ dᵀ H d`. J and H come from central
+  differences of `project()` in double precision (step 10⁻⁴ rad; near a
+  pole the stencil moves inside and the expansion is carried back). The
+  expansion's error is a third derivative times d³: about a metre at the
+  largest such tile, whose texels are 500 m, and nothing large is
+  subtracted in float. `r0` holds J, `r1` and `r2.xy` H, `r2.w` = 1.
+- **Large tiles**: the projection's formula in float
+  (`glslForwardSource()`, its own name plus `Forward`) at the vertex and
+  at the reference, subtracted: a metre or so of rounding against texels
+  of kilometres. `r0` and `r1` hold its parameters, `r2.xy` the reference.
+
+`r3` holds how far the domain lets d go, and the shader clamps d to it, so
+geometry beyond the edge is squashed onto it (as latitudes are on
+Mercator). GLSL's `atan` and `asinh` may be far from float precision
+(Mesa's `atan` is out by about 10⁻⁵, tens of metres here), so the formula
+uses `tsAtan2` and `tsAsinh` from `projection.cpp`: two exact halvings of
+the argument, then a short series.
+
+The subclass gives `project(lat, dLon)` (radians, no limits: it must be
+smooth a little past the domain), a first guess for the inverse, the GLSL
+formula and its parameters. The base class does the rest: `inverse()`
+refines the guess by Newton's method on `project()` (so it inverts this
+forward exactly), `bounds()` samples the domain's outline, `scaleAtPoint()`
+measures the Jacobian against the ellipsoid, and `nearestInDomain()` (for
+a drag past the edge) solves without the domain and clamps.
+
+| Projection | `id` | Parameters | Domain | As PROJ |
+| --- | --- | --- | --- | --- |
+| Transverse Mercator | `transverse-mercator` | central meridian, scale factor (1) | ±40° of the central meridian | `+proj=tmerc +ellps=WGS84` |
+| UTM | `utm` | zone 1–60 (30) | ±40° of the zone's meridian | `+proj=tmerc +k_0=0.9996` |
+| Cassini–Soldner | `cassini` | central meridian | ±30° of it | `+proj=cass +ellps=WGS84` |
+
+- **Transverse Mercator** is Krüger's series to n⁶ (Karney 2011), as
+  PROJ's default `tmerc`, accurate to nanometres within about 3900 km of
+  the central meridian and a millimetre at 40°. UTM is Transverse Mercator
+  with k0 = 0.9996 on its zone's meridian; the map shows the false
+  easting and northing's origin at the zone's meridian and the equator.
+- **Cassini–Soldner** is Snyder's series (eqs. 3-11 to 3-14), as PROJ's
+  `cass`; Snyder's inverse series is only the first guess. PROJ's inverse
+  stops at that series, so it doesn't quite invert its own forward far
+  from the meridian; the tests use the true point there.
+
+**The rest of the program.** Such a map doesn't repeat (`repeats()`
+false): `MapFrame::worldWidthM` is 0, `offsetOf()` doesn't wrap and
+`copyShiftsM()` gives one copy. The camera holds the centre in the
+domain (`clampLonDeg()`), takes the scale at the centre with
+`scaleAtPoint()`, and zooms out no further than the whole map. A drag
+past the edge stops on it and slides along it. The tile selector
+measures each tile by points sampled along the edges of its part in the
+domain (a fiftieth larger for the curve), judges the mesh's straight
+edges against the projected curve, and needs no detail outside the
+domain. Vector pieces are clipped to the domain and markers outside it
+are hidden, because lines and dots squashed onto the edge would show.
+
 ## Adding a projection
 
 1. **Write the class.** Derive from `ts::Projection`; from
    `CylindricalProjection` if it fits the Mercator family (then only the
    constants, names and PROJ string are needed); or from
    `NormalCylindricalProjection` for any other normal cylindrical one
-   (then f, its inverse and derivative). Implement `forward()`,
-   `inverse()`, `bounds()`, the latitude limits and `scaleAt()`.
+   (then f, its inverse and derivative); or from
+   `LocalExpansionProjection` for anything else (then `project()`, a guess
+   for the inverse, and a float GLSL formula; step 2 is done). Otherwise
+   implement `forward()`, `inverse()`, `bounds()`, the latitude limits and
+   `scaleAt()`.
 2. **Write the GLSL.** `glslSource()` returns one function with the
    signature above and a name of its own (`glslFunction()`). It returns
    the difference from the reference point, computed so that it stays
@@ -212,20 +281,18 @@ on Mesa llvmpipe uses 17 % of it.
 What the rest of the program assumes, and a new projection must respect or
 change:
 
-- The map **repeats in x** with period `bounds().widthM()`, and x doesn't
-  depend on the latitude's sign conventions beyond that: the renderer
-  draws copies of the world side by side. A projection that doesn't
-  repeat (anything but cylindrical ones centred on the equator) needs the
-  wrap-around in `MapFrame` and the selection to be made optional first.
+- If `repeats()` (the cylindrical ones) the map repeats in x with period
+  `bounds().widthM()` and the renderer draws copies of the world side by
+  side; otherwise it ends at the domain (`maximumLonOffsetDeg()` and the
+  latitude limits), as above.
 - `isCylindrical()` true lets the tile renderer draw a tile as one column
   of quads. Leave it false otherwise and tiles keep their full grids.
 - The antimeridian is where tiles end, so nothing is ever stretched across
   the map; a projection with other cuts (an interrupted one) would need
   them made in the meshes.
 
-The roadmap's later projections (transverse Mercator, conics, polar
-stereographic, pseudocylindricals) all need the first point addressed;
-the interface and the shader mechanism already fit them.
+The roadmap's later projections (conics, azimuthals, pseudocylindricals)
+fit `LocalExpansionProjection`; an interrupted one would need its cuts.
 
 ## Tests
 
@@ -238,6 +305,8 @@ without OpenGL 3.3):
 - Round trips within 1 mm on the ground.
 - Published values: the EPSG guidance note's EPSG:3857 example, Miller at
   50° N.
+- Domains that don't repeat: limits, clamping, bounds enclosing the
+  domain, no inverse outside it.
 - Instances with parameters: defaults give the listed instance, others
   are kept, clamped, share the shader index and agree with PROJ.
 - Domain and bounds: the limits, square Mercator maps, latitudes beyond

@@ -198,7 +198,7 @@ QByteArray CylindricalProjection::glslSource() const
 {
   // 6378137 is the WGS 84 semi-major axis.
   return "\nvec2 " + glslFunction() +
-         "(vec2 dLonLatRad, vec4 r0, vec4 r1)\n{\n"
+         "(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)\n{\n"
          "  return 6378137.0\n"
          "       * vec2(dLonLatRad.x, tsCylindricalDy(dLonLatRad.y, r0, r1));\n"
          "}\n";
