@@ -75,14 +75,18 @@ struct MapScale {
 
 /**
  * What a projection's GLSL function needs about a reference point,
- * computed in double precision and handed to the shader as floats: two
- * vec4 uniforms whose meaning is the projection's own.
+ * computed in double precision and handed to the shader as floats: four
+ * vec4 uniforms whose meaning is the projection's own (most use two).
  */
 struct ProjectionShaderReference {
   /** First vec4. */
   std::array<float, 4> r0{};
   /** Second vec4. */
   std::array<float, 4> r1{};
+  /** Third vec4. */
+  std::array<float, 4> r2{};
+  /** Fourth vec4. */
+  std::array<float, 4> r3{};
 };
 
 /**
@@ -104,6 +108,8 @@ struct ProjectionParameter {
   double maximum = 0.0;
   /** Unit shown after the value ("°"). */
   QString suffix;
+  /** Decimal places the dialog offers (0 for whole numbers, a zone). */
+  int32_t decimals = 4;
 };
 
 /** Parameter values by key (ProjectionParameter::key). */
@@ -119,11 +125,12 @@ using ProjectionParameterValues = std::map<QString, double>;
  * therefore doesn't project a position but the *difference* from a
  * reference point (a tile's centre), which stays exact close to it:
  *
- *     vec2 <glslFunction>(vec2 dLonLatRad, vec4 r0, vec4 r1)
+ *     vec2 <glslFunction>(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2,
+ *                         vec4 r3)
  *
  * returns, in metres, forward(reference + d) − forward(reference) for an
  * offset in longitude and latitude (radians) from the reference whose
- * shaderReference() is (r0, r1). See docs/design/projections.md, which
+ * shaderReference() is (r0, r1, r2, r3). See docs/design/projections.md, which
  * also says how to add a projection.
  *
  * Projections are immutable after construction.
@@ -176,6 +183,30 @@ public:
   }
 
   /**
+   * Returns how far east and west of the central meridian the valid
+   * domain reaches, degrees: 180 (everywhere) for most, less for those
+   * that run to infinity or lose accuracy far from it (Transverse
+   * Mercator).
+   */
+  virtual double maximumLonOffsetDeg() const { return 180.0; }
+
+  /** Returns true if the point is inside the valid domain. */
+  bool contains(double latDeg, double lonDeg) const;
+
+  /**
+   * Returns the longitude in the valid domain nearest @p lonDeg (itself
+   * when inside), within 180° of the central meridian.
+   */
+  double clampLonDeg(double lonDeg) const;
+
+  /**
+   * Returns true if the map repeats in x every bounds().widthM(), so the
+   * world is drawn side by side across the edge (the cylindrical
+   * projections). Otherwise the map ends at the edge of the domain.
+   */
+  virtual bool repeats() const { return isCylindrical(); }
+
+  /**
    * Returns the map position of a point. Longitudes wrap to within 180°
    * of the central meridian; latitudes outside the valid domain are
    * placed on its edge (the edge of the map).
@@ -188,11 +219,29 @@ public:
    */
   virtual std::optional<Geodetic> inverse(MapPoint point) const = 0;
 
+  /**
+   * Returns the point of the valid domain at @p point or, off the map,
+   * the one nearest in longitude and latitude to where it would be (for a
+   * drag past the edge, which then slides along it), or nothing if not
+   * even that is known. The default is inverse().
+   */
+  virtual std::optional<Geodetic> nearestInDomain(MapPoint point) const;
+
   /** Returns the rectangle the valid domain maps to. */
   virtual MapRect bounds() const = 0;
 
-  /** Returns the map's scale factors at @p latDeg. */
+  /**
+   * Returns the map's scale factors at @p latDeg on the central meridian
+   * (everywhere on that parallel for a cylindrical projection).
+   */
   virtual MapScale scaleAt(double latDeg) const = 0;
+
+  /**
+   * Returns the map's scale factors at a point. The default is
+   * scaleAt(latDeg), right for projections whose scale depends on the
+   * latitude alone.
+   */
+  virtual MapScale scaleAtPoint(double latDeg, double lonDeg) const;
 
   /**
    * Returns true if x depends only on the longitude, linearly, and y only
@@ -217,6 +266,15 @@ public:
    */
   virtual ProjectionShaderReference shaderReference(double latDeg,
                                                     double lonDeg) const = 0;
+
+  /**
+   * Returns the uniforms for a reference point whose geometry reaches at
+   * most @p halfSpanRad from it in longitude and latitude (half a tile).
+   * Projections whose GLSL is precise at any size ignore it; the default
+   * is shaderReference().
+   */
+  virtual ProjectionShaderReference
+  shaderReferenceFor(double latDeg, double lonDeg, double halfSpanRad) const;
 
 private:
   double m_centralMeridianDeg;

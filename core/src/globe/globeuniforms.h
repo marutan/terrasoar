@@ -159,13 +159,14 @@ vec3 tsTerrainNormal(vec3 up, vec2 slope)
  * docs/design/morph.md.
  */
 inline const char* const morphGlsl = R"(
-vec3 tsMorph(vec3 relative, vec2 dLonLatRad, vec4 mapOrigin, vec4 r0, vec4 r1)
+vec3 tsMorph(vec3 relative, vec2 dLonLatRad, vec4 mapOrigin, vec4 r0, vec4 r1,
+             vec4 r2, vec4 r3)
 {
   if (morph.x <= 0.0) {
     return relative;
   }
   vec2 plane = mapOrigin.xy
-             + morph.y * tsProject(int(morph.z), dLonLatRad, r0, r1);
+             + morph.y * tsProject(int(morph.z), dLonLatRad, r0, r1, r2, r3);
   vec3 onMap = planeOrigin.xyz + planeEast.xyz * plane.x
              + planeNorth.xyz * plane.y;
   return mix(relative, onMap, morph.x);

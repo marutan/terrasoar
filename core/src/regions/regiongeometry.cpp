@@ -133,11 +133,6 @@ GeoRect extentOf(const std::vector<LonLat>& vertices)
   return extent;
 }
 
-QString translated(const char* text)
-{
-  return QCoreApplication::translate("ts::RegionGeometry", text);
-}
-
 bool fail(QString* errorString, const QString& message)
 {
   if (errorString) {
@@ -285,8 +280,10 @@ unwrappedRing(const std::vector<LonLat>& vertices, double referenceLonDeg,
   for (const LonLat& vertex : vertices) {
     if (!std::isfinite(vertex.lonDeg) || !std::isfinite(vertex.latDeg) ||
         vertex.latDeg < -90.0 || vertex.latDeg > 90.0) {
-      fail(errorString, translated("A point of the area is not on the Earth "
-                                   "(latitude beyond ±90°)."));
+      fail(errorString,
+           QCoreApplication::translate(
+               "ts::RegionGeometry", "A point of the area is not on the Earth "
+                                     "(latitude beyond ±90°)."));
       return std::nullopt;
     }
     if (ring.empty() ||
@@ -302,8 +299,9 @@ unwrappedRing(const std::vector<LonLat>& vertices, double referenceLonDeg,
     ring.pop_back();
   }
   if (ring.size() < 3) {
-    fail(errorString,
-         translated("An area needs at least three different points."));
+    fail(errorString, QCoreApplication::translate(
+                          "ts::RegionGeometry",
+                          "An area needs at least three different points."));
     return std::nullopt;
   }
   // Unwrap: each vertex within 180° of the one before.
@@ -316,8 +314,10 @@ unwrappedRing(const std::vector<LonLat>& vertices, double referenceLonDeg,
   const double closing =
       ring.back().lonDeg + wrapDelta(ring.front().lonDeg - ring.back().lonDeg);
   if (std::abs(closing - ring.front().lonDeg) > 1e-9) {
-    fail(errorString, translated("An area can't go round a pole; use a "
-                                 "rectangle that reaches the pole instead."));
+    fail(errorString,
+         QCoreApplication::translate(
+             "ts::RegionGeometry", "An area can't go round a pole; use a "
+                                   "rectangle that reaches the pole instead."));
     return std::nullopt;
   }
   return ring;
@@ -374,8 +374,10 @@ std::optional<std::vector<LonLat>> ringFromJson(const QJsonArray& array,
   for (int32_t i = 0; i < array.size(); ++i) {
     const QJsonArray pair = array.at(i).toArray();
     if (pair.size() != 2 || !pair.at(0).isDouble() || !pair.at(1).isDouble()) {
-      fail(errorString, translated("A point of the region is not a pair "
-                                   "of numbers."));
+      fail(errorString,
+           QCoreApplication::translate("ts::RegionGeometry",
+                                       "A point of the region is not a pair "
+                                       "of numbers."));
       return std::nullopt;
     }
     vertices.push_back(LonLat{pair.at(0).toDouble(), pair.at(1).toDouble()});
@@ -406,8 +408,9 @@ RegionGeometry::polygons(const std::vector<std::vector<LonLat>>& rings,
                          QString* errorString)
 {
   if (rings.empty()) {
-    fail(errorString,
-         translated("An area needs at least three different points."));
+    fail(errorString, QCoreApplication::translate(
+                          "ts::RegionGeometry",
+                          "An area needs at least three different points."));
     return std::nullopt;
   }
   RegionGeometry geometry;
@@ -432,9 +435,10 @@ RegionGeometry::polygons(const std::vector<std::vector<LonLat>>& rings,
     extent.eastDeg = std::max(extent.eastDeg, ringExtent.eastDeg);
   }
   if (extent.eastDeg - extent.westDeg >= 360.0) {
-    fail(errorString,
-         translated("The area goes the whole way round the Earth; use a "
-                    "rectangle instead."));
+    fail(errorString, QCoreApplication::translate(
+                          "ts::RegionGeometry",
+                          "The area goes the whole way round the Earth; use a "
+                          "rectangle instead."));
     return std::nullopt;
   }
   const double shift = wrapLon(extent.westDeg) - extent.westDeg;
@@ -456,7 +460,8 @@ RegionGeometry::polygons(const std::vector<std::vector<LonLat>>& rings,
         std::max(geometry.m_extent.northDeg, ringExtent.northDeg);
   }
   if (geometry.areaKm2() <= 0.0) {
-    fail(errorString, translated("The area has no size."));
+    fail(errorString, QCoreApplication::translate("ts::RegionGeometry",
+                                                  "The area has no size."));
     return std::nullopt;
   }
   geometry.buildIndex();
@@ -653,7 +658,9 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
     const std::array<const char*, 4> names{"west", "south", "east", "north"};
     for (const char* name : names) {
       if (!json.value(QLatin1String(name)).isDouble()) {
-        fail(errorString, translated("The region's rectangle is incomplete."));
+        fail(errorString, QCoreApplication::translate(
+                              "ts::RegionGeometry",
+                              "The region's rectangle is incomplete."));
         return std::nullopt;
       }
     }
@@ -664,7 +671,8 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
                   east - west >= 360.0 ? west + 360.0 : east,
                   json.value(QStringLiteral("north")).toDouble());
     if (!geometry.isValid()) {
-      fail(errorString, translated("The area has no size."));
+      fail(errorString, QCoreApplication::translate("ts::RegionGeometry",
+                                                    "The area has no size."));
       return std::nullopt;
     }
     return geometry;
@@ -692,7 +700,9 @@ std::optional<RegionGeometry> RegionGeometry::fromJson(const QJsonObject& json,
     }
     return polygons(rings, errorString);
   }
-  fail(errorString, translated("The region's area is of an unknown kind."));
+  fail(errorString,
+       QCoreApplication::translate("ts::RegionGeometry",
+                                   "The region's area is of an unknown kind."));
   return std::nullopt;
 }
 

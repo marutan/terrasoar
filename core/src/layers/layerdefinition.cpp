@@ -206,6 +206,7 @@ std::vector<LayerDefinition> builtinLayerDefinitions()
     std::optional<LayerDefinition> definition =
         LayerDefinition::fromJson(array.at(i).toObject(), nullptr);
     if (definition) {
+      // ts-notr: marked for lupdate in builtinNames above
       definition->name = QCoreApplication::translate(
           "ts::BuiltinLayers", definition->name.toUtf8().constData());
       definitions.push_back(std::move(*definition));

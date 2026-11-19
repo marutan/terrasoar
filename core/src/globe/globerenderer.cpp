@@ -513,6 +513,10 @@ void GlobeRenderer::uploadMarkers(const Camera& camera)
     Vec3 position = marker.positionEcef;
     if (morphed) {
       const Geodetic geodetic = ecefToGeodetic(marker.positionEcef);
+      if (!frame.projection->contains(geodetic.latDeg, geodetic.lonDeg)) {
+        // Off a map that ends at its domain (it would sit on the edge).
+        continue;
+      }
       const Vec3 onGlobe = marker.positionEcef - camera.eyeEcef();
       const Vec3 onMap = camera.mapPlanePoint(
           frame.offsetOf(geodetic.latDeg, geodetic.lonDeg));

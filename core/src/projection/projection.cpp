@@ -30,6 +30,7 @@
 
 #include "ts/projection/cylindricalprojection.h"
 #include "ts/projection/normalcylindrical.h"
+#include "ts/projection/transversemercator.h"
 
 namespace ts
 {
@@ -59,6 +60,42 @@ float tsAtanh(float x)
   return 0.5 * log((1.0 + x) / (1.0 - x));
 }
 
+// atan() and asinh() of GLSL may be far less precise than a float (Mesa's
+// atan is out by about 1e-5), so projections that need them to a few
+// units in the last place use these: the argument is halved twice by
+// exact identities, then a short series finishes.
+//   tan(u/2) = tan u / (1 + sqrt(1 + tan² u))
+//   sinh(u/2) = sinh u / sqrt(2 (1 + sqrt(1 + sinh² u)))
+float tsAtanReduced(float z)
+{
+  z = z / (1.0 + sqrt(1.0 + z * z));
+  z = z / (1.0 + sqrt(1.0 + z * z));
+  float z2 = z * z;
+  return 4.0 * z * (1.0 - z2 * (1.0 / 3.0 - z2 * (1.0 / 5.0 - z2 * (1.0 / 7.0
+         - z2 * (1.0 / 9.0 - z2 * (1.0 / 11.0 - z2 * (1.0 / 13.0)))))));
+}
+
+float tsAtan2(float y, float x)
+{
+  float ay = abs(y);
+  float ax = abs(x);
+  float r = ay <= ax ? tsAtanReduced(ay / max(ax, 1e-37))
+                     : 1.5707963267948966 - tsAtanReduced(ax / ay);
+  if (x < 0.0) {
+    r = 3.141592653589793 - r;
+  }
+  return y < 0.0 ? -r : r;
+}
+
+float tsAsinh(float x)
+{
+  x = x / sqrt(2.0 * (1.0 + sqrt(1.0 + x * x)));
+  x = x / sqrt(2.0 * (1.0 + sqrt(1.0 + x * x)));
+  float x2 = x * x;
+  return 4.0 * x * (1.0 - x2 * (1.0 / 6.0 - x2 * (3.0 / 40.0 - x2 * (5.0 / 112.0
+         - x2 * (35.0 / 1152.0 - x2 * (63.0 / 2816.0))))));
+}
+
 float tsCylindricalDy(float dLatRad, vec4 r0, vec4 r1)
 {
   float q = clamp(dLatRad, r0.z, r0.w) * r1.z;
@@ -82,6 +119,38 @@ Projection::Projection(double centralMeridianDeg)
 
 Projection::~Projection() = default;
 
+bool Projection::contains(double latDeg, double lonDeg) const
+{
+  return containsLatitude(latDeg) &&
+         std::abs(normaliseLonDeg(lonDeg - centralMeridianDeg())) <=
+             maximumLonOffsetDeg();
+}
+
+double Projection::clampLonDeg(double lonDeg) const
+{
+  const double limit = maximumLonOffsetDeg();
+  const double offset =
+      std::clamp(normaliseLonDeg(lonDeg - centralMeridianDeg()), -limit, limit);
+  return centralMeridianDeg() + offset;
+}
+
+std::optional<Geodetic> Projection::nearestInDomain(MapPoint point) const
+{
+  return inverse(point);
+}
+
+MapScale Projection::scaleAtPoint(double latDeg, double /*lonDeg*/) const
+{
+  return scaleAt(latDeg);
+}
+
+ProjectionShaderReference
+Projection::shaderReferenceFor(double latDeg, double lonDeg,
+                               double /*halfSpanRad*/) const
+{
+  return shaderReference(latDeg, lonDeg);
+}
+
 const std::vector<const Projection*>& projections()
 {
   // To add a projection: write its class and list it here (see
@@ -92,9 +161,18 @@ const std::vector<const Projection*>& projections()
   static const EquidistantCylindricalProjection equidistantCylindrical;
   static const GallStereographicProjection gallStereographic;
   static const GallPetersProjection gallPeters;
-  static const std::vector<const Projection*> all = {
-      &mercator,          &webMercator, &miller, &equidistantCylindrical,
-      &gallStereographic, &gallPeters};
+  static const TransverseMercatorProjection transverseMercator;
+  static const UtmProjection utm;
+  static const CassiniProjection cassini;
+  static const std::vector<const Projection*> all = {&mercator,
+                                                     &webMercator,
+                                                     &miller,
+                                                     &equidistantCylindrical,
+                                                     &gallStereographic,
+                                                     &gallPeters,
+                                                     &transverseMercator,
+                                                     &utm,
+                                                     &cassini};
   return all;
 }
 
@@ -108,6 +186,19 @@ makeProjection(const QString& id, const ProjectionParameterValues& values)
   if (id == QLatin1String("equidistant-cylindrical")) {
     return std::make_unique<EquidistantCylindricalProjection>(
         values.at(QStringLiteral("standardParallel")));
+  }
+  if (id == QLatin1String("transverse-mercator")) {
+    return std::make_unique<TransverseMercatorProjection>(
+        values.at(QStringLiteral("centralMeridian")),
+        values.at(QStringLiteral("scaleFactor")));
+  }
+  if (id == QLatin1String("utm")) {
+    return std::make_unique<UtmProjection>(
+        static_cast<int32_t>(std::lround(values.at(QStringLiteral("zone")))));
+  }
+  if (id == QLatin1String("cassini")) {
+    return std::make_unique<CassiniProjection>(
+        values.at(QStringLiteral("centralMeridian")));
   }
   return nullptr;
 }
@@ -184,14 +275,15 @@ QByteArray projectionGlsl()
   for (const Projection* projection : all) {
     glsl += projection->glslSource();
   }
-  glsl += "\nvec2 tsProject(int index, vec2 dLonLatRad, vec4 r0, vec4 r1)\n{\n";
+  glsl += "\nvec2 tsProject(int index, vec2 dLonLatRad, vec4 r0, vec4 r1, "
+          "vec4 r2, vec4 r3)\n{\n";
   for (std::size_t i = 1; i < all.size(); ++i) {
     glsl += "  if (index == " + QByteArray::number(static_cast<int32_t>(i)) +
             ") {\n    return " + all[i]->glslFunction() +
-            "(dLonLatRad, r0, r1);\n  }\n";
+            "(dLonLatRad, r0, r1, r2, r3);\n  }\n";
   }
-  glsl +=
-      "  return " + all.front()->glslFunction() + "(dLonLatRad, r0, r1);\n}\n";
+  glsl += "  return " + all.front()->glslFunction() +
+          "(dLonLatRad, r0, r1, r2, r3);\n}\n";
   return glsl;
 }
 

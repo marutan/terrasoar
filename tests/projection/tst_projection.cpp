@@ -108,11 +108,22 @@ std::vector<double> gridLatitudes(const ts::Projection& projection)
 }
 
 /** Longitudes of the global grid, with the antimeridian's two sides. */
-std::vector<double> gridLongitudes()
+std::vector<double> gridLongitudes(const ts::Projection& projection)
 {
-  std::vector<double> lons = {-180.0, -179.999999, 179.999999};
-  for (int32_t step = -23; step < 24; ++step) {
-    lons.push_back(7.5 * step);
+  const double limit = projection.maximumLonOffsetDeg();
+  if (limit >= 180.0) {
+    std::vector<double> lons = {-180.0, -179.999999, 179.999999};
+    for (int32_t step = -23; step < 24; ++step) {
+      lons.push_back(7.5 * step);
+    }
+    return lons;
+  }
+  // The domain's edges and a grid inside it, about the central meridian.
+  const double centre = projection.centralMeridianDeg();
+  std::vector<double> lons = {centre - limit, centre + limit,
+                              centre - limit + 1e-6, centre + 1e-9};
+  for (double offset = -limit + 2.5; offset < limit; offset += 2.5) {
+    lons.push_back(centre + offset);
   }
   return lons;
 }
@@ -137,6 +148,8 @@ const char* const probeFragmentGlsl = R"(
 layout(std140) uniform Probe {
   vec4 r0;
   vec4 r1;
+  vec4 r2;
+  vec4 r3;
   vec4 steps;  // dLon per sample, dLat per sample, first sample, component
   vec4 which;  // projection index
 };
@@ -145,7 +158,7 @@ void main()
 {
   float sampleIndex = floor(gl_FragCoord.x) + steps.z;
   vec2 d = vec2(steps.x, steps.y) * sampleIndex;
-  vec2 result = tsProject(int(which.x), d, r0, r1);
+  vec2 result = tsProject(int(which.x), d, r0, r1, r2, r3);
   uint bits = floatBitsToUint(steps.w < 0.5 ? result.x : result.y);
   fragColor = vec4(float(bits & 255u), float((bits >> 8) & 255u),
                    float((bits >> 16) & 255u), float(bits >> 24)) / 255.0;
@@ -155,6 +168,8 @@ void main()
 struct ProbeBlock {
   std::array<float, 4> r0{};
   std::array<float, 4> r1{};
+  std::array<float, 4> r2{};
+  std::array<float, 4> r3{};
   std::array<float, 4> steps{};
   std::array<float, 4> which{};
 };
@@ -170,7 +185,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{6});
+    QCOMPARE(all.size(), std::size_t{9});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -181,10 +196,12 @@ private slots:
       functions.insert(projection->glslFunction());
       QCOMPARE(ts::projectionById(projection->id()), projection);
       QCOMPARE(ts::projectionIndex(projection), static_cast<int32_t>(i));
-      QCOMPARE(projection->centralMeridianDeg(), 0.0);
+      // UTM's default zone (30) is the one west of Greenwich.
+      QCOMPARE(projection->centralMeridianDeg(),
+               projection->id() == QLatin1String("utm") ? -3.0 : 0.0);
     }
-    QCOMPARE(ids.size(), 6);
-    QCOMPARE(functions.size(), 6);
+    QCOMPARE(ids.size(), 9);
+    QCOMPARE(functions.size(), 9);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -205,6 +222,9 @@ private slots:
     QTest::newRow("equidistant-cylindrical") << 3;
     QTest::newRow("gall-stereographic") << 4;
     QTest::newRow("gall-peters") << 5;
+    QTest::newRow("transverse-mercator") << 6;
+    QTest::newRow("utm") << 7;
+    QTest::newRow("cassini") << 8;
   }
 
   void againstProj()
@@ -219,7 +239,7 @@ private slots:
     double worstForwardM = 0.0;
     double worstInverseDeg = 0.0;
     for (const double lat : gridLatitudes(projection)) {
-      for (const double lon : gridLongitudes()) {
+      for (const double lon : gridLongitudes(projection)) {
         const ts::MapPoint ours = projection.forward(lat, lon);
         // PROJ puts −180° at +πa, we at −πa: the same meridian.
         ts::MapPoint theirs = proj.forward(lat, lon);
@@ -237,6 +257,12 @@ private slots:
         ts::Geodetic projBack = proj.inverse(theirs);
         if (std::abs(projBack.latDeg - lat) > toleranceDeg) {
           projBack = ts::Geodetic{lat, lon, 0.0};
+        }
+        if (std::abs(lat) == 90.0) {
+          // Every longitude is the pole.
+          worstInverseDeg = std::max(worstInverseDeg,
+                                     std::abs(back.latDeg - projBack.latDeg));
+          continue;
         }
         worstInverseDeg = std::max(
             {worstInverseDeg, std::abs(back.latDeg - projBack.latDeg),
@@ -316,7 +342,7 @@ private slots:
         *ts::projections().at(static_cast<std::size_t>(index));
     double worstM = 0.0;
     for (const double lat : gridLatitudes(projection)) {
-      for (const double lon : gridLongitudes()) {
+      for (const double lon : gridLongitudes(projection)) {
         const ts::Geodetic back =
             projection.inverse(projection.forward(lat, lon)).value_or(nowhere);
         QCOMPARE(back.heightM, 0.0);
@@ -366,6 +392,11 @@ private slots:
       QVERIFY(projection->containsLatitude(projection->maximumLatDeg()));
       QVERIFY(!projection->containsLatitude(90.5));
       const ts::MapRect bounds = projection->bounds();
+      QVERIFY(std::isfinite(bounds.westM) && std::isfinite(bounds.northM));
+      QVERIFY(!projection->inverse(ts::MapPoint{std::nan(""), 0.0}));
+      if (!projection->repeats()) {
+        continue; // nonRepeatingDomains()
+      }
       // A whole turn of longitude wide.
       QVERIFY(std::abs(bounds.widthM() -
                        2.0 * projection->forward(0.0, 90.0).xM * 2.0) < 1e-6);
@@ -390,6 +421,43 @@ private slots:
     // Miller's is about 1.36 times as wide as it is high.
     QVERIFY(std::abs(miller.bounds().widthM() / miller.bounds().heightM() -
                      1.3638) < 1e-3);
+  }
+
+  void nonRepeatingDomains()
+  {
+    // Projections whose domain is limited in longitude: they don't
+    // repeat, points outside have no inverse, forward() holds longitudes
+    // to the domain, and bounds() encloses the whole domain.
+    int32_t limited = 0;
+    for (const ts::Projection* projection : ts::projections()) {
+      const double limit = projection->maximumLonOffsetDeg();
+      if (limit >= 180.0) {
+        QVERIFY(projection->repeats());
+        QVERIFY(projection->contains(0.0, 179.9));
+        continue;
+      }
+      ++limited;
+      QVERIFY2(!projection->repeats(), qPrintable(projection->id()));
+      const double centre = projection->centralMeridianDeg();
+      QVERIFY(projection->contains(10.0, centre + limit));
+      QVERIFY(!projection->contains(10.0, centre + limit + 0.1));
+      QCOMPARE(projection->clampLonDeg(centre + limit + 20.0), centre + limit);
+      QCOMPARE(projection->clampLonDeg(centre - 5.0), centre - 5.0);
+      QCOMPARE(projection->forward(20.0, centre + limit + 30.0).xM,
+               projection->forward(20.0, centre + limit).xM);
+      const ts::MapRect bounds = projection->bounds();
+      for (const double lat : {-90.0, -60.0, 0.0, 45.0, 90.0}) {
+        for (const double lon : {-limit, -limit / 2.0, 0.0, limit}) {
+          const ts::MapPoint p = projection->forward(lat, centre + lon);
+          QVERIFY(p.xM >= bounds.westM - 1e-6 && p.xM <= bounds.eastM + 1e-6);
+          QVERIFY(p.yM >= bounds.southM - 1e-6 && p.yM <= bounds.northM + 1e-6);
+        }
+      }
+      // The corner of the box is beyond the domain's edge at the equator.
+      QVERIFY(!projection->inverse(ts::MapPoint{bounds.eastM, bounds.northM}));
+      QVERIFY(!projection->inverse(ts::MapPoint{bounds.eastM + 1e5, 0.0}));
+    }
+    QCOMPARE(limited, 3);
   }
 
   void centralMeridian()
@@ -423,17 +491,20 @@ private slots:
     for (const ts::Projection* projection : ts::projections()) {
       for (const double lat : {-80.0, -45.0, 0.0, 20.0, 60.0, 84.0}) {
         const double step = 1e-3;
-        const ts::MapPoint here = projection->forward(lat, 10.0);
+        const ts::MapPoint west = projection->forward(lat, 10.0 - step);
         const ts::MapPoint east = projection->forward(lat, 10.0 + step);
         const ts::MapPoint north = projection->forward(lat + step, 10.0);
         const ts::MapPoint south = projection->forward(lat - step, 10.0);
+        // Lengths on the map (on a map that isn't cylindrical a step east
+        // moves north too).
+        // Central differences: the scale changes along the step.
         const double parallel =
-            (east.xM - here.xM) /
-            groundDistanceM({lat, 10.0, 0.0}, {lat, 10.0 + step, 0.0});
+            std::hypot(east.xM - west.xM, east.yM - west.yM) /
+            groundDistanceM({lat, 10.0 - step, 0.0}, {lat, 10.0 + step, 0.0});
         const double meridian =
-            (north.yM - south.yM) /
+            std::hypot(north.xM - south.xM, north.yM - south.yM) /
             groundDistanceM({lat - step, 10.0, 0.0}, {lat + step, 10.0, 0.0});
-        const ts::MapScale scale = projection->scaleAt(lat);
+        const ts::MapScale scale = projection->scaleAtPoint(lat, 10.0);
         QVERIFY2(std::abs(scale.parallel / parallel - 1.0) < 1e-6,
                  qPrintable(projection->id()));
         QVERIFY2(std::abs(scale.meridian / meridian - 1.0) < 1e-6,
@@ -541,10 +612,14 @@ private slots:
             projection.forward(clampedReference, 0.0);
         for (const double span : spans) {
           ProbeBlock block;
+          // As the renderers ask: the samples reach half the span.
           const ts::ProjectionShaderReference shaderReference =
-              projection.shaderReference(referenceLat, 0.0);
+              projection.shaderReferenceFor(referenceLat, 0.0,
+                                            0.5 * ts::degToRad(span));
           block.r0 = shaderReference.r0;
           block.r1 = shaderReference.r1;
+          block.r2 = shaderReference.r2;
+          block.r3 = shaderReference.r3;
           const float stepLat =
               static_cast<float>(ts::degToRad(span) / samples);
           const float stepLon = 0.5F * stepLat;
@@ -579,26 +654,45 @@ private slots:
             const float index = static_cast<float>(i) + first;
             const double dLonRad = static_cast<double>(stepLon * index);
             const double dLatRad = static_cast<double>(stepLat * index);
-            const ts::MapPoint expected = projection.forward(
-                clampedReference + ts::radToDeg(dLatRad), 0.0);
-            // x is linear in the longitude on cylindrical maps.
-            const double expectedX =
-                projection.bounds().widthM() / (2.0 * ts::pi) * dLonRad;
-            const double expectedY = expected.yM - reference.yM;
-            // Float arithmetic: a few parts in ten million of the offset,
-            // more for offsets of tens of degrees (which only the coarsest
-            // tiles have, where a pixel is kilometres).
-            const double relative = 2e-6 + 2e-5 * std::abs(dLatRad);
+            double expectedX = 0.0;
+            double expectedY = 0.0;
+            double allowedX = 0.0;
+            double allowedY = 0.0;
+            if (projection.isCylindrical()) {
+              const ts::MapPoint expected = projection.forward(
+                  clampedReference + ts::radToDeg(dLatRad), 0.0);
+              // x is linear in the longitude on cylindrical maps.
+              expectedX =
+                  projection.bounds().widthM() / (2.0 * ts::pi) * dLonRad;
+              expectedY = expected.yM - reference.yM;
+              // Float arithmetic: a few parts in ten million of the
+              // offset, more for offsets of tens of degrees (which only
+              // the coarsest tiles have, where a pixel is kilometres).
+              const double relative = 2e-6 + 2e-5 * std::abs(dLatRad);
+              allowedX = 1e-6 + 2e-6 * std::abs(expectedX);
+              allowedY = 1e-6 + relative * std::abs(expectedY);
+            } else {
+              const ts::MapPoint expected =
+                  projection.forward(clampedReference + ts::radToDeg(dLatRad),
+                                     ts::radToDeg(dLonRad));
+              expectedX = expected.xM - reference.xM;
+              expectedY = expected.yM - reference.yM;
+              // The expansion (small spans) or the float formula (large
+              // ones): within a hundredth of a texel of a 256-pixel tile
+              // of this span, and a millimetre.
+              const double texelM =
+                  ts::degToRad(span) * ts::wgs84::semiMajorAxisM / 256.0;
+              allowedX = 1e-3 + 0.01 * texelM;
+              allowedY = allowedX;
+            }
             const double errorX =
                 std::abs(static_cast<double>(gpu[0]) - expectedX);
             const double errorY =
                 std::abs(static_cast<double>(gpu[1]) - expectedY);
             QVERIFY(std::isfinite(gpu[0]) && std::isfinite(gpu[1]));
             worstRelative =
-                std::max(worstRelative,
-                         errorY / (1e-6 + relative * std::abs(expectedY)));
-            if (errorX > 1e-6 + 2e-6 * std::abs(expectedX) ||
-                errorY > 1e-6 + relative * std::abs(expectedY)) {
+                std::max({worstRelative, errorX / allowedX, errorY / allowedY});
+            if (errorX > allowedX || errorY > allowedY) {
               QFAIL(qPrintable(
                   QStringLiteral("%1 at %2° + %3°: GPU (%4, %5), C++ (%6, %7)")
                       .arg(projection.id())
@@ -628,6 +722,9 @@ private slots:
             for (const ts::Projection* projection : ts::projections()) {
               const double lat = -80.0 + (thread * 7 + i) % 160;
               const double lon = -179.0 + (thread * 13 + i * 3) % 358;
+              if (!projection->contains(lat, lon)) {
+                continue;
+              }
               const std::optional<ts::Geodetic> back =
                   projection->inverse(projection->forward(lat, lon));
               ok = ok && back && std::abs(back->latDeg - lat) < 1e-9 &&

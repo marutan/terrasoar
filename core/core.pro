@@ -83,7 +83,9 @@ HEADERS += \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
     include/ts/projection/cylindricalprojection.h \
+    include/ts/projection/localexpansion.h \
     include/ts/projection/normalcylindrical.h \
+    include/ts/projection/transversemercator.h \
     include/ts/projection/projection.h \
     include/ts/providers/geopackagefeatureprovider.h \
     include/ts/providers/providerregistry.h \
@@ -162,7 +164,9 @@ SOURCES += \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
     src/projection/cylindricalprojection.cpp \
+    src/projection/localexpansion.cpp \
     src/projection/normalcylindrical.cpp \
+    src/projection/transversemercator.cpp \
     src/projection/projection.cpp \
     src/providers/geopackagefeatureprovider.cpp \
     src/providers/providerregistry.cpp \

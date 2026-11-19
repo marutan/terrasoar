@@ -24,7 +24,9 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <limits>
+#include <optional>
 #include <vector>
 
 #include "ts/camera/camera.h"
@@ -127,6 +129,132 @@ bool samplesBehindHorizon(const Camera& camera, TileKey key,
                      });
 }
 
+/**
+ * Returns the part of @p rect inside @p projection's domain, its
+ * longitudes counted from the central meridian (so west may be below
+ * −180° or east above 180°), or nothing if they don't meet.
+ */
+std::optional<GeoRect> domainPart(const Projection& projection,
+                                  const GeoRect& rect)
+{
+  const double southDeg = std::max(rect.southDeg, projection.minimumLatDeg());
+  const double northDeg = std::min(rect.northDeg, projection.maximumLatDeg());
+  if (!(southDeg < northDeg)) {
+    return std::nullopt;
+  }
+  const double limit = projection.maximumLonOffsetDeg();
+  const double centre = projection.centralMeridianDeg();
+  const double west = normaliseLonDeg(rect.westDeg - centre);
+  // The tile, or its copy a turn to the west, meets −limit…limit.
+  for (const double shift : {0.0, -360.0}) {
+    const double w = std::max(west + shift, -limit);
+    const double e = std::min(west + shift + rect.widthDeg(), limit);
+    if (w < e) {
+      return GeoRect{w + centre, southDeg, e + centre, northDeg};
+    }
+  }
+  return std::nullopt;
+}
+
+/** Points sampled along each edge of a tile for its extent on a map that
+ *  isn't cylindrical. */
+constexpr int32_t mapEdgeSamples = 8;
+
+/**
+ * Returns the extent on the map of the part of @p key inside the domain,
+ * relative to the view's centre, map metres: a box around points sampled
+ * along its edges (exact for a cylindrical projection, grown by a
+ * fiftieth for the bulge of curved edges otherwise). Nothing outside the
+ * domain. For maps that don't repeat.
+ */
+std::optional<MapRect> tileMapExtent(const MapFrame& frame, TileKey key)
+{
+  const Projection& projection = *frame.projection;
+  const std::optional<GeoRect> part = domainPart(projection, key.bounds());
+  if (!part) {
+    return std::nullopt;
+  }
+  MapRect extent{std::numeric_limits<double>::max(),
+                 std::numeric_limits<double>::max(),
+                 std::numeric_limits<double>::lowest(),
+                 std::numeric_limits<double>::lowest()};
+  const std::function<void(double, double)> include = [&](double latDeg,
+                                                          double lonDeg) {
+    const MapPoint point = frame.offsetOf(latDeg, lonDeg);
+    extent.westM = std::min(extent.westM, point.xM);
+    extent.eastM = std::max(extent.eastM, point.xM);
+    extent.southM = std::min(extent.southM, point.yM);
+    extent.northM = std::max(extent.northM, point.yM);
+  };
+  for (int32_t i = 0; i <= mapEdgeSamples; ++i) {
+    const double f = static_cast<double>(i) / mapEdgeSamples;
+    const double lon = part->westDeg + f * part->widthDeg();
+    const double lat = part->southDeg + f * part->heightDeg();
+    include(part->southDeg, lon);
+    include(part->northDeg, lon);
+    include(lat, part->westDeg);
+    include(lat, part->eastDeg);
+  }
+  if (!projection.isCylindrical()) {
+    const double growM = 0.02 * std::max(extent.widthM(), extent.heightM());
+    extent.westM -= growM;
+    extent.eastM += growM;
+    extent.southM -= growM;
+    extent.northM += growM;
+  }
+  return extent;
+}
+
+/**
+ * How far the straight edges of @p key's mesh cells stray from the curves
+ * they stand for on a map that isn't cylindrical, on screen: the largest
+ * gap between an edge's middle and the projected point it should be, over
+ * the cells in the corners and the middle of the tile's part in the
+ * domain (where the curvature is largest: projections curve away from
+ * their centre).
+ */
+double generalMapGeometryErrorPx(const Camera& camera, const MapFrame& frame,
+                                 TileKey key, int32_t segments)
+{
+  const Projection& projection = *frame.projection;
+  const std::optional<GeoRect> part = domainPart(projection, key.bounds());
+  if (!part) {
+    return 0.0;
+  }
+  const GeoRect rect = key.bounds();
+  const double cellLonDeg = rect.widthDeg() / std::max(segments, 1);
+  const double cellLatDeg = rect.heightDeg() / std::max(segments, 1);
+  const std::function<MapPoint(double, double)> at = [&](double latDeg,
+                                                         double lonDeg) {
+    return projection.forward(latDeg, lonDeg);
+  };
+  const std::function<double(double, double, double, double)> stray =
+      [&](double lat0, double lon0, double lat1, double lon1) {
+        const MapPoint a = at(lat0, lon0);
+        const MapPoint b = at(lat1, lon1);
+        const MapPoint middle = at(0.5 * (lat0 + lat1), 0.5 * (lon0 + lon1));
+        return std::hypot(middle.xM - 0.5 * (a.xM + b.xM),
+                          middle.yM - 0.5 * (a.yM + b.yM));
+      };
+  double errorM = 0.0;
+  const std::array<double, 3> lons = {
+      part->westDeg, 0.5 * (part->westDeg + part->eastDeg - cellLonDeg),
+      std::max(part->eastDeg - cellLonDeg, part->westDeg)};
+  const std::array<double, 3> lats = {
+      part->southDeg, 0.5 * (part->southDeg + part->northDeg - cellLatDeg),
+      std::max(part->northDeg - cellLatDeg, part->southDeg)};
+  for (const double lon : lons) {
+    for (const double lat : lats) {
+      const double east = std::min(lon + cellLonDeg, part->eastDeg);
+      const double north = std::min(lat + cellLatDeg, part->northDeg);
+      errorM = std::max(
+          {errorM, stray(lat, lon, lat, east), stray(lat, lon, north, lon),
+           stray(north, lon, north, east), stray(lat, east, north, east)});
+    }
+  }
+  return errorM / (2.0 * frame.halfHeightM) * camera.viewportHeightPx();
+}
+
 /** True if @p key's rectangle on the map of @p frame meets the view, taken
  * as ± @p halfWidthM by ± @p halfHeightM map metres about the centre. */
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters): width, then height
@@ -137,6 +265,12 @@ bool rectOnMap(const MapFrame& frame, TileKey key, double halfWidthM,
     return false;
   }
   const Projection& projection = *frame.projection;
+  if (!projection.repeats()) {
+    const std::optional<MapRect> extent = tileMapExtent(frame, key);
+    return extent && extent->westM < halfWidthM &&
+           extent->eastM > -halfWidthM && extent->southM < halfHeightM &&
+           extent->northM > -halfHeightM;
+  }
   const GeoRect rect = key.bounds();
   if (rect.southDeg >= projection.maximumLatDeg() ||
       rect.northDeg <= projection.minimumLatDeg()) {
@@ -192,6 +326,33 @@ std::vector<MorphSphere> morphSpheres(const Camera& camera,
   }
   const double t = camera.morph();
   const Projection& projection = *frame.projection;
+  const Vec3 globeOffset = globe.centreEcef - camera.eyeEcef();
+  if (!projection.repeats()) {
+    // Outside the domain the tile is squashed onto its edge, as the
+    // renderer draws it.
+    const std::optional<MapRect> extent = tileMapExtent(frame, key);
+    if (!extent) {
+      // All of it squashed onto the edge: somewhere on the map's outline.
+      const MapRect bounds = projection.bounds();
+      const MapPoint centre{
+          0.5 * (bounds.westM + bounds.eastM) - frame.centreXM,
+          0.5 * (bounds.southM + bounds.northM) - frame.centreYM};
+      const double mapRadiusM = frame.planeScale * 0.5 *
+                                std::hypot(bounds.widthM(), bounds.heightM());
+      return {MorphSphere{
+          globeOffset * (1.0 - t) + camera.mapPlanePoint(centre) * t,
+          (1.0 - t) * (globe.radiusM + raiseM) + t * (mapRadiusM + raiseM)}};
+    }
+    const double mapRadiusM =
+        frame.planeScale * 0.5 *
+            std::hypot(extent->widthM(), extent->heightM()) +
+        raiseM;
+    const Vec3 mapOffset =
+        camera.mapPlanePoint(MapPoint{0.5 * (extent->westM + extent->eastM),
+                                      0.5 * (extent->southM + extent->northM)});
+    return {MorphSphere{globeOffset * (1.0 - t) + mapOffset * t,
+                        (1.0 - t) * (globe.radiusM + raiseM) + t * mapRadiusM}};
+  }
   const GeoRect rect = key.bounds();
   // Beyond the projection's latitudes the tile is squashed onto its edge,
   // as the renderer draws it.
@@ -209,7 +370,6 @@ std::vector<MorphSphere> morphSpheres(const Camera& camera,
   const double mapRadiusM =
       frame.planeScale * std::hypot(halfSpanM, 0.5 * (northM - southM)) +
       raiseM;
-  const Vec3 globeOffset = globe.centreEcef - camera.eyeEcef();
   const double radiusM = (1.0 - t) * (globe.radiusM + raiseM) + t * mapRadiusM;
   std::vector<MorphSphere> spheres;
   for (const double shiftM :
@@ -337,12 +497,23 @@ double TileSelector::screenSpaceErrorPx(const View& view, TileKey key) const
   if (view.morph > 0.0) {
     const GeoRect rect = key.bounds();
     const Projection& projection = *view.frame.projection;
-    const double tallM = projection.forward(rect.northDeg, 0.0).yM -
-                         projection.forward(rect.southDeg, 0.0).yM;
-    const double halfWidthDeg = 0.5 * rect.widthDeg();
-    const double wideM = projection.forward(0.0, halfWidthDeg).xM -
-                         projection.forward(0.0, -halfWidthDeg).xM;
-    const double heightM = std::max(tallM, wideM);
+    double heightM = 0.0;
+    if (projection.repeats()) {
+      const double tallM = projection.forward(rect.northDeg, 0.0).yM -
+                           projection.forward(rect.southDeg, 0.0).yM;
+      const double halfWidthDeg = 0.5 * rect.widthDeg();
+      const double wideM = projection.forward(0.0, halfWidthDeg).xM -
+                           projection.forward(0.0, -halfWidthDeg).xM;
+      heightM = std::max(tallM, wideM);
+    } else {
+      // The tile's part in the domain, as large as it is drawn; outside
+      // it the tile is squashed onto the edge and needs no detail.
+      const std::optional<MapRect> extent = tileMapExtent(view.frame, key);
+      if (!extent) {
+        return 0.0;
+      }
+      heightM = std::max(extent->widthM(), extent->heightM());
+    }
     if (view.morph >= 1.0) {
       // Looking straight down at the plane every texel of the map is the
       // same size on screen, wherever it is.
@@ -384,6 +555,10 @@ double TileSelector::mapGeometryErrorPx(const Camera& camera, TileKey key) const
 {
   const MapFrame frame = camera.mapFrame();
   const Projection& projection = *frame.projection;
+  if (!projection.isCylindrical()) {
+    return generalMapGeometryErrorPx(camera, frame, key,
+                                     m_settings.meshSegments);
+  }
   const GeoRect rect = key.bounds();
   const double southDeg = std::max(rect.southDeg, projection.minimumLatDeg());
   const double northDeg = std::min(rect.northDeg, projection.maximumLatDeg());

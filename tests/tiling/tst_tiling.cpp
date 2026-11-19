@@ -586,6 +586,15 @@ private slots:
     QTest::newRow("Miller pole") << miller << 89.0 << -120.0 << 1.0e6;
     QTest::newRow("Web Mercator city")
         << QStringLiteral("web-mercator") << 51.5 << -0.1 << 5.0e3;
+    // Maps that don't repeat: the whole domain, a region, the edge of the
+    // domain, a city.
+    const QString tm = QStringLiteral("transverse-mercator");
+    QTest::newRow("Transverse Mercator whole") << tm << 0.0 << 0.0 << 5.0e7;
+    QTest::newRow("Transverse Mercator Europe") << tm << 48.0 << 10.0 << 2.0e6;
+    QTest::newRow("Transverse Mercator edge") << tm << -30.0 << 40.0 << 3.0e6;
+    QTest::newRow("UTM city") << QStringLiteral("utm") << 51.5 << -0.1 << 5.0e3;
+    QTest::newRow("Cassini pole")
+        << QStringLiteral("cassini") << 88.0 << 10.0 << 2.0e6;
   }
 
   void mapSelectionCoversViewWithoutOverlap()

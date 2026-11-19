@@ -1710,6 +1710,46 @@
             <source>Miller Cylindrical</source>
             <translation>Miller Cylindrical</translation>
         </message>
+        <message>
+            <source>Equidistant Cylindrical (Plate Carrée)</source>
+            <translation>Equidistant Cylindrical (Plate Carrée)</translation>
+        </message>
+        <message>
+            <source>Standard parallel</source>
+            <translation>Standard parallel</translation>
+        </message>
+        <message>
+            <source>Gall Stereographic</source>
+            <translation>Gall Stereographic</translation>
+        </message>
+        <message>
+            <source>Gall–Peters (Gall Orthographic)</source>
+            <translation>Gall–Peters (Gall Orthographic)</translation>
+        </message>
+        <message>
+            <source>Central meridian</source>
+            <translation>Central meridian</translation>
+        </message>
+        <message>
+            <source>Transverse Mercator</source>
+            <translation>Transverse Mercator</translation>
+        </message>
+        <message>
+            <source>Scale factor on the central meridian</source>
+            <translation>Scale factor on the central meridian</translation>
+        </message>
+        <message>
+            <source>Universal Transverse Mercator (UTM)</source>
+            <translation>Universal Transverse Mercator (UTM)</translation>
+        </message>
+        <message>
+            <source>Zone</source>
+            <translation>Zone</translation>
+        </message>
+        <message>
+            <source>Cassini–Soldner</source>
+            <translation>Cassini–Soldner</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>
@@ -1758,6 +1798,41 @@
         <message>
             <source>The terms of use of %1 don't allow downloading regions for offline use.</source>
             <translation>The terms of use of %1 don't allow downloading regions for offline use.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::RegionGeometry</name>
+        <message>
+            <source>A point of the area is not on the Earth (latitude beyond ±90°).</source>
+            <translation>A point of the area is not on the Earth (latitude beyond ±90°).</translation>
+        </message>
+        <message>
+            <source>An area needs at least three different points.</source>
+            <translation>An area needs at least three different points.</translation>
+        </message>
+        <message>
+            <source>An area can't go round a pole; use a rectangle that reaches the pole instead.</source>
+            <translation>An area can't go round a pole; use a rectangle that reaches the pole instead.</translation>
+        </message>
+        <message>
+            <source>A point of the region is not a pair of numbers.</source>
+            <translation>A point of the region is not a pair of numbers.</translation>
+        </message>
+        <message>
+            <source>The area goes the whole way round the Earth; use a rectangle instead.</source>
+            <translation>The area goes the whole way round the Earth; use a rectangle instead.</translation>
+        </message>
+        <message>
+            <source>The area has no size.</source>
+            <translation>The area has no size.</translation>
+        </message>
+        <message>
+            <source>The region's rectangle is incomplete.</source>
+            <translation>The region's rectangle is incomplete.</translation>
+        </message>
+        <message>
+            <source>The region's area is of an unknown kind.</source>
+            <translation>The region's area is of an unknown kind.</translation>
         </message>
     </context>
     <context>

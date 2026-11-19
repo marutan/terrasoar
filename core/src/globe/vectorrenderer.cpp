@@ -67,17 +67,19 @@ struct VectorBlock {
   Float4 params{};
   /**
    * The map reference point (the mesh's centre, held inside the
-   * projection's latitude limits) relative to the centre of the view, in
-   * metres on the map's plane (xy); the latitude of the mesh's centre
-   * minus the reference point's, radians (z).
+   * projection's domain) relative to the centre of the view, in metres on
+   * the map's plane (xy); the latitude (z) and longitude (w) of the
+   * mesh's centre minus the reference point's, radians.
    */
   Float4 mapOrigin{};
   /** The projection's reference values for the reference point. */
   Float4 projR0{};
   Float4 projR1{};
+  Float4 projR2{};
+  Float4 projR3{};
 };
 
-static_assert(sizeof(VectorBlock) == 144, "std140 layout of Vector");
+static_assert(sizeof(VectorBlock) == 176, "std140 layout of Vector");
 
 const char* const vectorBlockGlsl = R"(
 layout(std140) uniform Vector {
@@ -90,6 +92,8 @@ layout(std140) uniform Vector {
   vec4 mapOrigin;
   vec4 projR0;
   vec4 projR1;
+  vec4 projR2;
+  vec4 projR3;
 };
 )";
 
@@ -110,8 +114,8 @@ vec3 morphed(vec3 relative, vec2 lonLat)
   if (morph.x <= 0.0) {
     return relative;
   }
-  return tsMorph(relative, radians(lonLat) + vec2(0.0, mapOrigin.z),
-                 mapOrigin, projR0, projR1);
+  return tsMorph(relative, radians(lonLat) + mapOrigin.wz, mapOrigin, projR0,
+                 projR1, projR2, projR3);
 }
 
 // Positive where the ellipsoid faces the eye at that point (on this side
@@ -673,9 +677,31 @@ void VectorRenderer::writeUniforms(const Camera& camera)
           static_cast<float>(item.clip.northDeg - lat + clipSlackDeg)};
       if (onMap) {
         const Projection& projection = *frame.projection;
+        if (!projection.repeats()) {
+          // Nothing beyond the edge of a map that ends at its domain:
+          // there it would be squashed onto the edge, and lines and
+          // fills would show along it. Relative to the mesh's centre.
+          const double limit = projection.maximumLonOffsetDeg();
+          const double domainLon =
+              normaliseLonDeg(projection.centralMeridianDeg() - lon);
+          values.clipRect = {
+              std::max(values.clipRect[0],
+                       static_cast<float>(domainLon - limit)),
+              std::max(values.clipRect[1],
+                       static_cast<float>(projection.minimumLatDeg() - lat)),
+              std::min(values.clipRect[2],
+                       static_cast<float>(domainLon + limit)),
+              std::min(values.clipRect[3],
+                       static_cast<float>(projection.maximumLatDeg() - lat))};
+        }
+        // The reference point: the mesh's centre, held inside the domain.
         const double referenceLatDeg = std::clamp(
             lat, projection.minimumLatDeg(), projection.maximumLatDeg());
-        const MapPoint offset = frame.offsetOf(referenceLatDeg, lon);
+        const double referenceLonDeg = projection.clampLonDeg(lon);
+        const double dLatRad = degToRad(lat - referenceLatDeg);
+        const double dLonRad = degToRad(normaliseLonDeg(lon - referenceLonDeg));
+        const MapPoint offset =
+            frame.offsetOf(referenceLatDeg, referenceLonDeg);
         // offsetOf() takes the copy nearest the view's centre; the copies
         // of this piece were counted from the middle of its clip rectangle.
         const double pieceXM =
@@ -690,14 +716,25 @@ void VectorRenderer::writeUniforms(const Camera& camera)
         } else if (originXM - pieceXM < -halfWorldM) {
           originXM += frame.worldWidthM;
         }
+        // Its vertices reach the clip rectangle (and a little past it).
+        const double halfSpanRad =
+            degToRad(std::max({std::abs(item.clip.westDeg - lon),
+                               std::abs(item.clip.eastDeg - lon),
+                               std::abs(item.clip.southDeg - lat),
+                               std::abs(item.clip.northDeg - lat)}) +
+                     clipSlackDeg) +
+            std::max(std::abs(dLatRad), std::abs(dLonRad));
         const ProjectionShaderReference reference =
-            projection.shaderReference(referenceLatDeg, lon);
+            projection.shaderReferenceFor(referenceLatDeg, referenceLonDeg,
+                                          halfSpanRad);
         values.mapOrigin = {
             static_cast<float>((originXM + item.mapShiftM) * frame.planeScale),
             static_cast<float>(offset.yM * frame.planeScale),
-            static_cast<float>(degToRad(lat - referenceLatDeg)), 0.0F};
+            static_cast<float>(dLatRad), static_cast<float>(dLonRad)};
         values.projR0 = reference.r0;
         values.projR1 = reference.r1;
+        values.projR2 = reference.r2;
+        values.projR3 = reference.r3;
       }
       values.fillColor = premultipliedRgba(draw.style.fill, draw.alpha);
       values.outlineColor = premultipliedRgba(draw.style.outline, draw.alpha);

@@ -114,12 +114,22 @@ void CameraController::moveMapCentre(double xM, double yM)
   const MapFrame frame = m_camera.mapFrame();
   const Projection& projection = *frame.projection;
   const MapRect bounds = projection.bounds();
-  const double wrappedXM =
-      bounds.westM + std::fmod(std::fmod(xM - bounds.westM, frame.worldWidthM) +
-                                   frame.worldWidthM,
-                               frame.worldWidthM);
-  const std::optional<Geodetic> centre = projection.inverse(
-      MapPoint{wrappedXM, std::clamp(yM, bounds.southM, bounds.northM)});
+  const double clampedYM = std::clamp(yM, bounds.southM, bounds.northM);
+  std::optional<Geodetic> centre;
+  if (frame.worldWidthM > 0.0) {
+    const double wrappedXM =
+        bounds.westM +
+        std::fmod(std::fmod(xM - bounds.westM, frame.worldWidthM) +
+                      frame.worldWidthM,
+                  frame.worldWidthM);
+    centre = projection.inverse(MapPoint{wrappedXM, clampedYM});
+  } else {
+    // The map ends at the edge of the domain, which needn't be a
+    // rectangle: off it, the nearest point inside, so a drag slides along
+    // the edge instead of sticking.
+    const double clampedXM = std::clamp(xM, bounds.westM, bounds.eastM);
+    centre = projection.nearestInDomain(MapPoint{clampedXM, clampedYM});
+  }
   if (!centre) {
     return;
   }
@@ -129,7 +139,9 @@ void CameraController::moveMapCentre(double xM, double yM)
   pose.targetLonDeg = centre->lonDeg;
   applyPose(pose); // limits the latitude
   pose = m_camera.pose();
-  pose.rangeM = mapRangeM / projection.scaleAt(pose.targetLatDeg).parallel;
+  pose.rangeM =
+      mapRangeM /
+      projection.scaleAtPoint(pose.targetLatDeg, pose.targetLonDeg).parallel;
   applyPose(pose);
 }
 

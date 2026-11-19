@@ -50,7 +50,19 @@ chooses how it is flattened:
   countries can be compared by size; shapes are stretched north–south
   near the equator and squashed near the poles.
 
-The map wraps round east to west, so you can keep dragging.
+- **Transverse Mercator**: Mercator turned on its side, true to scale
+  along a central meridian of your choice. Regional and national maps of
+  places that stretch north–south. It shows 40° either side of that
+  meridian.
+- **Universal Transverse Mercator (UTM)**: Transverse Mercator on the
+  middle of one of the sixty 6° zones used by military and survey maps
+  worldwide.
+- **Cassini–Soldner**: the older transverse projection of many national
+  and cadastral surveys; 30° either side of its central meridian.
+
+The cylindrical maps wrap round east to west, so you can keep dragging.
+The transverse ones end at the edge of the area they show: the view stops
+there, and slides along the edge if you drag past it.
 
 ### Projection settings
 
@@ -62,6 +74,12 @@ the settings with the projection.
 - **Equidistant Cylindrical**: the **standard parallel**, the latitude
   (north and south) along which east–west distances are true too. 0°,
   the default, is Plate Carrée; larger values make the map narrower.
+- **Transverse Mercator**: the **central meridian** (the line down the
+  middle, true to scale) and the **scale factor** along it (1; 0.9996 or
+  0.9996012717 are common in national grids, to spread the error).
+- **UTM**: the **zone**, 1 to 60 from 180° west (zone 30 covers Greenwich
+  and the west of Europe, 31 the east of France, and so on).
+- **Cassini–Soldner**: the **central meridian**.
 
 ## The status bar
 

@@ -68,11 +68,6 @@ double authalicQ(double latRad)
           std::atanh(e * sine) / e);
 }
 
-QString text(const char* source)
-{
-  return QCoreApplication::translate("ts::Projection", source);
-}
-
 } // namespace
 
 // --- NormalCylindricalProjection ---------------------------------------------
@@ -179,7 +174,8 @@ QString EquidistantCylindricalProjection::id() const
 
 QString EquidistantCylindricalProjection::displayName() const
 {
-  return text("Equidistant Cylindrical (Plate Carrée)");
+  return QCoreApplication::translate("ts::Projection",
+                                     "Equidistant Cylindrical (Plate Carrée)");
 }
 
 QString EquidistantCylindricalProjection::projString() const
@@ -192,9 +188,10 @@ QString EquidistantCylindricalProjection::projString() const
 std::vector<ProjectionParameter>
 EquidistantCylindricalProjection::parameters() const
 {
-  return {ProjectionParameter{QStringLiteral("standardParallel"),
-                              text("Standard parallel"), 0.0, 0.0, 85.0,
-                              QStringLiteral("°")}};
+  return {ProjectionParameter{
+      QStringLiteral("standardParallel"),
+      QCoreApplication::translate("ts::Projection", "Standard parallel"), 0.0,
+      0.0, 85.0, QStringLiteral("°")}};
 }
 
 ProjectionParameterValues
@@ -212,7 +209,7 @@ QByteArray EquidistantCylindricalProjection::glslSource() const
 {
   // r0 = (least dLat, greatest dLat, k, 0): exact differences.
   return "\nvec2 " + glslFunction() +
-         "(vec2 dLonLatRad, vec4 r0, vec4 r1)\n{\n"
+         "(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)\n{\n"
          "  return 6378137.0 * vec2(r0.z * dLonLatRad.x,\n"
          "                          clamp(dLonLatRad.y, r0.x, r0.y));\n"
          "}\n";
@@ -260,7 +257,7 @@ QString GallStereographicProjection::id() const
 
 QString GallStereographicProjection::displayName() const
 {
-  return text("Gall Stereographic");
+  return QCoreApplication::translate("ts::Projection", "Gall Stereographic");
 }
 
 QString GallStereographicProjection::projString() const
@@ -281,7 +278,7 @@ QByteArray GallStereographicProjection::glslSource() const
   // nothing subtracted that is nearly equal. r0 = (least d, greatest d,
   // cos(A), sin(A)).
   return "\nvec2 " + glslFunction() +
-         "(vec2 dLonLatRad, vec4 r0, vec4 r1)\n{\n"
+         "(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)\n{\n"
          "  float h = 0.5 * clamp(dLonLatRad.y, r0.x, r0.y);\n"
          "  float dy = 1.7071067811865475 * sin(h)\n"
          "           / (r0.z * (r0.z * cos(h) - r0.w * sin(h)));\n"
@@ -332,7 +329,8 @@ QString GallPetersProjection::id() const
 
 QString GallPetersProjection::displayName() const
 {
-  return text("Gall–Peters (Gall Orthographic)");
+  return QCoreApplication::translate("ts::Projection",
+                                     "Gall–Peters (Gall Orthographic)");
 }
 
 QString GallPetersProjection::projString() const
@@ -356,7 +354,7 @@ QByteArray GallPetersProjection::glslSource() const
   // nothing subtracted that is nearly equal. r0 = (least d, greatest d,
   // S, cos φt); r1 = (e, k0, W = 1 − e² S², Q (1 − e²) = (1 − e²)/(2 k0)).
   return "\nvec2 " + glslFunction() +
-         "(vec2 dLonLatRad, vec4 r0, vec4 r1)\n{\n"
+         "(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)\n{\n"
          "  float q = clamp(dLonLatRad.y, r0.x, r0.y);\n"
          "  float sinHalf = sin(0.5 * q);\n"
          "  float d = 2.0 * (r0.w * cos(0.5 * q) - r0.z * sinHalf) * sinHalf;\n"
