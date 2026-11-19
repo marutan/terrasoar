@@ -1754,6 +1754,26 @@
             <source>UK National Grid (OSGB36)</source>
             <translation>UK National Grid (OSGB36)</translation>
         </message>
+        <message>
+            <source>Rotated Mercator (Oblique Mercator)</source>
+            <translation>Rotated Mercator (Oblique Mercator)</translation>
+        </message>
+        <message>
+            <source>Centre latitude</source>
+            <translation>Centre latitude</translation>
+        </message>
+        <message>
+            <source>Centre longitude</source>
+            <translation>Centre longitude</translation>
+        </message>
+        <message>
+            <source>Azimuth of the centre line</source>
+            <translation>Azimuth of the centre line</translation>
+        </message>
+        <message>
+            <source>Scale factor on the centre line</source>
+            <translation>Scale factor on the centre line</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>
@@ -1764,6 +1784,34 @@
         <message>
             <source>Restore &amp;Defaults</source>
             <translation>Restore &amp;Defaults</translation>
+        </message>
+        <message>
+            <source>No single line: the places are the same or opposite each other.</source>
+            <translation>No single line: the places are the same or opposite each other.</translation>
+        </message>
+        <message>
+            <source>Centre Line Through Two Places</source>
+            <translation>Centre Line Through Two Places</translation>
+        </message>
+        <message>
+            <source>First latitude</source>
+            <translation>First latitude</translation>
+        </message>
+        <message>
+            <source>First longitude</source>
+            <translation>First longitude</translation>
+        </message>
+        <message>
+            <source>Second latitude</source>
+            <translation>Second latitude</translation>
+        </message>
+        <message>
+            <source>Second longitude</source>
+            <translation>Second longitude</translation>
+        </message>
+        <message>
+            <source>&amp;Use These Places</source>
+            <translation>&amp;Use These Places</translation>
         </message>
     </context>
     <context>

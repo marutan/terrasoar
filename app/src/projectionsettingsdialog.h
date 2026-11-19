@@ -25,6 +25,7 @@
 #ifndef TS_APP_PROJECTIONSETTINGSDIALOG_H
 #define TS_APP_PROJECTIONSETTINGSDIALOG_H
 
+#include <array>
 #include <vector>
 
 #include <QDialog>
@@ -36,6 +37,7 @@ class QDialogButtonBox;
 class QDoubleSpinBox;
 class QEvent;
 class QFormLayout;
+class QGroupBox;
 class QLabel;
 class QPushButton;
 
@@ -77,6 +79,11 @@ protected:
 private:
   void retranslateUi();
   void restoreDefaults();
+  /** Rotated Mercator: the group that sets the centre line through two
+   *  places. */
+  void addTwoPoints();
+  /** Fills the centre and azimuth from the two places. */
+  void useTwoPoints();
 
   const Projection* m_projection;
   std::vector<ProjectionParameter> m_parameters;
@@ -85,6 +92,12 @@ private:
   std::vector<QDoubleSpinBox*> m_boxes;
   QPushButton* m_defaultsButton;
   QDialogButtonBox* m_buttons;
+  /** Rotated Mercator's two places (null otherwise). */
+  QGroupBox* m_twoPointsGroup = nullptr;
+  /** Latitude and longitude of the first place, then of the second. */
+  std::array<QDoubleSpinBox*, 4> m_pointBoxes{};
+  QPushButton* m_usePointsButton = nullptr;
+  QLabel* m_pointsMessage = nullptr;
 };
 
 } // namespace ts

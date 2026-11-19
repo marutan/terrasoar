@@ -55,6 +55,7 @@ using globe_detail::graticuleBinding;
 using globe_detail::graticuleBlockGlsl;
 using globe_detail::gridLinesGlsl;
 using globe_detail::morphGlsl;
+using globe_detail::offMapGlsl;
 using globe_detail::overlayDepthGlsl;
 using globe_detail::tileBinding;
 
@@ -189,6 +190,7 @@ in float vDepthW;
 in vec3 vNormal;
 in vec3 vRelative;
 in vec2 vSlope;
+in vec2 vLonLatDeg;
 out vec4 fragColor;
 
 // Where this fragment is in a layer's image. A Web Mercator image's rows
@@ -220,6 +222,10 @@ vec4 layerColor(sampler2D image, vec4 transform, float alpha, vec4 info,
 
 void main()
 {
+  // Beyond the projection's own domain (on the map) nothing is drawn.
+  if (tsOffMap(vLonLatDeg)) {
+    discard;
+  }
   int count = int(layerInfo.x);
   vec4 result = vec4(0.0);
   vec4 c;
@@ -273,6 +279,9 @@ in float vDepthW;
 out vec4 fragColor;
 void main()
 {
+  if (tsOffMap(vLonLatDeg)) {
+    discard;
+  }
   float widthPx = graticuleParams.x;
   float lon = vLonLatDeg.x;
   float lat = vLonLatDeg.y;
@@ -403,7 +412,9 @@ bool TileRenderer::initialise(QString* errorString)
                                   projectionGlsl() + morphGlsl + tileVertexGlsl;
   desc.vertexSource = vertexSource;
   desc.fragmentSource = QByteArray(frameBlockGlsl) + globeBlockGlsl +
-                        tileBlockGlsl + projectionGlsl() + tileFragmentGlsl();
+                        tileBlockGlsl + projectionGlsl() +
+                        projectionDomainGlsl() + offMapGlsl +
+                        tileFragmentGlsl();
   desc.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding},
                         {QByteArrayLiteral("Globe"), globeBinding},
                         {QByteArrayLiteral("Tile"), tileBinding}};
@@ -417,6 +428,7 @@ bool TileRenderer::initialise(QString* errorString)
   graticule.vertexSource = vertexSource;
   graticule.fragmentSource = QByteArray(frameBlockGlsl) + graticuleBlockGlsl +
                              gridLinesGlsl + overlayDepthGlsl +
+                             projectionDomainGlsl() + offMapGlsl +
                              tileGraticuleFragmentGlsl;
   graticule.uniformBlocks = {
       {QByteArrayLiteral("Frame"), frameBinding},
@@ -1128,10 +1140,10 @@ void TileRenderer::prepare(const Camera& camera)
     const Projection& projection = *frame.projection;
     const GeoRect rect = key.bounds();
     // The reference point: the tile's centre, held inside the domain.
-    const double referenceLatDeg =
-        std::clamp(rect.centreLatDeg(), projection.minimumLatDeg(),
-                   projection.maximumLatDeg());
-    const double referenceLonDeg = projection.clampLonDeg(rect.centreLonDeg());
+    const Geodetic inside =
+        projection.clampToDomain(rect.centreLatDeg(), rect.centreLonDeg());
+    const double referenceLatDeg = inside.latDeg;
+    const double referenceLonDeg = inside.lonDeg;
     const double dLatRad = degToRad(rect.centreLatDeg() - referenceLatDeg);
     const double dLonRad =
         degToRad(normaliseLonDeg(rect.centreLonDeg() - referenceLonDeg));

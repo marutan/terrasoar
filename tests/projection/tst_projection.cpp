@@ -46,6 +46,7 @@
 #include "ts/projection/datumshift.h"
 #include "ts/projection/nationalgrid.h"
 #include "ts/projection/projection.h"
+#include "ts/projection/rotatedmercator.h"
 
 namespace
 {
@@ -250,7 +251,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{10});
+    QCOMPARE(all.size(), std::size_t{11});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -271,8 +272,8 @@ private slots:
       }
       QCOMPARE(projection->centralMeridianDeg(), centre);
     }
-    QCOMPARE(ids.size(), 10);
-    QCOMPARE(functions.size(), 10);
+    QCOMPARE(ids.size(), 11);
+    QCOMPARE(functions.size(), 11);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -298,6 +299,8 @@ private slots:
     QTest::newRow("cassini") << 8;
     // With the Helmert transform (no OSTN15 grid installed).
     QTest::newRow("uk-national-grid") << 9;
+    // Inside its own domain.
+    QTest::newRow("rotated-mercator") << 10;
   }
 
   void againstProj()
@@ -313,11 +316,29 @@ private slots:
     double worstInverseDeg = 0.0;
     for (const double lat : gridLatitudes(projection)) {
       for (const double lon : gridLongitudes(projection)) {
+        if (!projection.contains(lat, lon)) {
+          continue; // outside a domain of its own: not drawn
+        }
         const ts::MapPoint ours = projection.forward(lat, lon);
         // PROJ puts −180° at +πa, we at −πa: the same meridian.
         ts::MapPoint theirs = proj.forward(lat, lon);
-        if (lon == -180.0) {
+        if (lon == -180.0 && projection.repeats()) {
           theirs.xM = -std::abs(theirs.xM);
+        }
+        // Rotated Mercator runs on across PROJ's cut, a turn of the line
+        // from PROJ there.
+        if (const ts::RotatedMercatorProjection* rotated =
+                dynamic_cast<const ts::RotatedMercatorProjection*>(
+                    &projection)) {
+          const ts::MapPoint turn = rotated->alongTurnM();
+          for (const double k : {-1.0, 1.0}) {
+            const ts::MapPoint shifted{theirs.xM + k * turn.xM,
+                                       theirs.yM + k * turn.yM};
+            if (std::hypot(shifted.xM - ours.xM, shifted.yM - ours.yM) <
+                std::hypot(theirs.xM - ours.xM, theirs.yM - ours.yM)) {
+              theirs = shifted;
+            }
+          }
         }
         worstForwardM = std::max({worstForwardM, std::abs(ours.xM - theirs.xM),
                                   std::abs(ours.yM - theirs.yM)});
@@ -420,6 +441,9 @@ private slots:
     double worstM = 0.0;
     for (const double lat : gridLatitudes(projection)) {
       for (const double lon : gridLongitudes(projection)) {
+        if (!projection.contains(lat, lon)) {
+          continue; // outside a domain of its own: not drawn
+        }
         const ts::Geodetic back =
             projection.inverse(projection.forward(lat, lon)).value_or(nowhere);
         QCOMPARE(back.heightM, 0.0);
@@ -507,6 +531,9 @@ private slots:
     // to the domain, and bounds() encloses the whole domain.
     int32_t limited = 0;
     for (const ts::Projection* projection : ts::projections()) {
+      if (projection->hasOwnDomain()) {
+        continue; // rotatedMercatorDomain()
+      }
       const double limit = projection->maximumLonOffsetDeg();
       if (limit >= 180.0) {
         QVERIFY(projection->repeats());
@@ -567,6 +594,9 @@ private slots:
     // east and north.
     for (const ts::Projection* projection : ts::projections()) {
       for (const double lat : {-80.0, -45.0, 0.0, 20.0, 60.0, 84.0}) {
+        if (!projection->contains(lat, 10.0)) {
+          continue;
+        }
         const double step = 1e-3;
         const ts::MapPoint west = projection->forward(lat, 10.0 - step);
         const ts::MapPoint east = projection->forward(lat, 10.0 + step);
@@ -731,6 +761,12 @@ private slots:
             const float index = static_cast<float>(i) + first;
             const double dLonRad = static_cast<double>(stepLon * index);
             const double dLatRad = static_cast<double>(stepLat * index);
+            ++compared;
+            if (projection.hasOwnDomain() &&
+                !projection.contains(clampedReference + ts::radToDeg(dLatRad),
+                                     ts::radToDeg(dLonRad))) {
+              continue; // discarded on screen
+            }
             const ProbeExpectation expected =
                 expectedProbeOffset(projection, clampedReference, reference,
                                     dLonRad, dLatRad, span);
@@ -756,7 +792,6 @@ private slots:
                       .arg(expectedX, 0, 'g', 12)
                       .arg(expectedY, 0, 'g', 12)));
             }
-            ++compared;
           }
         }
       }
@@ -1050,6 +1085,232 @@ private slots:
                              dir.filePath(QStringLiteral("missing.tif"))}});
     QVERIFY(ts::datumShiftGrid(QStringLiteral("ostn15")) == nullptr);
     QCOMPARE(ts::projectionWith(id, {}), standard);
+  }
+
+  void rotatedMercatorCentreLine()
+  {
+    // The centre maps to x = y = 0; the centre line (rotated latitude 0)
+    // is the straight line through it at the azimuth, and the scale along
+    // it is the scale factor: exactly at the centre, and within 2 parts in
+    // 10⁴ for 3000 km either way (Hotine's ellipsoidal form is true to
+    // scale on its aposphere, not quite on the ellipsoid).
+    const std::vector<std::array<double, 4>> sets = {{45.0, 0.0, 45.0, 1.0},
+                                                     {52.0, -1.0, 80.0, 0.9996},
+                                                     {-33.0, 151.0, -30.0, 1.0},
+                                                     {10.0, 100.0, 0.0, 1.0},
+                                                     {60.0, -40.0, 90.0, 1.0}};
+    double worstScale = 0.0;
+    for (const std::array<double, 4>& set : sets) {
+      const ts::RotatedMercatorProjection projection(set[0], set[1], set[2],
+                                                     set[3]);
+      const ts::MapPoint centre = projection.forward(set[0], set[1]);
+      QVERIFY(std::hypot(centre.xM, centre.yM) < 1e-6);
+      const std::array<double, 2> rotated =
+          projection.rotatedDeg(set[0], set[1]);
+      QVERIFY(std::abs(rotated[0]) < 1e-9 && std::abs(rotated[1]) < 1e-9);
+      QVERIFY(projection.contains(set[0], set[1]));
+      const double sinA = std::sin(ts::degToRad(set[2]));
+      const double cosA = std::cos(ts::degToRad(set[2]));
+      for (int32_t step = -6; step <= 6; ++step) {
+        const double t = 5.0e5 * step;
+        const ts::Geodetic a =
+            projection.inverse(ts::MapPoint{t * sinA, t * cosA})
+                .value_or(nowhere);
+        const ts::Geodetic b =
+            projection
+                .inverse(ts::MapPoint{(t + 100.0) * sinA, (t + 100.0) * cosA})
+                .value_or(nowhere);
+        // On the centre line,
+        QVERIFY2(std::abs(projection.rotatedDeg(a.latDeg, a.lonDeg)[0]) < 1e-9,
+                 qPrintable(QString::number(t)));
+        // and 100 m of it on the map is 100 m / k0 on the ground.
+        const double groundM = groundDistanceM(a, b);
+        const double scaleError = std::abs(100.0 / groundM / set[3] - 1.0);
+        if (step == 0) {
+          QVERIFY2(scaleError < 1e-9, qPrintable(QString::number(scaleError)));
+        }
+        worstScale = std::max(worstScale, scaleError);
+      }
+    }
+    QVERIFY2(worstScale < 2e-4, qPrintable(QString::number(worstScale)));
+  }
+
+  void rotatedMercatorDomain()
+  {
+    // A domain of its own: the centre is deep inside; near the rotated
+    // poles and far along the line is outside, has no inverse and clamps
+    // onto the edge; bounds() holds the domain.
+    const ts::RotatedMercatorProjection projection(52.0, -1.0, 80.0);
+    QVERIFY(projection.hasOwnDomain());
+    QVERIFY(!ts::projections().front()->hasOwnDomain());
+    QVERIFY(std::isinf(ts::projections().front()->domainMarginDeg(10.0, 10.0)));
+    QVERIFY(projection.domainMarginDeg(52.0, -1.0) > 50.0);
+    const ts::MapRect bounds = projection.bounds();
+    // 88° across the line from the centre, and 160° along it.
+    const ts::GeodesicDirect across =
+        ts::geodesicDirect(52.0, -1.0, 80.0 - 90.0, 88.0 * 111195.0);
+    const ts::GeodesicDirect along =
+        ts::geodesicDirect(52.0, -1.0, 80.0, 160.0 * 111195.0);
+    for (const ts::GeodesicDirect& point : {across, along}) {
+      QVERIFY(!projection.contains(point.latDeg, point.lonDeg));
+      QVERIFY(projection.domainMarginDeg(point.latDeg, point.lonDeg) < -1.0);
+      const ts::Geodetic edge =
+          projection.clampToDomain(point.latDeg, point.lonDeg);
+      QVERIFY2(std::abs(projection.domainMarginDeg(edge.latDeg, edge.lonDeg)) <
+                   1e-6,
+               qPrintable(QString::number(
+                   projection.domainMarginDeg(edge.latDeg, edge.lonDeg))));
+      const ts::MapPoint p = projection.forward(edge.latDeg, edge.lonDeg);
+      QVERIFY(p.xM >= bounds.westM - 1e-3 && p.xM <= bounds.eastM + 1e-3);
+      QVERIFY(p.yM >= bounds.southM - 1e-3 && p.yM <= bounds.northM + 1e-3);
+      // Beyond the edge on the map: no point.
+      QVERIFY(
+          !projection.inverse(projection.forward(point.latDeg, point.lonDeg)));
+    }
+    // Inside: clampToDomain() leaves the point alone.
+    const ts::Geodetic inside = projection.clampToDomain(40.0, -20.0);
+    QCOMPARE(inside.latDeg, 40.0);
+    QCOMPARE(inside.lonDeg, -20.0);
+    // Off the domain's rectangle on the map, no point.
+    QVERIFY(!projection.inverse(ts::MapPoint{bounds.eastM * 2.0, 0.0}));
+    // Every point inside maps into bounds().
+    for (int32_t i = -35; i <= 35; ++i) {
+      for (int32_t j = -71; j < 72; ++j) {
+        const double lat = 2.5 * i;
+        const double lon = 2.5 * j;
+        if (!projection.contains(lat, lon)) {
+          continue;
+        }
+        const ts::MapPoint p = projection.forward(lat, lon);
+        QVERIFY(p.xM >= bounds.westM - 1e-3 && p.xM <= bounds.eastM + 1e-3 &&
+                p.yM >= bounds.southM - 1e-3 && p.yM <= bounds.northM + 1e-3);
+      }
+    }
+    // The GLSL test exists for it alone.
+    QVERIFY(
+        ts::projectionDomainGlsl().contains("tsProjectRotatedMercatorOutside"));
+    QVERIFY(!ts::projectionDomainGlsl().contains("tsProjectMercatorOutside"));
+  }
+
+  void rotatedMercatorThroughPoints()
+  {
+    // The centre line through two places: halfway along the geodesic, at
+    // its azimuth there; both places lie on Hotine's centre line to within
+    // a few hundredths of a degree (it isn't quite the geodesic).
+    const std::optional<ts::ProjectionParameterValues> values =
+        ts::RotatedMercatorProjection::throughPoints(51.4775, -0.4614, 40.6413,
+                                                     -73.7781);
+    QVERIFY(values.has_value());
+    const ts::ProjectionParameterValues v =
+        values.value_or(ts::ProjectionParameterValues());
+    const double azimuth = v.at(QStringLiteral("azimuth"));
+    QVERIFY(azimuth >= -90.0 && azimuth <= 90.0);
+    QCOMPARE(v.at(QStringLiteral("scaleFactor")), 1.0);
+    const ts::Projection* projection =
+        ts::projectionWith(QStringLiteral("rotated-mercator"), v);
+    QVERIFY(projection != nullptr);
+    const ts::RotatedMercatorProjection line(
+        v.at(QStringLiteral("centreLatitude")),
+        v.at(QStringLiteral("centreLongitude")), azimuth, 1.0);
+    for (const std::array<double, 2>& place :
+         {std::array<double, 2>{51.4775, -0.4614},
+          std::array<double, 2>{40.6413, -73.7781}}) {
+      const double across = line.rotatedDeg(place[0], place[1])[0];
+      QVERIFY2(std::abs(across) < 0.05, qPrintable(QString::number(across)));
+    }
+    // No line through one place twice, or through antipodes.
+    QVERIFY(
+        !ts::RotatedMercatorProjection::throughPoints(10.0, 20.0, 10.0, 20.0));
+    QVERIFY(!ts::RotatedMercatorProjection::throughPoints(10.0, 20.0, -10.0,
+                                                          -160.0));
+  }
+
+  void glslDomainMatchesCpp()
+  {
+    // tsOutsideDomain() in the shader against contains() on a grid over
+    // the globe, away from the edge (within a tenth of a degree float may
+    // decide either way).
+    ts::test::OffscreenGl gl;
+    TS_TEST_REQUIRE_GL(gl);
+    ts::RenderDevice& device = gl.device();
+    constexpr int32_t columns = 256;
+    ts::ShaderDesc shaderDesc;
+    shaderDesc.label = QStringLiteral("domain probe");
+    shaderDesc.vertexSource = probeVertexGlsl;
+    shaderDesc.fragmentSource = ts::projectionDomainGlsl() + R"(
+layout(std140) uniform Domain {
+  vec4 d0;
+  vec4 d1;
+  vec4 which; // projection index, latitude (degrees)
+};
+out vec4 fragColor;
+void main()
+{
+  vec2 lonLat = vec2(-180.0 + gl_FragCoord.x * (360.0 / 256.0), which.y);
+  fragColor = tsOutsideDomain(int(which.x), lonLat, d0, d1) ? vec4(1.0)
+                                                            : vec4(0.0);
+}
+)";
+    shaderDesc.uniformBlocks = {{QByteArrayLiteral("Domain"), 0}};
+    QString error;
+    const std::unique_ptr<ts::ShaderProgram> shader =
+        device.createShaderProgram(shaderDesc, &error);
+    QVERIFY2(shader != nullptr, qPrintable(error));
+    ts::PipelineDesc pipelineDesc;
+    pipelineDesc.shader = shader.get();
+    const std::unique_ptr<ts::Pipeline> pipeline =
+        device.createPipeline(pipelineDesc);
+    const std::unique_ptr<ts::RenderTarget> target =
+        device.createRenderTarget(columns, 1);
+    struct DomainBlock {
+      std::array<float, 8> domain{};
+      std::array<float, 4> which{};
+    };
+    const std::unique_ptr<ts::GpuBuffer> uniforms =
+        device.createBuffer(ts::BufferType::Uniform, ts::BufferUsage::Dynamic,
+                            sizeof(DomainBlock), nullptr);
+    QVERIFY(pipeline && target && uniforms);
+    int32_t checked = 0;
+    for (const std::array<double, 3>& set :
+         {std::array<double, 3>{45.0, 0.0, 45.0},
+          std::array<double, 3>{-33.0, 151.0, -30.0},
+          std::array<double, 3>{60.0, -40.0, 90.0}}) {
+      const ts::Projection* projection =
+          ts::projectionWith(QStringLiteral("rotated-mercator"),
+                             {{QStringLiteral("centreLatitude"), set[0]},
+                              {QStringLiteral("centreLongitude"), set[1]},
+                              {QStringLiteral("azimuth"), set[2]}});
+      QVERIFY(projection != nullptr);
+      DomainBlock block;
+      block.domain = projection->glslDomainParameters();
+      for (int32_t row = 0; row < 90; ++row) {
+        const double lat = -89.0 + 2.0 * row;
+        block.which = {static_cast<float>(ts::projectionIndex(projection)),
+                       static_cast<float>(lat), 0.0F, 0.0F};
+        uniforms->update(0, &block, sizeof(block));
+        ts::PassDesc pass;
+        pass.target = target.get();
+        pass.viewportPx = QRect(0, 0, columns, 1);
+        device.beginPass(pass);
+        device.setPipeline(*pipeline);
+        device.setUniformBuffer(0, *uniforms, 0, sizeof(block));
+        device.draw(3, 0, 1);
+        device.endPass();
+        const QImage image = device.readPixels(*target);
+        for (int32_t i = 0; i < columns; ++i) {
+          const double lon = -180.0 + (i + 0.5) * (360.0 / columns);
+          if (std::abs(projection->domainMarginDeg(lat, lon)) < 0.1) {
+            continue;
+          }
+          const bool outside = qRed(image.pixel(i, 0)) > 127;
+          QVERIFY2(outside == !projection->contains(lat, lon),
+                   qPrintable(QStringLiteral("%1, %2").arg(lat).arg(lon)));
+          ++checked;
+        }
+      }
+    }
+    QCOMPARE(device.takeErrors(), QString());
+    QVERIFY(checked > 3 * 90 * columns * 9 / 10);
   }
 
   void concurrentSharedInstances()

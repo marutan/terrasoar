@@ -1406,7 +1406,7 @@ private slots:
     QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
     const QList<QAction*> actions = menu->actions();
     // The projections, a separator and Projection Settings.
-    QCOMPARE(actions.size(), 12);
+    QCOMPARE(actions.size(), 13);
     QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
     QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
     QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
@@ -1421,11 +1421,13 @@ private slots:
     QCOMPARE(actions.at(8)->text(), QStringLiteral("Cassini–Soldner"));
     QCOMPARE(actions.at(9)->text(),
              QStringLiteral("UK National Grid (OSGB36)"));
-    QVERIFY(actions.at(10)->isSeparator());
-    QCOMPARE(actions.at(11)->objectName(),
+    QCOMPARE(actions.at(10)->text(),
+             QStringLiteral("Rotated Mercator (Oblique Mercator)"));
+    QVERIFY(actions.at(11)->isSeparator());
+    QCOMPARE(actions.at(12)->objectName(),
              QStringLiteral("projectionSettingsAction"));
     // Mercator has no settings.
-    QVERIFY(!actions.at(11)->isEnabled());
+    QVERIFY(!actions.at(12)->isEnabled());
     QVERIFY(actions.at(0)->isChecked());
     ts::GlobeView* globe = globeOf(window);
     if (globe == nullptr) {
@@ -1495,6 +1497,51 @@ private slots:
              qPrintable(pointer->text()));
     QVERIFY2(pointer->text().startsWith(QStringLiteral("51.50")),
              qPrintable(pointer->text()));
+  }
+
+  void rotatedMercatorTwoPlaces()
+  {
+    // Rotated Mercator's settings: the centre line through two places
+    // fills the centre and azimuth; the same place twice says why not.
+    const ts::Projection* rotated =
+        ts::projectionById(QStringLiteral("rotated-mercator"));
+    QVERIFY(rotated != nullptr);
+    ts::ProjectionSettingsDialog dialog(nullptr, rotated);
+    QPushButton* use =
+        dialog.findChild<QPushButton*>(QStringLiteral("projectionUsePoints"));
+    QLabel* message =
+        dialog.findChild<QLabel*>(QStringLiteral("projectionPointsMessage"));
+    QDoubleSpinBox* azimuth = dialog.findChild<QDoubleSpinBox*>(
+        QStringLiteral("projectionParameter_azimuth"));
+    QDoubleSpinBox* centreLat = dialog.findChild<QDoubleSpinBox*>(
+        QStringLiteral("projectionParameter_centreLatitude"));
+    QDoubleSpinBox* secondLat =
+        dialog.findChild<QDoubleSpinBox*>(QStringLiteral("projectionPoint2"));
+    QDoubleSpinBox* secondLon =
+        dialog.findChild<QDoubleSpinBox*>(QStringLiteral("projectionPoint3"));
+    if (use == nullptr || message == nullptr || azimuth == nullptr ||
+        centreLat == nullptr || secondLat == nullptr || secondLon == nullptr) {
+      QFAIL("missing two-places controls");
+    }
+    // London to New York, the places it starts with.
+    use->click();
+    QVERIFY(std::abs(centreLat->value() - 52.24) < 0.01);
+    QVERIFY(std::abs(azimuth->value() - 75.33) < 0.01);
+    QVERIFY(message->text().isEmpty());
+    const ts::Projection* chosen = dialog.projection();
+    QCOMPARE(chosen->id(), QStringLiteral("rotated-mercator"));
+    QVERIFY(chosen != rotated);
+    // The same place twice.
+    secondLat->setValue(51.4775);
+    secondLon->setValue(-0.4614);
+    use->click();
+    QVERIFY(!message->text().isEmpty());
+    QVERIFY(std::abs(azimuth->value() - 75.33) < 0.01); // unchanged
+    // Other projections have no such group.
+    ts::ProjectionSettingsDialog other(
+        nullptr, ts::projectionById(QStringLiteral("transverse-mercator")));
+    QVERIFY(other.findChild<QPushButton*>(
+                QStringLiteral("projectionUsePoints")) == nullptr);
   }
 
   void projectionSettings()

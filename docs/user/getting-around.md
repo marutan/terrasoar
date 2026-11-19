@@ -59,6 +59,12 @@ chooses how it is flattened:
   worldwide.
 - **Cassini–Soldner**: the older transverse projection of many national
   and cadastral surveys; 30° either side of its central meridian.
+- **Rotated Mercator (Oblique Mercator)**: Mercator turned so that a
+  line of your choice, not the equator, is true to scale: for long,
+  narrow areas that don't run north–south, such as a coastline or a
+  flight route. North is up at its centre. The map ends at its own edge:
+  far from the line, where it would stretch without limit, and far along
+  it.
 - **UK National Grid (OSGB36)**: the Ordnance Survey's grid of Great
   Britain, as on OS maps. The status bar gives the grid reference under
   the pointer (such as TQ 30080 80729). Positions are converted from GPS
@@ -86,6 +92,11 @@ the settings with the projection.
 - **UTM**: the **zone**, 1 to 60 from 180° west (zone 30 covers Greenwich
   and the west of Europe, 31 the east of France, and so on).
 - **Cassini–Soldner**: the **central meridian**.
+- **Rotated Mercator**: the **centre** (latitude and longitude), the
+  **azimuth** of the centre line there (its direction, clockwise from
+  north) and the **scale factor** along it. Or give two places under
+  **Centre Line Through Two Places** and choose **Use These Places**: the
+  line then runs through both, centred halfway between them.
 
 ## The status bar
 

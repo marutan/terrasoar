@@ -47,6 +47,7 @@ using globe_detail::frameBlockGlsl;
 using globe_detail::globeBinding;
 using globe_detail::globeBlockGlsl;
 using globe_detail::morphGlsl;
+using globe_detail::offMapGlsl;
 using globe_detail::overlayDepthGlsl;
 using globe_detail::vectorBinding;
 
@@ -63,7 +64,8 @@ struct VectorBlock {
   Float4 fillColor{};
   /** Premultiplied by the layer's opacity. */
   Float4 outlineColor{};
-  /** Outline width (logical px), near plane (m), unused, unused. */
+  /** Outline width (logical px), near plane (m), the mesh's centre's
+   *  longitude and latitude (degrees). */
   Float4 params{};
   /**
    * The map reference point (the mesh's centre, held inside the
@@ -139,10 +141,13 @@ float facing(vec3 offset, vec3 relative)
 
 // For fragment shaders, after vectorBlockGlsl and overlayDepthGlsl.
 const char* const vectorFragmentHelpersGlsl = R"(
+// Outside the draw's clip rectangle, or (on the map) the projection's own
+// domain; lonLat is degrees from the mesh's centre (params.zw).
 bool outsideClip(vec2 lonLat)
 {
   return lonLat.x < clipRect.x || lonLat.y < clipRect.y
-      || lonLat.x > clipRect.z || lonLat.y > clipRect.w;
+      || lonLat.x > clipRect.z || lonLat.y > clipRect.w
+      || tsOffMap(lonLat + params.zw);
 }
 
 // True for what the globe hides: on the globe the far side of the
@@ -332,8 +337,9 @@ bool VectorRenderer::initialise(QString* errorString)
       QByteArray(frameBlockGlsl) + globeBlockGlsl + vectorBlockGlsl;
   const QByteArray vertexPrefix =
       blockGlsl + projectionGlsl() + morphGlsl + vectorVertexHelpersGlsl;
-  const QByteArray fragmentPrefix =
-      blockGlsl + overlayDepthGlsl + vectorFragmentHelpersGlsl;
+  const QByteArray fragmentPrefix = blockGlsl + projectionDomainGlsl() +
+                                    offMapGlsl + overlayDepthGlsl +
+                                    vectorFragmentHelpersGlsl;
 
   ShaderDesc fill;
   fill.label = QStringLiteral("vector fill");
@@ -695,9 +701,9 @@ void VectorRenderer::writeUniforms(const Camera& camera)
                        static_cast<float>(projection.maximumLatDeg() - lat))};
         }
         // The reference point: the mesh's centre, held inside the domain.
-        const double referenceLatDeg = std::clamp(
-            lat, projection.minimumLatDeg(), projection.maximumLatDeg());
-        const double referenceLonDeg = projection.clampLonDeg(lon);
+        const Geodetic inside = projection.clampToDomain(lat, lon);
+        const double referenceLatDeg = inside.latDeg;
+        const double referenceLonDeg = inside.lonDeg;
         const double dLatRad = degToRad(lat - referenceLatDeg);
         const double dLonRad = degToRad(normaliseLonDeg(lon - referenceLonDeg));
         const MapPoint offset =
@@ -739,7 +745,9 @@ void VectorRenderer::writeUniforms(const Camera& camera)
       values.fillColor = premultipliedRgba(draw.style.fill, draw.alpha);
       values.outlineColor = premultipliedRgba(draw.style.outline, draw.alpha);
       values.params = {static_cast<float>(draw.style.outlineWidthPx),
-                       static_cast<float>(camera.nearM()), 0.0F, 0.0F};
+                       static_cast<float>(camera.nearM()),
+                       static_cast<float>(item.mesh->centreLonDeg),
+                       static_cast<float>(item.mesh->centreLatDeg)};
       staging.resize((block + 1) * m_uniformStride);
       std::memcpy(staging.data() + block * m_uniformStride, &values,
                   sizeof(values));

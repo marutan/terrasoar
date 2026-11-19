@@ -25,6 +25,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <tuple>
@@ -33,6 +34,7 @@
 #include "ts/projection/datumshift.h"
 #include "ts/projection/nationalgrid.h"
 #include "ts/projection/normalcylindrical.h"
+#include "ts/projection/rotatedmercator.h"
 #include "ts/projection/transversemercator.h"
 
 namespace ts
@@ -122,11 +124,29 @@ Projection::Projection(double centralMeridianDeg)
 
 Projection::~Projection() = default;
 
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+double Projection::domainMarginDeg(double latDeg, double lonDeg) const
+{
+  Q_UNUSED(latDeg)
+  Q_UNUSED(lonDeg)
+  return std::numeric_limits<double>::infinity();
+}
+
 bool Projection::contains(double latDeg, double lonDeg) const
 {
   return containsLatitude(latDeg) &&
          std::abs(normaliseLonDeg(lonDeg - centralMeridianDeg())) <=
-             maximumLonOffsetDeg();
+             maximumLonOffsetDeg() &&
+         (!hasOwnDomain() || domainMarginDeg(latDeg, lonDeg) >= 0.0);
+}
+
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+Geodetic Projection::clampToDomain(double latDeg, double lonDeg) const
+{
+  return Geodetic{std::clamp(latDeg, minimumLatDeg(), maximumLatDeg()),
+                  normaliseLonDeg(clampLonDeg(lonDeg)), 0.0};
 }
 
 double Projection::clampLonDeg(double lonDeg) const
@@ -168,6 +188,7 @@ const std::vector<const Projection*>& projections()
   static const UtmProjection utm;
   static const CassiniProjection cassini;
   static const NationalGridProjection nationalGrid;
+  static const RotatedMercatorProjection rotatedMercator;
   static const std::vector<const Projection*> all = {&mercator,
                                                      &webMercator,
                                                      &miller,
@@ -177,7 +198,8 @@ const std::vector<const Projection*>& projections()
                                                      &transverseMercator,
                                                      &utm,
                                                      &cassini,
-                                                     &nationalGrid};
+                                                     &nationalGrid,
+                                                     &rotatedMercator};
   return all;
 }
 
@@ -204,6 +226,13 @@ makeProjection(const QString& id, const ProjectionParameterValues& values,
   if (id == QLatin1String("utm")) {
     return std::make_unique<UtmProjection>(
         static_cast<int32_t>(std::lround(values.at(QStringLiteral("zone")))));
+  }
+  if (id == QLatin1String("rotated-mercator")) {
+    return std::make_unique<RotatedMercatorProjection>(
+        values.at(QStringLiteral("centreLatitude")),
+        values.at(QStringLiteral("centreLongitude")),
+        values.at(QStringLiteral("azimuth")),
+        values.at(QStringLiteral("scaleFactor")));
   }
   if (id == QLatin1String("cassini")) {
     return std::make_unique<CassiniProjection>(
@@ -280,6 +309,25 @@ int32_t projectionIndex(const Projection* projection)
     }
   }
   return -1;
+}
+
+QByteArray projectionDomainGlsl()
+{
+  QByteArray glsl;
+  QByteArray dispatch =
+      "\nbool tsOutsideDomain(int index, vec2 lonLatDeg, vec4 d0, vec4 d1)\n"
+      "{\n";
+  const std::vector<const Projection*>& all = projections();
+  for (std::size_t i = 0; i < all.size(); ++i) {
+    if (!all[i]->hasOwnDomain()) {
+      continue;
+    }
+    glsl += all[i]->glslDomainSource();
+    dispatch += "  if (index == " + QByteArray::number(static_cast<qint64>(i)) +
+                ") {\n    return " + all[i]->glslFunction() +
+                "Outside(radians(lonLatDeg), d0, d1);\n  }\n";
+  }
+  return glsl + dispatch + "  return false;\n}\n";
 }
 
 QByteArray projectionGlsl()

@@ -19,6 +19,10 @@ All notable changes to Terra Soar. The format follows
   Cassini–Soldner, with their central meridian, scale factor or zone in
   Projection Settings. These maps end at the edge of the area they show
   (40° or 30° from the central meridian) instead of wrapping round.
+- Rotated Mercator (Oblique Mercator): Mercator about a centre line of
+  your choice, set by its centre and azimuth or through two places, for
+  long, narrow areas that don't run north–south. The map ends cleanly at
+  the edge of the area it can show.
 - The UK National Grid (Ordnance Survey, OSGB36) as a map projection,
   with the grid reference under the pointer in the status bar. Positions
   convert from WGS 84 to within a few metres, or about 10 cm with the
