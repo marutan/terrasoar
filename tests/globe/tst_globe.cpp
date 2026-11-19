@@ -336,7 +336,8 @@ const ts::Projection* projectionFromSpec(const QString& spec)
   const std::size_t count =
       std::min(static_cast<std::size_t>(values.size()), parameters.size());
   for (std::size_t i = 0; i < count; ++i) {
-    chosen[parameters.at(i).key] = values.at(static_cast<int>(i)).toDouble();
+    chosen[parameters.at(i).key] =
+        values.at(static_cast<int32_t>(i)).toDouble();
   }
   return ts::projectionWith(idAndValues.front(), chosen);
 }
