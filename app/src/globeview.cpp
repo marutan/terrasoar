@@ -323,7 +323,9 @@ void GlobeView::setMapProjection(const Projection* projection)
 
 const Projection* GlobeView::mapProjection() const
 {
-  return m_controller.camera().mapProjection();
+  // The one chosen (the ARC zones following the view, say), not the zone
+  // drawn now.
+  return m_controller.camera().requestedMapProjection();
 }
 
 double GlobeView::morphDurationS() const

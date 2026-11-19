@@ -73,6 +73,13 @@ protected:
    */
   NormalCylindricalProjection(double xScale, double maximumLatDeg);
 
+  /**
+   * Creates the projection with x scale @p xScale over the latitudes from
+   * @p minimumLatDeg to @p maximumLatDeg (a band: an ARC zone).
+   */
+  NormalCylindricalProjection(double xScale, double minimumLatDeg,
+                              double maximumLatDeg);
+
   /** Returns f(φ) for @p latRad. */
   virtual double unitNorthing(double latRad) const = 0;
   /** Returns the latitude (radians) whose f is @p unitY. */
@@ -85,6 +92,7 @@ protected:
 
 private:
   double m_xScale;
+  double m_minimumLatDeg;
   double m_maximumLatDeg;
 };
 

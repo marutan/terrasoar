@@ -231,6 +231,21 @@ public:
    */
   virtual int32_t geometryLevelsBeyondTexels() const { return -1; }
 
+  /**
+   * Returns the projection the map is drawn in when its centre is at
+   * latitude @p latDeg, longitude @p lonDeg: this one, but for one that
+   * follows the view (ARC's zones, each over its own band of latitude).
+   * It lives for the whole run.
+   */
+  // Latitude then longitude, as everywhere in Projection.
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  virtual const Projection* effectiveAt(double latDeg, double lonDeg) const
+  {
+    Q_UNUSED(latDeg)
+    Q_UNUSED(lonDeg)
+    return this;
+  }
+
   /** Returns true if domainMarginDeg() limits the domain. */
   virtual bool hasOwnDomain() const { return false; }
 

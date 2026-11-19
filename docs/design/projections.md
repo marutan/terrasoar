@@ -419,6 +419,39 @@ tile, each held to its side by `r3`); not done. No settings.
   acos rounds to 0 for offsets of 1e-8, which gives the wrong slope at
   the centre.
 
+## The ARC zones of RPF
+
+`arc.h`. The ARC (Equal Arc-second Raster Chart) system of MIL-A-89007
+(ADRG) and MIL-C-89038 (CADRG): 18 zones, nine bands of latitude each side
+of the equator (0°, 32°, 48°, 56°, 64°, 68°, 72°, 76°, 80°, 90°), RPF's
+`1`–`9` and `A`–`H`, `J`. `arc::zoneAt()`, `zoneLatitudesDeg()`.
+
+- **The pixels.** Appendix 70, table III gives each zone's pixel constant
+  A along the parallels and B (400384) along the meridians, pixels in a
+  turn at 1:1M. A CADRG product of scale 1:n scales them, rounds them up to
+  ADRG's 512-pixel blocks, then to CADRG's 256-pixel ones at 1.5 times
+  the pitch (B also over 4, a quarter turn): `arc::pixelSizeDeg()`, as
+  GDAL's CADRG writer. ONC (1:1M) in zone 1 is 246528 by 66816.
+- **The zones outside the poles** (`rpf-arc`, `ArcZoneProjection`) are
+  equirectangular over the band, x = a k λ, y = a φ, k the pixel's height
+  over its width in degrees, so a frame is drawn pixel for pixel; a
+  `NormalCylindricalProjection` with latitude limits of a band. The band
+  is also a domain of its own: the shader's formula isn't held to it
+  (equirectangular is defined everywhere) and the fragments beyond it are
+  discarded, so the rest of the world isn't squashed along its edges, as
+  Mercator's polar caps are along its top and bottom. Parameters: the
+  zone and the product scale.
+- **The polar zones** (`rpf-arc-north`, `-south`, `ArcPolarProjection`)
+  are the azimuthal equidistant about the pole on the sphere of radius a,
+  as GDAL georeferences CADRG polar frames, beyond 80°. `rpf-arc` with
+  zone 9 or 18 is one of them.
+- **Following the view.** Zone 0, the default, follows the view:
+  `Projection::effectiveAt()` is the zone of the view's centre. The
+  camera keeps the projection chosen (`requestedMapProjection()`, what
+  the menu, the settings and projects see) and draws in its effective one
+  for the centre, taken before the centre is held to its limits, so the
+  map changes zone as the view moves.
+
 ## Domains of their own: Rotated Mercator
 
 `ts::RotatedMercatorProjection` (`rotatedmercator.h`, id

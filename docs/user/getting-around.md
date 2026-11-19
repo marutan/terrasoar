@@ -89,6 +89,13 @@ chooses how it is flattened:
   compromises (Winkel Tripel is the one many atlases use); Mollweide is
   equal-area, so countries can be compared by size. They are centred on
   Greenwich and have no settings.
+- **ARC Zones (RPF)**: the zones of the ARC system that military raster
+  charts (CADRG) and imagery (CIB) are made in, so that such data is
+  shown pixel for pixel. Each zone is a band of latitude (0° to 32°,
+  32° to 48° and so on, nine each side of the equator); by default the
+  map follows the view, showing the zone its centre is in and changing
+  zone as you move. **ARC North Polar Zone** and **South Polar Zone**
+  show the polar caps beyond 80°.
 - **UK National Grid (OSGB36)**: the Ordnance Survey's grid of Great
   Britain, as on OS maps. The status bar gives the grid reference under
   the pointer (such as TQ 30080 80729). Positions are converted from GPS
@@ -127,6 +134,9 @@ the settings with the projection.
 - **Polar Stereographic**: the **latitude of true scale** and the
   **central meridian** (the one straight down from the north pole, or up
   from the south pole).
+- **ARC Zones**: the **zone** (0 to follow the view; 9 and 18 are the
+  polar zones) and the **product scale** (1:1,000,000 for ONC charts,
+  1:500,000 for TPC and so on), which sets the pixels' shape.
 - **Rotated Mercator**: the **centre** (latitude and longitude), the
   **azimuth** of the centre line there (its direction, clockwise from
   north) and the **scale factor** along it. Or give two places under

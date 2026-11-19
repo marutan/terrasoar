@@ -37,11 +37,13 @@
 #include "concurrency.h"
 #include "nationalgriddata.h"
 #include "offscreengl.h"
+#include "ts/camera/camera.h"
 #include "ts/deps/projcontext.h"
 #include "ts/geo/geodesic.h"
 #include "ts/geo/geodetic.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
+#include "ts/projection/arc.h"
 #include "ts/projection/azimuthal.h"
 #include "ts/projection/conic.h"
 #include "ts/projection/cylindricalprojection.h"
@@ -365,7 +367,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{20});
+    QCOMPARE(all.size(), std::size_t{23});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -391,8 +393,8 @@ private slots:
       }
       QCOMPARE(projection->centralMeridianDeg(), centre);
     }
-    QCOMPARE(ids.size(), 20);
-    QCOMPARE(functions.size(), 20);
+    QCOMPARE(ids.size(), 23);
+    QCOMPARE(functions.size(), 23);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -429,6 +431,9 @@ private slots:
     QTest::newRow("robinson") << 17;
     QTest::newRow("mollweide") << 18;
     QTest::newRow("winkel-tripel") << 19;
+    QTest::newRow("rpf-arc") << 20;
+    QTest::newRow("rpf-arc-north") << 21;
+    QTest::newRow("rpf-arc-south") << 22;
   }
 
   void againstProj()
@@ -601,10 +606,13 @@ private slots:
     for (const ts::Projection* projection : ts::projections()) {
       // Symmetric about the equator, but for a cone's and the polar maps'.
       if (projection->id() != QLatin1String("lambert-conformal-conic") &&
-          !projection->id().startsWith(QLatin1String("polar-"))) {
+          !projection->id().startsWith(QLatin1String("polar-")) &&
+          !projection->id().startsWith(QLatin1String("rpf-"))) {
         QCOMPARE(projection->minimumLatDeg(), -projection->maximumLatDeg());
       }
-      QVERIFY(projection->containsLatitude(0.0));
+      // The equator, but for an ARC polar zone.
+      QVERIFY(projection->containsLatitude(0.0) ||
+              projection->id().startsWith(QLatin1String("rpf-arc-")));
       QVERIFY(projection->containsLatitude(projection->maximumLatDeg()));
       QVERIFY(!projection->containsLatitude(90.5));
       const ts::MapRect bounds = projection->bounds();
@@ -617,7 +625,10 @@ private slots:
       QVERIFY(std::abs(bounds.widthM() -
                        2.0 * projection->forward(0.0, 90.0).xM * 2.0) < 1e-6);
       QCOMPARE(bounds.westM, -bounds.eastM);
-      QCOMPARE(bounds.southM, -bounds.northM);
+      // Symmetric about the equator, but for an ARC zone's band.
+      if (!projection->id().startsWith(QLatin1String("rpf-"))) {
+        QCOMPARE(bounds.southM, -bounds.northM);
+      }
       // Latitudes beyond the domain land on the map's edge.
       QCOMPARE(projection->forward(90.0, 10.0).yM, bounds.northM);
       QCOMPARE(projection->forward(-90.0, 10.0).yM, bounds.southM);
@@ -657,8 +668,9 @@ private slots:
         QVERIFY(projection->repeats() ||
                 projection->centralMeridianDeg() == 0.0 ||
                 projection->id().startsWith(QLatin1String("polar-")));
-        QVERIFY(projection->contains(10.0, 179.9) ||
-                projection->contains(-10.0, 179.9));
+        const double middleLat =
+            0.5 * (projection->minimumLatDeg() + projection->maximumLatDeg());
+        QVERIFY(projection->contains(middleLat, 179.9));
         continue;
       }
       ++limited;
@@ -715,7 +727,8 @@ private slots:
     // east and north.
     for (const ts::Projection* projection : ts::projections()) {
       for (const double lat : {-80.0, -45.0, 0.0, 20.0, 60.0, 84.0}) {
-        if (!projection->contains(lat, 10.0)) {
+        if (!projection->contains(lat - 1e-3, 10.0) ||
+            !projection->contains(lat + 1e-3, 10.0)) {
           continue;
         }
         const double step = 1e-3;
@@ -1660,6 +1673,99 @@ void main()
       QVERIFY(projection->forward(20.0, 179.999).xM > 0.0);
       QVERIFY(projection->forward(20.0, -179.999).xM < 0.0);
     }
+  }
+
+  void arcZones()
+  {
+    // MIL-A-89007's zones (appendix 70, table III) and CADRG's pixel
+    // spacings (MIL-C-89038 60.1): the zone of a latitude, its band, and
+    // ONC's (1:1M) pixel constants in zone 1, 246528 east–west and 66816
+    // per quarter turn north–south.
+    QCOMPARE(ts::arc::zoneAt(0.0), 1);
+    QCOMPARE(ts::arc::zoneAt(32.0), 1);
+    QCOMPARE(ts::arc::zoneAt(32.1), 2);
+    QCOMPARE(ts::arc::zoneAt(79.9), 8);
+    QCOMPARE(ts::arc::zoneAt(85.0), 9);
+    QCOMPARE(ts::arc::zoneAt(-50.0), 12);
+    QCOMPARE(ts::arc::zoneAt(-89.0), 18);
+    QCOMPARE(ts::arc::zoneCode(12), 'C');
+    QCOMPARE(ts::arc::zoneCode(18), 'J');
+    QVERIFY(ts::arc::isPolar(9) && ts::arc::isPolar(18) &&
+            !ts::arc::isPolar(8));
+    QCOMPARE(ts::arc::zoneLatitudesDeg(3), (std::array<double, 2>{48.0, 56.0}));
+    QCOMPARE(ts::arc::zoneLatitudesDeg(15),
+             (std::array<double, 2>{-72.0, -68.0}));
+    const std::array<double, 2> onc = ts::arc::pixelSizeDeg(1, 1.0e6);
+    QVERIFY(std::abs(onc[0] - 360.0 / 246528.0) < 1e-15);
+    QVERIFY(std::abs(onc[1] - 90.0 / 66816.0) < 1e-15);
+    // Every zone and common scale: pixels a little under 150 µm of chart
+    // apart, east–west a little wider than north–south far from the
+    // poles... and the ratio the projection takes.
+    for (int32_t zone = 1; zone <= 17; ++zone) {
+      if (ts::arc::isPolar(zone)) {
+        continue;
+      }
+      for (const double scale : {5.0e6, 2.0e6, 1.0e6, 5.0e5, 2.5e5}) {
+        const std::array<double, 2> pixel = ts::arc::pixelSizeDeg(zone, scale);
+        const ts::Projection* projection = ts::projectionWith(
+            QStringLiteral("rpf-arc"),
+            {{QStringLiteral("zone"), static_cast<double>(zone)},
+             {QStringLiteral("scale"), scale}});
+        QVERIFY(projection != nullptr);
+        // Square pixels: a pixel as wide as it is tall on the map.
+        const std::array<double, 2> band = ts::arc::zoneLatitudesDeg(zone);
+        const double lat = 0.5 * (band[0] + band[1]);
+        const ts::MapPoint a = projection->forward(lat, 0.0);
+        const ts::MapPoint east = projection->forward(lat, pixel[0]);
+        const ts::MapPoint north = projection->forward(lat + pixel[1], 0.0);
+        QVERIFY(std::abs((east.xM - a.xM) / (north.yM - a.yM) - 1.0) < 1e-9);
+        QCOMPARE(projection->minimumLatDeg(), band[0]);
+        QCOMPARE(projection->maximumLatDeg(), band[1]);
+      }
+    }
+    QVERIFY(std::abs(ts::arc::polarPixelSizeM(1.0e6) - 150.0) < 5.0);
+  }
+
+  void arcZonesFollowTheView()
+  {
+    // The default follows the view: the zone of the centre, the polar
+    // ones of their own kind, and the same instance each time.
+    const ts::Projection* follow =
+        ts::projectionById(QStringLiteral("rpf-arc"));
+    QVERIFY(follow != nullptr);
+    QCOMPARE(follow->parameterValues().at(QStringLiteral("zone")), 0.0);
+    const ts::Projection* zone2 = follow->effectiveAt(40.0, 10.0);
+    QCOMPARE(zone2->id(), QStringLiteral("rpf-arc"));
+    QCOMPARE(zone2->parameterValues().at(QStringLiteral("zone")), 2.0);
+    QCOMPARE(follow->effectiveAt(45.0, -100.0), zone2);
+    QCOMPARE(zone2->effectiveAt(70.0, 0.0), zone2); // a zone stays itself
+    QCOMPARE(follow->effectiveAt(85.0, 0.0)->id(),
+             QStringLiteral("rpf-arc-north"));
+    QCOMPARE(follow->effectiveAt(-85.0, 0.0)->id(),
+             QStringLiteral("rpf-arc-south"));
+    // Zone 9 asked of rpf-arc is the north polar zone.
+    QCOMPARE(ts::projectionWith(QStringLiteral("rpf-arc"),
+                                {{QStringLiteral("zone"), 9.0}})
+                 ->id(),
+             QStringLiteral("rpf-arc-north"));
+    // A camera following the view changes zone as its centre moves; its
+    // requested projection stays the one chosen.
+    ts::Camera camera;
+    camera.setViewportSize(800, 600);
+    camera.setMapProjection(follow);
+    camera.setMorph(1.0);
+    camera.setPose(ts::CameraPose{20.0, 0.0, 2.0e6, 0.0, 0.0});
+    QCOMPARE(
+        camera.mapProjection()->parameterValues().at(QStringLiteral("zone")),
+        1.0);
+    camera.setPose(ts::CameraPose{60.0, 0.0, 2.0e6, 0.0, 0.0});
+    QCOMPARE(
+        camera.mapProjection()->parameterValues().at(QStringLiteral("zone")),
+        4.0);
+    QCOMPARE(camera.pose().targetLatDeg, 60.0);
+    camera.setPose(ts::CameraPose{86.0, 0.0, 2.0e6, 0.0, 0.0});
+    QCOMPARE(camera.mapProjection()->id(), QStringLiteral("rpf-arc-north"));
+    QCOMPARE(camera.requestedMapProjection(), follow);
   }
 
   void concurrentSharedInstances()

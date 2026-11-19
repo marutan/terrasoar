@@ -865,6 +865,12 @@ private slots:
                                    << 0.0 << 5.0e7 << 0.0 << 0.0;
     QTest::newRow("map-winkel-tripel") << QStringLiteral("winkel-tripel") << 1.0
                                        << 0.0 << 0.0 << 5.0e7 << 0.0 << 0.0;
+    // Phase 11e's ARC zones: zone 2's band (32° to 48° N), following the
+    // view, and the north polar zone.
+    QTest::newRow("map-rpf-arc-zone-2") << QStringLiteral("rpf-arc") << 1.0
+                                        << 40.0 << 10.0 << 8.0e6 << 0.0 << 0.0;
+    QTest::newRow("map-rpf-arc-north") << QStringLiteral("rpf-arc-north") << 1.0
+                                       << 90.0 << 0.0 << 4.0e6 << 0.0 << 0.0;
     QTest::newRow("morph-half-winkel-tripel")
         << QStringLiteral("winkel-tripel") << 0.5 << 20.0 << 10.0 << 2.6e7
         << 0.0 << 0.0;
@@ -1673,6 +1679,11 @@ private slots:
         << 54.5 << -3.0 << 2.0e6 << 0.0 << nationalGrid << 1.0 << 0.0;
     QTest::newRow("base-map-national-grid-thames")
         << 51.5 << 0.6 << 1.5e5 << 0.0 << nationalGrid << 1.0 << 0.0;
+    // The Alps on the ARC zones following the view: zone 2 (32° to 48° N),
+    // as an ONC chart is made, the band's north edge across the top.
+    QTest::newRow("base-map-rpf-arc-alps")
+        << 46.0 << 9.0 << 1.5e6 << 0.0 << QStringLiteral("rpf-arc") << 1.0
+        << 0.0;
     // The world on Winkel Tripel, as atlases show it.
     QTest::newRow("base-map-winkel-tripel-world")
         << 0.0 << 0.0 << 5.0e7 << 0.0 << QStringLiteral("winkel-tripel") << 1.0

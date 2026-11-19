@@ -1406,7 +1406,7 @@ private slots:
     QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
     const QList<QAction*> actions = menu->actions();
     // The projections, a separator and Projection Settings.
-    QCOMPARE(actions.size(), 22);
+    QCOMPARE(actions.size(), 25);
     QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
     QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
     QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
@@ -1434,11 +1434,16 @@ private slots:
     QCOMPARE(actions.at(17)->text(), QStringLiteral("Robinson"));
     QCOMPARE(actions.at(18)->text(), QStringLiteral("Mollweide"));
     QCOMPARE(actions.at(19)->text(), QStringLiteral("Winkel Tripel"));
-    QVERIFY(actions.at(20)->isSeparator());
-    QCOMPARE(actions.at(21)->objectName(),
+    QCOMPARE(actions.at(20)->text(), QStringLiteral("ARC Zones (RPF)"));
+    QCOMPARE(actions.at(21)->text(),
+             QStringLiteral("ARC North Polar Zone (RPF)"));
+    QCOMPARE(actions.at(22)->text(),
+             QStringLiteral("ARC South Polar Zone (RPF)"));
+    QVERIFY(actions.at(23)->isSeparator());
+    QCOMPARE(actions.at(24)->objectName(),
              QStringLiteral("projectionSettingsAction"));
     // Mercator has no settings.
-    QVERIFY(!actions.at(21)->isEnabled());
+    QVERIFY(!actions.at(24)->isEnabled());
     QVERIFY(actions.at(0)->isChecked());
     ts::GlobeView* globe = globeOf(window);
     if (globe == nullptr) {

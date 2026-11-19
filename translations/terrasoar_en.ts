@@ -1826,6 +1826,26 @@
             <source>Winkel Tripel</source>
             <translation>Winkel Tripel</translation>
         </message>
+        <message>
+            <source>Product scale, 1 to</source>
+            <translation>Product scale, 1 to</translation>
+        </message>
+        <message>
+            <source>ARC Zones (RPF)</source>
+            <translation>ARC Zones (RPF)</translation>
+        </message>
+        <message>
+            <source>Zone (0 follows the view; 9 and 18 are polar)</source>
+            <translation>Zone (0 follows the view; 9 and 18 are polar)</translation>
+        </message>
+        <message>
+            <source>ARC North Polar Zone (RPF)</source>
+            <translation>ARC North Polar Zone (RPF)</translation>
+        </message>
+        <message>
+            <source>ARC South Polar Zone (RPF)</source>
+            <translation>ARC South Polar Zone (RPF)</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>
