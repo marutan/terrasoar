@@ -65,6 +65,15 @@ chooses how it is flattened:
   flight route. North is up at its centre. The map ends at its own edge:
   far from the line, where it would stretch without limit, and far along
   it.
+- **Lambert Conformal Conic**: the standard projection of aeronautical
+  charts and many national and continental maps; shapes are true, and
+  scale is true along one or two parallels. It starts as the map of
+  Europe used by the European Union (EPSG:3034). The map is a fan about
+  the pole; it leaves out the far side of the Earth and the opposite
+  hemisphere beyond 60° past the standard parallels.
+- **American Polyconic**: the projection of older US topographic maps:
+  every parallel is true to scale, as is the central meridian. It shows
+  75° either side of that meridian.
 - **UK National Grid (OSGB36)**: the Ordnance Survey's grid of Great
   Britain, as on OS maps. The status bar gives the grid reference under
   the pointer (such as TQ 30080 80729). Positions are converted from GPS
@@ -92,6 +101,11 @@ the settings with the projection.
 - **UTM**: the **zone**, 1 to 60 from 180° west (zone 30 covers Greenwich
   and the west of Europe, 31 the east of France, and so on).
 - **Cassini–Soldner**: the **central meridian**.
+- **Lambert Conformal Conic**: the two **standard parallels** (give the
+  same latitude twice for one), the **origin latitude** and the
+  **central meridian**.
+- **American Polyconic**: the **central meridian** and the **origin
+  latitude**.
 - **Rotated Mercator**: the **centre** (latitude and longitude), the
   **azimuth** of the centre line there (its direction, clockwise from
   north) and the **scale factor** along it. Or give two places under

@@ -232,11 +232,11 @@ void Camera::setPose(const CameraPose& pose)
   if (m_morph >= 1.0) {
     // The flat map: straight down, north up, inside the map, and never
     // wider than the world.
-    const double latLimit =
-        std::min({m_projection->maximumLatDeg(), -m_projection->minimumLatDeg(),
-                  maximumMapCentreLatDeg});
-    clamped.targetLatDeg =
-        std::clamp(clamped.targetLatDeg, -latLimit, latLimit);
+    // The domain's latitudes, which needn't be symmetric (a cone's).
+    clamped.targetLatDeg = std::clamp(
+        clamped.targetLatDeg,
+        std::max(m_projection->minimumLatDeg(), -maximumMapCentreLatDeg),
+        std::min(m_projection->maximumLatDeg(), maximumMapCentreLatDeg));
     clamped.targetLonDeg =
         normaliseLonDeg(m_projection->clampLonDeg(clamped.targetLonDeg));
     if (m_projection->hasOwnDomain()) {

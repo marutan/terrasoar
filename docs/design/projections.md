@@ -317,6 +317,34 @@ the square's south-west corner. `Projection::gridReference()` is what
 the status bar shows on the map (empty for projections without a grid of
 their own).
 
+## Conics: Lambert Conformal Conic, Polyconic
+
+`conic.h`, both `LocalExpansionProjection`s.
+
+- **Lambert Conformal Conic** (`lambert-conformal-conic`) is PROJ's
+  `lcc` on WGS 84: n from the two standard parallels (sin φ1 for one),
+  ρ = c t(φ)ⁿ about the apex, θ = n λ. Its parameters are the two
+  parallels, the origin latitude and the central meridian; EPSG:3034's
+  (35°, 65°, 52° N, 10° E) by default. Parallels symmetric about the
+  equator, where the cone becomes a cylinder (n = 0), are moved apart to
+  a sum of 1°. The latitudes run from the apex's pole to 60° beyond the
+  nearer standard parallel (a box; the far pole is at infinity). The
+  longitudes are a domain of its own (below), 170° about the central
+  meridian: the fan's cut, opposite the meridian, falls on cells that are
+  all outside and discarded, never on a cell that is partly drawn.
+  ρ goes as the distance from the apex to the power n < 1, which no
+  Taylor expansion follows near the apex, so tiles there use the formula
+  unless they are small beside that distance
+  (`localExpansionLimitRadAt()`).
+- **American Polyconic** (`polyconic`) is PROJ's `poly`, written as
+  x = N cos φ λ sinc z, y = M(φ) − M(φ0) + N cos φ λ sin(z/2) sinc(z/2),
+  z = λ sin φ: the same values, but smooth through the equator, where
+  PROJ has a case of its own and 1 − cos z loses its precision. PROJ's
+  inverse iteration is the first guess. Its parameters are the central
+  meridian and origin latitude. Shown within 75° of the meridian: by 90°
+  the meridians fold over each other near the poles and no inverse is
+  unique.
+
 ## Domains of their own: Rotated Mercator
 
 `ts::RotatedMercatorProjection` (`rotatedmercator.h`, id
@@ -362,7 +390,13 @@ The rest of the program follows the margin wherever it followed the box:
 reference points, a drag past the edge), `inverse()` (nothing outside),
 `bounds()` (the domain is a rectangle in Hotine's u and v: its turned
 corners) and the tile selector, which samples a tile's margin (centre
-first) and leaves out tiles certainly outside. Outside the box a
+first) and leaves out tiles certainly outside. With a longitude box of
+the whole 360°, a tile can meet it both where it is and a turn to the
+west, one of them a sliver at the far side; the selector takes the wider
+part (taking the sliver once culled the western half of a Lambert map
+with its children). The camera holds the map's centre within the
+latitude limits as they are, not ± the smaller of them, as a cone's
+aren't symmetric. Outside the box a
 projection squashes geometry onto the edge, which only works when the
 edge runs along a parallel or meridian; outside a domain of its own the
 fragment shaders discard instead. `projectionDomainGlsl()` gives

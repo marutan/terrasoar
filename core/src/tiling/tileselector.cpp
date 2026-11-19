@@ -178,19 +178,22 @@ std::optional<GeoRect> domainPart(const Projection& projection,
   const double limit = projection.maximumLonOffsetDeg();
   const double centre = projection.centralMeridianDeg();
   const double west = normaliseLonDeg(rect.westDeg - centre);
-  // The tile, or its copy a turn to the west, meets −limit…limit.
+  // The tile, or its copy a turn to the west, meets −limit…limit. With a
+  // limit of 180° both may: the wider part, the other being a sliver at
+  // the far side (which a whole tile of level 0 must not be taken for).
+  std::optional<GeoRect> best;
   for (const double shift : {0.0, -360.0}) {
     const double w = std::max(west + shift, -limit);
     const double e = std::min(west + shift + rect.widthDeg(), limit);
-    if (w < e) {
-      const GeoRect part{w + centre, southDeg, e + centre, northDeg};
-      if (projection.hasOwnDomain() && !meetsOwnDomain(projection, part)) {
-        return std::nullopt;
-      }
-      return part;
+    if (!(w < e) || (best && e - w <= best->widthDeg())) {
+      continue;
+    }
+    const GeoRect part{w + centre, southDeg, e + centre, northDeg};
+    if (!projection.hasOwnDomain() || meetsOwnDomain(projection, part)) {
+      best = part;
     }
   }
-  return std::nullopt;
+  return best;
 }
 
 /** Points sampled along each edge of a tile for its extent on a map that

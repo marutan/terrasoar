@@ -1774,6 +1774,26 @@
             <source>Scale factor on the centre line</source>
             <translation>Scale factor on the centre line</translation>
         </message>
+        <message>
+            <source>Lambert Conformal Conic</source>
+            <translation>Lambert Conformal Conic</translation>
+        </message>
+        <message>
+            <source>First standard parallel</source>
+            <translation>First standard parallel</translation>
+        </message>
+        <message>
+            <source>Second standard parallel (the first again for one)</source>
+            <translation>Second standard parallel (the first again for one)</translation>
+        </message>
+        <message>
+            <source>Origin latitude</source>
+            <translation>Origin latitude</translation>
+        </message>
+        <message>
+            <source>American Polyconic</source>
+            <translation>American Polyconic</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>

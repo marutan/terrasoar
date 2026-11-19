@@ -30,6 +30,7 @@
 #include <mutex>
 #include <tuple>
 
+#include "ts/projection/conic.h"
 #include "ts/projection/cylindricalprojection.h"
 #include "ts/projection/datumshift.h"
 #include "ts/projection/nationalgrid.h"
@@ -189,6 +190,8 @@ const std::vector<const Projection*>& projections()
   static const CassiniProjection cassini;
   static const NationalGridProjection nationalGrid;
   static const RotatedMercatorProjection rotatedMercator;
+  static const LambertConformalConicProjection lambertConformalConic;
+  static const PolyconicProjection polyconic;
   static const std::vector<const Projection*> all = {&mercator,
                                                      &webMercator,
                                                      &miller,
@@ -199,7 +202,9 @@ const std::vector<const Projection*>& projections()
                                                      &utm,
                                                      &cassini,
                                                      &nationalGrid,
-                                                     &rotatedMercator};
+                                                     &rotatedMercator,
+                                                     &lambertConformalConic,
+                                                     &polyconic};
   return all;
 }
 
@@ -226,6 +231,18 @@ makeProjection(const QString& id, const ProjectionParameterValues& values,
   if (id == QLatin1String("utm")) {
     return std::make_unique<UtmProjection>(
         static_cast<int32_t>(std::lround(values.at(QStringLiteral("zone")))));
+  }
+  if (id == QLatin1String("lambert-conformal-conic")) {
+    return std::make_unique<LambertConformalConicProjection>(
+        values.at(QStringLiteral("standardParallel1")),
+        values.at(QStringLiteral("standardParallel2")),
+        values.at(QStringLiteral("originLatitude")),
+        values.at(QStringLiteral("centralMeridian")));
+  }
+  if (id == QLatin1String("polyconic")) {
+    return std::make_unique<PolyconicProjection>(
+        values.at(QStringLiteral("centralMeridian")),
+        values.at(QStringLiteral("originLatitude")));
   }
   if (id == QLatin1String("rotated-mercator")) {
     return std::make_unique<RotatedMercatorProjection>(
