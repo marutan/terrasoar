@@ -224,16 +224,16 @@ bool drawnAt(const ts::Projection& projection, double latDeg, double lonDeg)
 }
 
 /**
- * Draws the probe of glslMatchesCpp() for @p block (its steps' component
+ * Draws the probe of glslMatchesCpp() for @p probe (its steps' component
  * is set here) and returns each of the @p samples offsets, x and y, as the
  * shader computed them.
  */
-std::vector<std::array<float, 2>> runProbe(ts::RenderDevice& device,
-                                           ts::Pipeline& pipeline,
-                                           ts::RenderTarget& target,
-                                           ts::GpuBuffer& uniforms,
-                                           ProbeBlock block, int32_t samples)
+std::vector<std::array<float, 2>>
+runProbe(ts::RenderDevice& device, ts::Pipeline& pipeline,
+         ts::RenderTarget& target, ts::GpuBuffer& uniforms,
+         const ProbeBlock& probe, int32_t samples)
 {
+  ProbeBlock block = probe;
   std::array<QImage, 2> images;
   for (std::size_t component = 0; component < images.size(); ++component) {
     block.steps[3] = static_cast<float>(component);
