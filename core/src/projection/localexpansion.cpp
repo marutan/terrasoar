@@ -83,8 +83,13 @@ std::optional<Geodetic> LocalExpansionProjection::inverse(MapPoint point) const
       std::abs(dLonDeg) > maximumLonOffsetDeg() + domainSlackDeg) {
     return std::nullopt;
   }
-  return Geodetic{std::clamp(latDeg, minimumLatDeg(), maximumLatDeg()),
-                  normaliseLonDeg(centralMeridianDeg() + dLonDeg), 0.0};
+  const Geodetic found{std::clamp(latDeg, minimumLatDeg(), maximumLatDeg()),
+                       normaliseLonDeg(centralMeridianDeg() + dLonDeg), 0.0};
+  if (hasOwnDomain() &&
+      domainMarginDeg(found.latDeg, found.lonDeg) < -domainSlackDeg) {
+    return std::nullopt;
+  }
+  return found;
 }
 
 std::optional<Geodetic>
@@ -94,12 +99,9 @@ LocalExpansionProjection::nearestInDomain(MapPoint point) const
   if (!solved) {
     return std::nullopt;
   }
-  const double limit = maximumLonOffsetDeg();
-  return Geodetic{
-      std::clamp(radToDeg((*solved)[0]), minimumLatDeg(), maximumLatDeg()),
-      normaliseLonDeg(centralMeridianDeg() +
-                      std::clamp(radToDeg((*solved)[1]), -limit, limit)),
-      0.0};
+  return clampToDomain(
+      radToDeg((*solved)[0]),
+      normaliseLonDeg(centralMeridianDeg() + radToDeg((*solved)[1])));
 }
 
 std::optional<std::array<double, 2>>

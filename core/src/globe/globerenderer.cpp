@@ -695,6 +695,12 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
     frame.planeEast = float4(local.eastEcef, 0.0);
     frame.planeNorth = float4(local.northEcef, 0.0);
     frame.planeOrigin = float4(camera.targetEcef() - eye, 0.0);
+    if (map.projection != nullptr && map.projection->hasOwnDomain()) {
+      const std::array<float, 8> domain =
+          map.projection->glslDomainParameters();
+      frame.domain = {Float4{domain[0], domain[1], domain[2], domain[3]},
+                      Float4{domain[4], domain[5], domain[6], domain[7]}};
+    }
   }
 
   const double a = wgs84::semiMajorAxisM;

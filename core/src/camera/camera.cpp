@@ -239,6 +239,13 @@ void Camera::setPose(const CameraPose& pose)
         std::clamp(clamped.targetLatDeg, -latLimit, latLimit);
     clamped.targetLonDeg =
         normaliseLonDeg(m_projection->clampLonDeg(clamped.targetLonDeg));
+    if (m_projection->hasOwnDomain()) {
+      // A domain of its own shape (Rotated Mercator): its nearest point.
+      const Geodetic inside = m_projection->clampToDomain(clamped.targetLatDeg,
+                                                          clamped.targetLonDeg);
+      clamped.targetLatDeg = inside.latDeg;
+      clamped.targetLonDeg = inside.lonDeg;
+    }
     clamped.headingDeg = 0.0;
     clamped.tiltDeg = 0.0;
     clamped.rangeM =

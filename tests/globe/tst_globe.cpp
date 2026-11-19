@@ -318,6 +318,29 @@ private:
   int32_t m_retries = 0;
 };
 
+/**
+ * Returns the projection a golden row names: "id", or "id@v1,v2,…" with
+ * its parameters set in order; null for an unknown id.
+ */
+const ts::Projection* projectionFromSpec(const QString& spec)
+{
+  const QStringList idAndValues = spec.split(QLatin1Char('@'));
+  const ts::Projection* standard = ts::projectionById(idAndValues.front());
+  if (standard == nullptr || idAndValues.size() < 2) {
+    return standard;
+  }
+  const std::vector<ts::ProjectionParameter> parameters =
+      standard->parameters();
+  const QStringList values = idAndValues.back().split(QLatin1Char(','));
+  ts::ProjectionParameterValues chosen;
+  const std::size_t count =
+      std::min(static_cast<std::size_t>(values.size()), parameters.size());
+  for (std::size_t i = 0; i < count; ++i) {
+    chosen[parameters.at(i).key] =
+        values.at(static_cast<int32_t>(i)).toDouble();
+  }
+  return ts::projectionWith(idAndValues.front(), chosen);
+}
 } // namespace
 
 /** GPU tests for ts/globe: golden images, precision near the surface. */
@@ -804,6 +827,13 @@ private slots:
         << nationalGrid << 1.0 << 0.0 << -2.0 << 5.0e7 << 0.0 << 0.0;
     QTest::newRow("morph-half-national-grid")
         << nationalGrid << 0.5 << 50.0 << -2.0 << 1.2e7 << 0.0 << 0.0;
+    // Phase 11b-3's Rotated Mercator: its whole domain of its own (edges
+    // across the map, nothing squashed onto them), and half way there.
+    const QString rotated = QStringLiteral("rotated-mercator");
+    QTest::newRow("map-rotated-mercator")
+        << rotated << 1.0 << 45.0 << 0.0 << 9.0e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half-rotated-mercator")
+        << rotated << 0.5 << 45.0 << 0.0 << 1.2e7 << 0.0 << 0.0;
   }
 
   void morphGolden()
@@ -845,16 +875,9 @@ private slots:
 
     ts::Camera camera;
     camera.setViewportSize(imageWidthPx, imageHeightPx);
-    // "id@value": the projection with its first parameter set.
-    const QStringList idAndValue = projection.split(QLatin1Char('@'));
-    const ts::Projection* chosen = ts::projectionById(idAndValue.front());
+    const ts::Projection* chosen = projectionFromSpec(projection);
     if (chosen == nullptr) {
       QFAIL("unknown projection");
-    }
-    if (idAndValue.size() == 2) {
-      chosen = ts::projectionWith(
-          idAndValue.front(),
-          {{chosen->parameters().front().key, idAndValue.back().toDouble()}});
     }
     camera.setMapProjection(chosen);
     camera.setPose(ts::CameraPose{latDeg, lonDeg, rangeM, headingDeg, tiltDeg});
@@ -1101,7 +1124,7 @@ private slots:
     ts::Camera camera =
         makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
     if (!projection.isEmpty()) {
-      camera.setMapProjection(ts::projectionById(projection));
+      camera.setMapProjection(projectionFromSpec(projection));
       camera.setMorph(morph);
     }
     m_gl->makeCurrent();
@@ -1616,6 +1639,11 @@ private slots:
         << 54.5 << -3.0 << 2.0e6 << 0.0 << nationalGrid << 1.0 << 0.0;
     QTest::newRow("base-map-national-grid-thames")
         << 51.5 << 0.6 << 1.5e5 << 0.0 << nationalGrid << 1.0 << 0.0;
+    // The North Atlantic on the centre line from London to New York.
+    QTest::newRow("base-map-rotated-mercator-atlantic")
+        << 52.2398 << -41.2968 << 7.0e6 << 0.0
+        << QStringLiteral("rotated-mercator@52.2398,-41.2968,75.3336") << 1.0
+        << 0.0;
     // Terrain from the base pack's DEM, looking across mountains.
     QTest::newRow("base-terrain-alps")
         << 46.0 << 8.0 << 2.0e5 << 65.0 << none << 0.0 << 3.0;

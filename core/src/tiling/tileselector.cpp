@@ -129,6 +129,39 @@ bool samplesBehindHorizon(const Camera& camera, TileKey key,
                      });
 }
 
+/** Samples across a tile, each way, for its projection's own domain. */
+constexpr int32_t domainSamples = 8;
+
+/**
+ * True unless @p rect is certainly outside @p projection's own domain
+ * (Projection::domainMarginDeg()): no sample across it is inside, nor
+ * near enough that the domain could reach in between them (the margin
+ * changes by up to about twice the distance moved).
+ */
+bool meetsOwnDomain(const Projection& projection, const GeoRect& rect)
+{
+  const double spacingDeg =
+      std::hypot(rect.heightDeg(),
+                 rect.widthDeg() * std::cos(degToRad(rect.centreLatDeg()))) /
+      domainSamples;
+  const double enough = -2.0 * spacingDeg;
+  // The centre first: most tiles drawn are inside.
+  if (projection.domainMarginDeg(rect.centreLatDeg(), rect.centreLonDeg()) >
+      enough) {
+    return true;
+  }
+  for (int32_t i = 0; i <= domainSamples; ++i) {
+    for (int32_t j = 0; j <= domainSamples; ++j) {
+      const double lat = rect.southDeg + rect.heightDeg() * i / domainSamples;
+      const double lon = rect.westDeg + rect.widthDeg() * j / domainSamples;
+      if (projection.domainMarginDeg(lat, lon) > enough) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Returns the part of @p rect inside @p projection's domain, its
  * longitudes counted from the central meridian (so west may be below
@@ -150,7 +183,11 @@ std::optional<GeoRect> domainPart(const Projection& projection,
     const double w = std::max(west + shift, -limit);
     const double e = std::min(west + shift + rect.widthDeg(), limit);
     if (w < e) {
-      return GeoRect{w + centre, southDeg, e + centre, northDeg};
+      const GeoRect part{w + centre, southDeg, e + centre, northDeg};
+      if (projection.hasOwnDomain() && !meetsOwnDomain(projection, part)) {
+        return std::nullopt;
+      }
+      return part;
     }
   }
   return std::nullopt;

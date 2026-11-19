@@ -87,6 +87,7 @@ HEADERS += \
     include/ts/projection/localexpansion.h \
     include/ts/projection/nationalgrid.h \
     include/ts/projection/normalcylindrical.h \
+    include/ts/projection/rotatedmercator.h \
     include/ts/projection/transversemercator.h \
     include/ts/projection/projection.h \
     include/ts/providers/geopackagefeatureprovider.h \
@@ -170,6 +171,7 @@ SOURCES += \
     src/projection/localexpansion.cpp \
     src/projection/nationalgrid.cpp \
     src/projection/normalcylindrical.cpp \
+    src/projection/rotatedmercator.cpp \
     src/projection/transversemercator.cpp \
     src/projection/projection.cpp \
     src/providers/geopackagefeatureprovider.cpp \

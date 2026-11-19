@@ -26,6 +26,7 @@
 #include <QDoubleSpinBox>
 #include <QEvent>
 #include <QFormLayout>
+#include <QGroupBox>
 #include <QKeySequence>
 #include <QLabel>
 #include <QPushButton>
@@ -33,6 +34,7 @@
 #include <QVBoxLayout>
 
 #include "helpwindow.h"
+#include "ts/projection/rotatedmercator.h"
 
 namespace ts
 {
@@ -77,6 +79,10 @@ ProjectionSettingsDialog::ProjectionSettingsDialog(QWidget* parent,
   QVBoxLayout* layout = new QVBoxLayout(this);
   layout->addWidget(m_titleLabel);
   layout->addLayout(m_form);
+  if (projection->id() == QLatin1String("rotated-mercator")) {
+    addTwoPoints();
+    layout->addWidget(m_twoPointsGroup);
+  }
   layout->addWidget(m_buttons);
   retranslateUi();
 }
@@ -105,6 +111,57 @@ void ProjectionSettingsDialog::restoreDefaults()
   }
 }
 
+void ProjectionSettingsDialog::addTwoPoints()
+{
+  m_twoPointsGroup = new QGroupBox(this);
+  m_twoPointsGroup->setObjectName(QStringLiteral("projectionTwoPoints"));
+  QFormLayout* form = new QFormLayout(m_twoPointsGroup);
+  // London Heathrow and New York JFK: a line across the North Atlantic.
+  const std::array<double, 4> starts = {51.4775, -0.4614, 40.6413, -73.7781};
+  for (std::size_t i = 0; i < m_pointBoxes.size(); ++i) {
+    QDoubleSpinBox* box = new QDoubleSpinBox(m_twoPointsGroup);
+    box->setObjectName(QStringLiteral("projectionPoint%1").arg(i));
+    box->setDecimals(4);
+    const double limit = i % 2 == 0 ? 90.0 : 180.0;
+    box->setRange(-limit, limit);
+    box->setSuffix(QStringLiteral("°"));
+    box->setValue(starts.at(i));
+    m_pointBoxes.at(i) = box;
+    form->addRow(QString(), box);
+  }
+  m_usePointsButton = new QPushButton(m_twoPointsGroup);
+  m_usePointsButton->setObjectName(QStringLiteral("projectionUsePoints"));
+  m_pointsMessage = new QLabel(m_twoPointsGroup);
+  m_pointsMessage->setObjectName(QStringLiteral("projectionPointsMessage"));
+  m_pointsMessage->setWordWrap(true);
+  form->addRow(m_usePointsButton);
+  form->addRow(m_pointsMessage);
+  connect(m_usePointsButton, &QPushButton::clicked, this,
+          &ProjectionSettingsDialog::useTwoPoints);
+}
+
+void ProjectionSettingsDialog::useTwoPoints()
+{
+  const std::optional<ProjectionParameterValues> line =
+      RotatedMercatorProjection::throughPoints(
+          m_pointBoxes[0]->value(), m_pointBoxes[1]->value(),
+          m_pointBoxes[2]->value(), m_pointBoxes[3]->value());
+  if (!line) {
+    m_pointsMessage->setText(
+        tr("No single line: the places are the same or opposite each "
+           "other."));
+    return;
+  }
+  m_pointsMessage->clear();
+  for (std::size_t i = 0; i < m_parameters.size(); ++i) {
+    const ProjectionParameterValues::const_iterator value =
+        line->find(m_parameters[i].key);
+    if (value != line->end()) {
+      m_boxes[i]->setValue(value->second);
+    }
+  }
+}
+
 void ProjectionSettingsDialog::changeEvent(QEvent* event)
 {
   if (event->type() == QEvent::LanguageChange) {
@@ -127,6 +184,22 @@ void ProjectionSettingsDialog::retranslateUi()
     }
   }
   m_defaultsButton->setText(tr("Restore &Defaults"));
+  if (m_twoPointsGroup != nullptr) {
+    m_twoPointsGroup->setTitle(tr("Centre Line Through Two Places"));
+    QFormLayout* form = qobject_cast<QFormLayout*>(m_twoPointsGroup->layout());
+    const std::array<QString, 4> labels = {
+        tr("First latitude"), tr("First longitude"), tr("Second latitude"),
+        tr("Second longitude")};
+    for (std::size_t i = 0; i < m_pointBoxes.size(); ++i) {
+      if (QLabel* label = form != nullptr
+                              ? qobject_cast<QLabel*>(
+                                    form->labelForField(m_pointBoxes.at(i)))
+                              : nullptr) {
+        label->setText(labels.at(i));
+      }
+    }
+    m_usePointsButton->setText(tr("&Use These Places"));
+  }
 }
 
 } // namespace ts

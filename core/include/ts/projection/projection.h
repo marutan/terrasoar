@@ -211,8 +211,46 @@ public:
    */
   virtual double maximumLonOffsetDeg() const { return 180.0; }
 
+  /**
+   * Returns how far inside the projection's own domain latitude @p latDeg
+   * and longitude @p lonDeg are, about as an angle on the Earth, degrees;
+   * negative outside. Most projections' domains are just the latitude
+   * limits and maximumLonOffsetDeg() (a box in latitude and longitude):
+   * they return +∞. One whose domain is its own shape, in a rotated frame
+   * (Rotated Mercator; later the azimuthals), says so with hasOwnDomain()
+   * and gives it here; on the map the renderers then discard what lies
+   * outside it (tsOutsideDomain()) instead of squashing it onto the edge.
+   */
+  virtual double domainMarginDeg(double latDeg, double lonDeg) const;
+
+  /** Returns true if domainMarginDeg() limits the domain. */
+  virtual bool hasOwnDomain() const { return false; }
+
   /** Returns true if the point is inside the valid domain. */
   bool contains(double latDeg, double lonDeg) const;
+
+  /**
+   * Returns the point of the valid domain nearest latitude @p latDeg and
+   * longitude @p lonDeg (itself when inside), height 0. By default the
+   * latitude clamped to the limits and clampLonDeg().
+   */
+  virtual Geodetic clampToDomain(double latDeg, double lonDeg) const;
+
+  /**
+   * Returns the eight floats glslDomainSource()'s function takes as d0
+   * and d1 (zeros by default).
+   */
+  virtual std::array<float, 8> glslDomainParameters() const { return {}; }
+
+  /**
+   * Returns the GLSL source of
+   *
+   *     bool <glslFunction()>Outside(vec2 lonLatRad, vec4 d0, vec4 d1)
+   *
+   * true for a longitude and latitude (radians) outside the domain, with
+   * d0 and d1 from glslDomainParameters(); empty unless hasOwnDomain().
+   */
+  virtual QByteArray glslDomainSource() const { return QByteArray(); }
 
   /**
    * Returns the longitude in the valid domain nearest @p lonDeg (itself
@@ -341,6 +379,20 @@ const Projection* projectionById(const QString& id);
  * @threadsafe
  */
 int32_t projectionIndex(const Projection* projection);
+
+/**
+ * Returns the GLSL source of
+ *
+ *     bool tsOutsideDomain(int index, vec2 lonLatDeg, vec4 d0, vec4 d1)
+ *
+ * true where a longitude and latitude (degrees) are outside the domain of
+ * the projection with that projectionIndex() (Projection::hasOwnDomain();
+ * always false for the others), d0 and d1 being its
+ * glslDomainParameters(). Fragment shaders on the map discard there.
+ *
+ * @threadsafe
+ */
+QByteArray projectionDomainGlsl();
 
 /**
  * Returns the GLSL source of every projection in projections(), their

@@ -67,6 +67,12 @@ struct FrameBlock {
    * morph), and the hillshade's slope factor. See docs/design/terrain.md.
    */
   Float4 terrain{};
+  /**
+   * On the map, the projection's own domain (Projection::
+   * glslDomainParameters(): d0, d1 of tsOutsideDomain()); zeros when it
+   * has none.
+   */
+  std::array<Float4, 2> domain{};
 };
 
 /** Uniform block "Globe" (std140). Binding 1. */
@@ -96,7 +102,7 @@ struct GlobeBlock {
   Float4 gridParams{};
 };
 
-static_assert(sizeof(FrameBlock) == 208, "std140 layout of Frame");
+static_assert(sizeof(FrameBlock) == 240, "std140 layout of Frame");
 static_assert(sizeof(GlobeBlock) == 160, "std140 layout of Globe");
 
 /** Binding of the "Frame" block. */
@@ -122,6 +128,7 @@ layout(std140) uniform Frame {
   vec4 planeNorth;
   vec4 planeOrigin;
   vec4 terrain;
+  vec4 domain[2];
 };
 
 // The height a vertex is drawn at above the ellipsoid: its sea level plus
@@ -146,6 +153,22 @@ vec3 tsTerrainNormal(vec3 up, vec2 slope)
   vec3 north = cross(up, east);
   float k = terrain.x * terrain.y;
   return normalize(up - k * (slope.x * east + slope.y * north));
+}
+)";
+
+/**
+ * GLSL of tsOffMap(lonLatDeg), true on the map where a fragment is outside
+ * the projection's own domain: fragment shaders discard there. After
+ * frameBlockGlsl and projectionDomainGlsl().
+ */
+inline const char* const offMapGlsl = R"(
+// True on the map where the fragment at longitude, latitude lonLatDeg is
+// outside the projection's own domain (needs projectionDomainGlsl()):
+// discarded there, not squashed onto the edge.
+bool tsOffMap(vec2 lonLatDeg)
+{
+  return morph.x > 0.0
+      && tsOutsideDomain(int(morph.z + 0.5), lonLatDeg, domain[0], domain[1]);
 }
 )";
 

@@ -317,6 +317,65 @@ the square's south-west corner. `Projection::gridReference()` is what
 the status bar shows on the map (empty for projections without a grid of
 their own).
 
+## Domains of their own: Rotated Mercator
+
+`ts::RotatedMercatorProjection` (`rotatedmercator.h`, id
+`rotated-mercator`) is Hotine's oblique Mercator on WGS 84, as PROJ's
+`omerc` with `alpha` and `lonc` (rectified, so north is up at the centre;
+the u offset kept, so the centre is at x = y = 0). Its parameters are the
+centre's latitude (±80°) and longitude, the centre line's azimuth there
+(±90°) and the scale factor on it. The Projection Settings dialog can
+also set the centre and azimuth from two places
+(`throughPoints()`: halfway along the geodesic between them, at its
+azimuth there; Hotine's centre line is a great circle on its aposphere,
+so the places lie within a few hundredths of a degree of it).
+
+Matches PROJ to a micrometre, with two deliberate differences:
+
+- PROJ measures the angle along the line from where it crosses the
+  aposphere's equator, and cuts the map half a turn from there; here it
+  is measured from the centre, so the cut is opposite the centre and the
+  domain is centred on it. Across PROJ's cut the two differ by a whole
+  turn of the line (`alongTurnM()`).
+- PROJ's special case where cos Bλ is nearly 0 (`u = A λ`) puts both
+  sides of a rotated pole on its meridian at one place; `atan2` always
+  here.
+
+The scale along the centre line is the scale factor at the centre and
+within 2 parts in 10⁴ for 3000 km along it (Hotine's projection is true to
+scale on its aposphere, not quite on the ellipsoid).
+
+**A domain of its own.** No box of latitude and longitude fits this map:
+it runs to infinity at the rotated poles, which can be anywhere. So
+`Projection::hasOwnDomain()` is true and `domainMarginDeg()` says how far
+inside the domain a point is (about as an angle on the Earth):
+
+- within 85° of the centre line in the rotated frame (as Mercator);
+- within 150° along it either way from the centre, short of the cut;
+- within π / B of the meridian λ0: B is a little over 1, so beyond that
+  the aposphere's longitude would wrap round and the map cover itself
+  again. A sliver about 0.6° wide on the far side of the Earth is left
+  out (its place on the map is already taken).
+
+The rest of the program follows the margin wherever it followed the box:
+`contains()`, `clampToDomain()` (the camera's centre, the renderers'
+reference points, a drag past the edge), `inverse()` (nothing outside),
+`bounds()` (the domain is a rectangle in Hotine's u and v: its turned
+corners) and the tile selector, which samples a tile's margin (centre
+first) and leaves out tiles certainly outside. Outside the box a
+projection squashes geometry onto the edge, which only works when the
+edge runs along a parallel or meridian; outside a domain of its own the
+fragment shaders discard instead. `projectionDomainGlsl()` gives
+`tsOutsideDomain(index, lonLatDeg, d0, d1)` (the projection's
+`glslDomainSource()`, with `glslDomainParameters()` in the Frame block's
+`domain[2]`), and `tsOffMap()` (globeuniforms.h) applies it on the map to
+tile imagery, the tiles' graticule and vector fills and lines. Triangles
+reaching past the domain are drawn only where they are inside it, so the
+map's edge is a clean line wherever it runs; the cut and the rotated
+poles, far outside, are never seen. On the GPU the formula's angles come
+as angles (p1: γ0, the rectification, the centre's angle along), as all
+eight floats are taken.
+
 ## Adding a projection
 
 1. **Write the class.** Derive from `ts::Projection`; from
@@ -347,7 +406,7 @@ change:
 - If `repeats()` (the cylindrical ones) the map repeats in x with period
   `bounds().widthM()` and the renderer draws copies of the world side by
   side; otherwise it ends at the domain (`maximumLonOffsetDeg()` and the
-  latitude limits), as above.
+  latitude limits, or a domain of its own, as above).
 - `isCylindrical()` true lets the tile renderer draw a tile as one column
   of quads. Leave it false otherwise and tiles keep their full grids.
 - The antimeridian is where tiles end, so nothing is ever stretched across
