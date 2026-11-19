@@ -23,6 +23,9 @@ All notable changes to Terra Soar. The format follows
 - The ARC zones of the Raster Product Format (CADRG charts, CIB imagery):
   each zone's band, pixel for pixel at the product's scale, following the
   view by default, and the polar zones.
+- File → Add Imagery File…: a georeferenced image from your computer
+  (GeoTIFF, JPEG 2000, …) as a layer, and RPF charts and imagery (CADRG,
+  CIB) through their A.TOC.
 - Azimuthal Equidistant (centred on any point, with polar presets),
   Gnomonic, and Polar Stereographic for the Arctic and Antarctic (as
   EPSG:3413 and EPSG:3031).

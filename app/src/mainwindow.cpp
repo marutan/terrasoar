@@ -39,6 +39,7 @@
 #include <QFileInfo>
 #include <QInputDialog>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLocale>
@@ -193,6 +194,8 @@ MainWindow::MainWindow(QWidget* parent)
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
           [this]() { addWmtsLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addImageryFileRequested, this,
+          [this]() { addImageryFile(); });
   connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
           [this]() { addElevationFile(); });
   connect(m_layerDock, &LayerTreeDock::addWebTerrainRequested, this,
@@ -532,6 +535,11 @@ void MainWindow::createActions()
   connect(m_addWebTerrainAction, &QAction::triggered, this,
           [this]() { addWebTerrain(); });
 
+  m_addImageryAction = new QAction(this);
+  m_addImageryAction->setObjectName(QStringLiteral("addImageryAction"));
+  connect(m_addImageryAction, &QAction::triggered, this,
+          [this]() { addImageryFile(); });
+
   m_addElevationAction = new QAction(this);
   m_addElevationAction->setObjectName(QStringLiteral("addElevationAction"));
   connect(m_addElevationAction, &QAction::triggered, this,
@@ -581,6 +589,71 @@ void MainWindow::createActions()
   m_aboutAction->setObjectName(QStringLiteral("aboutAction"));
   m_aboutAction->setMenuRole(QAction::AboutRole);
   connect(m_aboutAction, &QAction::triggered, this, &MainWindow::showAbout);
+}
+
+namespace
+{
+
+/**
+ * A layer's name for the raster @p path: its name, but for an RPF table
+ * of contents, A.TOC, the name of the disc or folder it is on.
+ */
+QString imageryLayerName(const QString& path)
+{
+  const QFileInfo file(path);
+  if (file.fileName().compare(QLatin1String("A.TOC"), Qt::CaseInsensitive) !=
+      0) {
+    return file.completeBaseName();
+  }
+  // Usually <disc>/RPF/A.TOC.
+  QDir folder = file.absoluteDir();
+  if (folder.dirName().compare(QLatin1String("RPF"), Qt::CaseInsensitive) ==
+          0 &&
+      folder.cdUp() && !folder.dirName().isEmpty()) {
+    return folder.dirName();
+  }
+  return file.absoluteDir().dirName();
+}
+
+} // namespace
+
+void MainWindow::addImageryFile()
+{
+  const QString path = QFileDialog::getOpenFileName(
+      this, tr("Add Imagery File"), QString(),
+      tr("Images (*.tif *.tiff *.jp2 *.vrt *.img *.ntf *.nitf *.toc);;"
+         "All files (*)"));
+  if (path.isEmpty()) {
+    return;
+  }
+  QString error;
+  if (!addImageryLayer(path, &error)) {
+    QMessageBox::warning(this, tr("Add Imagery File"), error);
+  }
+}
+
+bool MainWindow::addImageryLayer(const QString& path, QString* errorString)
+{
+  LayerDefinition definition;
+  definition.id = QStringLiteral("user:imagery-") +
+                  QUuid::createUuid().toString(QUuid::WithoutBraces);
+  definition.origin = LayerOrigin::User;
+  definition.type = LayerType::Imagery;
+  definition.name = imageryLayerName(path);
+  QJsonObject source;
+  source.insert(QStringLiteral("kind"), QStringLiteral("file"));
+  source.insert(QStringLiteral("path"), QDir::cleanPath(path));
+  definition.source = source;
+  // Opened once now, so that an unreadable file is said at once.
+  QString error;
+  if (!m_registry->imagery(source, &error)) {
+    if (errorString != nullptr) {
+      *errorString = error;
+    }
+    return false;
+  }
+  m_layerDock->addLayer(definition);
+  return true;
 }
 
 void MainWindow::addElevationFile()
@@ -731,6 +804,7 @@ void MainWindow::createMenus()
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addWmtsAction);
+  m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
@@ -821,6 +895,10 @@ void MainWindow::retranslateUi()
   m_addWebTerrainAction->setStatusTip(
       tr("Add elevation from a web terrain tile service or a Cloud "
          "Optimized GeoTIFF on a server"));
+  m_addImageryAction->setText(tr("Add &Imagery File…"));
+  m_addImageryAction->setStatusTip(
+      tr("Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and "
+         "imagery through their A.TOC) as a layer"));
   m_addElevationAction->setText(tr("Add &Elevation File…"));
   m_addElevationAction->setStatusTip(
       tr("Add a digital elevation model (GeoTIFF or another raster) as "

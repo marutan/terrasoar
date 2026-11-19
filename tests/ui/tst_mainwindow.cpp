@@ -1023,6 +1023,37 @@ private slots:
     }
   }
 
+  void imageryFileLayer()
+  {
+    // A raster file becomes a visible imagery layer at the top; an RPF
+    // A.TOC is named after the disc or folder it is on, as RPF's own
+    // name says nothing.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QVERIFY(window.findChild<QAction*>(QStringLiteral("addImageryAction")));
+    QVERIFY(window.findChild<QAction*>(QStringLiteral("addImageryFileAction")));
+    ts::LayerTreeModel* model = window.layerModel();
+    const int32_t rows = model->rowCount();
+    QString error;
+    QVERIFY(window.addImageryLayer(
+        QStringLiteral(TS_TEST_DATA_DIR "/rpf/zone2/RPF/A.TOC"), &error));
+    QCOMPARE(model->rowCount(), rows + 1);
+    const QModelIndex added = model->index(0, 0);
+    const ts::LayerDefinition definition = model->layerDefinition(added);
+    QCOMPARE(definition.type, ts::LayerType::Imagery);
+    QCOMPARE(definition.name, QStringLiteral("zone2"));
+    QCOMPARE(definition.source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("file"));
+    QCOMPARE(model->data(added, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Checked));
+    // A file that can't be used: no layer, and why.
+    QVERIFY(!window.addImageryLayer(
+        QStringLiteral(TS_TEST_DATA_DIR "/sample.wkt"), &error));
+    QVERIFY(error.contains(QLatin1String("sample.wkt")));
+    QCOMPARE(model->rowCount(), rows + 1);
+  }
+
   void elevationFileLayer()
   {
     // A DEM file becomes a visible elevation layer above the terrain, and

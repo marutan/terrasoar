@@ -131,6 +131,19 @@ public:
   void addWmtsLayer(const QString& address = QString());
 
   /**
+   * Asks for a raster file (a GeoTIFF, an RPF A.TOC, …) and adds it as an
+   * imagery layer.
+   */
+  void addImageryFile();
+
+  /**
+   * Adds the raster file @p path as a visible imagery layer at the top,
+   * or returns false (and the reason in @p errorString) if it can't be
+   * used.
+   */
+  bool addImageryLayer(const QString& path, QString* errorString = nullptr);
+
+  /**
    * Asks for a DEM file and what its heights are measured from, and adds
    * it as an elevation layer.
    */
@@ -282,6 +295,7 @@ private:
   /** The line of the profile shown. */
   std::vector<LonLat> m_profileLine;
   QAction* m_addElevationAction = nullptr;
+  QAction* m_addImageryAction = nullptr;
   QAction* m_addWebTerrainAction = nullptr;
   QMenu* m_projectionMenu = nullptr;
   QActionGroup* m_projectionGroup = nullptr;

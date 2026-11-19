@@ -18,8 +18,21 @@ A new project starts with:
 
 **Add Layer** adds more: the built-in layers again (also Land, the
 shoreline filled, and test patterns), a [WMS layer](adding-wms-layers.md),
-an [elevation file or web terrain](terrain.md), or a solid colour (a tint
+an [imagery file](#imagery-files), an
+[elevation file or web terrain](terrain.md), or a solid colour (a tint
 over what is below).
+
+## Imagery files
+
+**File → Add Imagery File…** (or **Imagery File…** under **Add Layer**)
+adds a georeferenced image from your computer: a GeoTIFF, JPEG 2000 or
+another raster that says where on the Earth it is. For military charts
+and imagery in the Raster Product Format (CADRG, CIB), choose the disc's
+or folder's `A.TOC`: every chart it lists is shown, and the layer is
+named after the disc or folder. To see such charts as they were made,
+use View → Map Projection → **ARC Zones (RPF)** ([getting
+around](getting-around.md)). Images are fitted to the globe's tiles, so
+they are a little softer than the file, most of all near the poles.
 
 Vector layers (shoreline, graticule) are always drawn above imagery, in
 their order in the list.

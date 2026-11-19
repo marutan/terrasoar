@@ -13,4 +13,5 @@ otherwise.
 | `wms/*` | `tests/wms` | WMS capabilities documents: seven real ones (contact details removed) and synthetic odd ones; sources in `wms/README.md` |
 | `wmts/*` | `tests/wmts` | WMTS capabilities documents: seven real ones (contact details removed, large ones trimmed) and synthetic odd ones; sources in `wmts/README.md` |
 | `golden/*.png` | `tests/globe` | Golden images of the globe from fixed cameras, rendered on Mesa llvmpipe; see docs/testing.md to regenerate them |
+| `rpf/*` | `tests/providers`, `tests/globe`, `tests/ui` | Two synthetic CADRG charts (a checker, GNC 1:5M) in ARC zones 2 and 9, written by `tools/fixtures/make_rpf_fixtures.cpp` with GDAL 3.13's CADRG writer; see docs/design/rpf.md |
 | `geodtest-sample.dat` | `tests/geo` | 500 geodesics, every 20th line of C. F. F. Karney's `GeodTest-short.dat` (<https://doi.org/10.5281/zenodo.32156>, CC0 1.0); source and columns in the file header |

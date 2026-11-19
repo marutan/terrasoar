@@ -39,6 +39,7 @@
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/datumshift.h"
+#include "ts/providers/gdalimageryprovider.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
@@ -643,6 +644,30 @@ QString ProviderRegistry::basePackDirectory() const
   return m_basePackDirectory;
 }
 
+namespace
+{
+
+/** A local raster file read by GDAL ("kind": "file", "path"). */
+std::shared_ptr<ImageryProvider> createFileImagery(const QJsonObject& source,
+                                                   QString* errorString)
+{
+  const QString path = source.value(QStringLiteral("path")).toString();
+  std::shared_ptr<GdalImageryProvider> provider =
+      std::make_shared<GdalImageryProvider>(path);
+  if (provider->isValid()) {
+    return provider;
+  }
+  if (errorString != nullptr) {
+    *errorString =
+        QCoreApplication::translate("ts::ProviderRegistry",
+                                    "Cannot use \"%1\" as imagery: %2")
+            .arg(QDir::toNativeSeparators(path), provider->errorString());
+  }
+  return nullptr;
+}
+
+} // namespace
+
 std::shared_ptr<ImageryProvider>
 ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
 {
@@ -669,6 +694,9 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("wmts")) {
     provider = createWmtsImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("file")) {
+    provider = createFileImagery(source, errorString);
   } else {
     provider = createImageryProvider(source, errorString);
   }

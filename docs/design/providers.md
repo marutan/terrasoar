@@ -103,6 +103,10 @@ worker and no connection is ever used by two threads at once.
   and line strings with their multi forms) with bounds checks: a damaged
   blob is skipped, never read past its end.
 
+`GdalImageryProvider` reads any georeferenced raster GDAL can, an RPF
+`A.TOC` included, warping each tile from it into the tile's rectangle;
+layer sources `{"kind": "file", "path": …}` ([rpf.md](rpf.md)).
+
 Their writers, `SqliteTileStoreWriter` and `GeoPackageFeatureWriter`
 (through GDAL's GPKG driver, with an R-tree on every table), live next to
 them in core: the packager and the tests write files the same way.

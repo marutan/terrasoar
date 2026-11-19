@@ -94,6 +94,7 @@ HEADERS += \
     include/ts/projection/transversemercator.h \
     include/ts/projection/worldmaps.h \
     include/ts/projection/projection.h \
+    include/ts/providers/gdalimageryprovider.h \
     include/ts/providers/geopackagefeatureprovider.h \
     include/ts/providers/providerregistry.h \
     include/ts/providers/sqlitetileimageryprovider.h \
@@ -183,6 +184,7 @@ SOURCES += \
     src/projection/transversemercator.cpp \
     src/projection/worldmaps.cpp \
     src/projection/projection.cpp \
+    src/providers/gdalimageryprovider.cpp \
     src/providers/geopackagefeatureprovider.cpp \
     src/providers/providerregistry.cpp \
     src/providers/sqlitestatementpool.cpp \
