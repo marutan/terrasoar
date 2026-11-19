@@ -305,12 +305,23 @@ LocalExpansionProjection::shaderReferenceFor(double latDeg, double lonDeg,
                     static_cast<float>(e.hessianY[2]), 0.0F, 1.0F};
     return reference;
   }
-  const std::array<std::array<float, 4>, 2> parameters = glslParameters();
+  const std::array<std::array<float, 4>, 2> parameters =
+      glslParametersAt(latRad, dLonRad);
   reference.r0 = parameters[0];
   reference.r1 = parameters[1];
   reference.r2 = {static_cast<float>(dLonRad), static_cast<float>(latRad), 0.0F,
                   0.0F};
   return reference;
+}
+
+std::array<std::array<float, 4>, 2>
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+LocalExpansionProjection::glslParametersAt(double latRad, double dLonRad) const
+{
+  Q_UNUSED(latRad)
+  Q_UNUSED(dLonRad)
+  return glslParameters();
 }
 
 } // namespace ts

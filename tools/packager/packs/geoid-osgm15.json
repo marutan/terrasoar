@@ -1,9 +1,9 @@
 {
   "id": "geoid-osgm15",
-  "version": "2015.1",
+  "version": "2015.2",
   "index": {
-    "name": "OSGM15 geoid (Great Britain)",
-    "description": "Ordnance Survey's OSGM15 model of Ordnance Datum Newlyn, the height datum of Great Britain's maps and DEMs (OS Terrain 50, Environment Agency lidar). Adds it to the vertical datums elevation files can be measured from.",
+    "name": "UK grids: OSGM15 geoid and OSTN15 (Great Britain)",
+    "description": "Ordnance Survey's OSGM15 model of Ordnance Datum Newlyn, the height datum of Great Britain's maps and DEMs (OS Terrain 50, Environment Agency lidar), and OSTN15, the definitive transformation between GPS positions and the National Grid's OSGB36 datum. Adds ODN to the vertical datums elevation files can be measured from, and makes the UK National Grid map projection accurate to about 0.1 m instead of a few metres.",
     "licence": "BSD-2-Clause (Ordnance Survey, via PROJ)"
   },
   "sizeLimitBytes": 10000000,
@@ -17,6 +17,15 @@
       "name": "OSGM15 geoid model, ODN height (Ordnance Survey, as distributed by PROJ)",
       "version": "2015",
       "localNotices": ["../notices/uk_os_README.txt", "../notices/bsd-2-clause.txt"]
+    },
+    {
+      "id": "ostn15",
+      "file": "uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+      "url": "https://cdn.proj.org/uk_os_OSTN15_NTv2_OSGBtoETRS.tif",
+      "sha256": "5d6ed64d2119952c4c559fa1fccbc594b6520fc3ec3ef2fc10be13202c4384fa",
+      "name": "OSTN15 OSGB36 to ETRS89 transformation, NTv2 form (Ordnance Survey, as distributed by PROJ)",
+      "version": "2015",
+      "localNotices": ["../notices/uk_os_README.txt", "../notices/bsd-2-clause.txt"]
     }
   ],
   "geoids": [
@@ -27,6 +36,15 @@
       "licence": "BSD-2-Clause (Ordnance Survey)",
       "attribution": "OSGM15: Ordnance Survey",
       "copy": true
+    }
+  ],
+  "datumShifts": [
+    {
+      "dataset": "ostn15",
+      "source": "ostn15",
+      "name": "OSTN15 (OSGB36 to ETRS89)",
+      "licence": "BSD-2-Clause (Ordnance Survey)",
+      "attribution": "OSTN15: Ordnance Survey"
     }
   ]
 }

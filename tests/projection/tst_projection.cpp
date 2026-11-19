@@ -27,12 +27,15 @@
 #include <optional>
 #include <vector>
 
+#include <QFile>
 #include <QSet>
+#include <QTemporaryDir>
 #include <QtTest>
 
 #include <proj.h>
 
 #include "concurrency.h"
+#include "nationalgriddata.h"
 #include "offscreengl.h"
 #include "ts/deps/projcontext.h"
 #include "ts/geo/geodesic.h"
@@ -40,6 +43,8 @@
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
 #include "ts/projection/cylindricalprojection.h"
+#include "ts/projection/datumshift.h"
+#include "ts/projection/nationalgrid.h"
 #include "ts/projection/projection.h"
 
 namespace
@@ -92,6 +97,12 @@ private:
   ts::ProjContext m_context;
   PJ* m_transform = nullptr;
 };
+
+/** Stands in for offsets a grid didn't give. */
+constexpr std::array<double, 2> noOffset{1e9, 1e9};
+
+/** Stands in for a grid reference that didn't parse. */
+constexpr ts::MapPoint noPoint{-1.0, -1.0};
 
 /** Latitudes of the global grid inside @p projection's domain. */
 std::vector<double> gridLatitudes(const ts::Projection& projection)
@@ -239,7 +250,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{9});
+    QCOMPARE(all.size(), std::size_t{10});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -250,12 +261,18 @@ private slots:
       functions.insert(projection->glslFunction());
       QCOMPARE(ts::projectionById(projection->id()), projection);
       QCOMPARE(ts::projectionIndex(projection), static_cast<int32_t>(i));
-      // UTM's default zone (30) is the one west of Greenwich.
-      QCOMPARE(projection->centralMeridianDeg(),
-               projection->id() == QLatin1String("utm") ? -3.0 : 0.0);
+      // UTM's default zone (30) is the one west of Greenwich; the
+      // National Grid's origin is at 2° W.
+      double centre = 0.0;
+      if (projection->id() == QLatin1String("utm")) {
+        centre = -3.0;
+      } else if (projection->id() == QLatin1String("uk-national-grid")) {
+        centre = -2.0;
+      }
+      QCOMPARE(projection->centralMeridianDeg(), centre);
     }
-    QCOMPARE(ids.size(), 9);
-    QCOMPARE(functions.size(), 9);
+    QCOMPARE(ids.size(), 10);
+    QCOMPARE(functions.size(), 10);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -279,6 +296,8 @@ private slots:
     QTest::newRow("transverse-mercator") << 6;
     QTest::newRow("utm") << 7;
     QTest::newRow("cassini") << 8;
+    // With the Helmert transform (no OSTN15 grid installed).
+    QTest::newRow("uk-national-grid") << 9;
   }
 
   void againstProj()
@@ -305,11 +324,15 @@ private slots:
         const ts::Geodetic back = projection.inverse(theirs).value_or(nowhere);
         // PROJ's inverse of the ellipsoidal equal-area map is a truncated
         // series, out by up to about 1e-8° (and at its south pole, where
-        // the northing is flat in the latitude, by 2e-6°). Where PROJ
-        // doesn't come back to the point itself, the point is the
-        // reference.
+        // the northing is flat in the latitude, by 2e-6°); its inverse of
+        // the National Grid's Helmert pipeline restarts the OSGB36 height
+        // at zero, out by up to 7e-6° in longitude. Where PROJ doesn't
+        // come back to the point itself, the point is the reference.
         ts::Geodetic projBack = proj.inverse(theirs);
-        if (std::abs(projBack.latDeg - lat) > toleranceDeg) {
+        if (std::abs(projBack.latDeg - lat) > toleranceDeg ||
+            (std::abs(lat) < 90.0 &&
+             std::abs(ts::normaliseLonDeg(projBack.lonDeg - lon)) >
+                 toleranceDeg)) {
           projBack = ts::Geodetic{lat, lon, 0.0};
         }
         if (std::abs(lat) == 90.0) {
@@ -511,7 +534,7 @@ private slots:
       QVERIFY(!projection->inverse(ts::MapPoint{bounds.eastM, bounds.northM}));
       QVERIFY(!projection->inverse(ts::MapPoint{bounds.eastM + 1e5, 0.0}));
     }
-    QCOMPARE(limited, 3);
+    QCOMPARE(limited, 4);
   }
 
   void centralMeridian()
@@ -740,6 +763,293 @@ private slots:
     }
     QCOMPARE(compared, static_cast<int32_t>(all.size()) * 9 * 7 * samples);
     qInfo("GLSL against C++: worst error %.2f of the allowance", worstRelative);
+  }
+
+  void nationalGridHelmert()
+  {
+    // Without OSTN15: the Ordnance Survey's test points within 5 m (the
+    // Helmert transform's accuracy in Great Britain).
+    const ts::Projection& grid =
+        *ts::projectionById(QStringLiteral("uk-national-grid"));
+    double worstM = 0.0;
+    for (const ts::test::Ostn15TestPoint& point :
+         ts::test::ostn15TestPoints()) {
+      const ts::MapPoint ours = grid.forward(point.latDeg, point.lonDeg);
+      worstM = std::max(worstM, std::hypot(ours.xM - point.eastingM,
+                                           ours.yM - point.northingM));
+    }
+    QVERIFY2(worstM < 5.0, qPrintable(QString::number(worstM)));
+    QVERIFY(worstM > 0.5); // it is the Helmert, not the grid
+    qInfo("Helmert: worst %.2f m from the OSTN15 test points", worstM);
+  }
+
+  void nationalGridOstn15()
+  {
+    // With the real OSTN15 grid, where there is one (TS_OSTN15_GRID, or
+    // PROJ's data): the test points within a centimetre (the grid's NTv2
+    // form; PROJ is as far out), and PROJ's own result to a millimetre.
+    const QString path = ts::test::ostn15GridPath();
+    if (path.isEmpty()) {
+      QSKIP("No OSTN15 grid: set TS_OSTN15_GRID to "
+            "uk_os_OSTN15_NTv2_OSGBtoETRS.tif.");
+    }
+    QString error;
+    const std::shared_ptr<const ts::HorizontalShiftGrid> ostn15 =
+        ts::HorizontalShiftGrid::load(path, &error);
+    QVERIFY2(ostn15 != nullptr, qPrintable(error));
+    const ts::NationalGridProjection grid(ostn15);
+    const ProjPipeline proj(grid.projString());
+    QVERIFY2(proj.isValid(), qPrintable(grid.projString()));
+    double worstOsM = 0.0;
+    double worstProjM = 0.0;
+    double worstBackDeg = 0.0;
+    for (const ts::test::Ostn15TestPoint& point :
+         ts::test::ostn15TestPoints()) {
+      const ts::MapPoint ours = grid.forward(point.latDeg, point.lonDeg);
+      const ts::MapPoint theirs = proj.forward(point.latDeg, point.lonDeg);
+      worstOsM = std::max(worstOsM, std::hypot(ours.xM - point.eastingM,
+                                               ours.yM - point.northingM));
+      worstProjM = std::max(
+          worstProjM, std::hypot(ours.xM - theirs.xM, ours.yM - theirs.yM));
+      const ts::Geodetic back = grid.inverse(ours).value_or(nowhere);
+      worstBackDeg =
+          std::max({worstBackDeg, std::abs(back.latDeg - point.latDeg),
+                    std::abs(back.lonDeg - point.lonDeg)});
+    }
+    QVERIFY2(worstOsM < 0.01, qPrintable(QString::number(worstOsM)));
+    QVERIFY2(worstProjM < toleranceM, qPrintable(QString::number(worstProjM)));
+    QVERIFY2(worstBackDeg < toleranceDeg,
+             qPrintable(QString::number(worstBackDeg)));
+    qInfo("OSTN15: worst %.4f m from the test points, %.6f m from PROJ",
+          worstOsM, worstProjM);
+  }
+
+  void shiftGrid()
+  {
+    // A synthetic grid: offsets at the nodes, bilinear between them, the
+    // NTv2 sign convention undone, nothing outside.
+    const QTemporaryDir dir;
+    const QString east = dir.filePath(QStringLiteral("east.tif"));
+    const QString west = dir.filePath(QStringLiteral("west.tif"));
+    QVERIFY(ts::test::writeFixtureShiftGrid(east, 0.25, false));
+    QVERIFY(ts::test::writeFixtureShiftGrid(west, 0.25, true));
+    QString error;
+    const std::shared_ptr<const ts::HorizontalShiftGrid> grid =
+        ts::HorizontalShiftGrid::load(east, &error);
+    QVERIFY2(grid != nullptr, qPrintable(error));
+    const std::shared_ptr<const ts::HorizontalShiftGrid> westGrid =
+        ts::HorizontalShiftGrid::load(west, &error);
+    QVERIFY2(westGrid != nullptr, qPrintable(error));
+    const double second = ts::degToRad(1.0 / 3600.0);
+    for (const std::array<double, 2>& node :
+         {std::array<double, 2>{49.0, -9.0}, std::array<double, 2>{61.0, 2.0},
+          std::array<double, 2>{52.5, -1.75}}) {
+      const std::optional<std::array<double, 2>> offset =
+          grid->offsetRad(ts::degToRad(node[0]), ts::degToRad(node[1]));
+      QVERIFY(offset.has_value());
+      const std::array<double, 2> at = offset.value_or(noOffset);
+      QVERIFY(std::abs(at[0] / second -
+                       ts::test::fixtureLatOffsetSec(node[0], node[1])) < 1e-5);
+      QVERIFY(std::abs(at[1] / second -
+                       ts::test::fixtureLonOffsetSec(node[0], node[1])) < 1e-5);
+      QCOMPARE(
+          westGrid->offsetRad(ts::degToRad(node[0]), ts::degToRad(node[1])),
+          offset);
+    }
+    // Halfway between four nodes: their mean.
+    const std::optional<std::array<double, 2>> middle =
+        grid->offsetRad(ts::degToRad(52.625), ts::degToRad(-1.875));
+    QVERIFY(middle.has_value());
+    double mean = 0.0;
+    for (const double lat : {52.5, 52.75}) {
+      for (const double lon : {-2.0, -1.75}) {
+        mean += 0.25 * ts::test::fixtureLatOffsetSec(lat, lon);
+      }
+    }
+    QVERIFY(std::abs(middle.value_or(noOffset)[0] / second - mean) < 1e-5);
+    QVERIFY(!grid->offsetRad(ts::degToRad(48.99), 0.0).has_value());
+    QVERIFY(
+        !grid->offsetRad(ts::degToRad(50.0), ts::degToRad(2.01)).has_value());
+    QCOMPARE(grid->insideDeg(50.0, 1.5), 0.5);
+    QVERIFY(grid->insideDeg(48.0, 0.0) < 0.0);
+    // Outside, the nearest edge's offsets.
+    QCOMPARE(grid->clampedOffsetRad(ts::degToRad(70.0), ts::degToRad(1.0)),
+             grid->offsetRad(ts::degToRad(61.0), ts::degToRad(1.0))
+                 .value_or(noOffset));
+    // Not a horizontal offset grid.
+    const QString other = dir.filePath(QStringLiteral("other.tif"));
+    QFile text(other);
+    QVERIFY(text.open(QIODevice::WriteOnly));
+    text.write("not a grid");
+    text.close();
+    QVERIFY(ts::HorizontalShiftGrid::load(other, &error) == nullptr);
+    QVERIFY(!error.isEmpty());
+  }
+
+  void osgb36Datum()
+  {
+    const QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("grid.tif"));
+    QVERIFY(ts::test::writeFixtureShiftGrid(path));
+    QString error;
+    const ts::Osgb36Datum datum(ts::HorizontalShiftGrid::load(path, &error));
+    QVERIFY2(datum.hasGrid(), qPrintable(error));
+    QCOMPARE(datum.gridPath(), path);
+    const ts::Osgb36Datum helmert(nullptr);
+    QVERIFY(!helmert.hasGrid());
+    const std::shared_ptr<const ts::HorizontalShiftGrid> loaded =
+        ts::HorizontalShiftGrid::load(path, &error);
+    QVERIFY(loaded != nullptr);
+    const ts::HorizontalShiftGrid& grid = *loaded;
+
+    // Well inside: OSGB36 plus the offset at the OSGB36 point is WGS 84.
+    const double lat = ts::degToRad(53.2);
+    const double lon = ts::degToRad(-3.1);
+    const std::array<double, 2> osgb = datum.fromWgs84(lat, lon);
+    const std::array<double, 2> offset =
+        grid.offsetRad(osgb[0], osgb[1]).value_or(noOffset);
+    QVERIFY(std::abs(osgb[0] + offset[0] - lat) < 1e-14);
+    QVERIFY(std::abs(osgb[1] + offset[1] - lon) < 1e-14);
+    const std::array<double, 2> back = datum.toWgs84(osgb[0], osgb[1]);
+    QVERIFY(std::abs(back[0] - lat) < 1e-13);
+    QVERIFY(std::abs(back[1] - lon) < 1e-13);
+
+    // Outside: the Helmert transform; across the blended edge, no jump.
+    const std::array<double, 2> outside =
+        datum.fromWgs84(ts::degToRad(45.0), ts::degToRad(-3.0));
+    QCOMPARE(outside, ts::Osgb36Datum::helmertFromWgs84(ts::degToRad(45.0),
+                                                        ts::degToRad(-3.0)));
+    QCOMPARE(helmert.fromWgs84(lat, lon),
+             ts::Osgb36Datum::helmertFromWgs84(lat, lon));
+    const double step = ts::degToRad(1e-7);
+    for (int32_t i = 0; i < 25; ++i) {
+      const double a = ts::degToRad(48.95 + 0.01 * i);
+      const std::array<double, 2> below = datum.fromWgs84(a, lon);
+      const std::array<double, 2> above = datum.fromWgs84(a + step, lon);
+      // No jump: the change is about the step itself (the fixture is
+      // seconds of arc from the Helmert, blended over 0.1°).
+      QVERIFY(std::abs((above[0] - below[0]) - step) < 0.1 * step);
+      QVERIFY(std::abs(above[1] - below[1]) < 0.1 * step);
+    }
+  }
+
+  void gridReferences()
+  {
+    // Formatting, as the Ordnance Survey does (truncated, not rounded).
+    QCOMPARE(ts::formatGridReference(0.0, 0.0),
+             QStringLiteral("SV 00000 00000"));
+    QCOMPARE(ts::formatGridReference(438710.908, 114792.248),
+             QStringLiteral("SU 38710 14792"));
+    QCOMPARE(ts::formatGridReference(438710.908, 114792.248, 6),
+             QStringLiteral("SU 387 147"));
+    QCOMPARE(ts::formatGridReference(438710.908, 114792.248, 2),
+             QStringLiteral("SU 3 1"));
+    QCOMPARE(ts::formatGridReference(438710.908, 114792.248, 0),
+             QStringLiteral("SU"));
+    QCOMPARE(ts::formatGridReference(132508.0, 830205.0),
+             QStringLiteral("NG 32508 30205"));
+    QCOMPARE(ts::formatGridReference(500025.0, 500025.0, 4),
+             QStringLiteral("OV 00 00"));
+    QCOMPARE(ts::formatGridReference(530080.4, 180729.9),
+             QStringLiteral("TQ 30080 80729"));
+    QCOMPARE(ts::formatGridReference(699999.0, 1299999.0),
+             QStringLiteral("JM 99999 99999"));
+    QCOMPARE(ts::formatGridReference(460000.0, 1210000.0, 0),
+             QStringLiteral("HP"));
+    QVERIFY(ts::formatGridReference(-1.0, 10.0).isEmpty());
+    QVERIFY(ts::formatGridReference(700000.0, 10.0).isEmpty());
+    QVERIFY(ts::formatGridReference(10.0, 1300000.0).isEmpty());
+    QVERIFY(ts::formatGridReference(10.0, 10.0, 3).isEmpty());
+
+    // Parsing: the south-west corner of the square named.
+    const std::optional<ts::MapPoint> tq =
+        ts::parseGridReference(QStringLiteral("TQ 30080 80729"));
+    QVERIFY(tq.has_value());
+    QCOMPARE(tq.value_or(noPoint).xM, 530080.0);
+    QCOMPARE(tq.value_or(noPoint).yM, 180729.0);
+    const std::optional<ts::MapPoint> packed =
+        ts::parseGridReference(QStringLiteral(" tq3008080729 "));
+    QVERIFY(packed.has_value());
+    QCOMPARE(packed.value_or(noPoint).xM, 530080.0);
+    QCOMPARE(packed.value_or(noPoint).yM, 180729.0);
+    const std::optional<ts::MapPoint> su =
+        ts::parseGridReference(QStringLiteral("SU 387 147"));
+    QVERIFY(su.has_value());
+    QCOMPARE(su.value_or(noPoint).xM, 438700.0);
+    QCOMPARE(su.value_or(noPoint).yM, 114700.0);
+    const std::optional<ts::MapPoint> nn =
+        ts::parseGridReference(QStringLiteral("NN"));
+    QVERIFY(nn.has_value());
+    QCOMPARE(nn.value_or(noPoint).xM, 200000.0);
+    QCOMPARE(nn.value_or(noPoint).yM, 700000.0);
+    for (const char* bad : {"", "TQ 123 45", "TQ 12345", "IQ 1 1", "ZZ", "AA",
+                            "TQ 123456 123456", "T 1 1", "TQ 1a 1"}) {
+      QVERIFY2(!ts::parseGridReference(QString::fromLatin1(bad)).has_value(),
+               bad);
+    }
+    // Every test point, there and back.
+    for (const ts::test::Ostn15TestPoint& point :
+         ts::test::ostn15TestPoints()) {
+      const QString reference =
+          ts::formatGridReference(point.eastingM, point.northingM);
+      const std::optional<ts::MapPoint> parsed =
+          ts::parseGridReference(reference);
+      QVERIFY2(parsed.has_value(), qPrintable(reference));
+      QCOMPARE(parsed.value_or(noPoint).xM, std::floor(point.eastingM));
+      QCOMPARE(parsed.value_or(noPoint).yM, std::floor(point.northingM));
+    }
+  }
+
+  void gridReadout()
+  {
+    // The National Grid gives its grid reference; projections without a
+    // grid of their own, and points outside the lettered squares, none.
+    const ts::Projection& grid =
+        *ts::projectionById(QStringLiteral("uk-national-grid"));
+    const ts::MapPoint london = grid.forward(51.5007, -0.1246);
+    QCOMPARE(grid.gridReference(51.5007, -0.1246),
+             ts::formatGridReference(london.xM, london.yM));
+    QVERIFY(grid.gridReference(51.5007, -0.1246)
+                .startsWith(QLatin1String("TQ 30")));
+    QVERIFY(grid.gridReference(10.0, -2.0).isEmpty());
+    QVERIFY(grid.gridReference(51.5, 90.0).isEmpty()); // outside the domain
+    QVERIFY(ts::projections().front()->gridReference(51.5, -0.12).isEmpty());
+    QCOMPARE(grid.datumShiftGridId(), QStringLiteral("ostn15"));
+    QVERIFY(ts::projections().front()->datumShiftGridId().isEmpty());
+  }
+
+  void projectionWithDatumGrid()
+  {
+    // An installed grid: projectionWith() gives an instance that uses it,
+    // the same one each time; without, the standard instance again.
+    const QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("ostn15.tif"));
+    QVERIFY(ts::test::writeFixtureShiftGrid(path));
+    const QString id = QStringLiteral("uk-national-grid");
+    const ts::Projection* standard = ts::projectionById(id);
+    QCOMPARE(ts::projectionWith(id, {}), standard);
+    ts::setDatumShiftGrids({{QStringLiteral("ostn15"), path}});
+    const ts::Projection* withGrid = ts::projectionWith(id, {});
+    QVERIFY(withGrid != standard);
+    QCOMPARE(ts::projectionWith(id, {}), withGrid);
+    QCOMPARE(ts::projectionIndex(withGrid), ts::projectionIndex(standard));
+    QVERIFY(withGrid->projString().contains(QLatin1String("hgridshift")));
+    QVERIFY(withGrid->projString().contains(path));
+    // The fixture's offsets differ from the real datum shift by tens of
+    // metres: a different map position.
+    const ts::MapPoint a = standard->forward(53.0, -2.0);
+    const ts::MapPoint b = withGrid->forward(53.0, -2.0);
+    QVERIFY(std::hypot(a.xM - b.xM, a.yM - b.yM) > 1.0);
+    // Other projections are unaffected.
+    QCOMPARE(ts::projectionWith(QStringLiteral("mercator"), {}),
+             ts::projections().front());
+    ts::setDatumShiftGrids({});
+    QCOMPARE(ts::projectionWith(id, {}), standard);
+    // A grid that can't be read is left out.
+    ts::setDatumShiftGrids({{QStringLiteral("ostn15"),
+                             dir.filePath(QStringLiteral("missing.tif"))}});
+    QVERIFY(ts::datumShiftGrid(QStringLiteral("ostn15")) == nullptr);
+    QCOMPARE(ts::projectionWith(id, {}), standard);
   }
 
   void concurrentSharedInstances()

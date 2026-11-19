@@ -59,6 +59,12 @@ chooses how it is flattened:
   worldwide.
 - **Cassini–Soldner**: the older transverse projection of many national
   and cadastral surveys; 30° either side of its central meridian.
+- **UK National Grid (OSGB36)**: the Ordnance Survey's grid of Great
+  Britain, as on OS maps. The status bar gives the grid reference under
+  the pointer (such as TQ 30080 80729). Positions are converted from GPS
+  coordinates to the grid's OSGB36 datum to within a few metres; with
+  the **UK grids** data pack (File → Data Packs) installed, to about
+  10 cm, the Ordnance Survey's own transformation (OSTN15).
 
 The cylindrical maps wrap round east to west, so you can keep dragging.
 The transverse ones end at the edge of the area they show: the view stops
@@ -85,9 +91,10 @@ the settings with the projection.
 
 At the bottom right:
 
-- the **pointer's position** in latitude and longitude, and, with an
-  elevation layer, the **height of the ground** there (above sea level, or
-  above the WGS 84 ellipsoid with View → Heights Above the Ellipsoid);
+- the **pointer's position** in latitude and longitude; on the UK
+  National Grid map also its **grid reference**; and, with an elevation
+  layer, the **height of the ground** there (above sea level, or above
+  the WGS 84 ellipsoid with View → Heights Above the Ellipsoid);
 - the **eye height**: how high the camera is above the ellipsoid;
 - the **base pack**'s state (checked when the program starts; it says if
   the built-in data is missing or damaged).

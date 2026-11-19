@@ -135,6 +135,9 @@ struct PackVerification {
  *                  "source": {"name": "...", "version": "...",
  *                             "url": "...", "sha256": "..."},
  *                  "replaces": "..."} ],
+ *   "datumShifts": [ {"id": "ostn15", "file": "...", "name": "...",
+ *                     "licence": "...", "attribution": "...",
+ *                     "source": {...}} ],
  *   "notices": ["licences/..."]
  * }
  * ```
@@ -188,6 +191,13 @@ public:
   std::vector<PackFile> files;
   /** The pack's datasets. */
   std::vector<PackDataset> datasets;
+  /**
+   * Horizontal datum shift grids (PROJ GeoTIFF, such as OSTN15), by the
+   * id projections ask for (ts::datumShiftGrid()); their kind is unused.
+   * Optional, and listed apart from the datasets: versions 0.0.2 and
+   * earlier reject a dataset kind they don't know, and ignore this.
+   */
+  std::vector<PackDataset> datumShifts;
   /** Licence and notice files in the pack, relative paths. */
   std::vector<QString> notices;
 };

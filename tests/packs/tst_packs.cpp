@@ -41,12 +41,14 @@
 #include "fixturepack.h"
 #include "mockhttpserver.h"
 #include "mockpacks.h"
+#include "nationalgriddata.h"
 #include "ts/network/networkclient.h"
 #include "ts/packs/basepack.h"
 #include "ts/packs/packindex.h"
 #include "ts/packs/packinstall.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
+#include "ts/projection/datumshift.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/tiling/tilekey.h"
@@ -437,6 +439,73 @@ private slots:
                  .datasets.at(0)
                  .replaces,
              QStringLiteral("bluemarble"));
+  }
+
+  void manifestDatumShifts()
+  {
+    const QTemporaryDir dir;
+    ts::PackManifest manifest =
+        writePack(dir.path(), QStringLiteral("test-pack"));
+    // None: no "datumShifts" key, so the manifest is as before.
+    QVERIFY(!manifest.toJson().contains(QStringLiteral("datumShifts")));
+    ts::PackDataset shift;
+    shift.id = QStringLiteral("ostn15");
+    shift.file = manifest.files.at(0).path;
+    shift.name = QStringLiteral("OSTN15");
+    shift.attribution = QStringLiteral("OSTN15: Ordnance Survey");
+    shift.source.url = QStringLiteral("https://example.org/ostn15.tif");
+    manifest.datumShifts.push_back(shift);
+    QString error;
+    const std::optional<ts::PackManifest> read =
+        ts::PackManifest::fromJson(manifest.toJson(), &error);
+    if (!read) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(read->toJson(), manifest.toJson());
+    QCOMPARE(read->datumShifts.size(), std::size_t{1});
+    QCOMPARE(read->datumShifts.at(0).id, QStringLiteral("ostn15"));
+    QCOMPARE(read->datumShifts.at(0).source.url, shift.source.url);
+    // Not among the datasets: versions 0.0.2 and earlier reject a kind
+    // they don't know, and skip this key.
+    QCOMPARE(read->datasets.size(), manifest.datasets.size());
+
+    // Its file must be one of the pack's.
+    manifest.datumShifts.at(0).file = QStringLiteral("missing.tif");
+    QVERIFY(!ts::PackManifest::fromJson(manifest.toJson(), &error));
+    QVERIFY(error.contains(QLatin1String("Datum shift")));
+  }
+
+  void installedDatumShifts()
+  {
+    // An installed pack's grid becomes the process's (for the National
+    // Grid projection); a damaged pack's doesn't, nor once it's gone.
+    const QTemporaryDir dir;
+    QVERIFY(ts::test::writeFixtureShiftGrid(
+        dir.filePath(QStringLiteral("ostn15.tif"))));
+    ts::InstalledPack pack;
+    pack.directory = dir.path();
+    pack.manifest.id = QStringLiteral("uk-grids");
+    ts::PackDataset shift;
+    shift.id = QStringLiteral("ostn15");
+    shift.file = QStringLiteral("ostn15.tif");
+    pack.manifest.datumShifts.push_back(shift);
+    ts::ProviderRegistry registry;
+    registry.setInstalledPacks({pack});
+    const std::shared_ptr<const ts::HorizontalShiftGrid> grid =
+        ts::datumShiftGrid(QStringLiteral("ostn15"));
+    QVERIFY(grid != nullptr);
+    QCOMPARE(grid->path(), dir.filePath(QStringLiteral("ostn15.tif")));
+    // The same file again: the grid already read.
+    registry.setInstalledPacks({pack});
+    QCOMPARE(ts::datumShiftGrid(QStringLiteral("ostn15")), grid);
+    pack.damaged = true;
+    registry.setInstalledPacks({pack});
+    QVERIFY(ts::datumShiftGrid(QStringLiteral("ostn15")) == nullptr);
+    pack.damaged = false;
+    registry.setInstalledPacks({pack});
+    QVERIFY(ts::datumShiftGrid(QStringLiteral("ostn15")) != nullptr);
+    registry.setInstalledPacks({});
+    QVERIFY(ts::datumShiftGrid(QStringLiteral("ostn15")) == nullptr);
   }
 
   void installFromScratch()

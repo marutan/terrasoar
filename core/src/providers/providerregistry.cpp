@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <map>
 
 #include <QColor>
 #include <QCoreApplication>
@@ -37,6 +38,7 @@
 #include "ts/network/networkclient.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
+#include "ts/projection/datumshift.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
@@ -248,9 +250,16 @@ void ProviderRegistry::setInstalledPacks(
   m_packGeoids.clear();
   // Providers created from now on use the packs' geoids.
   m_geoids.clear();
+  // Datum shift grids (OSTN15) go to the projections; the first pack
+  // with one wins.
+  std::map<QString, QString> shiftGrids;
   for (const InstalledPack& pack : packs) {
     if (pack.damaged) {
       continue;
+    }
+    for (const PackDataset& shift : pack.manifest.datumShifts) {
+      shiftGrids.try_emplace(shift.id,
+                             QDir(pack.directory).filePath(shift.file));
     }
     for (const PackDataset& dataset : pack.manifest.datasets) {
       if (dataset.kind == PackDataset::Kind::Geoid) {
@@ -274,6 +283,7 @@ void ProviderRegistry::setInstalledPacks(
       m_replacements[dataset.replaces] = replacement;
     }
   }
+  setDatumShiftGrids(shiftGrids);
 }
 
 std::shared_ptr<FeatureProvider>

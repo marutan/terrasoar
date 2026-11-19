@@ -83,7 +83,9 @@ HEADERS += \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
     include/ts/projection/cylindricalprojection.h \
+    include/ts/projection/datumshift.h \
     include/ts/projection/localexpansion.h \
+    include/ts/projection/nationalgrid.h \
     include/ts/projection/normalcylindrical.h \
     include/ts/projection/transversemercator.h \
     include/ts/projection/projection.h \
@@ -164,7 +166,9 @@ SOURCES += \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
     src/projection/cylindricalprojection.cpp \
+    src/projection/datumshift.cpp \
     src/projection/localexpansion.cpp \
+    src/projection/nationalgrid.cpp \
     src/projection/normalcylindrical.cpp \
     src/projection/transversemercator.cpp \
     src/projection/projection.cpp \

@@ -1750,6 +1750,10 @@
             <source>Cassini–Soldner</source>
             <translation>Cassini–Soldner</translation>
         </message>
+        <message>
+            <source>UK National Grid (OSGB36)</source>
+            <translation>UK National Grid (OSGB36)</translation>
+        </message>
     </context>
     <context>
         <name>ts::ProjectionSettingsDialog</name>

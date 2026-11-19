@@ -54,7 +54,7 @@ versions ignore the field.
 | `bluemarble-full` | `bluemarble` | The same Blue Marble image as the base pack (21600 × 10800 px), tiled to level 6 instead of 4: about 1.2 km per pixel instead of 4.9 km | 67 MB |
 | `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the high and full resolutions: crude to intermediate as in the base pack, high (0.2 km) from level 6, full (10.9 million vertices) from level 8 | 241 MB |
 | `geoid-egm2008-fine` | `egm2008` | EGM2008 at its published 2.5′ grid (PROJ's `us_nga_egm08_25.tif`) instead of the base pack's 5′, as 16-bit centimetres: within 1 cm of PROJ's grid instead of 0.4 m | 13.4 MB |
-| `geoid-osgm15` | (a datum of its own, `osgm15`) | Ordnance Survey's OSGM15 for Ordnance Datum Newlyn (PROJ's `uk_os_OSGM15_GB.tif`, shipped as it is, BSD-2-Clause) | 1.5 MB |
+| `geoid-osgm15` ("UK grids") | (a datum of its own, `osgm15`) | Ordnance Survey's OSGM15 for Ordnance Datum Newlyn (PROJ's `uk_os_OSGM15_GB.tif`, shipped as it is, BSD-2-Clause); from version 2015.2 also OSTN15 (PROJ's `uk_os_OSTN15_NTv2_OSGBtoETRS.tif`, BSD-2-Clause) for the UK National Grid projection | 4.5 MB |
 
 A geoid pack replacing a base pack geoid makes every elevation source on
 that datum use the finer grid (the registry keys providers by the grid in
@@ -62,6 +62,16 @@ use, so the terrain is reloaded when the pack is installed or removed).
 One that brings a datum of its own adds it to the datums elevation files
 and web terrain can be measured from (`ProviderRegistry::verticalDatums()`,
 see [vertical-datums.md](vertical-datums.md)).
+
+**Datum shift grids.** A pack may also carry horizontal datum shift
+grids (PROJ GeoTIFF, such as OSTN15) for projections in another datum,
+listed under the manifest's optional `"datumShifts"` (each with `id`,
+`file`, `name`, `licence`, `attribution` and `source`, as a dataset
+without `kind`), not among the datasets: versions 0.0.2 and earlier
+reject a manifest with a dataset kind they don't know, but ignore an
+unknown key, so the UK grids pack still installs there (OSGM15 only).
+`setInstalledPacks()` passes them to `ts::setDatumShiftGrids()`; see
+[projections.md](projections.md#the-uk-national-grid-and-the-osgb36-datum).
 
 Their packager configurations are `tools/packager/packs/*.json`; `make packs`
 builds them with their release files and index entries

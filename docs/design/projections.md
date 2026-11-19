@@ -254,6 +254,69 @@ edges against the projected curve, and needs no detail outside the
 domain. Vector pieces are clipped to the domain and markers outside it
 are hidden, because lines and dots squashed onto the edge would show.
 
+## The UK National Grid and the OSGB36 datum
+
+`ts::NationalGridProjection` (`nationalgrid.h`, id `uk-national-grid`) is
+the Ordnance Survey National Grid, EPSG:27700: Transverse Mercator on the
+Airy 1830 ellipsoid (a = 6 377 563.396 m, b = 6 356 256.909 m), true
+origin 49° N 2° W, k0 = 0.9996012717, false origin E 400 km, N −100 km.
+It is `TransverseMercatorProjection` made on Airy (Krüger's series are
+built for any ellipsoid) with a datum change before it, so map positions
+are true eastings and northings. It has no settings; it shows ±40° of
+2° W and ±85° of latitude (as Mercator; see below).
+
+**The datum.** The map's data are WGS 84; the grid is on OSGB36.
+`ts::Osgb36Datum` converts as PROJ does from EPSG:4326 to EPSG:4277:
+
+- **With OSTN15**, the Ordnance Survey's definitive transformation, in
+  its NTv2 form (PROJ's `uk_os_OSTN15_NTv2_OSGBtoETRS.tif`): WGS 84 is
+  taken as ETRS89 (they differ by under a metre, as PROJ also takes
+  them), and the grid's offsets, which are given at OSGB36 points, are
+  removed by iteration (`OSGB36 + offset(OSGB36) = ETRS89`), as PROJ's
+  inverse `hgridshift`. The OS's 40 test points (TP01–TP40) come out
+  within 8 mm, as PROJ's do; PROJ's own result within a micrometre.
+- **Without it, or outside it**: the Helmert transform "OSGB36 to WGS 84
+  (6)" (EPSG:1314, position vector, rotations as small angles), at zero
+  ellipsoidal height, the height dropped: PROJ's choice without the grid,
+  within 0.1 mm of PROJ and 5 m of OSTN15 over Great Britain.
+- Over the grid's outermost 0.1° (all at sea: the grid runs from 9° W to
+  2° E and 49° N to 61° N) the two are blended by a smoothstep, so
+  positions don't jump at its edge (Helmert and OSTN15 differ by metres
+  there).
+
+`ts::HorizontalShiftGrid` (`datumshift.h`) reads such a grid (PROJ's
+GeoTIFF horizontal offsets: arc-seconds, longitude positive east, NTv2's
+positive west undone) whole into memory and interpolates it bilinearly.
+The grid comes in the `geoid-osgm15` ("UK grids") pack, listed in its
+manifest under `datumShifts` (see [packs](packs.md)).
+`ProviderRegistry::setInstalledPacks()` hands the installed packs' grids
+to `ts::setDatumShiftGrids()`; `projectionWith()` then makes a National
+Grid instance with the grid (keyed by it, as instances are by their
+parameters), and the main window chooses the projection again whenever
+the packs change. `Projection::datumShiftGridId()` says which grid a
+projection wants.
+
+**In the shader.** Small tiles need nothing new: the Taylor expansion is
+of `project()`, datum change and all. Large tiles use the Transverse
+Mercator formula on Airy with a prologue (`glslForwardPrologue()`) that
+shifts the vertex's latitude and longitude by the abridged Molodensky
+formulas (the Helmert's translation and the change of ellipsoid) in
+float, plus `p1.xy`: the exact shift at the tile's reference minus
+Molodensky's there (`glslParametersAt()`). So the shift is exact at the
+reference, and what the shader leaves out (the Helmert's rotations and
+scale, OSTN15's detail) changes by little across a tile. Molodensky
+divides by cos φ, and near the poles it drifts from the exact shift
+faster than a tile's texels allow; hence the ±85° latitude limit.
+
+**Grid references.** `formatGridReference()` gives "TQ 30080 80729": the
+two letters of the 500 km and 100 km squares (A–Z without I, from the
+north-west; the false origin is in SV), then the easting and northing
+within the square, truncated as the OS does, with 0 to 10 digits.
+`parseGridReference()` reads the same, with or without spaces, and gives
+the square's south-west corner. `Projection::gridReference()` is what
+the status bar shows on the map (empty for projections without a grid of
+their own).
+
 ## Adding a projection
 
 1. **Write the class.** Derive from `ts::Projection`; from

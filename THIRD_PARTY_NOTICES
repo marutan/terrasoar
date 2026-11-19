@@ -137,14 +137,20 @@ shoreline-full: GSHHG 2.3.7 above with its high and full resolutions
 geoid-egm2008-fine: the EGM2008 geoid above at its 2.5' grid
   (us_nga_egm08_25.tif). Public domain (NGA).
 
-geoid-osgm15: OSGM15, Ordnance Survey's geoid model for Ordnance Datum
-  Newlyn, Great Britain (uk_os_OSGM15_GB.tif as distributed by PROJ,
+geoid-osgm15 ("UK grids"): OSGM15, Ordnance Survey's geoid model for
+  Ordnance Datum Newlyn, Great Britain (uk_os_OSGM15_GB.tif as
+  distributed by PROJ, unchanged), and, from version 2015.2, OSTN15, the
+  Ordnance Survey's transformation between OSGB36 and ETRS89 in its NTv2
+  form (uk_os_OSTN15_NTv2_OSGBtoETRS.tif as distributed by PROJ,
   unchanged). BSD 2-Clause licence (Ordnance Survey, via PROJ).
-  Attribution: "OSGM15: Ordnance Survey"
+  Attribution: "OSGM15: Ordnance Survey", "OSTN15: Ordnance Survey"
 
 The source tree also has test data that is not distributed:
 tests/data/geodtest-sample.dat, a sample of C. F. F. Karney's "Test set
-for geodesics", CC0 1.0, https://doi.org/10.5281/zenodo.32156.
+for geodesics", CC0 1.0, https://doi.org/10.5281/zenodo.32156; and, in
+tests/support/nationalgriddata.h, the Ordnance Survey's OSTN15 test
+points (TP01 to TP40 and their National Grid coordinates, from the
+OSTN15 developer pack), BSD 2-Clause licence as OSTN15 itself.
 
 Build-time tools (not distributed)
 ----------------------------------

@@ -27,8 +27,11 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <tuple>
 
 #include "ts/projection/cylindricalprojection.h"
+#include "ts/projection/datumshift.h"
+#include "ts/projection/nationalgrid.h"
 #include "ts/projection/normalcylindrical.h"
 #include "ts/projection/transversemercator.h"
 
@@ -164,6 +167,7 @@ const std::vector<const Projection*>& projections()
   static const TransverseMercatorProjection transverseMercator;
   static const UtmProjection utm;
   static const CassiniProjection cassini;
+  static const NationalGridProjection nationalGrid;
   static const std::vector<const Projection*> all = {&mercator,
                                                      &webMercator,
                                                      &miller,
@@ -172,7 +176,8 @@ const std::vector<const Projection*>& projections()
                                                      &gallPeters,
                                                      &transverseMercator,
                                                      &utm,
-                                                     &cassini};
+                                                     &cassini,
+                                                     &nationalGrid};
   return all;
 }
 
@@ -181,8 +186,12 @@ namespace
 
 /** Makes an instance of a projection with parameters, by id. */
 std::unique_ptr<Projection>
-makeProjection(const QString& id, const ProjectionParameterValues& values)
+makeProjection(const QString& id, const ProjectionParameterValues& values,
+               const std::shared_ptr<const HorizontalShiftGrid>& grid)
 {
+  if (id == QLatin1String("uk-national-grid")) {
+    return std::make_unique<NationalGridProjection>(grid);
+  }
   if (id == QLatin1String("equidistant-cylindrical")) {
     return std::make_unique<EquidistantCylindricalProjection>(
         values.at(QStringLiteral("standardParallel")));
@@ -225,19 +234,24 @@ const Projection* projectionWith(const QString& id,
     complete[parameter.key] = value;
     allDefault = allDefault && value == parameter.defaultValue;
   }
-  if (allDefault) {
+  const QString gridId = standard->datumShiftGridId();
+  const std::shared_ptr<const HorizontalShiftGrid> grid =
+      gridId.isEmpty() ? nullptr : datumShiftGrid(gridId);
+  if (allDefault && !grid) {
     return standard;
   }
   // Instances live for the whole run: the camera and the renderers keep
-  // plain pointers to them.
+  // plain pointers to them. Each holds its grid, so a grid's address
+  // isn't reused while it is a key.
   static std::mutex mutex;
-  static std::map<std::pair<QString, ProjectionParameterValues>,
+  static std::map<std::tuple<QString, ProjectionParameterValues, const void*>,
                   std::unique_ptr<Projection>>
       made;
   const std::lock_guard<std::mutex> lock(mutex);
-  std::unique_ptr<Projection>& instance = made[{id, complete}];
+  std::unique_ptr<Projection>& instance =
+      made[{id, complete, static_cast<const void*>(grid.get())}];
   if (!instance) {
-    instance = makeProjection(id, complete);
+    instance = makeProjection(id, complete, grid);
   }
   return instance ? instance.get() : standard;
 }

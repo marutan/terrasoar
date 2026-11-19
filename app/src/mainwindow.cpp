@@ -464,9 +464,10 @@ void MainWindow::createActions()
     connect(m_projectionGroup, &QActionGroup::triggered, m_globeView,
             [this](const QAction* action) {
               // Choosing the projection already shown keeps its settings.
+              // projectionWith(): with an installed pack's datum grid.
               const QString id = action->data().toString();
               if (m_globeView->mapProjection()->id() != id) {
-                m_globeView->setMapProjection(projectionById(id));
+                m_globeView->setMapProjection(projectionWith(id, {}));
               }
             });
     connect(m_globeView, &GlobeView::viewModeChanged, this,
@@ -923,6 +924,14 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
   if (onGlobe) {
     QString text = tr("%1  %2").arg(formatLatitude(latDeg, locale),
                                     formatLongitude(lonDeg, locale));
+    // On the map, the position in its own grid too (a grid reference).
+    if (m_globeView != nullptr && m_globeView->viewMode() == ViewMode::Map) {
+      const QString grid =
+          m_globeView->mapProjection()->gridReference(latDeg, lonDeg);
+      if (!grid.isEmpty()) {
+        text = tr("%1  %2").arg(text, grid);
+      }
+    }
     const std::optional<GroundHeight> ground =
         m_globeView != nullptr ? m_globeView->pointerGround() : std::nullopt;
     if (ground) {
@@ -950,6 +959,11 @@ void MainWindow::refreshLayers()
     watchLayerStatus(stack);
     return;
   }
+  // A pack may have brought or taken away the projection's datum grid
+  // (OSTN15 for the National Grid).
+  const Projection* projection = m_globeView->mapProjection();
+  m_globeView->setMapProjection(
+      projectionWith(projection->id(), projection->parameterValues()));
   QStringList errors;
   m_globeView->setImageryDraws(
       imageryDrawsForStack(stack, *m_registry, &errors));
