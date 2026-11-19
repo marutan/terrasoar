@@ -49,6 +49,7 @@
 #include "ts/projection/nationalgrid.h"
 #include "ts/projection/projection.h"
 #include "ts/projection/rotatedmercator.h"
+#include "ts/projection/worldmaps.h"
 
 namespace
 {
@@ -106,6 +107,41 @@ constexpr std::array<double, 2> noOffset{1e9, 1e9};
 
 /** Stands in for a grid reference that didn't parse. */
 constexpr ts::MapPoint noPoint{-1.0, -1.0};
+
+/**
+ * Returns PROJ's inverse of @p theirs, or the point @p latDeg, @p lonDeg
+ * where PROJ doesn't come back to it itself: its inverse of the
+ * ellipsoidal equal-area map is a truncated series, out by up to about
+ * 1e-8° (and at its south pole, where the northing is flat in the
+ * latitude, by 2e-6°); of the National Grid's Helmert pipeline it restarts
+ * the OSGB36 height at zero, out by up to 7e-6° in longitude.
+ */
+ts::Geodetic
+projReference(const ProjPipeline& proj, ts::MapPoint theirs,
+              // Latitude then longitude, as everywhere.
+              // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+              double latDeg, double lonDeg)
+{
+  const ts::Geodetic back = proj.inverse(theirs);
+  const bool lost =
+      std::abs(back.latDeg - latDeg) > toleranceDeg ||
+      (std::abs(latDeg) < 90.0 &&
+       std::abs(ts::normaliseLonDeg(back.lonDeg - lonDeg)) > toleranceDeg);
+  return lost ? ts::Geodetic{latDeg, lonDeg, 0.0} : back;
+}
+
+/** How far @p ours is from @p reference, degrees (if @p atPole, where
+ *  every longitude is the pole, the latitude only). */
+double inverseErrorDeg(const ts::Geodetic& ours, const ts::Geodetic& reference,
+                       bool atPole)
+{
+  const double lat = std::abs(ours.latDeg - reference.latDeg);
+  if (atPole) {
+    return lat;
+  }
+  return std::max(
+      lat, std::abs(ts::normaliseLonDeg(ours.lonDeg - reference.lonDeg)));
+}
 
 /** Latitudes of the global grid inside @p projection's domain. */
 std::vector<double> gridLatitudes(const ts::Projection& projection)
@@ -329,7 +365,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{17});
+    QCOMPARE(all.size(), std::size_t{20});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -355,8 +391,8 @@ private slots:
       }
       QCOMPARE(projection->centralMeridianDeg(), centre);
     }
-    QCOMPARE(ids.size(), 17);
-    QCOMPARE(functions.size(), 17);
+    QCOMPARE(ids.size(), 20);
+    QCOMPARE(functions.size(), 20);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -390,6 +426,9 @@ private slots:
     QTest::newRow("gnomonic") << 14;
     QTest::newRow("polar-stereographic-north") << 15;
     QTest::newRow("polar-stereographic-south") << 16;
+    QTest::newRow("robinson") << 17;
+    QTest::newRow("mollweide") << 18;
+    QTest::newRow("winkel-tripel") << 19;
   }
 
   void againstProj()
@@ -415,34 +454,31 @@ private slots:
           theirs.xM = -std::abs(theirs.xM);
         }
         theirs = nearestCopy(projection, ours, theirs);
-        worstForwardM = std::max({worstForwardM, std::abs(ours.xM - theirs.xM),
-                                  std::abs(ours.yM - theirs.yM)});
-        const ts::Geodetic back = projection.inverse(theirs).value_or(nowhere);
-        // PROJ's inverse of the ellipsoidal equal-area map is a truncated
-        // series, out by up to about 1e-8° (and at its south pole, where
-        // the northing is flat in the latitude, by 2e-6°); its inverse of
-        // the National Grid's Helmert pipeline restarts the OSGB36 height
-        // at zero, out by up to 7e-6° in longitude. Where PROJ doesn't
-        // come back to the point itself, the point is the reference.
-        ts::Geodetic projBack = proj.inverse(theirs);
-        if (std::abs(projBack.latDeg - lat) > toleranceDeg ||
-            (std::abs(lat) < 90.0 &&
-             std::abs(ts::normaliseLonDeg(projBack.lonDeg - lon)) >
-                 toleranceDeg)) {
-          projBack = ts::Geodetic{lat, lon, 0.0};
-        }
-        if (std::abs(lat) == 90.0) {
-          // Every longitude is the pole.
-          worstInverseDeg = std::max(worstInverseDeg,
-                                     std::abs(back.latDeg - projBack.latDeg));
-          continue;
-        }
+        // PROJ's Mollweide stops short of θ = 90° at the poles, leaving x
+        // off the point the pole is (112 m at 180°): compare y there.
+        const bool mollweidePole =
+            std::abs(lat) == 90.0 &&
+            projection.id() == QLatin1String("mollweide");
+        worstForwardM = std::max(
+            {worstForwardM, mollweidePole ? 0.0 : std::abs(ours.xM - theirs.xM),
+             std::abs(ours.yM - theirs.yM)});
+        // Robinson's own map point (PROJ's may be past its edge, by its
+        // table's steps), and Mollweide's at its poles.
+        const bool own =
+            mollweidePole || projection.id() == QLatin1String("robinson");
+        const ts::Geodetic back =
+            projection.inverse(own ? ours : theirs).value_or(nowhere);
         worstInverseDeg = std::max(
-            {worstInverseDeg, std::abs(back.latDeg - projBack.latDeg),
-             std::abs(ts::normaliseLonDeg(back.lonDeg - projBack.lonDeg))});
+            worstInverseDeg,
+            inverseErrorDeg(back, projReference(proj, theirs, lat, lon),
+                            std::abs(lat) == 90.0));
       }
     }
-    QVERIFY2(worstForwardM < toleranceM,
+    // Robinson: PROJ's table steps by up to 2.5 m at its nodes, ours is
+    // made continuous there (worldmaps.cpp).
+    const double allowedM =
+        projection.id() == QLatin1String("robinson") ? 3.0 : toleranceM;
+    QVERIFY2(worstForwardM < allowedM,
              qPrintable(QString::number(worstForwardM, 'g', 6)));
     QVERIFY2(worstInverseDeg < toleranceDeg,
              qPrintable(QString::number(worstInverseDeg, 'g', 6)));
@@ -615,9 +651,11 @@ private slots:
       }
       const double limit = projection->maximumLonOffsetDeg();
       if (limit >= 180.0) {
-        // Every longitude: the cylindricals, which repeat, or the polar
-        // maps, which go all the way round the pole.
+        // Every longitude: the cylindricals, which repeat, the polar maps,
+        // which go all the way round the pole, or the world maps, whose
+        // edge is the antimeridian.
         QVERIFY(projection->repeats() ||
+                projection->centralMeridianDeg() == 0.0 ||
                 projection->id().startsWith(QLatin1String("polar-")));
         QVERIFY(projection->contains(10.0, 179.9) ||
                 projection->contains(-10.0, 179.9));
@@ -1584,6 +1622,43 @@ void main()
                  epsg);
       }
       proj_destroy(transform);
+    }
+  }
+
+  void worldMaps()
+  {
+    // Mollweide is equal-area (the map's area of a graticule cell over the
+    // sphere's); every one keeps the equator straight and the world in one
+    // piece, its edge the antimeridian.
+    const ts::MollweideProjection mollweide;
+    const double r = ts::wgs84::semiMajorAxisM;
+    for (const double lat : {0.0, 30.0, 60.0, 80.0}) {
+      constexpr double cell = 0.01;
+      const ts::MapPoint a = mollweide.forward(lat, 10.0);
+      const ts::MapPoint b = mollweide.forward(lat, 10.0 + cell);
+      const ts::MapPoint c = mollweide.forward(lat + cell, 10.0);
+      const ts::MapPoint d = mollweide.forward(lat + cell, 10.0 + cell);
+      // The cell's area on the map (a quadrilateral), against the sphere's.
+      const double mapArea = 0.5 * std::abs((b.xM - a.xM) * (c.yM - a.yM) -
+                                            (c.xM - a.xM) * (b.yM - a.yM)) +
+                             0.5 * std::abs((b.xM - d.xM) * (c.yM - d.yM) -
+                                            (c.xM - d.xM) * (b.yM - d.yM));
+      const double sphereArea =
+          r * r * ts::degToRad(cell) *
+          (std::sin(ts::degToRad(lat + cell)) - std::sin(ts::degToRad(lat)));
+      QVERIFY2(std::abs(mapArea / sphereArea - 1.0) < 1e-5,
+               qPrintable(QString::number(mapArea / sphereArea)));
+    }
+    const ts::RobinsonProjection robinson;
+    const ts::WinkelTripelProjection winkel;
+    for (const ts::Projection* projection :
+         std::initializer_list<const ts::Projection*>{&robinson, &mollweide,
+                                                      &winkel}) {
+      QVERIFY(!projection->repeats());
+      QVERIFY(std::abs(projection->forward(0.0, 50.0).yM) < 1e-6);
+      // The antimeridian's two sides are the map's two edges.
+      QVERIFY(projection->forward(20.0, 179.999).xM > 0.0);
+      QVERIFY(projection->forward(20.0, -179.999).xM < 0.0);
     }
   }
 

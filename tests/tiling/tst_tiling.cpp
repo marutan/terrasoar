@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -903,6 +904,36 @@ private slots:
       deepestAtEnds = std::max(deepestAtEnds, key.level);
     }
     QVERIFY(deepest <= deepestAtEnds + 1);
+  }
+
+  void geometryRefinementNearPoles()
+  {
+    // Mollweide isn't smooth at its poles: its geometry refines at most
+    // two levels beyond its texels' needs, so a world view stays within a
+    // few hundred tiles (Robinson's, with flat poles, a few dozen).
+    // Mercator's has no limit: its poles keep their finer geometry.
+    const ts::TileSelector selector;
+    std::map<QString, int32_t> counts;
+    for (const char* id : {"mollweide", "robinson"}) {
+      ts::Camera camera = makeCamera(ts::CameraPose{0.0, 0.0, 5.0e7, 0.0, 0.0});
+      camera.setMapProjection(ts::projectionById(QString::fromLatin1(id)));
+      camera.setMorph(1.0);
+      camera.setPose(ts::CameraPose{0.0, 0.0, 5.0e7, 0.0, 0.0});
+      counts[QString::fromLatin1(id)] = static_cast<int32_t>(
+          selector.select(camera, everythingRenderable).render.size());
+    }
+    qInfo("world view: Mollweide %d tiles, Robinson %d",
+          counts[QStringLiteral("mollweide")],
+          counts[QStringLiteral("robinson")]);
+    // Without the limit it was over 400 tiles at 320 × 240 pixels, and
+    // runs to thousands here.
+    QVERIFY(counts[QStringLiteral("mollweide")] < 300);
+    QCOMPARE(ts::projectionById(QStringLiteral("mollweide"))
+                 ->geometryLevelsBeyondTexels(),
+             2);
+    QCOMPARE(ts::projectionById(QStringLiteral("mercator"))
+                 ->geometryLevelsBeyondTexels(),
+             -1);
   }
 
   void refinementWaitsForChildren()

@@ -91,6 +91,7 @@ HEADERS += \
     include/ts/projection/normalcylindrical.h \
     include/ts/projection/rotatedmercator.h \
     include/ts/projection/transversemercator.h \
+    include/ts/projection/worldmaps.h \
     include/ts/projection/projection.h \
     include/ts/providers/geopackagefeatureprovider.h \
     include/ts/providers/providerregistry.h \
@@ -178,6 +179,7 @@ SOURCES += \
     src/projection/normalcylindrical.cpp \
     src/projection/rotatedmercator.cpp \
     src/projection/transversemercator.cpp \
+    src/projection/worldmaps.cpp \
     src/projection/projection.cpp \
     src/providers/geopackagefeatureprovider.cpp \
     src/providers/providerregistry.cpp \

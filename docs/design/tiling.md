@@ -104,7 +104,10 @@ within the limit, and fixed cameras select fixed tile sets.
   Mercator's stretching towards the poles asks for finer tiles there.
 - *Geometry*: a tile is also split while its mesh, straight between grid
   rows, is more than half a pixel from the projection's curve
-  (`mapGeometryErrorPx()`), whatever the deepest level of the data.
+  (`mapGeometryErrorPx()`), whatever the deepest level of the data. A
+  projection not smooth at its poles (Mollweide), where the geometry
+  error falls only slowly with the level, limits this to
+  `geometryLevelsBeyondTexels()` levels beyond what the texels need.
 
 While the view changes between the two (0 < morph < 1) a tile is judged
 where it is drawn at that moment, part of the way between globe and map:

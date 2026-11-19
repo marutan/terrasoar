@@ -152,7 +152,7 @@ A mesh is straight between its grid lines. That matters twice:
   Mercator map. The selection therefore splits a tile while the middle of
   its most poleward grid row is more than half a pixel from where the
   projection puts it (`TileSelector::mapGeometryErrorPx()`), whatever the
-  imagery's deepest level; a layer without data that deep is drawn from
+  imagery's deepest level (Mollweide limits it near its poles); a layer without data that deep is drawn from
   its ancestors' images as usual. Near the equator, and on Miller almost
   everywhere, this asks for nothing.
 

@@ -857,6 +857,17 @@ private slots:
     QTest::newRow("map-polar-stereographic-north")
         << QStringLiteral("polar-stereographic-north") << 1.0 << 80.0 << -45.0
         << 2.0e7 << 0.0 << 0.0;
+    // Phase 11d's world maps, each the whole world, Winkel Tripel also
+    // half way there.
+    QTest::newRow("map-robinson") << QStringLiteral("robinson") << 1.0 << 0.0
+                                  << 0.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-mollweide") << QStringLiteral("mollweide") << 1.0 << 0.0
+                                   << 0.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-winkel-tripel") << QStringLiteral("winkel-tripel") << 1.0
+                                       << 0.0 << 0.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half-winkel-tripel")
+        << QStringLiteral("winkel-tripel") << 0.5 << 20.0 << 10.0 << 2.6e7
+        << 0.0 << 0.0;
   }
 
   void morphGolden()
@@ -1662,6 +1673,10 @@ private slots:
         << 54.5 << -3.0 << 2.0e6 << 0.0 << nationalGrid << 1.0 << 0.0;
     QTest::newRow("base-map-national-grid-thames")
         << 51.5 << 0.6 << 1.5e5 << 0.0 << nationalGrid << 1.0 << 0.0;
+    // The world on Winkel Tripel, as atlases show it.
+    QTest::newRow("base-map-winkel-tripel-world")
+        << 0.0 << 0.0 << 5.0e7 << 0.0 << QStringLiteral("winkel-tripel") << 1.0
+        << 0.0;
     // Antarctica on Polar Stereographic (EPSG:3031), and the world about
     // London on the Azimuthal Equidistant.
     QTest::newRow("base-map-polar-south")

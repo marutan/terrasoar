@@ -223,6 +223,14 @@ public:
    */
   virtual double domainMarginDeg(double latDeg, double lonDeg) const;
 
+  /**
+   * Returns how many levels beyond what its texels need the map's
+   * geometry may refine tiles (TileSelector), or −1 for no limit (the
+   * default). A projection not smooth at its poles, where the geometry
+   * error falls only slowly with the level (Mollweide), gives a limit.
+   */
+  virtual int32_t geometryLevelsBeyondTexels() const { return -1; }
+
   /** Returns true if domainMarginDeg() limits the domain. */
   virtual bool hasOwnDomain() const { return false; }
 
