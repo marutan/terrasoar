@@ -34,9 +34,9 @@ repeats every `bounds().widthM()` in x. So the central meridian matters to
 `forward()` and `inverse()` as coordinates (a WMS request in EPSG:3857,
 say), not to what is drawn.
 
-## The three projections
+## The Mercator family
 
-All three are normal cylindrical projections of one family
+Mercator, Web Mercator and Miller are normal cylindrical projections of one family
 (`ts::CylindricalProjection`), with a the WGS 84 semi-major axis, λ the
 longitude from the central meridian and φ the latitude:
 
@@ -78,6 +78,54 @@ asin(tanh u), which doesn't lose precision towards the poles.
 assume: a radian of longitude is N cos φ metres and a radian of latitude M
 metres, with N and M the prime-vertical and meridional radii of curvature.
 So k = a / (N cos φ) for all three, and h = (dy/dφ) / M.
+
+## Other normal cylindrical projections
+
+`ts::NormalCylindricalProjection` (`normalcylindrical.h`) is the general
+case, x = a k λ and y = a f(φ) with a constant k and any northing
+function f, which each subclass gives with its inverse, its derivative
+and its own GLSL. The map repeats every 2πak, so maps narrower than
+Mercator's wrap with their own width (`bounds().widthM()`).
+
+| Projection | `id` | k | f(φ) | Latitude limit | As PROJ |
+| --- | --- | --- | --- | --- | --- |
+| Equidistant Cylindrical | `equidistant-cylindrical` | cos φ1 | φ | ±90° | `+proj=eqc +lat_ts=φ1 +R=6378137` |
+| Gall Stereographic | `gall-stereographic` | 1/√2 | (1 + √2/2) tan(φ/2) | ±90° | `+proj=gall +R=6378137` |
+| Gall–Peters | `gall-peters` | k0 (below) | q(φ) / (2 k0) | ±90° | `+proj=cea +lat_ts=45 +ellps=WGS84` |
+
+- **Equidistant Cylindrical** has a parameter, the standard parallel φ1
+  (0°, Plate Carrée, by default; 0–85°). Spherical with radius a, as
+  PROJ's `eqc`.
+- **Gall Stereographic** is spherical with radius a, as PROJ's `gall`.
+  In GLSL the northing difference tan(A + h) − tan(A) is written
+  sin(h) / (cos A cos(A + h)), with A = φt/2 and h = d/2.
+- **Gall–Peters** is the cylindrical equal-area projection on the WGS 84
+  ellipsoid with standard parallels ±45°: k0 = cos φ1 / √(1 − e² sin² φ1)
+  and q(φ) = (1 − e²)(sin φ / (1 − e² sin² φ) + atanh(e sin φ) / e).
+  The inverse solves q(φ) = 2 k0 y / a by Newton's method; q is flat at
+  the poles (q ≈ qp − c (π/2 − φ)²), so a northing within a few units in
+  the last place of the pole's is taken as the pole. PROJ's own inverse
+  uses a truncated series that is out by about 10⁻⁸° (2·10⁻⁶° at its south
+  pole); the tests take the point itself as the reference where PROJ
+  doesn't come back to it. In GLSL the differences of both terms of q are
+  written without subtracting nearly equal numbers (see
+  `normalcylindrical.cpp`).
+
+## Parameters
+
+A projection may have settings (`Projection::parameters()`: a key, a
+label, a default and a range). `projections()` holds the default
+instance of each; `projectionWith(id, values)` gives an instance with
+other values, made once and kept for the whole run, so the camera and the
+renderers can keep plain pointers. Values are clamped to their ranges.
+An instance with parameters shares its default instance's shader index
+(`projectionIndex()` goes by `id()`): the values reach the shader in the
+tile's `shaderReference()` floats, which are worked out every frame.
+
+**View → Map Projection → Projection Settings…** (`ProjectionSettingsDialog`)
+edits them for the projection shown. Project files keep them in
+`view.projectionParameters`, an optional object of numbers by key,
+written only when there are any (so the format version is unchanged).
 
 ## In shaders
 
@@ -142,9 +190,11 @@ on Mesa llvmpipe uses 17 % of it.
 
 ## Adding a projection
 
-1. **Write the class.** Derive from `ts::Projection`, or from
-   `CylindricalProjection` if it fits the family (then only the
-   parameters, names and PROJ string are needed). Implement `forward()`,
+1. **Write the class.** Derive from `ts::Projection`; from
+   `CylindricalProjection` if it fits the Mercator family (then only the
+   constants, names and PROJ string are needed); or from
+   `NormalCylindricalProjection` for any other normal cylindrical one
+   (then f, its inverse and derivative). Implement `forward()`,
    `inverse()`, `bounds()`, the latitude limits and `scaleAt()`.
 2. **Write the GLSL.** `glslSource()` returns one function with the
    signature above and a name of its own (`glslFunction()`). It returns
@@ -153,7 +203,8 @@ on Mesa llvmpipe uses 17 % of it.
    the reference it needs, in up to eight floats. It may call the helpers
    in `projection.cpp` (`tsAtanh`).
 3. **List it** in `projections()` in `projection.cpp`. That adds it to the
-   View menu, to project files (by `id()`) and to every shader.
+   View menu, to project files (by `id()`) and to every shader. If it has
+   parameters, also make instances of it in `makeProjection()` there.
 4. **Test it.** Add it to the rows of `againstProj` and `roundTrip` in
    `tests/projection`; `glslMatchesCpp` and the scale test pick it up from
    the list. Add a golden image in `tests/globe`.
@@ -187,6 +238,8 @@ without OpenGL 3.3):
 - Round trips within 1 mm on the ground.
 - Published values: the EPSG guidance note's EPSG:3857 example, Miller at
   50° N.
+- Instances with parameters: defaults give the listed instance, others
+  are kept, clamped, share the shader index and agree with PROJ.
 - Domain and bounds: the limits, square Mercator maps, latitudes beyond
   the domain on the edge, nothing off the map.
 - A central meridian other than Greenwich, against PROJ.

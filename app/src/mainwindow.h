@@ -253,6 +253,7 @@ private:
   void watchLayerStatus(const LayerStack& stack);
   void updateLayerStatus();
   void syncViewActions();
+  void showProjectionSettings();
   void openProjectDialog();
   void saveProjectDialog(bool askForPath);
   void findBasePack();
@@ -284,6 +285,7 @@ private:
   QAction* m_addWebTerrainAction = nullptr;
   QMenu* m_projectionMenu = nullptr;
   QActionGroup* m_projectionGroup = nullptr;
+  QAction* m_projectionSettingsAction = nullptr;
   QMenu* m_exaggerationMenu = nullptr;
   QActionGroup* m_exaggerationGroup = nullptr;
   QAction* m_openAction = nullptr;

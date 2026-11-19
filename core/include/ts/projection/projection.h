@@ -28,6 +28,7 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <vector>
 
@@ -85,6 +86,30 @@ struct ProjectionShaderReference {
 };
 
 /**
+ * A setting of a projection the user can change (a standard parallel, a
+ * centre), for the Map Projection Settings dialog and project files.
+ *
+ * @reentrant
+ */
+struct ProjectionParameter {
+  /** Key in project files ("standardParallel"). */
+  QString key;
+  /** Label for the user, translated. */
+  QString label;
+  /** Value of the default instance (projections()). */
+  double defaultValue = 0.0;
+  /** Smallest allowed value. */
+  double minimum = 0.0;
+  /** Largest allowed value. */
+  double maximum = 0.0;
+  /** Unit shown after the value ("°"). */
+  QString suffix;
+};
+
+/** Parameter values by key (ProjectionParameter::key). */
+using ProjectionParameterValues = std::map<QString, double>;
+
+/**
  * A map projection of the WGS 84 ellipsoid onto a plane.
  *
  * Besides the usual forward and inverse, a projection brings a GLSL
@@ -125,6 +150,15 @@ public:
 
   /** Returns the PROJ string of the same projection (for tests, WMS). */
   virtual QString projString() const = 0;
+
+  /**
+   * Returns the settings this projection has (none for most), in the
+   * order the dialog shows them.
+   */
+  virtual std::vector<ProjectionParameter> parameters() const { return {}; }
+
+  /** Returns this instance's value of each of parameters(). */
+  virtual ProjectionParameterValues parameterValues() const { return {}; }
 
   /** Returns the longitude that maps to x = 0, degrees. */
   double centralMeridianDeg() const { return m_centralMeridianDeg; }
@@ -198,6 +232,19 @@ private:
 const std::vector<const Projection*>& projections();
 
 /**
+ * Returns the projection @p id with @p values for its parameters (missing
+ * ones take their defaults; values are clamped to their ranges), or null
+ * for an id this build doesn't know. Projections without parameters, and
+ * values equal to the defaults, give the instance of projections(). Every
+ * instance made lives for the whole run, so the same id and values give
+ * the same pointer.
+ *
+ * @threadsafe
+ */
+const Projection* projectionWith(const QString& id,
+                                 const ProjectionParameterValues& values);
+
+/**
  * Returns the projection with identifier @p id, or null.
  *
  * @threadsafe
@@ -205,8 +252,10 @@ const std::vector<const Projection*>& projections();
 const Projection* projectionById(const QString& id);
 
 /**
- * Returns the index of @p projection in projections(), which is also its
- * index for tsProject() in shaders; −1 if it is not one of them.
+ * Returns the index in projections() of the projection with
+ * @p projection's id (so an instance with parameters has its default
+ * instance's), which is also its index for tsProject() in shaders; −1 if
+ * there is none.
  *
  * @threadsafe
  */

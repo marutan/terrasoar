@@ -170,7 +170,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{3});
+    QCOMPARE(all.size(), std::size_t{6});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -183,15 +183,16 @@ private slots:
       QCOMPARE(ts::projectionIndex(projection), static_cast<int32_t>(i));
       QCOMPARE(projection->centralMeridianDeg(), 0.0);
     }
-    QCOMPARE(ids.size(), 3);
-    QCOMPARE(functions.size(), 3);
+    QCOMPARE(ids.size(), 6);
+    QCOMPARE(functions.size(), 6);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("no-such")) == nullptr);
     QVERIFY(ts::projectionById(QString()) == nullptr);
+    // Another instance shares its projection's shader function.
     const ts::MercatorProjection other;
-    QCOMPARE(ts::projectionIndex(&other), -1);
+    QCOMPARE(ts::projectionIndex(&other), 0);
     QCOMPARE(ts::projectionIndex(nullptr), -1);
   }
 
@@ -201,6 +202,9 @@ private slots:
     QTest::newRow("mercator") << 0;
     QTest::newRow("web-mercator") << 1;
     QTest::newRow("miller") << 2;
+    QTest::newRow("equidistant-cylindrical") << 3;
+    QTest::newRow("gall-stereographic") << 4;
+    QTest::newRow("gall-peters") << 5;
   }
 
   void againstProj()
@@ -225,7 +229,15 @@ private slots:
         worstForwardM = std::max({worstForwardM, std::abs(ours.xM - theirs.xM),
                                   std::abs(ours.yM - theirs.yM)});
         const ts::Geodetic back = projection.inverse(theirs).value_or(nowhere);
-        const ts::Geodetic projBack = proj.inverse(theirs);
+        // PROJ's inverse of the ellipsoidal equal-area map is a truncated
+        // series, out by up to about 1e-8° (and at its south pole, where
+        // the northing is flat in the latitude, by 2e-6°). Where PROJ
+        // doesn't come back to the point itself, the point is the
+        // reference.
+        ts::Geodetic projBack = proj.inverse(theirs);
+        if (std::abs(projBack.latDeg - lat) > toleranceDeg) {
+          projBack = ts::Geodetic{lat, lon, 0.0};
+        }
         worstInverseDeg = std::max(
             {worstInverseDeg, std::abs(back.latDeg - projBack.latDeg),
              std::abs(ts::normaliseLonDeg(back.lonDeg - projBack.lonDeg))});
@@ -238,6 +250,63 @@ private slots:
   }
 
   void roundTrip_data() { againstProj_data(); }
+
+  void parameterisedInstances()
+  {
+    // projectionWith(): defaults give the listed instance, other values a
+    // kept instance that shares the listed one's shader index and agrees
+    // with PROJ; values are clamped; unknown ids give null.
+    const QString id = QStringLiteral("equidistant-cylindrical");
+    const ts::Projection* standard = ts::projectionById(id);
+    if (standard == nullptr) {
+      QFAIL("no equidistant-cylindrical");
+    }
+    QCOMPARE(ts::projectionWith(id, {}), standard);
+    QCOMPARE(
+        ts::projectionWith(id, {{QStringLiteral("standardParallel"), 0.0}}),
+        standard);
+    const ts::Projection* thirty =
+        ts::projectionWith(id, {{QStringLiteral("standardParallel"), 30.0}});
+    if (thirty == nullptr) {
+      QFAIL("no instance for 30°");
+    }
+    QVERIFY(thirty != standard);
+    QCOMPARE(
+        ts::projectionWith(id, {{QStringLiteral("standardParallel"), 30.0}}),
+        thirty);
+    QCOMPARE(ts::projectionIndex(thirty), ts::projectionIndex(standard));
+    QCOMPARE(thirty->parameterValues().at(QStringLiteral("standardParallel")),
+             30.0);
+    const ts::Projection* clamped =
+        ts::projectionWith(id, {{QStringLiteral("standardParallel"), 120.0}});
+    if (clamped == nullptr) {
+      QFAIL("no clamped instance");
+    }
+    QCOMPARE(clamped->parameterValues().at(QStringLiteral("standardParallel")),
+             85.0);
+    // Parameterless projections ignore values.
+    const ts::Projection* mercator =
+        ts::projectionById(QStringLiteral("mercator"));
+    QCOMPARE(ts::projectionWith(QStringLiteral("mercator"),
+                                {{QStringLiteral("standardParallel"), 30.0}}),
+             mercator);
+    QVERIFY(ts::projectionWith(QStringLiteral("no-such"), {}) == nullptr);
+
+    const ProjPipeline proj(thirty->projString());
+    QVERIFY2(proj.isValid(), qPrintable(thirty->projString()));
+    double worstM = 0.0;
+    for (const double lat : gridLatitudes(*thirty)) {
+      for (const double lon : {-179.0, -45.0, 0.0, 12.5, 179.0}) {
+        const ts::MapPoint ours = thirty->forward(lat, lon);
+        const ts::MapPoint theirs = proj.forward(lat, lon);
+        worstM = std::max({worstM, std::abs(ours.xM - theirs.xM),
+                           std::abs(ours.yM - theirs.yM)});
+      }
+    }
+    QVERIFY2(worstM < toleranceM, qPrintable(QString::number(worstM, 'g', 6)));
+    // True to scale along the standard parallel.
+    QVERIFY(std::abs(thirty->scaleAt(30.0).parallel - 1.0) < 0.01);
+  }
 
   void roundTrip()
   {
@@ -297,8 +366,9 @@ private slots:
       QVERIFY(projection->containsLatitude(projection->maximumLatDeg()));
       QVERIFY(!projection->containsLatitude(90.5));
       const ts::MapRect bounds = projection->bounds();
+      // A whole turn of longitude wide.
       QVERIFY(std::abs(bounds.widthM() -
-                       2.0 * ts::pi * ts::wgs84::semiMajorAxisM) < 1e-6);
+                       2.0 * projection->forward(0.0, 90.0).xM * 2.0) < 1e-6);
       QCOMPARE(bounds.westM, -bounds.eastM);
       QCOMPARE(bounds.southM, -bounds.northM);
       // Latitudes beyond the domain land on the map's edge.
@@ -400,7 +470,8 @@ private slots:
     // Off the map the latitude carries on past the limit.
     QVERIFY(mercator.latitudeDeg(mercator.bounds().northM * 1.1) >
             mercator.maximumLatDeg());
-    QCOMPARE(mercator.parameters().latitudeFactor, 1.0);
+    QCOMPARE(mercator.constants().latitudeFactor, 1.0);
+    QVERIFY(mercator.parameters().empty());
   }
 
   void glslSources()
@@ -510,7 +581,9 @@ private slots:
             const double dLatRad = static_cast<double>(stepLat * index);
             const ts::MapPoint expected = projection.forward(
                 clampedReference + ts::radToDeg(dLatRad), 0.0);
-            const double expectedX = ts::wgs84::semiMajorAxisM * dLonRad;
+            // x is linear in the longitude on cylindrical maps.
+            const double expectedX =
+                projection.bounds().widthM() / (2.0 * ts::pi) * dLonRad;
             const double expectedY = expected.yM - reference.yM;
             // Float arithmetic: a few parts in ten million of the offset,
             // more for offsets of tens of degrees (which only the coarsest
@@ -541,7 +614,7 @@ private slots:
         }
       }
     }
-    QCOMPARE(compared, 3 * 9 * 7 * samples);
+    QCOMPARE(compared, static_cast<int32_t>(all.size()) * 9 * 7 * samples);
     qInfo("GLSL against C++: worst error %.2f of the allowance", worstRelative);
   }
 

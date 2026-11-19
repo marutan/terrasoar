@@ -51,6 +51,7 @@
 #include "newregiondialog.h"
 #include "offlineregionsdialog.h"
 #include "packmanagerdialog.h"
+#include "projectionsettingsdialog.h"
 #include "ts/base/buildinfo.h"
 #include "userguide.h"
 
@@ -327,7 +328,8 @@ private slots:
                               ts::OfflineRegionsDialog::helpTarget(),
                               ts::NewRegionDialog::helpTarget(),
                               ts::PackManagerDialog::helpTarget(),
-                              ts::ElevationProfileDialog::helpTarget()};
+                              ts::ElevationProfileDialog::helpTarget(),
+                              ts::ProjectionSettingsDialog::helpTarget()};
     for (const QString& target : targets) {
       const QUrl url = guide::pageUrl(target);
       QVERIFY2(guide::pageExists(pageOf(url)), qPrintable(target));

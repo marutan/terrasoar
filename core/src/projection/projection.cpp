@@ -20,10 +20,16 @@
 
 #include "ts/projection/projection.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <memory>
+#include <mutex>
 
 #include "ts/projection/cylindricalprojection.h"
+#include "ts/projection/normalcylindrical.h"
 
 namespace ts
 {
@@ -83,9 +89,66 @@ const std::vector<const Projection*>& projections()
   static const MercatorProjection mercator;
   static const WebMercatorProjection webMercator;
   static const MillerProjection miller;
-  static const std::vector<const Projection*> all = {&mercator, &webMercator,
-                                                     &miller};
+  static const EquidistantCylindricalProjection equidistantCylindrical;
+  static const GallStereographicProjection gallStereographic;
+  static const GallPetersProjection gallPeters;
+  static const std::vector<const Projection*> all = {
+      &mercator,          &webMercator, &miller, &equidistantCylindrical,
+      &gallStereographic, &gallPeters};
   return all;
+}
+
+namespace
+{
+
+/** Makes an instance of a projection with parameters, by id. */
+std::unique_ptr<Projection>
+makeProjection(const QString& id, const ProjectionParameterValues& values)
+{
+  if (id == QLatin1String("equidistant-cylindrical")) {
+    return std::make_unique<EquidistantCylindricalProjection>(
+        values.at(QStringLiteral("standardParallel")));
+  }
+  return nullptr;
+}
+
+} // namespace
+
+const Projection* projectionWith(const QString& id,
+                                 const ProjectionParameterValues& values)
+{
+  const Projection* standard = projectionById(id);
+  if (standard == nullptr) {
+    return nullptr;
+  }
+  // Every parameter, clamped to its range; the default where missing.
+  ProjectionParameterValues complete;
+  bool allDefault = true;
+  for (const ProjectionParameter& parameter : standard->parameters()) {
+    const ProjectionParameterValues::const_iterator given =
+        values.find(parameter.key);
+    const double value =
+        given == values.end() || !std::isfinite(given->second)
+            ? parameter.defaultValue
+            : std::clamp(given->second, parameter.minimum, parameter.maximum);
+    complete[parameter.key] = value;
+    allDefault = allDefault && value == parameter.defaultValue;
+  }
+  if (allDefault) {
+    return standard;
+  }
+  // Instances live for the whole run: the camera and the renderers keep
+  // plain pointers to them.
+  static std::mutex mutex;
+  static std::map<std::pair<QString, ProjectionParameterValues>,
+                  std::unique_ptr<Projection>>
+      made;
+  const std::lock_guard<std::mutex> lock(mutex);
+  std::unique_ptr<Projection>& instance = made[{id, complete}];
+  if (!instance) {
+    instance = makeProjection(id, complete);
+  }
+  return instance ? instance.get() : standard;
 }
 
 const Projection* projectionById(const QString& id)
@@ -100,9 +163,14 @@ const Projection* projectionById(const QString& id)
 
 int32_t projectionIndex(const Projection* projection)
 {
+  if (projection == nullptr) {
+    return -1;
+  }
+  // By id: an instance with parameters (projectionWith()) shares its
+  // projection's GLSL; the parameters travel in the tile's uniforms.
   const std::vector<const Projection*>& all = projections();
   for (std::size_t i = 0; i < all.size(); ++i) {
-    if (all[i] == projection) {
+    if (all[i] == projection || all[i]->id() == projection->id()) {
       return static_cast<int32_t>(i);
     }
   }

@@ -60,7 +60,7 @@ public:
   };
 
   /** Returns the constants. */
-  const Parameters& parameters() const { return m_parameters; }
+  const Parameters& constants() const { return m_parameters; }
 
   double minimumLatDeg() const override;
   double maximumLatDeg() const override;

@@ -66,6 +66,7 @@
 #include "offlineregionsdialog.h"
 #include "packmanager.h"
 #include "packmanagerdialog.h"
+#include "projectionsettingsdialog.h"
 #include "ts/base/buildinfo.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/elevationprofile.h"
@@ -445,6 +446,11 @@ void MainWindow::createActions()
     action->setData(projection->id());
     m_projectionGroup->addAction(action);
   }
+  m_projectionSettingsAction = new QAction(this);
+  m_projectionSettingsAction->setObjectName(
+      QStringLiteral("projectionSettingsAction"));
+  connect(m_projectionSettingsAction, &QAction::triggered, this,
+          &MainWindow::showProjectionSettings);
   if (m_globeView) {
     connect(m_mapViewAction, &QAction::toggled, m_globeView,
             [this](bool checked) {
@@ -457,8 +463,11 @@ void MainWindow::createActions()
             &GlobeView::setAttributionsVisible);
     connect(m_projectionGroup, &QActionGroup::triggered, m_globeView,
             [this](const QAction* action) {
-              m_globeView->setMapProjection(
-                  projectionById(action->data().toString()));
+              // Choosing the projection already shown keeps its settings.
+              const QString id = action->data().toString();
+              if (m_globeView->mapProjection()->id() != id) {
+                m_globeView->setMapProjection(projectionById(id));
+              }
             });
     connect(m_globeView, &GlobeView::viewModeChanged, this,
             &MainWindow::syncViewActions);
@@ -736,6 +745,8 @@ void MainWindow::createMenus()
   m_projectionMenu = m_viewMenu->addMenu(QString());
   m_projectionMenu->setObjectName(QStringLiteral("projectionMenu"));
   m_projectionMenu->addActions(m_projectionGroup->actions());
+  m_projectionMenu->addSeparator();
+  m_projectionMenu->addAction(m_projectionSettingsAction);
   m_viewMenu->addAction(m_scaleBarAction);
   m_viewMenu->addAction(m_attributionsAction);
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
@@ -773,6 +784,10 @@ void MainWindow::retranslateUi()
   m_mapViewAction->setStatusTip(
       tr("Change between the 3D globe and a flat map"));
   m_projectionMenu->setTitle(tr("Map &Projection"));
+  m_projectionSettingsAction->setText(tr("Projection &Settings…"));
+  m_projectionSettingsAction->setStatusTip(
+      tr("Change the settings of the flat map's projection, such as its "
+         "standard parallel"));
   for (QAction* action : m_projectionGroup->actions()) {
     if (const Projection* projection =
             projectionById(action->data().toString())) {
@@ -866,6 +881,18 @@ void MainWindow::retranslateUi()
   showEyeHeight(m_eyeHeightM);
 }
 
+void MainWindow::showProjectionSettings()
+{
+  if (m_globeView == nullptr ||
+      m_globeView->mapProjection()->parameters().empty()) {
+    return;
+  }
+  ProjectionSettingsDialog dialog(this, m_globeView->mapProjection());
+  if (dialog.exec() == QDialog::Accepted) {
+    m_globeView->setMapProjection(dialog.projection());
+  }
+}
+
 void MainWindow::syncViewActions()
 {
   // The actions follow the view (a project just opened, for instance).
@@ -882,6 +909,9 @@ void MainWindow::syncViewActions()
       action->setChecked(true);
     }
   }
+  m_projectionSettingsAction->setEnabled(
+      m_globeView != nullptr &&
+      !m_globeView->mapProjection()->parameters().empty());
 }
 
 void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
@@ -1207,7 +1237,8 @@ bool MainWindow::openProject(const QString& path, QString* errorString)
   }
   if (m_globeView) {
     // An unknown projection (a newer program's) keeps the current one.
-    m_globeView->setMapProjection(projectionById(project->projection));
+    m_globeView->setMapProjection(
+        projectionWith(project->projection, project->projectionParameters));
     m_globeView->setViewMode(project->mapView ? ViewMode::Map : ViewMode::Globe,
                              false);
     m_globeView->setPose(project->camera);
@@ -1224,6 +1255,8 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
   if (m_globeView) {
     project.mapView = m_globeView->viewMode() == ViewMode::Map;
     project.projection = m_globeView->mapProjection()->id();
+    project.projectionParameters =
+        m_globeView->mapProjection()->parameterValues();
   }
   project.layers = m_layers->toJson();
   if (!ts::saveProject(path, project, errorString)) {
