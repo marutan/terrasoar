@@ -59,6 +59,8 @@ LocalExpansionProjection::LocalExpansionProjection(double centralMeridianDeg)
 {
 }
 
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 MapPoint LocalExpansionProjection::forward(double latDeg, double lonDeg) const
 {
   const double lat = std::clamp(latDeg, minimumLatDeg(), maximumLatDeg());
@@ -182,6 +184,8 @@ MapScale LocalExpansionProjection::scaleAt(double latDeg) const
   return scaleAtPoint(latDeg, centralMeridianDeg());
 }
 
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 MapScale LocalExpansionProjection::scaleAtPoint(double latDeg,
                                                 double lonDeg) const
 {
@@ -203,6 +207,8 @@ MapScale LocalExpansionProjection::scaleAtPoint(double latDeg,
 }
 
 LocalExpansionProjection::Expansion
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 LocalExpansionProjection::expansionAt(double latRad, double dLonRad) const
 {
   // Central differences; near a pole the stencil moves inside, and the
@@ -271,6 +277,8 @@ LocalExpansionProjection::shaderReference(double latDeg, double lonDeg) const
 }
 
 ProjectionShaderReference
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 LocalExpansionProjection::shaderReferenceFor(double latDeg, double lonDeg,
                                              double halfSpanRad) const
 {

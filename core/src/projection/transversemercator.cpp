@@ -105,7 +105,7 @@ double meridianArcM(double latRad)
   const Ellipsoid& s = wgs84Series();
   double sum = latRad;
   for (std::size_t j = 0; j < s.arc.size(); ++j) {
-    sum += s.arc[j] * std::sin(2.0 * static_cast<double>(j + 1) * latRad);
+    sum += s.arc.at(j) * std::sin(2.0 * static_cast<double>(j + 1) * latRad);
   }
   return s.rectifyingRadius * sum;
 }
@@ -117,7 +117,7 @@ double footpointLatRad(double arcM)
   const double mu = arcM / s.rectifyingRadius;
   double lat = mu;
   for (std::size_t j = 0; j < s.footpoint.size(); ++j) {
-    lat += s.footpoint[j] * std::sin(2.0 * static_cast<double>(j + 1) * mu);
+    lat += s.footpoint.at(j) * std::sin(2.0 * static_cast<double>(j + 1) * mu);
   }
   return lat;
 }
@@ -172,6 +172,8 @@ ProjectionParameter centralMeridianParameter()
 // --- Transverse Mercator -----------------------------------------------------
 
 TransverseMercatorProjection::TransverseMercatorProjection(
+    // An angle, then a factor: they can't be mixed up meaningfully.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     double centralMeridianDeg, double scaleFactor)
     : LocalExpansionProjection(centralMeridianDeg), m_scaleFactor(scaleFactor)
 {
@@ -217,6 +219,8 @@ QByteArray TransverseMercatorProjection::glslFunction() const
   return "tsProjectTransverseMercator";
 }
 
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 MapPoint TransverseMercatorProjection::project(double latRad,
                                                double dLonRad) const
 {
@@ -231,8 +235,8 @@ MapPoint TransverseMercatorProjection::project(double latRad,
   double eta = etap;
   for (std::size_t j = 0; j < s.alpha.size(); ++j) {
     const double k = 2.0 * static_cast<double>(j + 1);
-    xi += s.alpha[j] * std::sin(k * xip) * std::cosh(k * etap);
-    eta += s.alpha[j] * std::cos(k * xip) * std::sinh(k * etap);
+    xi += s.alpha.at(j) * std::sin(k * xip) * std::cosh(k * etap);
+    eta += s.alpha.at(j) * std::cos(k * xip) * std::sinh(k * etap);
   }
   const double scale = m_scaleFactor * s.rectifyingRadius;
   return MapPoint{scale * eta, scale * xi};
@@ -252,8 +256,8 @@ TransverseMercatorProjection::approximateInverse(MapPoint point) const
   double etap = eta;
   for (std::size_t j = 0; j < s.beta.size(); ++j) {
     const double k = 2.0 * static_cast<double>(j + 1);
-    xip -= s.beta[j] * std::sin(k * xi) * std::cosh(k * eta);
-    etap -= s.beta[j] * std::cos(k * xi) * std::sinh(k * eta);
+    xip -= s.beta.at(j) * std::sin(k * xi) * std::cosh(k * eta);
+    etap -= s.beta.at(j) * std::cos(k * xi) * std::sinh(k * eta);
   }
   const double sinhEta = std::sinh(etap);
   const double cosXi = std::cos(xip);
@@ -392,6 +396,8 @@ QByteArray CassiniProjection::glslFunction() const
   return "tsProjectCassini";
 }
 
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 MapPoint CassiniProjection::project(double latRad, double dLonRad) const
 {
   // Snyder (1987), eqs. 3-11 to 3-14, as PROJ's cass:

@@ -122,8 +122,8 @@ std::vector<double> gridLongitudes(const ts::Projection& projection)
   const double centre = projection.centralMeridianDeg();
   std::vector<double> lons = {centre - limit, centre + limit,
                               centre - limit + 1e-6, centre + 1e-9};
-  for (double offset = -limit + 2.5; offset < limit; offset += 2.5) {
-    lons.push_back(centre + offset);
+  for (int32_t step = 1; -limit + 2.5 * step < limit; ++step) {
+    lons.push_back(centre - limit + 2.5 * step);
   }
   return lons;
 }
@@ -173,6 +173,60 @@ struct ProbeBlock {
   std::array<float, 4> steps{};
   std::array<float, 4> which{};
 };
+
+/** What the probe should read back for one offset, and the allowance. */
+struct ProbeExpectation {
+  /** The offset from the reference, metres. */
+  double xM = 0.0;
+  /** The same in y. */
+  double yM = 0.0;
+  /** The largest error allowed in x, metres. */
+  double allowedXM = 0.0;
+  /** The same in y. */
+  double allowedYM = 0.0;
+};
+
+/**
+ * Returns the C++ offset of @p dLonRad, @p dLatRad from the reference at
+ * latitude @p referenceLat (longitude 0, map position @p reference) and
+ * how far the GPU may be from it for samples spanning @p spanDeg.
+ */
+ProbeExpectation
+expectedProbeOffset(const ts::Projection& projection, double referenceLat,
+                    const ts::MapPoint& reference,
+                    // Longitude then latitude, as the
+                    // probe's offsets.
+                    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+                    double dLonRad, double dLatRad, double spanDeg)
+{
+  ProbeExpectation result;
+  if (projection.isCylindrical()) {
+    const ts::MapPoint expected =
+        projection.forward(referenceLat + ts::radToDeg(dLatRad), 0.0);
+    // x is linear in the longitude on cylindrical maps.
+    result.xM = projection.bounds().widthM() / (2.0 * ts::pi) * dLonRad;
+    result.yM = expected.yM - reference.yM;
+    // Float arithmetic: a few parts in ten million of the offset, more
+    // for offsets of tens of degrees (which only the coarsest tiles have,
+    // where a pixel is kilometres).
+    const double relative = 2e-6 + 2e-5 * std::abs(dLatRad);
+    result.allowedXM = 1e-6 + 2e-6 * std::abs(result.xM);
+    result.allowedYM = 1e-6 + relative * std::abs(result.yM);
+    return result;
+  }
+  const ts::MapPoint expected = projection.forward(
+      referenceLat + ts::radToDeg(dLatRad), ts::radToDeg(dLonRad));
+  result.xM = expected.xM - reference.xM;
+  result.yM = expected.yM - reference.yM;
+  // The expansion (small spans) or the float formula (large ones): within
+  // a hundredth of a texel of a 256-pixel tile of this span, and a
+  // millimetre.
+  const double texelM =
+      ts::degToRad(spanDeg) * ts::wgs84::semiMajorAxisM / 256.0;
+  result.allowedXM = 1e-3 + 0.01 * texelM;
+  result.allowedYM = result.allowedXM;
+  return result;
+}
 
 } // namespace
 
@@ -654,37 +708,13 @@ private slots:
             const float index = static_cast<float>(i) + first;
             const double dLonRad = static_cast<double>(stepLon * index);
             const double dLatRad = static_cast<double>(stepLat * index);
-            double expectedX = 0.0;
-            double expectedY = 0.0;
-            double allowedX = 0.0;
-            double allowedY = 0.0;
-            if (projection.isCylindrical()) {
-              const ts::MapPoint expected = projection.forward(
-                  clampedReference + ts::radToDeg(dLatRad), 0.0);
-              // x is linear in the longitude on cylindrical maps.
-              expectedX =
-                  projection.bounds().widthM() / (2.0 * ts::pi) * dLonRad;
-              expectedY = expected.yM - reference.yM;
-              // Float arithmetic: a few parts in ten million of the
-              // offset, more for offsets of tens of degrees (which only
-              // the coarsest tiles have, where a pixel is kilometres).
-              const double relative = 2e-6 + 2e-5 * std::abs(dLatRad);
-              allowedX = 1e-6 + 2e-6 * std::abs(expectedX);
-              allowedY = 1e-6 + relative * std::abs(expectedY);
-            } else {
-              const ts::MapPoint expected =
-                  projection.forward(clampedReference + ts::radToDeg(dLatRad),
-                                     ts::radToDeg(dLonRad));
-              expectedX = expected.xM - reference.xM;
-              expectedY = expected.yM - reference.yM;
-              // The expansion (small spans) or the float formula (large
-              // ones): within a hundredth of a texel of a 256-pixel tile
-              // of this span, and a millimetre.
-              const double texelM =
-                  ts::degToRad(span) * ts::wgs84::semiMajorAxisM / 256.0;
-              allowedX = 1e-3 + 0.01 * texelM;
-              allowedY = allowedX;
-            }
+            const ProbeExpectation expected =
+                expectedProbeOffset(projection, clampedReference, reference,
+                                    dLonRad, dLatRad, span);
+            const double expectedX = expected.xM;
+            const double expectedY = expected.yM;
+            const double allowedX = expected.allowedXM;
+            const double allowedY = expected.allowedYM;
             const double errorX =
                 std::abs(static_cast<double>(gpu[0]) - expectedX);
             const double errorY =
