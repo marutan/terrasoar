@@ -457,6 +457,36 @@ private slots:
     QVERIFY(ts::projectToJson(ts::Project()).contains("\"mode\": \"globe\""));
   }
 
+  void projectProjectionParameters()
+  {
+    // A projection's settings are an optional member of the view: kept
+    // when there are any, absent (so older files' bytes are unchanged)
+    // when not; values that aren't numbers are ignored.
+    ts::Project project;
+    project.projection = QStringLiteral("equidistant-cylindrical");
+    QVERIFY(!ts::projectToJson(project).contains("projectionParameters"));
+    project.projectionParameters[QStringLiteral("standardParallel")] = 37.5;
+    const QByteArray json = ts::projectToJson(project);
+    QVERIFY(json.contains("\"projectionParameters\""));
+    QString error;
+    const std::optional<ts::Project> loaded = ts::projectFromJson(json, &error);
+    if (!loaded) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(
+        loaded->projectionParameters.at(QStringLiteral("standardParallel")),
+        37.5);
+    QCOMPARE(ts::projectToJson(*loaded), json);
+    QByteArray odd = json;
+    odd.replace("37.5", "\"north\"");
+    const std::optional<ts::Project> oddLoaded =
+        ts::projectFromJson(odd, &error);
+    if (!oddLoaded) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(oddLoaded->projectionParameters.empty());
+  }
+
   void projectVersions()
   {
     // Every earlier format version keeps loading: each has a fixture.

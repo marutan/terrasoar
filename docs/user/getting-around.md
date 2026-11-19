@@ -41,8 +41,27 @@ chooses how it is flattened:
   same picture.
 - **Miller Cylindrical**: a compromise that shows the whole world, poles
   nearly included, with less stretching near the poles.
+- **Equidistant Cylindrical (Plate Carrée)**: latitude and longitude as a
+  plain grid; distances along the meridians are true. It has a setting
+  (below).
+- **Gall Stereographic**: a compromise for world maps, poles included,
+  less stretched than Mercator.
+- **Gall–Peters (Gall Orthographic)**: areas are true everywhere, so
+  countries can be compared by size; shapes are stretched north–south
+  near the equator and squashed near the poles.
 
 The map wraps round east to west, so you can keep dragging.
+
+### Projection settings
+
+Some projections have settings. **View → Map Projection → Projection
+Settings…** changes them for the projection shown (it is greyed out for
+the others), and **Restore Defaults** puts them back. Projects remember
+the settings with the projection.
+
+- **Equidistant Cylindrical**: the **standard parallel**, the latitude
+  (north and south) along which east–west distances are true too. 0°,
+  the default, is Plate Carrée; larger values make the map narrower.
 
 ## The status bar
 

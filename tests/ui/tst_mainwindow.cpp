@@ -18,6 +18,7 @@
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <utility>
@@ -28,6 +29,7 @@
 #include <QComboBox>
 #include <QDir>
 #include <QDirIterator>
+#include <QDoubleSpinBox>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFontMetrics>
@@ -76,6 +78,7 @@
 #include "offlineregionsdialog.h"
 #include "packmanager.h"
 #include "packmanagerdialog.h"
+#include "projectionsettingsdialog.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
@@ -1402,10 +1405,21 @@ private slots:
     }
     QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
     const QList<QAction*> actions = menu->actions();
-    QCOMPARE(actions.size(), 3);
+    // The projections, a separator and Projection Settings.
+    QCOMPARE(actions.size(), 8);
     QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
     QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
     QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
+    QCOMPARE(actions.at(3)->text(),
+             QStringLiteral("Equidistant Cylindrical (Plate Carrée)"));
+    QCOMPARE(actions.at(4)->text(), QStringLiteral("Gall Stereographic"));
+    QCOMPARE(actions.at(5)->text(),
+             QStringLiteral("Gall–Peters (Gall Orthographic)"));
+    QVERIFY(actions.at(6)->isSeparator());
+    QCOMPARE(actions.at(7)->objectName(),
+             QStringLiteral("projectionSettingsAction"));
+    // Mercator has no settings.
+    QVERIFY(!actions.at(7)->isEnabled());
     QVERIFY(actions.at(0)->isChecked());
     ts::GlobeView* globe = globeOf(window);
     if (globe == nullptr) {
@@ -1437,6 +1451,72 @@ private slots:
       globe->grabFramebuffer().save(
           QDir(shots).filePath(QStringLiteral("map-miller-world.png")));
     }
+  }
+
+  void projectionSettings()
+  {
+    // Equidistant Cylindrical's standard parallel: the settings action is
+    // enabled for it, the dialog changes the map, choosing the same
+    // projection again keeps the setting, and projects keep it.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QAction* equidistant = window.findChild<QAction*>(
+        QStringLiteral("projectionAction_equidistant-cylindrical"));
+    QAction* settings =
+        window.findChild<QAction*>(QStringLiteral("projectionSettingsAction"));
+    if (equidistant == nullptr || settings == nullptr) {
+      QFAIL("missing projection actions");
+    }
+    equidistant->trigger();
+    QCOMPARE(globe->mapProjection()->id(),
+             QStringLiteral("equidistant-cylindrical"));
+    QVERIFY(settings->isEnabled());
+
+    ts::ProjectionSettingsDialog dialog(&window, globe->mapProjection());
+    QDoubleSpinBox* box = dialog.findChild<QDoubleSpinBox*>(
+        QStringLiteral("projectionParameter_standardParallel"));
+    QPushButton* defaults = dialog.findChild<QPushButton*>(
+        QStringLiteral("projectionDefaultsButton"));
+    if (box == nullptr || defaults == nullptr) {
+      QFAIL("missing dialog controls");
+    }
+    QCOMPARE(box->value(), 0.0);
+    QCOMPARE(box->maximum(), 85.0);
+    QCOMPARE(dialog.projection(), globe->mapProjection());
+    box->setValue(60.0);
+    const ts::Projection* sixty = dialog.projection();
+    QVERIFY(sixty != globe->mapProjection());
+    defaults->click();
+    QCOMPARE(box->value(), 0.0);
+    box->setValue(60.0);
+    globe->setMapProjection(dialog.projection());
+    QCOMPARE(globe->mapProjection(), sixty);
+    // Half as wide as Plate Carrée: cos 60° = 0.5.
+    QVERIFY(std::abs(globe->mapProjection()->bounds().widthM() -
+                     3.14159265358979323846 * 6378137.0) < 1e-3);
+    equidistant->trigger();
+    QCOMPARE(globe->mapProjection(), sixty);
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("settings.terrasoar"));
+    QString error;
+    QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+    QAction* mercator =
+        window.findChild<QAction*>(QStringLiteral("projectionAction_mercator"));
+    if (mercator == nullptr) {
+      QFAIL("no Mercator action");
+    }
+    mercator->trigger();
+    QVERIFY(!settings->isEnabled());
+    QVERIFY2(window.openProject(path, &error), qPrintable(error));
+    QCOMPARE(globe->mapProjection(), sixty);
+    QVERIFY(settings->isEnabled());
   }
 
   // --- WMS

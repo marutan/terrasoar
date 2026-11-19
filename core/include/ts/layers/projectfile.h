@@ -33,6 +33,7 @@
 #include <QString>
 
 #include "ts/camera/camera.h"
+#include "ts/projection/projection.h"
 
 namespace ts
 {
@@ -47,6 +48,11 @@ struct Project {
   bool mapView = false;
   /** Identifier of the flat map's projection (Projection::id()). */
   QString projection = QStringLiteral("mercator");
+  /**
+   * The projection's parameters (Projection::parameterValues()); empty
+   * for none. An optional member of `view`.
+   */
+  ProjectionParameterValues projectionParameters;
   /** The layer tree (LayerTreeModel::toJson()). */
   QJsonArray layers;
 };

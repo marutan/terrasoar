@@ -764,6 +764,23 @@ private slots:
     // Close in: the island with its lake.
     QTest::newRow("map-lake")
         << mercator << 1.0 << 40.0 << 30.0 << 4.0e6 << 0.0 << 0.0;
+    // Phase 11a's projections, the whole world; Equidistant Cylindrical
+    // also with a standard parallel of 45° (narrower), and Gall–Peters'
+    // squashed pole.
+    QTest::newRow("map-equidistant-cylindrical")
+        << QStringLiteral("equidistant-cylindrical") << 1.0 << 0.0 << 0.0
+        << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-equidistant-cylindrical-45")
+        << QStringLiteral("equidistant-cylindrical@45") << 1.0 << 0.0 << 0.0
+        << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-gall-stereographic")
+        << QStringLiteral("gall-stereographic") << 1.0 << 0.0 << 0.0 << 5.0e7
+        << 0.0 << 0.0;
+    QTest::newRow("map-gall-peters") << QStringLiteral("gall-peters") << 1.0
+                                     << 0.0 << 0.0 << 5.0e7 << 0.0 << 0.0;
+    QTest::newRow("map-gall-peters-north")
+        << QStringLiteral("gall-peters") << 1.0 << 80.0 << 30.0 << 2.0e6 << 0.0
+        << 0.0;
   }
 
   void morphGolden()
@@ -805,7 +822,18 @@ private slots:
 
     ts::Camera camera;
     camera.setViewportSize(imageWidthPx, imageHeightPx);
-    camera.setMapProjection(ts::projectionById(projection));
+    // "id@value": the projection with its first parameter set.
+    const QStringList idAndValue = projection.split(QLatin1Char('@'));
+    const ts::Projection* chosen = ts::projectionById(idAndValue.front());
+    if (chosen == nullptr) {
+      QFAIL("unknown projection");
+    }
+    if (idAndValue.size() == 2) {
+      chosen = ts::projectionWith(
+          idAndValue.front(),
+          {{chosen->parameters().front().key, idAndValue.back().toDouble()}});
+    }
+    camera.setMapProjection(chosen);
     camera.setPose(ts::CameraPose{latDeg, lonDeg, rangeM, headingDeg, tiltDeg});
     camera.setMorph(morph);
 

@@ -330,14 +330,19 @@ double TileSelector::screenSpaceErrorPx(const View& view, TileKey key) const
 {
   const Camera& camera = *view.camera;
   const double tileSizePx = std::max(m_settings.tileSizePx, 1);
-  // One texel of the tile along a meridian of the map, on the plane it is
-  // drawn on, metres: where the projection stretches most.
+  // One texel of the tile on the plane it is drawn on, metres: along a
+  // meridian or a parallel, whichever the projection stretches more
+  // (meridians on Mercator, parallels near the poles of Gall–Peters).
   double mapTexelM = 0.0;
   if (view.morph > 0.0) {
     const GeoRect rect = key.bounds();
     const Projection& projection = *view.frame.projection;
-    const double heightM = projection.forward(rect.northDeg, 0.0).yM -
-                           projection.forward(rect.southDeg, 0.0).yM;
+    const double tallM = projection.forward(rect.northDeg, 0.0).yM -
+                         projection.forward(rect.southDeg, 0.0).yM;
+    const double halfWidthDeg = 0.5 * rect.widthDeg();
+    const double wideM = projection.forward(0.0, halfWidthDeg).xM -
+                         projection.forward(0.0, -halfWidthDeg).xM;
+    const double heightM = std::max(tallM, wideM);
     if (view.morph >= 1.0) {
       // Looking straight down at the plane every texel of the map is the
       // same size on screen, wherever it is.

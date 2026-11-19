@@ -32,6 +32,7 @@ HEADERS += \
     $$PWD/src/helpbrowser.h \
     $$PWD/src/helpwindow.h \
     $$PWD/src/addwebterraindialog.h \
+    $$PWD/src/projectionsettingsdialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
     $$PWD/src/elevationprofiledialog.h \
@@ -53,6 +54,7 @@ SOURCES += \
     $$PWD/src/helpbrowser.cpp \
     $$PWD/src/helpwindow.cpp \
     $$PWD/src/addwebterraindialog.cpp \
+    $$PWD/src/projectionsettingsdialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
     $$PWD/src/elevationprofiledialog.cpp \

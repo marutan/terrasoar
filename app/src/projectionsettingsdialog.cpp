@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+  Terra Soar - A virtual globe
+
+  Copyright (C) 2026 Peter Howkins
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, see <https://www.gnu.org/licenses/>.
+ */
+#include "projectionsettingsdialog.h"
+
+#include <cstddef>
+#include <cstdint>
+
+#include <QDialogButtonBox>
+#include <QDoubleSpinBox>
+#include <QEvent>
+#include <QFormLayout>
+#include <QKeySequence>
+#include <QLabel>
+#include <QPushButton>
+#include <QShortcut>
+#include <QVBoxLayout>
+
+#include "helpwindow.h"
+
+namespace ts
+{
+
+QString ProjectionSettingsDialog::helpTarget()
+{
+  return QStringLiteral("getting-around.md#projection-settings");
+}
+
+ProjectionSettingsDialog::ProjectionSettingsDialog(QWidget* parent,
+                                                   const Projection* projection)
+    : QDialog(parent), m_projection(projection),
+      m_parameters(projection->parameters()), m_titleLabel(new QLabel(this)),
+      m_form(new QFormLayout()), m_defaultsButton(new QPushButton(this)),
+      m_buttons(new QDialogButtonBox(
+          QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this))
+{
+  QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
+  connect(help, &QShortcut::activated, this,
+          [this]() { showUserGuide(this, helpTarget()); });
+  setObjectName(QStringLiteral("projectionSettingsDialog"));
+  m_defaultsButton->setObjectName(QStringLiteral("projectionDefaultsButton"));
+  const ProjectionParameterValues current = projection->parameterValues();
+  for (const ProjectionParameter& parameter : m_parameters) {
+    QDoubleSpinBox* box = new QDoubleSpinBox(this);
+    box->setObjectName(QStringLiteral("projectionParameter_") + parameter.key);
+    box->setDecimals(4);
+    box->setRange(parameter.minimum, parameter.maximum);
+    box->setSuffix(parameter.suffix);
+    const ProjectionParameterValues::const_iterator value =
+        current.find(parameter.key);
+    box->setValue(value != current.end() ? value->second
+                                         : parameter.defaultValue);
+    m_form->addRow(parameter.label, box);
+    m_boxes.push_back(box);
+  }
+  m_buttons->addButton(m_defaultsButton, QDialogButtonBox::ResetRole);
+  connect(m_defaultsButton, &QPushButton::clicked, this,
+          &ProjectionSettingsDialog::restoreDefaults);
+  connect(m_buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
+  connect(m_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
+  QVBoxLayout* layout = new QVBoxLayout(this);
+  layout->addWidget(m_titleLabel);
+  layout->addLayout(m_form);
+  layout->addWidget(m_buttons);
+  retranslateUi();
+}
+
+ProjectionSettingsDialog::~ProjectionSettingsDialog() = default;
+
+ProjectionParameterValues ProjectionSettingsDialog::values() const
+{
+  ProjectionParameterValues values;
+  for (std::size_t i = 0; i < m_parameters.size(); ++i) {
+    values[m_parameters[i].key] = m_boxes[i]->value();
+  }
+  return values;
+}
+
+const Projection* ProjectionSettingsDialog::projection() const
+{
+  const Projection* chosen = projectionWith(m_projection->id(), values());
+  return chosen != nullptr ? chosen : m_projection;
+}
+
+void ProjectionSettingsDialog::restoreDefaults()
+{
+  for (std::size_t i = 0; i < m_parameters.size(); ++i) {
+    m_boxes[i]->setValue(m_parameters[i].defaultValue);
+  }
+}
+
+void ProjectionSettingsDialog::changeEvent(QEvent* event)
+{
+  if (event->type() == QEvent::LanguageChange) {
+    retranslateUi();
+  }
+  QDialog::changeEvent(event);
+}
+
+void ProjectionSettingsDialog::retranslateUi()
+{
+  setWindowTitle(tr("Map Projection Settings"));
+  m_titleLabel->setText(m_projection->displayName());
+  // The labels come from the projection, translated in its context.
+  const std::vector<ProjectionParameter> parameters =
+      m_projection->parameters();
+  for (std::size_t i = 0; i < parameters.size() && i < m_boxes.size(); ++i) {
+    if (QLabel* label =
+            qobject_cast<QLabel*>(m_form->labelForField(m_boxes[i]))) {
+      label->setText(parameters[i].label);
+    }
+  }
+  m_defaultsButton->setText(tr("Restore &Defaults"));
+}
+
+} // namespace ts

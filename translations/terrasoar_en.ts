@@ -1194,6 +1194,14 @@
             <source>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</source>
             <translation>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</translation>
         </message>
+        <message>
+            <source>Projection &amp;Settings…</source>
+            <translation>Projection &amp;Settings…</translation>
+        </message>
+        <message>
+            <source>Change the settings of the flat map's projection, such as its standard parallel</source>
+            <translation>Change the settings of the flat map's projection, such as its standard parallel</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -1701,6 +1709,17 @@
         <message>
             <source>Miller Cylindrical</source>
             <translation>Miller Cylindrical</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ProjectionSettingsDialog</name>
+        <message>
+            <source>Map Projection Settings</source>
+            <translation>Map Projection Settings</translation>
+        </message>
+        <message>
+            <source>Restore &amp;Defaults</source>
+            <translation>Restore &amp;Defaults</translation>
         </message>
     </context>
     <context>

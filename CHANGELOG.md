@@ -7,6 +7,21 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Three more projections for the flat map (View → Map Projection):
+  Equidistant Cylindrical (Plate Carrée), Gall Stereographic and
+  Gall–Peters (Gall Orthographic, equal-area).
+- View → Map Projection → Projection Settings…: a projection's settings,
+  such as Equidistant Cylindrical's standard parallel. Projects remember
+  them.
+
+### Fixed
+
+- The flat map chooses its detail by the larger of a tile's height and
+  width, so maps whose tiles are wider than tall (Gall–Peters near the
+  poles) aren't drawn too coarse.
+
 ## [0.0.2] – 2026-11-19
 
 ### Added

@@ -99,6 +99,15 @@ QByteArray projectToJson(const Project& project)
                                           ? QStringLiteral("map")
                                           : QStringLiteral("globe"));
   view.insert(QStringLiteral("projection"), project.projection);
+  // Only when there are any, so files without them stay as they were.
+  if (!project.projectionParameters.empty()) {
+    QJsonObject parameters;
+    for (const std::pair<const QString, double>& parameter :
+         project.projectionParameters) {
+      parameters.insert(parameter.first, parameter.second);
+    }
+    view.insert(QStringLiteral("projectionParameters"), parameters);
+  }
   document.insert(QStringLiteral("view"), view);
   document.insert(QStringLiteral("layers"), project.layers);
   return QJsonDocument(document).toJson(QJsonDocument::Indented);
@@ -147,6 +156,14 @@ std::optional<Project> projectFromJson(const QByteArray& json,
       view.value(QStringLiteral("mode")).toString() == QLatin1String("map");
   project.projection =
       view.value(QStringLiteral("projection")).toString(Project().projection);
+  const QJsonObject parameters =
+      view.value(QStringLiteral("projectionParameters")).toObject();
+  for (QJsonObject::const_iterator it = parameters.begin();
+       it != parameters.end(); ++it) {
+    if (it.value().isDouble()) {
+      project.projectionParameters[it.key()] = it.value().toDouble();
+    }
+  }
   project.layers = object.value(QStringLiteral("layers")).toArray();
   return project;
 }
