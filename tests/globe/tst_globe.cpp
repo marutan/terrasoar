@@ -834,6 +834,16 @@ private slots:
         << rotated << 1.0 << 45.0 << 0.0 << 9.0e7 << 0.0 << 0.0;
     QTest::newRow("morph-half-rotated-mercator")
         << rotated << 0.5 << 45.0 << 0.0 << 1.2e7 << 0.0 << 0.0;
+    // Phase 11c-1's conics: Lambert's fan (EPSG:3034's, apex at the pole,
+    // the cut opposite 10° E left out), half way there, and the
+    // Polyconic's curved meridians.
+    const QString lambert = QStringLiteral("lambert-conformal-conic");
+    QTest::newRow("map-lambert-conformal-conic")
+        << lambert << 1.0 << 52.0 << 10.0 << 6.0e7 << 0.0 << 0.0;
+    QTest::newRow("morph-half-lambert-conformal-conic")
+        << lambert << 0.5 << 52.0 << 10.0 << 1.2e7 << 0.0 << 0.0;
+    QTest::newRow("map-polyconic") << QStringLiteral("polyconic") << 1.0 << 20.0
+                                   << 0.0 << 4.0e7 << 0.0 << 0.0;
   }
 
   void morphGolden()
@@ -1639,6 +1649,10 @@ private slots:
         << 54.5 << -3.0 << 2.0e6 << 0.0 << nationalGrid << 1.0 << 0.0;
     QTest::newRow("base-map-national-grid-thames")
         << 51.5 << 0.6 << 1.5e5 << 0.0 << nationalGrid << 1.0 << 0.0;
+    // Europe on Lambert Conformal Conic (EPSG:3034).
+    QTest::newRow("base-map-lambert-europe")
+        << 52.0 << 10.0 << 5.0e6 << 0.0
+        << QStringLiteral("lambert-conformal-conic") << 1.0 << 0.0;
     // The North Atlantic on the centre line from London to New York.
     QTest::newRow("base-map-rotated-mercator-atlantic")
         << 52.2398 << -41.2968 << 7.0e6 << 0.0

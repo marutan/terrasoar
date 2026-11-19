@@ -42,6 +42,7 @@
 #include "ts/geo/geodetic.h"
 #include "ts/geo/wgs84.h"
 #include "ts/maths/angles.h"
+#include "ts/projection/conic.h"
 #include "ts/projection/cylindricalprojection.h"
 #include "ts/projection/datumshift.h"
 #include "ts/projection/nationalgrid.h"
@@ -325,7 +326,7 @@ private slots:
   void listOfProjections()
   {
     const std::vector<const ts::Projection*>& all = ts::projections();
-    QCOMPARE(all.size(), std::size_t{11});
+    QCOMPARE(all.size(), std::size_t{13});
     QSet<QString> ids;
     QSet<QByteArray> functions;
     for (std::size_t i = 0; i < all.size(); ++i) {
@@ -343,11 +344,13 @@ private slots:
         centre = -3.0;
       } else if (projection->id() == QLatin1String("uk-national-grid")) {
         centre = -2.0;
+      } else if (projection->id() == QLatin1String("lambert-conformal-conic")) {
+        centre = 10.0; // EPSG:3034's
       }
       QCOMPARE(projection->centralMeridianDeg(), centre);
     }
-    QCOMPARE(ids.size(), 11);
-    QCOMPARE(functions.size(), 11);
+    QCOMPARE(ids.size(), 13);
+    QCOMPARE(functions.size(), 13);
     QCOMPARE(all.front()->id(), QStringLiteral("mercator"));
     QVERIFY(ts::projectionById(QStringLiteral("web-mercator")) != nullptr);
     QVERIFY(ts::projectionById(QStringLiteral("miller")) != nullptr);
@@ -375,6 +378,8 @@ private slots:
     QTest::newRow("uk-national-grid") << 9;
     // Inside its own domain.
     QTest::newRow("rotated-mercator") << 10;
+    QTest::newRow("lambert-conformal-conic") << 11;
+    QTest::newRow("polyconic") << 12;
   }
 
   void againstProj()
@@ -548,7 +553,10 @@ private slots:
     QVERIFY(std::abs(mercator.maximumLatDeg() - 85.0840590501) < 1e-6);
     QCOMPARE(miller.maximumLatDeg(), 90.0);
     for (const ts::Projection* projection : ts::projections()) {
-      QCOMPARE(projection->minimumLatDeg(), -projection->maximumLatDeg());
+      // Symmetric about the equator, but for a cone's.
+      if (projection->id() != QLatin1String("lambert-conformal-conic")) {
+        QCOMPARE(projection->minimumLatDeg(), -projection->maximumLatDeg());
+      }
       QVERIFY(projection->containsLatitude(0.0));
       QVERIFY(projection->containsLatitude(projection->maximumLatDeg()));
       QVERIFY(!projection->containsLatitude(90.5));
@@ -621,7 +629,7 @@ private slots:
       QVERIFY(!projection->inverse(ts::MapPoint{bounds.eastM, bounds.northM}));
       QVERIFY(!projection->inverse(ts::MapPoint{bounds.eastM + 1e5, 0.0}));
     }
-    QCOMPARE(limited, 4);
+    QCOMPARE(limited, 5);
   }
 
   void centralMeridian()
@@ -1352,6 +1360,91 @@ void main()
     }
     QCOMPARE(device.takeErrors(), QString());
     QVERIFY(checked > 3 * 90 * columns * 9 / 10);
+  }
+
+  void lambertConformalConic()
+  {
+    // Conformal, true to scale on both standard parallels (or the one),
+    // as PROJ with one parallel and for a cone in the south; parallels
+    // symmetric about the equator are moved apart.
+    struct Case {
+      double parallel1;
+      double parallel2;
+      double origin;
+      double meridian;
+    };
+    for (const Case& c :
+         {Case{35.0, 65.0, 52.0, 10.0}, Case{33.0, 45.0, 39.0, -96.0},
+          Case{45.0, 45.0, 45.0, 0.0}, Case{-10.0, -40.0, -25.0, 135.0}}) {
+      const ts::LambertConformalConicProjection projection(
+          c.parallel1, c.parallel2, c.origin, c.meridian);
+      for (const double parallel : {c.parallel1, c.parallel2}) {
+        const ts::MapScale scale =
+            projection.scaleAtPoint(parallel, c.meridian + 5.0);
+        QVERIFY2(std::abs(scale.parallel - 1.0) < 1e-6,
+                 qPrintable(QString::number(scale.parallel - 1.0)));
+        QVERIFY(std::abs(scale.meridian / scale.parallel - 1.0) < 1e-6);
+      }
+      // Between secant parallels the scale is below 1.
+      if (c.parallel1 != c.parallel2) {
+        QVERIFY(projection
+                    .scaleAtPoint(0.5 * (c.parallel1 + c.parallel2), c.meridian)
+                    .parallel < 1.0);
+      }
+      const ProjPipeline proj(projection.projString());
+      QVERIFY2(proj.isValid(), qPrintable(projection.projString()));
+      double worstM = 0.0;
+      for (int32_t i = -8; i <= 8; ++i) {
+        for (int32_t j = -16; j <= 16; ++j) {
+          const double lat = 10.0 * i;
+          const double lon = c.meridian + 10.0 * j;
+          if (!projection.contains(lat, lon)) {
+            continue;
+          }
+          const ts::MapPoint ours = projection.forward(lat, lon);
+          const ts::MapPoint theirs = proj.forward(lat, lon);
+          worstM = std::max(
+              worstM, std::hypot(ours.xM - theirs.xM, ours.yM - theirs.yM));
+          const ts::Geodetic back = projection.inverse(ours).value_or(nowhere);
+          QVERIFY(std::abs(back.latDeg - lat) < 1e-9);
+        }
+      }
+      QVERIFY2(worstM < toleranceM, qPrintable(QString::number(worstM)));
+      // The far pole is outside; the cut opposite the meridian too.
+      QVERIFY(
+          !projection.contains(c.parallel1 > 0.0 ? -85.0 : 85.0, c.meridian));
+      QVERIFY(!projection.contains(c.origin, c.meridian + 175.0));
+      QVERIFY(projection.contains(c.origin, c.meridian + 165.0));
+    }
+    const ts::LambertConformalConicProjection cylinder(20.0, -20.0, 0.0, 0.0);
+    QCOMPARE(cylinder.parameterValues().at(QStringLiteral("standardParallel2")),
+             -19.0);
+    QVERIFY(cylinder.coneConstant() > 0.0);
+  }
+
+  void polyconic()
+  {
+    // Every parallel and the central meridian are true to scale.
+    const ts::PolyconicProjection projection(-96.0, 30.0);
+    for (const double lat : {-60.0, -10.0, 0.0, 1e-9, 25.0, 50.0, 80.0}) {
+      for (const double lon : {-96.0, -80.0, -40.0}) {
+        const ts::MapScale scale = projection.scaleAtPoint(lat, lon);
+        QVERIFY2(std::abs(scale.parallel - 1.0) < 1e-6,
+                 qPrintable(QStringLiteral("%1, %2: %3")
+                                .arg(lat)
+                                .arg(lon)
+                                .arg(scale.parallel)));
+      }
+      QVERIFY(std::abs(projection.scaleAtPoint(lat, -96.0).meridian - 1.0) <
+              1e-6);
+    }
+    // Smooth through the equator (PROJ has a case of its own there).
+    const ts::MapPoint below = projection.forward(-1e-9, -50.0);
+    const ts::MapPoint above = projection.forward(1e-9, -50.0);
+    QVERIFY(std::hypot(above.xM - below.xM, above.yM - below.yM) < 1e-3);
+    // The origin.
+    const ts::MapPoint origin = projection.forward(30.0, -96.0);
+    QVERIFY(std::hypot(origin.xM, origin.yM) < 1e-6);
   }
 
   void concurrentSharedInstances()

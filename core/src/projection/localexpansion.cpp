@@ -295,7 +295,7 @@ LocalExpansionProjection::shaderReferenceFor(double latDeg, double lonDeg,
                   static_cast<float>(limitRad - dLonRad),
                   static_cast<float>(degToRad(minimumLatDeg()) - latRad),
                   static_cast<float>(degToRad(maximumLatDeg()) - latRad)};
-  if (halfSpanRad < localExpansionLimitRad()) {
+  if (halfSpanRad < localExpansionLimitRadAt(latRad, dLonRad)) {
     const Expansion e = expansionAt(latRad, dLonRad);
     reference.r0 = {
         static_cast<float>(e.jacobian[0]), static_cast<float>(e.jacobian[1]),
@@ -314,6 +314,16 @@ LocalExpansionProjection::shaderReferenceFor(double latDeg, double lonDeg,
   reference.r2 = {static_cast<float>(dLonRad), static_cast<float>(latRad), 0.0F,
                   0.0F};
   return reference;
+}
+
+// Latitude then longitude, as everywhere in Projection.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+double LocalExpansionProjection::localExpansionLimitRadAt(double latRad,
+                                                          double dLonRad) const
+{
+  Q_UNUSED(latRad)
+  Q_UNUSED(dLonRad)
+  return localExpansionLimitRad();
 }
 
 std::array<std::array<float, 4>, 2>

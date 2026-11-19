@@ -82,6 +82,7 @@ HEADERS += \
     include/ts/packs/packlibrary.h \
     include/ts/packs/packmanifest.h \
     include/ts/perf/processstats.h \
+    include/ts/projection/conic.h \
     include/ts/projection/cylindricalprojection.h \
     include/ts/projection/datumshift.h \
     include/ts/projection/localexpansion.h \
@@ -166,6 +167,7 @@ SOURCES += \
     src/packs/packlibrary.cpp \
     src/packs/packmanifest.cpp \
     src/perf/processstats.cpp \
+    src/projection/conic.cpp \
     src/projection/cylindricalprojection.cpp \
     src/projection/datumshift.cpp \
     src/projection/localexpansion.cpp \

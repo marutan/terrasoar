@@ -118,6 +118,15 @@ protected:
   virtual std::array<std::array<float, 4>, 2> glslParameters() const = 0;
 
   /**
+   * Returns the half-span below which a tile about latitude @p latRad,
+   * @p dLonRad east of the central meridian, uses the Taylor expansion
+   * (radians): localExpansionLimitRad() by default. A projection that
+   * isn't smooth somewhere (a cone's apex) gives less near there, so that
+   * tiles near it use the formula.
+   */
+  virtual double localExpansionLimitRadAt(double latRad, double dLonRad) const;
+
+  /**
    * Returns p0 and p1 of the GLSL forward for a large tile about latitude
    * @p latRad, @p dLonRad east of the central meridian (radians). The
    * default is glslParameters(); a projection whose forward depends on

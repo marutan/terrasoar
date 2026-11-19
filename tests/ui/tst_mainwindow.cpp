@@ -1406,7 +1406,7 @@ private slots:
     QCOMPARE(menu->title(), QStringLiteral("Map &Projection"));
     const QList<QAction*> actions = menu->actions();
     // The projections, a separator and Projection Settings.
-    QCOMPARE(actions.size(), 13);
+    QCOMPARE(actions.size(), 15);
     QCOMPARE(actions.at(0)->text(), QStringLiteral("Mercator"));
     QCOMPARE(actions.at(1)->text(), QStringLiteral("Web Mercator"));
     QCOMPARE(actions.at(2)->text(), QStringLiteral("Miller Cylindrical"));
@@ -1423,11 +1423,13 @@ private slots:
              QStringLiteral("UK National Grid (OSGB36)"));
     QCOMPARE(actions.at(10)->text(),
              QStringLiteral("Rotated Mercator (Oblique Mercator)"));
-    QVERIFY(actions.at(11)->isSeparator());
-    QCOMPARE(actions.at(12)->objectName(),
+    QCOMPARE(actions.at(11)->text(), QStringLiteral("Lambert Conformal Conic"));
+    QCOMPARE(actions.at(12)->text(), QStringLiteral("American Polyconic"));
+    QVERIFY(actions.at(13)->isSeparator());
+    QCOMPARE(actions.at(14)->objectName(),
              QStringLiteral("projectionSettingsAction"));
     // Mercator has no settings.
-    QVERIFY(!actions.at(12)->isEnabled());
+    QVERIFY(!actions.at(14)->isEnabled());
     QVERIFY(actions.at(0)->isChecked());
     ts::GlobeView* globe = globeOf(window);
     if (globe == nullptr) {
