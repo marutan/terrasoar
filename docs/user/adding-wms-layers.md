@@ -31,6 +31,26 @@ layers at the opacity you choose, and saved with your project.
 The layer goes to the top of the Layers panel (or into the collection you
 had selected). Move it, hide it or change its opacity like any layer.
 
+## What is here
+
+Many WMS layers can tell you about the place you click: the name of a
+road, the depth of the sea, the reading of a weather station. Click the
+globe or the map (without dragging) on such a layer, and the **What Is
+Here** window lists, for each visible layer that can be asked, topmost
+first, what the server has at that point: each feature with its
+attributes, or the server's text. "Nothing here" means the server found
+nothing at that point.
+
+- Only layers the server marks as queryable are asked; others (and WMTS,
+  XYZ and built-in layers) aren't listed.
+- A layer with times is asked about the time it shows.
+- Pictures and links in a server's answer are not loaded or followed;
+  only its text is shown.
+- **View → What Is Here on Click** turns it off, so clicks only move the
+  view.
+- Layers added with a version of Terra Soar before 0.0.3 don't know how
+  to be asked; add them again.
+
 ## The listed services
 
 The list in the dialog comes with Terra Soar and is updated online, so

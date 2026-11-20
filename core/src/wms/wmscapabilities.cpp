@@ -525,6 +525,26 @@ void parseGetMap(QXmlStreamReader& reader, WmsCapabilities& capabilities)
   }
 }
 
+void parseGetFeatureInfo(QXmlStreamReader& reader,
+                         WmsCapabilities& capabilities)
+{
+  while (reader.readNextStartElement()) {
+    if (reader.name() == QLatin1String("Format")) {
+      const QString format = text(reader);
+      if (!format.isEmpty()) {
+        capabilities.getFeatureInfoFormats.append(format);
+      }
+    } else if (reader.name() == QLatin1String("DCPType")) {
+      const QUrl get = dcpGetUrl(reader);
+      if (capabilities.getFeatureInfoUrl.isEmpty()) {
+        capabilities.getFeatureInfoUrl = get;
+      }
+    } else {
+      reader.skipCurrentElement();
+    }
+  }
+}
+
 void parseCapability(QXmlStreamReader& reader, WmsCapabilities& capabilities,
                      std::vector<RawLayer>& layers)
 {
@@ -533,6 +553,8 @@ void parseCapability(QXmlStreamReader& reader, WmsCapabilities& capabilities,
       while (reader.readNextStartElement()) {
         if (reader.name() == QLatin1String("GetMap")) {
           parseGetMap(reader, capabilities);
+        } else if (reader.name() == QLatin1String("GetFeatureInfo")) {
+          parseGetFeatureInfo(reader, capabilities);
         } else {
           reader.skipCurrentElement();
         }

@@ -49,6 +49,7 @@
 
 class QKeyEvent;
 class QMouseEvent;
+class QTimer;
 class QPainter;
 class QWheelEvent;
 
@@ -305,6 +306,13 @@ signals:
   /** The user finished drawing a line (RegionDrawing::Line). */
   void lineDrawn(const std::vector<ts::LonLat>& points);
 
+  /**
+   * The user clicked the globe or map at @p point (a press and release
+   * without dragging, not part of a double click), where the view shows
+   * @p degreesPerPixel of longitude per pixel. Not while drawing.
+   */
+  void pointClicked(ts::LonLat point, double degreesPerPixel);
+
   /** The user cancelled drawing a region, or it was cancelled. */
   void regionDrawingCancelled();
 
@@ -341,6 +349,7 @@ private:
   void onFrameTimer();
   void releaseGl();
   void updatePointerReadout();
+  void reportClick();
   void drawOverlay();
   void drawAttributions();
   void drawScaleBar();
@@ -395,6 +404,12 @@ private:
   std::vector<LonLat> m_drawnPoints;
   /** True while dragging out a rectangle. */
   bool m_drawingDrag = false;
+  /** Where a left press that may become a click was. */
+  std::optional<QPointF> m_clickPressPx;
+  /** Waits out a double click before reporting a click. */
+  QTimer* m_clickTimer = nullptr;
+  /** Where the click to report was. */
+  QPointF m_clickPx;
   std::vector<RegionGeometry> m_outlines;
 };
 
@@ -403,5 +418,6 @@ private:
 // For queued connections and QSignalSpy (Qt 5 needs it declared).
 Q_DECLARE_METATYPE(ts::RegionGeometry)
 Q_DECLARE_METATYPE(std::vector<ts::LonLat>)
+Q_DECLARE_METATYPE(ts::LonLat)
 
 #endif // TS_APP_GLOBEVIEW_H

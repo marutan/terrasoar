@@ -46,12 +46,14 @@
 #include <QNetworkProxy>
 #include <QPointer>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QShortcut>
 #include <QSignalSpy>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStyleHints>
 #include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -68,6 +70,7 @@
 #include "addxyzdialog.h"
 #include "appsettings.h"
 #include "elevationprofiledialog.h"
+#include "featureinfowindow.h"
 #include "fixturepack.h"
 #include "globeview.h"
 #include "helpwindow.h"
@@ -96,6 +99,7 @@
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
+#include "ts/wms/wmscapabilities.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "userguide.h"
@@ -626,7 +630,10 @@ private slots:
     ts::AddXyzDialog xyz(std::make_shared<ts::NetworkClient>(settings),
                          nullptr);
     ts::AddWebTerrainDialog terrain(nullptr);
+    ts::FeatureInfoWindow featureInfo(
+        std::make_shared<ts::NetworkClient>(settings), nullptr);
     const std::vector<std::pair<QDialog*, QString>> dialogs{
+        {&featureInfo, ts::FeatureInfoWindow::helpTarget()},
         {&wms, ts::AddWmsDialog::helpTarget()},
         {&wmts, ts::AddWmtsDialog::helpTarget()},
         {&xyz, ts::AddXyzDialog::helpTarget()},
@@ -2379,6 +2386,131 @@ private slots:
     ts::MainWindow reopened;
     QVERIFY2(reopened.openProject(path, &error), qPrintable(error));
     QCOMPARE(reopened.clock()->time(), window.clock()->time());
+  }
+
+  void wmsWhatIsHere()
+  {
+    // A click on the globe reports the point; asking a queryable WMS layer
+    // there sends GetFeatureInfo for that point (the mock answers with
+    // the point it was asked about) and lists the answer; layers that
+    // can't be asked aren't; the action turns it off.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    behaviour->featureInfo = true;
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    window.registry().setWmsNetwork(network, wms);
+    QString error;
+    const std::optional<ts::WmsCapabilities> capabilities =
+        ts::parseWmsCapabilities(ts::test::mockWmsCapabilities(
+                                     QStringLiteral("1.3.0"),
+                                     server.url(QStringLiteral("/wms")),
+                                     QStringLiteral("EPSG:4326"), false, true),
+                                 &error);
+    QVERIFY2(capabilities.has_value(), qPrintable(error));
+    // No layer to ask: nothing happens.
+    QCOMPARE(window.identifyAt(ts::LonLat{-2.0, 51.0}, 0.01), 0);
+    QVERIFY(window.featureInfoWindow() == nullptr);
+    for (const QString& name :
+         {QStringLiteral("background"), QStringLiteral("pattern")}) {
+      const std::optional<ts::WmsSource> source = ts::wmsSourceFor(
+          *capabilities, {name}, {QString()}, QString(), &error);
+      QVERIFY2(source.has_value(), qPrintable(error));
+      QCOMPARE(source->featureInfoUrl.isEmpty(),
+               name == QLatin1String("background"));
+      ts::LayerDefinition definition;
+      definition.id = QStringLiteral("wms:") + name;
+      definition.type = ts::LayerType::Imagery;
+      definition.name = source->title;
+      definition.source = source->toJson();
+      window.layerModel()->addLayer(definition);
+    }
+    for (const QString& format :
+         {QStringLiteral("application/json"), QStringLiteral("text/html"),
+          QStringLiteral("text/plain")}) {
+      // Asked about (-2.3, 51.4) at about 0.01° a pixel.
+      QJsonObject source =
+          window.layerModel()
+              ->layerDefinition(window.layerModel()->index(0, 0))
+              .source;
+      QJsonObject info = source.value(QStringLiteral("featureInfo")).toObject();
+      info.insert(QStringLiteral("format"), format);
+      source.insert(QStringLiteral("featureInfo"), info);
+      ts::LayerDefinition changed = window.layerModel()->layerDefinition(
+          window.layerModel()->index(0, 0));
+      changed.source = source;
+      window.layerModel()->setLayerDefinition(window.layerModel()->index(0, 0),
+                                              changed);
+      QCOMPARE(window.identifyAt(ts::LonLat{-2.3, 51.4}, 0.01), 1);
+      ts::FeatureInfoWindow* results = window.featureInfoWindow();
+      QVERIFY(results != nullptr && results->isVisible());
+      QSignalSpy finished(results, &ts::FeatureInfoWindow::finished);
+      QVERIFY(results->pendingCount() == 0 || finished.wait(5000));
+      const QString text = results->resultsText();
+      QVERIFY2(text.startsWith(QLatin1String("Test pattern")),
+               qPrintable(text));
+      // The point asked about, to the pixel of the tile it was asked in.
+      const QRegularExpression lon(QStringLiteral("lon: (-?[0-9.]+)"));
+      const QRegularExpression lat(QStringLiteral("lat: (-?[0-9.]+)"));
+      const double answeredLon = lon.match(text).captured(1).toDouble();
+      const double answeredLat = lat.match(text).captured(1).toDouble();
+      QVERIFY2(std::abs(answeredLon + 2.3) < 0.02 &&
+                   std::abs(answeredLat - 51.4) < 0.02,
+               qPrintable(format + QLatin1Char('\n') + text));
+      QVERIFY(!text.contains(QLatin1String("Opaque background")));
+    }
+    // GetFeatureInfo asked for the queryable layer only.
+    int32_t infoRequests = 0;
+    for (const ts::test::MockHttpRequest& request : server.requests()) {
+      const QUrlQuery query(request.url);
+      if (query.queryItemValue(QStringLiteral("REQUEST")) ==
+          QLatin1String("GetFeatureInfo")) {
+        ++infoRequests;
+        QCOMPARE(query.queryItemValue(QStringLiteral("QUERY_LAYERS")),
+                 QStringLiteral("pattern"));
+      }
+    }
+    QCOMPARE(infoRequests, 3);
+
+    // Turned off: nothing is asked.
+    QAction* action =
+        window.findChild<QAction*>(QStringLiteral("featureInfoAction"));
+    QVERIFY(action != nullptr && action->isChecked());
+    action->setChecked(false);
+    QCOMPARE(window.identifyAt(ts::LonLat{-2.3, 51.4}, 0.01), 0);
+    action->setChecked(true);
+
+    // A click (not a drag) on the globe is reported once, with the point.
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      return;
+    }
+    QSignalSpy clicked(globe, &ts::GlobeView::pointClicked);
+    const QPoint middle = globe->rect().center();
+    QTest::mouseClick(globe, Qt::LeftButton, Qt::NoModifier, middle);
+    QVERIFY(clicked.wait(3000));
+    QCOMPARE(clicked.count(), 1);
+    QVERIFY(clicked.at(0).at(1).toDouble() > 0.0);
+    // A drag is not a click.
+    QTest::mousePress(globe, Qt::LeftButton, Qt::NoModifier, middle);
+    QMouseEvent move(QEvent::MouseMove, QPointF(middle + QPoint(40, 0)),
+                     globe->mapToGlobal(QPointF(middle + QPoint(40, 0))),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(globe, &move);
+    QTest::mouseRelease(globe, Qt::LeftButton, Qt::NoModifier,
+                        middle + QPoint(40, 0));
+    QTest::qWait(QGuiApplication::styleHints()->mouseDoubleClickInterval() +
+                 200);
+    QCOMPARE(clicked.count(), 1);
   }
 
   void offlineRegionEndToEnd()

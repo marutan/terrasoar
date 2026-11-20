@@ -1,0 +1,6 @@
+Results for FeatureType 'http://www.openplans.org/topp:states':
+--------------------------------------------
+the_geom = [GEOMETRY (MultiPolygon) with 1066 points]
+STATE_NAME = Illinois
+STATE_FIPS = 17
+--------------------------------------------

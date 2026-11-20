@@ -60,6 +60,7 @@
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
 #include "elevationprofiledialog.h"
+#include "featureinfowindow.h"
 #include "globeview.h"
 #include "helpwindow.h"
 #include "layertreedock.h"
@@ -84,10 +85,12 @@
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/regions/countryareas.h"
+#include "ts/tiling/tilekey.h"
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
 #include "ts/wms/wmsimageryprovider.h"
+#include "ts/wms/wmssource.h"
 
 namespace ts
 {
@@ -150,6 +153,10 @@ MainWindow::MainWindow(QWidget* parent)
             &MainWindow::showPointerPosition);
     connect(m_globeView, &GlobeView::cameraChanged, this,
             &MainWindow::showEyeHeight);
+    connect(m_globeView, &GlobeView::pointClicked, this,
+            [this](LonLat point, double degreesPerPixel) {
+              identifyAt(point, degreesPerPixel);
+            });
   } else {
     // Headless runs (the offscreen platform) and broken drivers: the rest
     // of the window still works.
@@ -548,6 +555,10 @@ void MainWindow::createActions()
   m_addWmtsAction->setObjectName(QStringLiteral("addWmtsAction"));
   connect(m_addWmtsAction, &QAction::triggered, this,
           [this]() { addWmtsLayer(); });
+  m_featureInfoAction = new QAction(this);
+  m_featureInfoAction->setObjectName(QStringLiteral("featureInfoAction"));
+  m_featureInfoAction->setCheckable(true);
+  m_featureInfoAction->setChecked(true);
   m_addXyzAction = new QAction(this);
   m_addXyzAction->setObjectName(QStringLiteral("addXyzAction"));
   connect(m_addXyzAction, &QAction::triggered, this,
@@ -849,6 +860,7 @@ void MainWindow::createMenus()
   m_viewMenu->addAction(m_scaleBarAction);
   m_viewMenu->addAction(m_attributionsAction);
   m_viewMenu->addAction(m_timeBar->toggleViewAction());
+  m_viewMenu->addAction(m_featureInfoAction);
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
@@ -913,6 +925,10 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_featureInfoAction->setText(tr("What Is &Here on Click"));
+  m_featureInfoAction->setStatusTip(
+      tr("Clicking the globe or the map asks WMS layers what they show "
+         "there"));
   m_timeBar->toggleViewAction()->setText(tr("&Time Slider"));
   m_timeBar->toggleViewAction()->setStatusTip(
       tr("Show the slider that sets the time shown by layers with dates"));
@@ -1132,6 +1148,52 @@ LayerStack MainWindow::timedStack() const
     }
   }
   return stack;
+}
+
+int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
+{
+  if (!m_featureInfoAction->isChecked()) {
+    return 0;
+  }
+  // The visible WMS layers that can be asked, topmost first, as drawn now.
+  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
+  std::vector<FeatureInfoQuery> queries;
+  for (std::size_t i = stack.imagery.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.imagery[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wms")) {
+      continue;
+    }
+    const std::optional<WmsSource> source =
+        WmsSource::fromJson(definition.source, nullptr);
+    if (!source || source->featureInfoUrl.isEmpty()) {
+      continue;
+    }
+    // The tile at the view's scale (its pixels about the screen's).
+    const double perPixel = std::max(degreesPerPixel, 1e-9);
+    const int32_t level = std::clamp(
+        static_cast<int32_t>(std::lround(std::log2(
+            180.0 / (static_cast<double>(source->tileSizePx) * perPixel)))),
+        0, std::min(source->maximumLevel, TileKey::maximumLevel));
+    const TileKey key =
+        TileKey::containing(level, Geodetic{point.latDeg, point.lonDeg, 0.0});
+    const QUrl url =
+        getFeatureInfoUrl(*source, key, point.lonDeg, point.latDeg);
+    if (!url.isEmpty()) {
+      queries.push_back(
+          FeatureInfoQuery{definition.name, url, source->infoFormat});
+    }
+  }
+  if (queries.empty()) {
+    return 0;
+  }
+  if (m_featureInfoWindow == nullptr) {
+    m_featureInfoWindow = new FeatureInfoWindow(m_registry->network(), this);
+  }
+  m_featureInfoWindow->query(point, queries);
+  m_featureInfoWindow->show();
+  m_featureInfoWindow->raise();
+  return static_cast<int32_t>(queries.size());
 }
 
 void MainWindow::updateTimeBar(const LayerStack& stack)

@@ -57,6 +57,7 @@ namespace ts
 {
 
 class ElevationProfileDialog;
+class FeatureInfoWindow;
 struct AboutDataRow;
 
 class CountryAreas;
@@ -231,6 +232,17 @@ public:
   /** Returns the time slider (for tests). */
   TimeBar* timeBar() const { return m_timeBar; }
 
+  /**
+   * Asks the visible WMS layers that can be queried what they have at
+   * @p point (GetFeatureInfo, at the scale of @p degreesPerPixel) and shows
+   * the answers in the What Is Here window. Returns the number of layers
+   * asked; none if View → What Is Here on Click is off.
+   */
+  int32_t identifyAt(LonLat point, double degreesPerPixel);
+
+  /** Returns the What Is Here window, or null before the first click. */
+  FeatureInfoWindow* featureInfoWindow() const { return m_featureInfoWindow; }
+
   /** Returns the path of the current project, empty if never saved. */
   const QString& projectPath() const { return m_projectPath; }
 
@@ -333,6 +345,8 @@ private:
   QAction* m_addWmsAction = nullptr;
   QAction* m_addWmtsAction = nullptr;
   QAction* m_addXyzAction = nullptr;
+  QAction* m_featureInfoAction = nullptr;
+  FeatureInfoWindow* m_featureInfoWindow = nullptr;
   QAction* m_offlineRegionsAction = nullptr;
   /** Destroyed before the registry. */
   std::unique_ptr<OfflineRegionManager> m_offlineRegions;

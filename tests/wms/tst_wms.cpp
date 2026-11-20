@@ -23,6 +23,8 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -45,6 +47,7 @@
 #include "ts/time/timeextent.h"
 #include "ts/wms/wmscapabilities.h"
 #include "ts/wms/wmscatalogue.h"
+#include "ts/wms/wmsfeatureinfo.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 
@@ -354,6 +357,279 @@ private slots:
              QStringLiteral("ELEVATION"));
     QCOMPARE(ts::wmsDimensionParameter(QStringLiteral("band")),
              QStringLiteral("DIM_BAND"));
+  }
+
+  void featureInfoCapabilities()
+  {
+    // GetFeatureInfo's address and formats; sources of queryable layers
+    // keep them, with the format chosen (GeoJSON, then GML, …).
+    const ts::WmsCapabilities nowcoast = capabilitiesOf("nowcoast-130.xml");
+    QVERIFY(nowcoast.getFeatureInfoUrl.toString().startsWith(
+        QLatin1String("https://nowcoast.noaa.gov/geoserver/ows")));
+    QVERIFY(nowcoast.getFeatureInfoFormats.contains(
+        QStringLiteral("application/json")));
+    QCOMPARE(ts::chooseInfoFormat(nowcoast.getFeatureInfoFormats),
+             QStringLiteral("application/json"));
+    const ts::WmsCapabilities gebco = capabilitiesOf("gebco-130.xml");
+    QCOMPARE(ts::chooseInfoFormat(gebco.getFeatureInfoFormats),
+             QStringLiteral("application/vnd.ogc.gml"));
+    QCOMPARE(ts::chooseInfoFormat(
+                 capabilitiesOf("usgs-130.xml").getFeatureInfoFormats),
+             QStringLiteral("application/geo+json"));
+    QCOMPARE(ts::chooseInfoFormat(
+                 capabilitiesOf("terrestris-130.xml").getFeatureInfoFormats),
+             QStringLiteral("text/xml"));
+    QCOMPARE(ts::chooseInfoFormat({QStringLiteral("image/png")}), QString());
+    QCOMPARE(
+        ts::chooseInfoFormat({QStringLiteral("text/xml; subtype=gml/3.2")}),
+        QStringLiteral("text/xml; subtype=gml/3.2"));
+
+    QString error;
+    const ts::WmsLayer* queryable = nullptr;
+    for (const ts::WmsLayer* layer : gebco.namedLayers()) {
+      if (layer->queryable) {
+        queryable = layer;
+      }
+    }
+    QVERIFY(queryable != nullptr);
+    const std::optional<ts::WmsSource> source = ts::wmsSourceFor(
+        gebco, {queryable->name}, {QString()}, QString(), &error);
+    QVERIFY2(source.has_value(), qPrintable(error));
+    QCOMPARE(source->featureInfoUrl.host(), QStringLiteral("wms.gebco.net"));
+    QCOMPARE(source->infoFormat, QStringLiteral("application/vnd.ogc.gml"));
+    // Kept in JSON, and not part of the id.
+    const std::optional<ts::WmsSource> back =
+        ts::WmsSource::fromJson(source->toJson(), &error);
+    QVERIFY(back.has_value());
+    QCOMPARE(back->featureInfoUrl, source->featureInfoUrl);
+    QCOMPARE(back->infoFormat, source->infoFormat);
+    ts::WmsSource closedSource = *source;
+    closedSource.featureInfoUrl.clear();
+    QCOMPARE(closedSource.id(), source->id());
+    // Not queryable: no feature info.
+    ts::WmsCapabilities closedCaps = gebco;
+    const std::function<void(std::vector<ts::WmsLayer>&)> close =
+        [&close](std::vector<ts::WmsLayer>& layers) {
+          for (ts::WmsLayer& layer : layers) {
+            layer.queryable = false;
+            close(layer.children);
+          }
+        };
+    close(closedCaps.layers);
+    const std::optional<ts::WmsSource> notQueryable = ts::wmsSourceFor(
+        closedCaps, {queryable->name}, {QString()}, QString(), &error);
+    QVERIFY(notQueryable.has_value());
+    QVERIFY(notQueryable->featureInfoUrl.isEmpty());
+    QVERIFY(!notQueryable->toJson().contains(QStringLiteral("featureInfo")));
+  }
+
+  void featureInfoRequests_data()
+  {
+    QTest::addColumn<QString>("version");
+    QTest::addColumn<QString>("crs");
+    QTest::addColumn<QString>("bbox");
+    QTest::addColumn<QString>("iName");
+    QTest::addColumn<int32_t>("i");
+    QTest::addColumn<int32_t>("j");
+    // Quadtree tile (3, 9, 2): lon 22.5 to 45, lat 22.5 to 45; the point
+    // (30, 40) is a third of the way across and two ninths down.
+    QTest::newRow("1.3.0 EPSG:4326, latitude first")
+        << "1.3.0" << "EPSG:4326" << "22.5,22.5,45,45" << "I" << 85 << 56;
+    QTest::newRow("1.3.0 CRS:84")
+        << "1.3.0" << "CRS:84" << "22.5,22.5,45,45" << "I" << 85 << 56;
+    QTest::newRow("1.1.1 X and Y")
+        << "1.1.1" << "EPSG:4326" << "22.5,22.5,45,45" << "X" << 85 << 56;
+    // Web Mercator: rows even in northing, which stretches the north of
+    // the tile, so (30, 40) is lower down.
+    QTest::newRow("Web Mercator")
+        << "1.3.0" << "EPSG:3857"
+        << "2504688.5428486555,2571663.0471736453,5009377.085697311,"
+           "5621521.486192066"
+        << "I" << 85 << 63;
+  }
+
+  void featureInfoRequests()
+  {
+    QFETCH(QString, version);
+    QFETCH(QString, crs);
+    QFETCH(QString, bbox);
+    QFETCH(QString, iName);
+    QFETCH(int32_t, i);
+    QFETCH(int32_t, j);
+    ts::WmsSource source;
+    source.url = QUrl(QStringLiteral("https://example.org/wms?map=a"));
+    source.version = version;
+    source.crs = crs;
+    source.layers = QStringList{QStringLiteral("a"), QStringLiteral("b")};
+    source.styles = QStringList{QString(), QString()};
+    source.dimensions = {
+        {QStringLiteral("time"), QStringLiteral("2026-11-05")}};
+    const ts::TileKey key{3, 9, 2};
+    // Not queryable: nothing.
+    QVERIFY(ts::getFeatureInfoUrl(source, key, 30.0, 40.0).isEmpty());
+    source.featureInfoUrl =
+        QUrl(QStringLiteral("https://info.example.org/fi?map=b"));
+    source.infoFormat = QStringLiteral("application/json");
+    const QUrl url = ts::getFeatureInfoUrl(source, key, 30.0, 40.0, 5);
+    QCOMPARE(url.host(), QStringLiteral("info.example.org"));
+    const QUrlQuery query(url);
+    QCOMPARE(query.queryItemValue(QStringLiteral("REQUEST")),
+             QStringLiteral("GetFeatureInfo"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("map")), QStringLiteral("b"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("LAYERS")),
+             QStringLiteral("a,b"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("QUERY_LAYERS")),
+             QStringLiteral("a,b"));
+    QCOMPARE(
+        query.queryItemValue(QStringLiteral("INFO_FORMAT"), QUrl::FullyDecoded),
+        QStringLiteral("application/json"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("FEATURE_COUNT")),
+             QStringLiteral("5"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("TIME")),
+             QStringLiteral("2026-11-05"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("WIDTH")),
+             QStringLiteral("256"));
+    QCOMPARE(query.queryItemValue(QStringLiteral("BBOX"), QUrl::FullyDecoded),
+             bbox);
+    QCOMPARE(query.queryItemValue(iName).toInt(), i);
+    QCOMPARE(query
+                 .queryItemValue(iName == QLatin1String("I")
+                                     ? QStringLiteral("J")
+                                     : QStringLiteral("Y"))
+                 .toInt(),
+             j);
+    QVERIFY(!query.hasQueryItem(QStringLiteral("TRANSPARENT")));
+    // A point outside the tile: nothing.
+    QVERIFY(ts::getFeatureInfoUrl(source, key, 10.0, 40.0).isEmpty());
+  }
+
+  void featureInfoAnswers_data()
+  {
+    QTest::addColumn<QString>("file");
+    QTest::addColumn<QString>("type");
+    QTest::addColumn<int32_t>("features");
+    QTest::addColumn<QString>("layer");
+    QTest::addColumn<QString>("id");
+    QTest::addColumn<QString>("name");
+    QTest::addColumn<QString>("value");
+    QTest::newRow("GeoJSON")
+        << "geoserver.json" << "application/json" << 1 << "topp:states"
+        << "topp:states.13" << "STATE_NAME" << "Illinois";
+    QTest::newRow("GeoJSON by sniffing")
+        << "geoserver.json" << "" << 1 << "topp:states" << "topp:states.13"
+        << "PERSONS" << "11430602";
+    QTest::newRow("GeoJSON, nothing")
+        << "geoserver-empty.json" << "application/json" << 0 << "" << "" << ""
+        << "";
+    QTest::newRow("GML 2") << "geoserver-gml.xml" << "application/vnd.ogc.gml"
+                           << 1 << "states" << "states.13" << "STATE_NAME"
+                           << "Illinois";
+    QTest::newRow("MapServer GML")
+        << "mapserver-gml.xml" << "application/vnd.ogc.gml" << 1
+        << "GEBCO_LATEST" << "" << "value_0" << "-3412";
+    QTest::newRow("ArcGIS FIELDS")
+        << "arcgis-fields.xml" << "application/vnd.esri.wms_featureinfo_xml"
+        << 1 << "" << "" << "NAME" << "Lake Michigan";
+    QTest::newRow("ArcGIS collection")
+        << "arcgis-collection.xml" << "text/xml" << 1 << "Rivers" << ""
+        << "NAME" << "Thames";
+    QTest::newRow("HTML table") << "geoserver.html" << "text/html" << 2
+                                << "states" << "" << "STATE_NAME" << "Illinois";
+    QTest::newRow("GeoServer text")
+        << "geoserver-plain.txt" << "text/plain" << 1
+        << "http://www.openplans.org/topp:states" << "" << "STATE_NAME"
+        << "Illinois";
+    QTest::newRow("MapServer text") << "mapserver-plain.txt" << "text/plain"
+                                    << 2 << "roads" << "12" << "NAME" << "A1";
+    QTest::newRow("nothing, text")
+        << "nothing-plain.txt" << "text/plain" << 0 << "" << "" << "" << "";
+  }
+
+  void featureInfoAnswers()
+  {
+    QFETCH(QString, file);
+    QFETCH(QString, type);
+    QFETCH(int32_t, features);
+    QFETCH(QString, layer);
+    QFETCH(QString, id);
+    QFETCH(QString, name);
+    QFETCH(QString, value);
+    QString error;
+    const std::optional<ts::WmsFeatureInfo> info = ts::parseFeatureInfo(
+        fixture(QStringLiteral("featureinfo/") + file), type, &error);
+    if (!info) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(static_cast<int32_t>(info->features.size()), features);
+    QCOMPARE(info->isEmpty(), features == 0);
+    if (features == 0) {
+      return;
+    }
+    const ts::FeatureInfoFeature& first = info->features.front();
+    QCOMPARE(first.layer, layer);
+    QCOMPARE(first.id, id);
+    bool found = false;
+    for (const std::pair<QString, QString>& attribute : first.attributes) {
+      if (attribute.first == name) {
+        QCOMPARE(attribute.second, value);
+        found = true;
+      }
+      // Geometry is left out.
+      QVERIFY(!attribute.second.contains(QLatin1String("88.07")));
+      QVERIFY(!attribute.first.contains(QLatin1String("geom")));
+    }
+    QVERIFY2(found, qPrintable(name));
+  }
+
+  void featureInfoOddAnswers()
+  {
+    QString error;
+    // GeoJSON values of every kind as text.
+    const std::optional<ts::WmsFeatureInfo> json = ts::parseFeatureInfo(
+        fixture(QStringLiteral("featureinfo/geoserver.json")),
+        QStringLiteral("application/json"), &error);
+    QVERIFY(json.has_value());
+    std::map<QString, QString> values(json->features.front().attributes.begin(),
+                                      json->features.front().attributes.end());
+    QCOMPARE(values.at(QStringLiteral("LAND_KM")), QStringLiteral("143986.61"));
+    QCOMPARE(values.at(QStringLiteral("MALE")), QStringLiteral("5552233"));
+    QCOMPARE(values.at(QStringLiteral("NOTES")), QString());
+    QCOMPARE(values.at(QStringLiteral("TAGS")),
+             QStringLiteral("[\"a\",\"b\"]"));
+    // HTML: entities decoded, scripts dropped, nothing loaded.
+    const std::optional<ts::WmsFeatureInfo> table = ts::parseFeatureInfo(
+        fixture(QStringLiteral("featureinfo/geoserver.html")),
+        QStringLiteral("text/html"), &error);
+    QVERIFY(table.has_value());
+    QCOMPARE(table->features.at(1).attributes.at(1).second,
+             QStringLiteral("Indiana & more"));
+    QCOMPARE(table->features.at(1).attributes.at(0),
+             (std::pair<QString, QString>{QStringLiteral("fid"),
+                                          QStringLiteral("states.14")}));
+    const std::optional<ts::WmsFeatureInfo> prose =
+        ts::parseFeatureInfo(fixture(QStringLiteral("featureinfo/prose.html")),
+                             QStringLiteral("text/html"), &error);
+    QVERIFY(prose.has_value());
+    QVERIFY(prose->features.empty());
+    QCOMPARE(prose->text,
+             QStringLiteral("Sea surface temperature\nAt this point: 14.2 °C "
+                            "<estimated>"));
+    // A service exception: its message.
+    QVERIFY(!ts::parseFeatureInfo(
+        fixture(QStringLiteral("featureinfo/exception.xml")),
+        QStringLiteral("application/vnd.ogc.se_xml"), &error));
+    QVERIFY2(error.contains(QLatin1String("not queryable")), qPrintable(error));
+    // Broken answers.
+    QVERIFY(!ts::parseFeatureInfo(
+        "{\"type\":", QStringLiteral("application/json"), &error));
+    QVERIFY(!ts::parseFeatureInfo("<a><b></a>", QStringLiteral("text/xml"),
+                                  &error));
+    // Other XML: its text.
+    const std::optional<ts::WmsFeatureInfo> other =
+        ts::parseFeatureInfo("<Result><Depth>-30 m</Depth></Result>",
+                             QStringLiteral("text/xml"), &error);
+    QVERIFY(other.has_value());
+    QCOMPARE(other->text, QStringLiteral("-30 m"));
   }
 
   void axesAndOddities()

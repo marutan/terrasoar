@@ -267,6 +267,48 @@ and the registry draws the variant its `month` value names. So the
 seasons follow the clock; a fixed month can be chosen from the layer's
 Time menu, and removing the pack brings back the July picture.
 
+## GetFeatureInfo
+
+**Capabilities.** `WmsCapabilities::getFeatureInfoUrl` and
+`getFeatureInfoFormats` come from the `GetFeatureInfo` request's `DCPType`
+and `Format`s. `wmsSourceFor()` gives a source a `featureInfoUrl` and an
+`infoFormat` (kept as `"featureInfo": {"url", "format"}`, not part of
+`id()`) when every chosen layer is `queryable`. `chooseInfoFormat()`
+prefers GeoJSON (names and values exactly), then GML and the other XML
+forms (ArcGIS's `vnd.esri.wms_featureinfo_xml`, `text/xml`), then HTML,
+then plain text: nowCOAST answers in JSON, GEBCO in GML, the USGS in
+GeoJSON, terrestris in XML.
+
+**The request.** A click on the globe or the map (a press and release
+within 4 px, reported after the double-click interval so a double click
+isn't one; `GlobeView::pointClicked`) carries the point and the view's
+degrees per pixel there. `MainWindow::identifyAt()` picks, for each
+visible queryable WMS layer as drawn at the clock's time, the quadtree
+tile at the view's scale containing the point (so the server judges
+scale-dependent layers as for what is drawn), and `getFeatureInfoUrl()`
+asks as if the point were clicked in that tile's GetMap image: the same
+BBOX, size, CRS, styles and dimensions, `QUERY_LAYERS`, `INFO_FORMAT`,
+`FEATURE_COUNT` (10), and the pixel as `I`/`J` (1.3.0) or `X`/`Y`
+(1.1.1), rows even in latitude or, for Web Mercator, in northing.
+
+**The answer.** `parseFeatureInfo()` reads, by the response's content type
+(else the format asked for, else by sniffing):
+
+| Answer | Read as |
+| --- | --- |
+| GeoJSON (GeoServer, QGIS Server, MapServer, ArcGIS) | Each feature's id and properties; numbers without needless decimals, nested values as compact JSON |
+| GML `featureMember`/`featureMembers` (GeoServer) | Each member's simple elements; geometry (`*geom*`, `boundedBy`, `shape`) and nested elements left out; `fid` as the id |
+| MapServer `msGMLOutput` | `<x_layer>` (its `gml:name`) and its `<x_feature>`s |
+| ArcGIS `FeatureInfoResponse` | `<FIELDS name="value" …/>` attributes, or `FeatureInfoCollection`'s `Field`s |
+| Other XML | Its text; a service exception is an error with its message |
+| HTML | Each table with a header row: one feature per row; a two-column table: one feature of names and values; else the page's text. Scripts, styles and comments are dropped, entities decoded; nothing is loaded |
+| Plain text | `name = value` lines grouped by GeoServer's and MapServer's headings and rules; geometry summaries left out; "no features" is nothing |
+
+**The window** (`app/src/featureinfowindow.*`) asks every layer at once
+through the shared network client and lists the answers as they come.
+A new click cancels the requests of the last one. View → What Is Here on
+Click turns clicking off.
+
 ## The catalogue
 
 `data/wms-catalogue.json` lists open services for the dialog:
@@ -307,6 +349,10 @@ tests and offline installations.
   and `Extent` inherited and overridden (`synthetic-111-time.xml`), the
   GetMap parameter names, dimension values in JSON, requests and ids;
   `tests/time` covers time extents and the source drawn for each time.
+- GetFeatureInfo: addresses and formats from real capabilities, the
+  format chosen, sources of queryable layers only, the request for a
+  point (BBOX, I/J or X/Y, Web Mercator rows, dimensions), and answers in
+  every form above (`tests/data/wms/featureinfo`).
 - The BBOX for every version and CRS, Web Mercator's edges, full GetMap
   and GetCapabilities URLs, CRS and format choice, sources from
   capabilities (several layers, layer limits, fixed sizes), JSON round

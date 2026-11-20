@@ -177,6 +177,10 @@ struct WmsCapabilities {
   QUrl getMapUrl;
   /** Image formats GetMap can return. */
   QStringList getMapFormats;
+  /** Where GetFeatureInfo requests go (HTTP GET); empty without one. */
+  QUrl getFeatureInfoUrl;
+  /** Formats GetFeatureInfo can answer in. */
+  QStringList getFeatureInfoFormats;
   /** The top-level layers (usually one, containing the rest). */
   std::vector<WmsLayer> layers;
 

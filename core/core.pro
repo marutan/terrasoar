@@ -117,6 +117,7 @@ HEADERS += \
     include/ts/vector/vectortileloader.h \
     include/ts/wms/wmscapabilities.h \
     include/ts/wms/wmscatalogue.h \
+    include/ts/wms/wmsfeatureinfo.h \
     include/ts/wms/wmsimageryprovider.h \
     include/ts/wms/wmssource.h \
     include/ts/time/layertime.h \
@@ -211,6 +212,7 @@ SOURCES += \
     src/vector/vectortileloader.cpp \
     src/wms/wmscapabilities.cpp \
     src/wms/wmscatalogue.cpp \
+    src/wms/wmsfeatureinfo.cpp \
     src/wms/wmsimageryprovider.cpp \
     src/wms/wmssource.cpp \
     src/time/layertime.cpp \

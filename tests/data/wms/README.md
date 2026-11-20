@@ -30,3 +30,19 @@ Written for the tests, to cover valid but unusual cases compactly.
 | `exception-111.xml` | A ServiceExceptionReport instead of capabilities (MapServer's wording) |
 | `error-page.html` | An HTML error page |
 | `truncated-130.xml` | The first 3,000 bytes of `terrestris-130.xml` |
+
+## GetFeatureInfo answers (`featureinfo/`)
+
+Written for the tests in the layouts the servers use (field names and
+structure as GeoServer 2.x, MapServer 8 and ArcGIS Server 11 answer;
+values made up or from their documentation's examples):
+
+| File | Covers |
+| --- | --- |
+| `geoserver.json`, `geoserver-empty.json` | GeoJSON feature collection with numbers, null, a list; and with no features |
+| `geoserver-gml.xml` | GML 2 `featureMember` with a geometry to leave out and a `fid` |
+| `mapserver-gml.xml` | MapServer's `msGMLOutput` (`<x_layer>`, `<gml:name>`, `<x_feature>`) |
+| `arcgis-fields.xml`, `arcgis-collection.xml` | ArcGIS's `FIELDS` attributes and `FeatureInfoCollection` fields |
+| `geoserver.html`, `prose.html` | An HTML table with a header row and a caption, a script; a page of prose with entities and an image |
+| `geoserver-plain.txt`, `mapserver-plain.txt`, `nothing-plain.txt` | Plain-text layouts, and "nothing found" |
+| `exception.xml` | A service exception |

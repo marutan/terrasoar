@@ -619,6 +619,52 @@
         </message>
     </context>
     <context>
+        <name>ts::FeatureInfoWindow</name>
+        <message>
+            <source>What Is Here</source>
+            <translation>What Is Here</translation>
+        </message>
+        <message>
+            <source>Layer and feature</source>
+            <translation>Layer and feature</translation>
+        </message>
+        <message>
+            <source>Value</source>
+            <translation>Value</translation>
+        </message>
+        <message>
+            <source>At %1, %2:</source>
+            <translation>At %1, %2:</translation>
+        </message>
+        <message>
+            <source>Click a WMS layer on the globe or the map to see what is there.</source>
+            <translation>Click a WMS layer on the globe or the map to see what is there.</translation>
+        </message>
+        <message>
+            <source>Asking…</source>
+            <translation>Asking…</translation>
+        </message>
+        <message>
+            <source>The server answered %1.</source>
+            <translation>The server answered %1.</translation>
+        </message>
+        <message>
+            <source>Nothing here</source>
+            <translation>Nothing here</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n feature(s)</source>
+            <translation>
+                <numerusform>%n feature</numerusform>
+                <numerusform>%n features</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Feature %1</source>
+            <translation>Feature %1</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::GdalElevationProvider</name>
         <message>
             <source>The file has no raster band.</source>
@@ -1328,6 +1374,14 @@
         <message>
             <source>Show the slider that sets the time shown by layers with dates</source>
             <translation>Show the slider that sets the time shown by layers with dates</translation>
+        </message>
+        <message>
+            <source>What Is &amp;Here on Click</source>
+            <translation>What Is &amp;Here on Click</translation>
+        </message>
+        <message>
+            <source>Clicking the globe or the map asks WMS layers what they show there</source>
+            <translation>Clicking the globe or the map asks WMS layers what they show there</translation>
         </message>
     </context>
     <context>
@@ -2266,6 +2320,25 @@
         <message>
             <source>The WMTS catalogue is of a newer format than this program reads.</source>
             <translation>The WMTS catalogue is of a newer format than this program reads.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmsFeatureInfo</name>
+        <message>
+            <source>The server's answer isn't valid JSON: %1</source>
+            <translation>The server's answer isn't valid JSON: %1</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't valid XML.</source>
+            <translation>The server's answer isn't valid XML.</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't valid XML: %1</source>
+            <translation>The server's answer isn't valid XML: %1</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
         </message>
     </context>
     <context>
