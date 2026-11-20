@@ -995,6 +995,41 @@
         </message>
     </context>
     <context>
+        <name>ts::KmlReader</name>
+        <message>
+            <source>%1 (line %2, column %3)</source>
+            <translation>%1 (line %2, column %3)</translation>
+        </message>
+        <message>
+            <source>The file is not KML: %1 (line %2, column %3).</source>
+            <translation>The file is not KML: %1 (line %2, column %3).</translation>
+        </message>
+        <message>
+            <source>The file is not KML: it starts with &lt;%1&gt;.</source>
+            <translation>The file is not KML: it starts with &lt;%1&gt;.</translation>
+        </message>
+        <message>
+            <source>The KML is damaged: %1 (line %2, column %3).</source>
+            <translation>The KML is damaged: %1 (line %2, column %3).</translation>
+        </message>
+        <message>
+            <source>Cannot open "%1": %2</source>
+            <translation>Cannot open "%1": %2</translation>
+        </message>
+        <message>
+            <source>"%1" is a KMZ archive without a KML file in it.</source>
+            <translation>"%1" is a KMZ archive without a KML file in it.</translation>
+        </message>
+        <message>
+            <source>"%1" is not a local file.</source>
+            <translation>"%1" is not a local file.</translation>
+        </message>
+        <message>
+            <source>Cannot read "%1".</source>
+            <translation>Cannot read "%1".</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::LayerDefinition</name>
         <message>
             <source>A layer definition has no id.</source>

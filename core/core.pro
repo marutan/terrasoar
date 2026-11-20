@@ -61,6 +61,8 @@ HEADERS += \
     include/ts/globe/vectorrenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
+    include/ts/kml/kmldocument.h \
+    include/ts/kml/kmlreader.h \
     include/ts/layers/layerdefinition.h \
     include/ts/layers/layertreemodel.h \
     include/ts/layers/projectfile.h \
@@ -165,6 +167,8 @@ SOURCES += \
     src/globe/vectorrenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
+    src/kml/kmldocument.cpp \
+    src/kml/kmlreader.cpp \
     src/layers/layerdefinition.cpp \
     src/layers/layertreemodel.cpp \
     src/layers/projectfile.cpp \

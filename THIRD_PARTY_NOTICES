@@ -168,7 +168,10 @@ tests/data/geodtest-sample.dat, a sample of C. F. F. Karney's "Test set
 for geodesics", CC0 1.0, https://doi.org/10.5281/zenodo.32156; and, in
 tests/support/nationalgriddata.h, the Ordnance Survey's OSTN15 test
 points (TP01 to TP40 and their National Grid coordinates, from the
-OSTN15 developer pack), BSD 2-Clause licence as OSTN15 itself.
+OSTN15 developer pack), BSD 2-Clause licence as OSTN15 itself; and
+tests/data/kml/gdal/, KML test files from GDAL's autotest suite (MIT
+licence), among them Google's "KML Samples" from the KML documentation
+(Google, CC BY 4.0).
 
 Build-time tools (not distributed)
 ----------------------------------

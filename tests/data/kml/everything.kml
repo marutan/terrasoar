@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Every element Terra Soar reads (written for its tests). -->
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2" xmlns:atom="http://www.w3.org/2005/Atom">
+  <Document id="doc">
+    <name>Everything</name>
+    <open>1</open>
+    <atom:author><atom:name>Terra Soar tests</atom:name></atom:author>
+    <LookAt>
+      <longitude>-1.5</longitude><latitude>52.5</latitude><altitude>0</altitude>
+      <heading>10</heading><tilt>30</tilt><range>250000</range>
+      <altitudeMode>relativeToGround</altitudeMode>
+    </LookAt>
+    <Style id="red">
+      <IconStyle>
+        <color>ff0000ff</color><scale>1.5</scale><heading>45</heading>
+        <Icon><href>icons/pin.png</href></Icon>
+        <hotSpot x="0.5" y="0" xunits="fraction" yunits="fraction"/>
+      </IconStyle>
+      <LabelStyle><color>ff00ffff</color><scale>0.8</scale></LabelStyle>
+      <LineStyle><color>ff0000ff</color><width>3</width></LineStyle>
+      <PolyStyle><color>7f00ff00</color><fill>1</fill><outline>0</outline></PolyStyle>
+      <BalloonStyle><bgColor>ffffffcc</bgColor><textColor>ff000000</textColor><text><![CDATA[<b>$[name]</b>]]></text></BalloonStyle>
+    </Style>
+    <Style id="blue"><LineStyle><color>ffff0000</color><width>2</width></LineStyle></Style>
+    <StyleMap id="redOrBlue">
+      <Pair><key>normal</key><styleUrl>#red</styleUrl></Pair>
+      <Pair><key>highlight</key><styleUrl>#blue</styleUrl></Pair>
+    </StyleMap>
+    <Style id="radio"><ListStyle><listItemType>radioFolder</listItemType></ListStyle></Style>
+    <Folder id="shapes">
+      <name>Shapes</name>
+      <visibility>1</visibility>
+      <Placemark id="point">
+        <name>A point</name>
+        <description><![CDATA[<p>A <i>point</i> in Birmingham.</p>]]></description>
+        <styleUrl>#redOrBlue</styleUrl>
+        <ExtendedData>
+          <Data name="population"><displayName>Population</displayName><value>1141816</value></Data>
+          <Data name="county"><value>West Midlands</value></Data>
+          <SchemaData schemaUrl="#s"><SimpleData name="code">BHM</SimpleData></SchemaData>
+        </ExtendedData>
+        <Point><altitudeMode>absolute</altitudeMode><extrude>1</extrude><coordinates>-1.8904,52.4862,140</coordinates></Point>
+      </Placemark>
+      <Placemark id="line">
+        <name>A line</name>
+        <Style><LineStyle><color>ff00a5ff</color><width>5</width></LineStyle></Style>
+        <LineString><tessellate>1</tessellate><coordinates>
+          -3.0, 53.4, 0  -2.24,53.48,0
+          -1.55,53.8,0</coordinates></LineString>
+      </Placemark>
+      <Placemark id="ring"><name>A ring</name><LinearRing><coordinates>0,51 1,51 1,52 0,51</coordinates></LinearRing></Placemark>
+      <Placemark id="polygon">
+        <name>A polygon with a hole</name>
+        <styleUrl>#red</styleUrl>
+        <Polygon>
+          <extrude>1</extrude>
+          <altitudeMode>relativeToGround</altitudeMode>
+          <outerBoundaryIs><LinearRing><coordinates>-2,52,100 -1,52,100 -1,53,100 -2,53,100 -2,52,100</coordinates></LinearRing></outerBoundaryIs>
+          <innerBoundaryIs><LinearRing><coordinates>-1.6,52.4,100 -1.4,52.4,100 -1.4,52.6,100 -1.6,52.4,100</coordinates></LinearRing></innerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark id="multi">
+        <name>Two points and a line</name>
+        <MultiGeometry>
+          <Point><coordinates>-4,50</coordinates></Point>
+          <Point><coordinates>-4.1,50.1</coordinates></Point>
+          <LineString><coordinates>-4,50 -4.1,50.1</coordinates></LineString>
+        </MultiGeometry>
+      </Placemark>
+    </Folder>
+    <Folder>
+      <name>Times and places</name>
+      <styleUrl>#radio</styleUrl>
+      <Placemark>
+        <name>Stamped</name>
+        <TimeStamp><when>2026-11-20T12:00:00Z</when></TimeStamp>
+        <Camera><longitude>0.1</longitude><latitude>51.5</latitude><altitude>800</altitude><heading>90</heading><tilt>60</tilt><roll>2</roll><altitudeMode>absolute</altitudeMode></Camera>
+        <Region>
+          <LatLonAltBox><north>51.6</north><south>51.4</south><east>0.2</east><west>0</west></LatLonAltBox>
+          <Lod><minLodPixels>128</minLodPixels><maxLodPixels>-1</maxLodPixels></Lod>
+        </Region>
+        <Point><coordinates>0.1,51.5</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Spanned</name>
+        <TimeSpan><begin>2026-01-01</begin><end>2026-06-30</end></TimeSpan>
+        <Point><coordinates>0.2,51.5</coordinates></Point>
+      </Placemark>
+      <Placemark>
+        <name>Track</name>
+        <gx:Track>
+          <gx:altitudeMode>relativeToSeaFloor</gx:altitudeMode>
+          <when>2026-11-20T10:00:00Z</when>
+          <when>2026-11-20T11:00:00Z</when>
+          <gx:coord>-1 51 100</gx:coord>
+          <gx:coord>-0.5 51.2 200</gx:coord>
+        </gx:Track>
+      </Placemark>
+    </Folder>
+    <GroundOverlay>
+      <name>A picture</name>
+      <color>80ffffff</color>
+      <drawOrder>2</drawOrder>
+      <Icon><href>images/overlay.png</href></Icon>
+      <altitude>0</altitude>
+      <LatLonBox><north>52</north><south>51</south><east>1</east><west>-1</west><rotation>15</rotation></LatLonBox>
+    </GroundOverlay>
+    <GroundOverlay>
+      <name>A quad</name>
+      <Icon><href>images/overlay.png</href></Icon>
+      <gx:LatLonQuad><coordinates>0,40 2,40 2.5,42 -0.5,42</coordinates></gx:LatLonQuad>
+    </GroundOverlay>
+    <ScreenOverlay>
+      <name>A legend</name>
+      <Icon><href>images/legend.png</href></Icon>
+      <overlayXY x="0" y="1" xunits="fraction" yunits="fraction"/>
+      <screenXY x="10" y="10" xunits="pixels" yunits="insetPixels"/>
+      <rotationXY x="0.5" y="0.5" xunits="fraction" yunits="fraction"/>
+      <size x="0" y="0" xunits="pixels" yunits="pixels"/>
+      <rotation>5</rotation>
+    </ScreenOverlay>
+    <NetworkLink>
+      <name>Live</name>
+      <flyToView>1</flyToView>
+      <Link>
+        <href>https://example.invalid/live.kml</href>
+        <refreshMode>onInterval</refreshMode><refreshInterval>30</refreshInterval>
+        <viewRefreshMode>onStop</viewRefreshMode><viewRefreshTime>2</viewRefreshTime>
+        <viewBoundScale>0.9</viewBoundScale>
+      </Link>
+    </NetworkLink>
+    <PhotoOverlay><name>Not supported</name></PhotoOverlay>
+    <Placemark><name>External style</name><styleUrl>styles.kml#shared</styleUrl><Point><coordinates>5,45</coordinates></Point></Placemark>
+  </Document>
+</kml>
