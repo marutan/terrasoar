@@ -69,6 +69,22 @@
             <comment>Program name; normally kept as it is</comment>
             <translation>Terra Soar</translation>
         </message>
+        <message>
+            <source>Epoch %1 UTC</source>
+            <translation>Epoch %1 UTC</translation>
+        </message>
+        <message>
+            <source>Older than %1 days: positions may be far off. %2</source>
+            <translation>Older than %1 days: positions may be far off. %2</translation>
+        </message>
+        <message>
+            <source>Own</source>
+            <translation>Own</translation>
+        </message>
+        <message>
+            <source>Satellites of %1</source>
+            <translation>Satellites of %1</translation>
+        </message>
     </context>
     <context>
         <name>ts::AboutDialog</name>
@@ -111,6 +127,69 @@
         <message>
             <source>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%6"&gt;Read the user guide&lt;/a&gt; (Help → User Guide, F1).&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</source>
             <translation>&lt;h2&gt;Terra Soar %1&lt;/h2&gt;&lt;p&gt;Copyright (C) 2026 Peter Howkins&lt;/p&gt;&lt;p&gt;A 3D globe and 2D map viewer: imagery, shorelines, terrain and web map services, online and offline.&lt;/p&gt;&lt;p&gt;Built with Qt %2 (running on Qt %3) and %4.&lt;/p&gt;&lt;p&gt;Terra Soar is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License, version 2 or (at your option) any later version. It comes with no warranty. See the Licence tab.&lt;/p&gt;&lt;p&gt;It uses Qt, GDAL, PROJ, GEOS, SQLite and GeographicLib, and data from NASA, NOAA, NGA, Natural Earth and others: see the Data and Third-Party Notices tabs.&lt;/p&gt;&lt;p&gt;&lt;a href="%6"&gt;Read the user guide&lt;/a&gt; (Help → User Guide, F1).&lt;/p&gt;&lt;p&gt;&lt;a href="%5"&gt;%5&lt;/a&gt;&lt;/p&gt;</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::AddSatellitesDialog</name>
+        <message>
+            <source>Open Element Sets</source>
+            <translation>Open Element Sets</translation>
+        </message>
+        <message>
+            <source>Element sets (*.tle *.3le *.2le *.txt *.json);;All files (*)</source>
+            <translation>Element sets (*.tle *.3le *.2le *.txt *.json);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Choose a group.</source>
+            <translation>Choose a group.</translation>
+        </message>
+        <message>
+            <source>Choose a file.</source>
+            <translation>Choose a file.</translation>
+        </message>
+        <message>
+            <source>Satellites</source>
+            <translation>Satellites</translation>
+        </message>
+        <message>
+            <source>Add Satellites</source>
+            <translation>Add Satellites</translation>
+        </message>
+        <message>
+            <source>&amp;CelesTrak</source>
+            <translation>&amp;CelesTrak</translation>
+        </message>
+        <message>
+            <source>&amp;File</source>
+            <translation>&amp;File</translation>
+        </message>
+        <message>
+            <source>&amp;Text</source>
+            <translation>&amp;Text</translation>
+        </message>
+        <message>
+            <source>Filter groups</source>
+            <translation>Filter groups</translation>
+        </message>
+        <message>
+            <source>CelesTrak's current element sets, by group. They are downloaded again after two hours at the soonest, and kept for use offline.</source>
+            <translation>CelesTrak's current element sets, by group. They are downloaded again after two hours at the soonest, and kept for use offline.</translation>
+        </message>
+        <message>
+            <source>&amp;Browse…</source>
+            <translation>&amp;Browse…</translation>
+        </message>
+        <message>
+            <source>A file of TLEs (two-line or three-line) or OMM JSON:</source>
+            <translation>A file of TLEs (two-line or three-line) or OMM JSON:</translation>
+        </message>
+        <message>
+            <source>&amp;Name:</source>
+            <translation>&amp;Name:</translation>
+        </message>
+        <message>
+            <source>Paste TLEs here: two-line or three-line, as CelesTrak and Space-Track give them.</source>
+            <translation>Paste TLEs here: two-line or three-line, as CelesTrak and Space-Track give them.</translation>
         </message>
     </context>
     <context>
@@ -643,10 +722,347 @@
         </message>
     </context>
     <context>
+        <name>ts::Celestrak</name>
+        <message>
+            <source>Space stations</source>
+            <translation>Space stations</translation>
+        </message>
+        <message>
+            <source>Special interest</source>
+            <translation>Special interest</translation>
+        </message>
+        <message>
+            <source>100 (or so) brightest</source>
+            <translation>100 (or so) brightest</translation>
+        </message>
+        <message>
+            <source>Active satellites</source>
+            <translation>Active satellites</translation>
+        </message>
+        <message>
+            <source>Launched in the last 30 days</source>
+            <translation>Launched in the last 30 days</translation>
+        </message>
+        <message>
+            <source>Analyst satellites</source>
+            <translation>Analyst satellites</translation>
+        </message>
+        <message>
+            <source>Weather</source>
+            <translation>Weather</translation>
+        </message>
+        <message>
+            <source>Weather and Earth resources</source>
+            <translation>Weather and Earth resources</translation>
+        </message>
+        <message>
+            <source>NOAA</source>
+            <translation>NOAA</translation>
+        </message>
+        <message>
+            <source>GOES</source>
+            <translation>GOES</translation>
+        </message>
+        <message>
+            <source>Earth resources</source>
+            <translation>Earth resources</translation>
+        </message>
+        <message>
+            <source>Search and rescue (SARSAT)</source>
+            <translation>Search and rescue (SARSAT)</translation>
+        </message>
+        <message>
+            <source>Disaster Monitoring</source>
+            <translation>Disaster Monitoring</translation>
+        </message>
+        <message>
+            <source>Tracking and Data Relay (TDRSS)</source>
+            <translation>Tracking and Data Relay (TDRSS)</translation>
+        </message>
+        <message>
+            <source>ARGOS Data Collection System</source>
+            <translation>ARGOS Data Collection System</translation>
+        </message>
+        <message>
+            <source>Planet</source>
+            <translation>Planet</translation>
+        </message>
+        <message>
+            <source>Spire</source>
+            <translation>Spire</translation>
+        </message>
+        <message>
+            <source>Active geosynchronous</source>
+            <translation>Active geosynchronous</translation>
+        </message>
+        <message>
+            <source>Communications</source>
+            <translation>Communications</translation>
+        </message>
+        <message>
+            <source>Intelsat</source>
+            <translation>Intelsat</translation>
+        </message>
+        <message>
+            <source>SES</source>
+            <translation>SES</translation>
+        </message>
+        <message>
+            <source>Eutelsat</source>
+            <translation>Eutelsat</translation>
+        </message>
+        <message>
+            <source>Iridium NEXT</source>
+            <translation>Iridium NEXT</translation>
+        </message>
+        <message>
+            <source>Starlink</source>
+            <translation>Starlink</translation>
+        </message>
+        <message>
+            <source>OneWeb</source>
+            <translation>OneWeb</translation>
+        </message>
+        <message>
+            <source>Kuiper</source>
+            <translation>Kuiper</translation>
+        </message>
+        <message>
+            <source>Qianfan</source>
+            <translation>Qianfan</translation>
+        </message>
+        <message>
+            <source>Orbcomm</source>
+            <translation>Orbcomm</translation>
+        </message>
+        <message>
+            <source>Globalstar</source>
+            <translation>Globalstar</translation>
+        </message>
+        <message>
+            <source>Swarm</source>
+            <translation>Swarm</translation>
+        </message>
+        <message>
+            <source>Amateur radio</source>
+            <translation>Amateur radio</translation>
+        </message>
+        <message>
+            <source>SatNOGS</source>
+            <translation>SatNOGS</translation>
+        </message>
+        <message>
+            <source>Experimental communications</source>
+            <translation>Experimental communications</translation>
+        </message>
+        <message>
+            <source>Other communications</source>
+            <translation>Other communications</translation>
+        </message>
+        <message>
+            <source>GNSS</source>
+            <translation>GNSS</translation>
+        </message>
+        <message>
+            <source>Navigation</source>
+            <translation>Navigation</translation>
+        </message>
+        <message>
+            <source>GPS operational</source>
+            <translation>GPS operational</translation>
+        </message>
+        <message>
+            <source>GLONASS operational</source>
+            <translation>GLONASS operational</translation>
+        </message>
+        <message>
+            <source>Galileo</source>
+            <translation>Galileo</translation>
+        </message>
+        <message>
+            <source>Beidou</source>
+            <translation>Beidou</translation>
+        </message>
+        <message>
+            <source>Satellite-based augmentation (SBAS)</source>
+            <translation>Satellite-based augmentation (SBAS)</translation>
+        </message>
+        <message>
+            <source>Navy Navigation Satellite System</source>
+            <translation>Navy Navigation Satellite System</translation>
+        </message>
+        <message>
+            <source>Russian LEO navigation</source>
+            <translation>Russian LEO navigation</translation>
+        </message>
+        <message>
+            <source>Space and Earth science</source>
+            <translation>Space and Earth science</translation>
+        </message>
+        <message>
+            <source>Scientific</source>
+            <translation>Scientific</translation>
+        </message>
+        <message>
+            <source>Geodetic</source>
+            <translation>Geodetic</translation>
+        </message>
+        <message>
+            <source>Engineering</source>
+            <translation>Engineering</translation>
+        </message>
+        <message>
+            <source>Education</source>
+            <translation>Education</translation>
+        </message>
+        <message>
+            <source>Miscellaneous military</source>
+            <translation>Miscellaneous military</translation>
+        </message>
+        <message>
+            <source>Miscellaneous</source>
+            <translation>Miscellaneous</translation>
+        </message>
+        <message>
+            <source>Radar calibration</source>
+            <translation>Radar calibration</translation>
+        </message>
+        <message>
+            <source>CubeSats</source>
+            <translation>CubeSats</translation>
+        </message>
+        <message>
+            <source>Other satellites</source>
+            <translation>Other satellites</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ClockWidget</name>
+        <message numerus="yes">
+            <source>%n day(s)</source>
+            <translation>
+                <numerusform>%n day</numerusform>
+                <numerusform>%n days</numerusform>
+            </translation>
+        </message>
+        <message numerus="yes">
+            <source>%n hour(s)</source>
+            <translation>
+                <numerusform>%n hour</numerusform>
+                <numerusform>%n hours</numerusform>
+            </translation>
+        </message>
+        <message numerus="yes">
+            <source>%n minute(s)</source>
+            <translation>
+                <numerusform>%n minute</numerusform>
+                <numerusform>%n minutes</numerusform>
+            </translation>
+        </message>
+        <message numerus="yes">
+            <source>%n second(s)</source>
+            <translation>
+                <numerusform>%n second</numerusform>
+                <numerusform>%n seconds</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>×%1</source>
+            <translation>×%1</translation>
+        </message>
+        <message>
+            <source>Step &amp;Forward</source>
+            <translation>Step &amp;Forward</translation>
+        </message>
+        <message>
+            <source>Step forward %1</source>
+            <translation>Step forward %1</translation>
+        </message>
+        <message>
+            <source>Step &amp;Back</source>
+            <translation>Step &amp;Back</translation>
+        </message>
+        <message>
+            <source>Step back %1</source>
+            <translation>Step back %1</translation>
+        </message>
+        <message>
+            <source>&amp;Faster</source>
+            <translation>&amp;Faster</translation>
+        </message>
+        <message>
+            <source>&amp;Slower</source>
+            <translation>&amp;Slower</translation>
+        </message>
+        <message>
+            <source>&amp;Now</source>
+            <translation>&amp;Now</translation>
+        </message>
+        <message>
+            <source>Run the clock in real time, from now</source>
+            <translation>Run the clock in real time, from now</translation>
+        </message>
+        <message>
+            <source>&amp;Jump to Date and Time…</source>
+            <translation>&amp;Jump to Date and Time…</translation>
+        </message>
+        <message>
+            <source>The program's time (UTC): click to jump to a date and time</source>
+            <translation>The program's time (UTC): click to jump to a date and time</translation>
+        </message>
+        <message>
+            <source>How fast the clock runs</source>
+            <translation>How fast the clock runs</translation>
+        </message>
+        <message>
+            <source>S&amp;tep</source>
+            <translation>S&amp;tep</translation>
+        </message>
+        <message>
+            <source>&amp;Pause</source>
+            <translation>&amp;Pause</translation>
+        </message>
+        <message>
+            <source>&amp;Play</source>
+            <translation>&amp;Play</translation>
+        </message>
+        <message>
+            <source>Pause the clock</source>
+            <translation>Pause the clock</translation>
+        </message>
+        <message>
+            <source>Run the clock</source>
+            <translation>Run the clock</translation>
+        </message>
+        <message>
+            <source>Real time</source>
+            <translation>Real time</translation>
+        </message>
+        <message>
+            <source>%1 UTC</source>
+            <translation>%1 UTC</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::CountryAreas</name>
         <message>
             <source>The country's outline can't be read.</source>
             <translation>The country's outline can't be read.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ElementSource</name>
+        <message>
+            <source>Cannot reach the server: %1</source>
+            <translation>Cannot reach the server: %1</translation>
+        </message>
+        <message>
+            <source>The server answered with HTTP %1.</source>
+            <translation>The server answered with HTTP %1.</translation>
+        </message>
+        <message>
+            <source>The server's answer has no element sets: %1</source>
+            <translation>The server's answer has no element sets: %1</translation>
         </message>
     </context>
     <context>
@@ -1019,6 +1435,21 @@
         <message>
             <source>No pages match</source>
             <translation>No pages match</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::JumpToTimeDialog</name>
+        <message>
+            <source>Jump to Date and Time</source>
+            <translation>Jump to Date and Time</translation>
+        </message>
+        <message>
+            <source>&amp;Date and time (UTC):</source>
+            <translation>&amp;Date and time (UTC):</translation>
+        </message>
+        <message>
+            <source>&amp;Now</source>
+            <translation>&amp;Now</translation>
         </message>
     </context>
     <context>
@@ -2099,6 +2530,64 @@
             <source>%1.kml</source>
             <translation>%1.kml</translation>
         </message>
+        <message>
+            <source>&amp;Clock</source>
+            <translation>&amp;Clock</translation>
+        </message>
+        <message>
+            <source>Add &amp;Satellites…</source>
+            <translation>Add &amp;Satellites…</translation>
+        </message>
+        <message>
+            <source>Add satellites from CelesTrak, a TLE or OMM file, or TLEs pasted in</source>
+            <translation>Add satellites from CelesTrak, a TLE or OMM file, or TLEs pasted in</translation>
+        </message>
+        <message>
+            <source>Online</source>
+            <translation>Online</translation>
+        </message>
+        <message>
+            <source>Satellite orbital elements</source>
+            <translation>Satellite orbital elements</translation>
+        </message>
+        <message>
+            <source>CelesTrak (celestrak.org), from the US Space Force's catalogue</source>
+            <translation>CelesTrak (celestrak.org), from the US Space Force's catalogue</translation>
+        </message>
+        <message>
+            <source>Free to use, with credit to CelesTrak</source>
+            <translation>Free to use, with credit to CelesTrak</translation>
+        </message>
+        <message>
+            <source>Using the last download: %1</source>
+            <translation>Using the last download: %1</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n satellite(s) with elements older than %1 days: Refresh Elements in this layer's menu.</source>
+            <translation>
+                <numerusform>%n satellite with elements older than %1 days: Refresh Elements in this layer's menu.</numerusform>
+                <numerusform>%n satellites with elements older than %1 days: Refresh Elements in this layer's menu.</numerusform>
+            </translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n satellite(s) with elements older than %2 days; right-click the layer and choose Refresh Elements.</source>
+            <translation>
+                <numerusform>%1: %n satellite with elements older than %2 days; right-click the layer and choose Refresh Elements.</numerusform>
+                <numerusform>%1: %n satellites with elements older than %2 days; right-click the layer and choose Refresh Elements.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Satellites…</source>
+            <translation>Satellites…</translation>
+        </message>
+        <message>
+            <source>Satellite Layer Properties…</source>
+            <translation>Satellite Layer Properties…</translation>
+        </message>
+        <message>
+            <source>Refresh Elements</source>
+            <translation>Refresh Elements</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -2371,6 +2860,61 @@
         <message>
             <source>Export Region</source>
             <translation>Export Region</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::OrbitalElements</name>
+        <message>
+            <source>line %1, column %2: '%3' expected</source>
+            <translation>line %1, column %2: '%3' expected</translation>
+        </message>
+        <message>
+            <source>line %1 is too short (%2 characters, %3 expected)</source>
+            <translation>line %1 is too short (%2 characters, %3 expected)</translation>
+        </message>
+        <message>
+            <source>line %1 has characters a TLE can't have</source>
+            <translation>line %1 has characters a TLE can't have</translation>
+        </message>
+        <message>
+            <source>line %1: wrong checksum (%2, should be %3)</source>
+            <translation>line %1: wrong checksum (%2, should be %3)</translation>
+        </message>
+        <message>
+            <source>line 1 has a field that isn't a number</source>
+            <translation>line 1 has a field that isn't a number</translation>
+        </message>
+        <message>
+            <source>line 2 has a field that isn't a number</source>
+            <translation>line 2 has a field that isn't a number</translation>
+        </message>
+        <message>
+            <source>the catalogue numbers of lines 1 and 2 differ</source>
+            <translation>the catalogue numbers of lines 1 and 2 differ</translation>
+        </message>
+        <message>
+            <source>Line %1: line 2 without line 1</source>
+            <translation>Line %1: line 2 without line 1</translation>
+        </message>
+        <message>
+            <source>Line %1: line 1 without line 2</source>
+            <translation>Line %1: line 1 without line 2</translation>
+        </message>
+        <message>
+            <source>Line %1: %2</source>
+            <translation>Line %1: %2</translation>
+        </message>
+        <message>
+            <source>an OMM without its epoch, catalogue number or mean elements</source>
+            <translation>an OMM without its epoch, catalogue number or mean elements</translation>
+        </message>
+        <message>
+            <source>Not JSON: %1</source>
+            <translation>Not JSON: %1</translation>
+        </message>
+        <message>
+            <source>Entry %1: %2</source>
+            <translation>Entry %1: %2</translation>
         </message>
     </context>
     <context>
@@ -2881,6 +3425,315 @@
         </message>
     </context>
     <context>
+        <name>ts::SatelliteInfoWindow</name>
+        <message>
+            <source>Satellite</source>
+            <translation>Satellite</translation>
+        </message>
+        <message>
+            <source>&amp;Refresh Elements</source>
+            <translation>&amp;Refresh Elements</translation>
+        </message>
+        <message>
+            <source>Layer</source>
+            <translation>Layer</translation>
+        </message>
+        <message>
+            <source>Catalogue number</source>
+            <translation>Catalogue number</translation>
+        </message>
+        <message>
+            <source>International designator</source>
+            <translation>International designator</translation>
+        </message>
+        <message>
+            <source>%1 UTC, %2 days before the clock's time</source>
+            <translation>%1 UTC, %2 days before the clock's time</translation>
+        </message>
+        <message>
+            <source>%1 UTC, %2 days after the clock's time</source>
+            <translation>%1 UTC, %2 days after the clock's time</translation>
+        </message>
+        <message>
+            <source>Older than %1 days: the position may be far off.</source>
+            <translation>Older than %1 days: the position may be far off.</translation>
+        </message>
+        <message>
+            <source>Elements</source>
+            <translation>Elements</translation>
+        </message>
+        <message>
+            <source>Latitude</source>
+            <translation>Latitude</translation>
+        </message>
+        <message>
+            <source>Longitude</source>
+            <translation>Longitude</translation>
+        </message>
+        <message>
+            <source>Altitude</source>
+            <translation>Altitude</translation>
+        </message>
+        <message>
+            <source>%1 km</source>
+            <translation>%1 km</translation>
+        </message>
+        <message>
+            <source>Speed</source>
+            <translation>Speed</translation>
+        </message>
+        <message>
+            <source>%1 km/s</source>
+            <translation>%1 km/s</translation>
+        </message>
+        <message>
+            <source>Period</source>
+            <translation>Period</translation>
+        </message>
+        <message>
+            <source>%1 min</source>
+            <translation>%1 min</translation>
+        </message>
+        <message>
+            <source>Inclination</source>
+            <translation>Inclination</translation>
+        </message>
+        <message>
+            <source>%1°</source>
+            <translation>%1°</translation>
+        </message>
+        <message>
+            <source>Point at the ground to see the next pass over it.</source>
+            <translation>Point at the ground to see the next pass over it.</translation>
+        </message>
+        <message>
+            <source>None above %1° in the next 3 days.</source>
+            <translation>None above %1° in the next 3 days.</translation>
+        </message>
+        <message>
+            <source>Always above %1° from there (highest %2°).</source>
+            <translation>Always above %1° from there (highest %2°).</translation>
+        </message>
+        <message>
+            <source>Rises %1 UTC (azimuth %2°), highest %3° at %4, sets %5 (azimuth %6°)%7</source>
+            <translation>Rises %1 UTC (azimuth %2°), highest %3° at %4, sets %5 (azimuth %6°)%7</translation>
+        </message>
+        <message>
+            <source>: up now</source>
+            <translation>: up now</translation>
+        </message>
+        <message>
+            <source>Over %1 %2</source>
+            <translation>Over %1 %2</translation>
+        </message>
+        <message>
+            <source>Next pass</source>
+            <translation>Next pass</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::SatelliteLayers</name>
+        <message>
+            <source>Cannot read %1: %2</source>
+            <translation>Cannot read %1: %2</translation>
+        </message>
+        <message>
+            <source>It has no element sets (TLEs or OMM JSON).</source>
+            <translation>It has no element sets (TLEs or OMM JSON).</translation>
+        </message>
+        <message>
+            <source>This isn't a satellite layer's source.</source>
+            <translation>This isn't a satellite layer's source.</translation>
+        </message>
+        <message>
+            <source>No network.</source>
+            <translation>No network.</translation>
+        </message>
+        <message>
+            <source>%1 (old)</source>
+            <translation>%1 (old)</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::SatelliteListDialog</name>
+        <message>
+            <source>%1 of %2</source>
+            <translation>%1 of %2</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n satellite(s)</source>
+            <translation>
+                <numerusform>%n satellite</numerusform>
+                <numerusform>%n satellites</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Filter by name or catalogue number</source>
+            <translation>Filter by name or catalogue number</translation>
+        </message>
+        <message>
+            <source>Show &amp;All</source>
+            <translation>Show &amp;All</translation>
+        </message>
+        <message>
+            <source>&amp;Hide All</source>
+            <translation>&amp;Hide All</translation>
+        </message>
+        <message>
+            <source>Show &amp;Only These</source>
+            <translation>Show &amp;Only These</translation>
+        </message>
+        <message>
+            <source>Show only the satellites the filter leaves</source>
+            <translation>Show only the satellites the filter leaves</translation>
+        </message>
+        <message>
+            <source>Track &amp;Spans…</source>
+            <translation>Track &amp;Spans…</translation>
+        </message>
+        <message>
+            <source>The selected satellites' own past and future track spans</source>
+            <translation>The selected satellites' own past and future track spans</translation>
+        </message>
+        <message>
+            <source>Name</source>
+            <translation>Name</translation>
+        </message>
+        <message>
+            <source>Number</source>
+            <translation>Number</translation>
+        </message>
+        <message>
+            <source>Age (days)</source>
+            <translation>Age (days)</translation>
+        </message>
+        <message>
+            <source>Spans</source>
+            <translation>Spans</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::SatellitePropertiesDialog</name>
+        <message>
+            <source>Colour of %1</source>
+            <translation>Colour of %1</translation>
+        </message>
+        <message>
+            <source>Properties of %1</source>
+            <translation>Properties of %1</translation>
+        </message>
+        <message>
+            <source>&amp;Colour:</source>
+            <translation>&amp;Colour:</translation>
+        </message>
+        <message>
+            <source>&amp;Marker size:</source>
+            <translation>&amp;Marker size:</translation>
+        </message>
+        <message>
+            <source> px</source>
+            <translation> px</translation>
+        </message>
+        <message>
+            <source>&amp;Names beside the markers</source>
+            <translation>&amp;Names beside the markers</translation>
+        </message>
+        <message>
+            <source>&amp;Tracks:</source>
+            <translation>&amp;Tracks:</translation>
+        </message>
+        <message>
+            <source>None</source>
+            <translation>None</translation>
+        </message>
+        <message>
+            <source>The selected satellite</source>
+            <translation>The selected satellite</translation>
+        </message>
+        <message>
+            <source>All shown, or the selected one when more than %1 are shown</source>
+            <translation>All shown, or the selected one when more than %1 are shown</translation>
+        </message>
+        <message>
+            <source>All shown</source>
+            <translation>All shown</translation>
+        </message>
+        <message>
+            <source>&amp;Past track:</source>
+            <translation>&amp;Past track:</translation>
+        </message>
+        <message>
+            <source>&amp;Future track:</source>
+            <translation>&amp;Future track:</translation>
+        </message>
+        <message>
+            <source>&amp;Ground tracks under them on the globe</source>
+            <translation>&amp;Ground tracks under them on the globe</translation>
+        </message>
+        <message>
+            <source>F&amp;ootprints:</source>
+            <translation>F&amp;ootprints:</translation>
+        </message>
+        <message>
+            <source>Seen &amp;above:</source>
+            <translation>Seen &amp;above:</translation>
+        </message>
+        <message>
+            <source>° elevation</source>
+            <translation>° elevation</translation>
+        </message>
+        <message>
+            <source>Elements &amp;old after:</source>
+            <translation>Elements &amp;old after:</translation>
+        </message>
+        <message>
+            <source> days</source>
+            <translation> days</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::Sgp4</name>
+        <message>
+            <source>The mean eccentricity left its range (0 to 1).</source>
+            <translation>The mean eccentricity left its range (0 to 1).</translation>
+        </message>
+        <message>
+            <source>The mean motion fell below zero.</source>
+            <translation>The mean motion fell below zero.</translation>
+        </message>
+        <message>
+            <source>The perturbed eccentricity left its range (0 to 1).</source>
+            <translation>The perturbed eccentricity left its range (0 to 1).</translation>
+        </message>
+        <message>
+            <source>The semi-latus rectum fell below zero.</source>
+            <translation>The semi-latus rectum fell below zero.</translation>
+        </message>
+        <message>
+            <source>The satellite has decayed (its orbit is inside the Earth).</source>
+            <translation>The satellite has decayed (its orbit is inside the Earth).</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::SpanOverrideDialog</name>
+        <message>
+            <source>Track Spans of %1</source>
+            <translation>Track Spans of %1</translation>
+        </message>
+        <message>
+            <source>Own &amp;past track:</source>
+            <translation>Own &amp;past track:</translation>
+        </message>
+        <message>
+            <source>Own &amp;future track:</source>
+            <translation>Own &amp;future track:</translation>
+        </message>
+        <message>
+            <source>Unchecked, a span is the layer's (Properties of the layer).</source>
+            <translation>Unchecked, a span is the layer's (Properties of the layer).</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::TestProviders</name>
         <message>
             <source>Solid colour %1</source>
@@ -2971,6 +3824,17 @@
         <message>
             <source>Always this time:</source>
             <translation>Always this time:</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::TimeSpanEdit</name>
+        <message>
+            <source>orbits</source>
+            <translation>orbits</translation>
+        </message>
+        <message>
+            <source>minutes</source>
+            <translation>minutes</translation>
         </message>
     </context>
     <context>

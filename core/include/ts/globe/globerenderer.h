@@ -64,6 +64,52 @@ struct GlobeMarker {
   double radiusPx = 4.0;
 };
 
+/**
+ * One point of a SpaceLine: where it is, the point below it (for the map),
+ * and how it is drawn there.
+ *
+ * @reentrant
+ */
+struct SpaceLinePoint {
+  /** Where the point is, ECEF metres. */
+  Vec3 positionEcef{};
+  /** Latitude of the point below it, degrees. */
+  double latDeg = 0.0;
+  /** Longitude of the point below it, degrees. */
+  double lonDeg = 0.0;
+  /** Opacity here, multiplying the line's (fading a track with age). */
+  float alpha = 1.0F;
+  /** Distance along the line for its dashes, in dash lengths. */
+  float along = 0.0F;
+};
+
+/**
+ * A line through space or over the ground (a satellite's track, its
+ * ground track, a footprint): straight between its points, a fixed width
+ * in pixels, tested against the globe's depth so that the Earth hides
+ * what is behind it.
+ *
+ * On the flat map (and during the change to it) each point moves to the
+ * point below it, as markers do, and the line is broken where the map
+ * wraps around or ends, so a track becomes its ground track.
+ *
+ * @reentrant
+ */
+struct SpaceLine {
+  /** The points, in order. */
+  std::vector<SpaceLinePoint> points;
+  /** Colour, 8-bit RGBA, not premultiplied. */
+  std::array<std::uint8_t, 4> rgba = {255, 255, 255, 255};
+  /** Width, logical pixels. */
+  float widthPx = 1.5F;
+  /** Dashed: drawn for the first half of each unit of along. */
+  bool dashed = false;
+  /** Closed: the last point joins the first (a footprint). */
+  bool closed = false;
+  /** Drawn on the globe only (a ground track the map draws anyway). */
+  bool globeOnly = false;
+};
+
 /** Colours and options for the globe. */
 struct GlobeStyle {
   /** Clear colour behind the globe, linear RGB in [0, 1]. */
@@ -94,6 +140,9 @@ struct GlobeStyle {
  * (|eye/radii|² − 1), which is computed in double on the CPU. Depth is
  * logarithmic (log2(1 + w) / log2(1 + far)) so that tiles drawn later in
  * the same pass can test against the globe.
+ *
+ * Space lines (satellite tracks) are instanced quads per segment, placed
+ * the same way and depth tested against the globe, see SpaceLine.
  *
  * Markers are instanced quads positioned relative to the eye from
  * high/low float pairs (see SplitFloat), so they stay still to well under
@@ -143,6 +192,12 @@ public:
 
   /** Replaces the markers. */
   void setMarkers(const std::vector<GlobeMarker>& markers);
+
+  /** Replaces the lines through space (see SpaceLine), drawn under markers. */
+  void setSpaceLines(std::vector<SpaceLine> lines);
+
+  /** Returns how many line segments the last frame drew. */
+  int32_t spaceSegmentsDrawn() const;
 
   /**
    * Sets the imagery drawn on the globe from the tile quadtree, or null
@@ -238,6 +293,7 @@ private:
   struct Resources;
 
   void uploadMarkers(const Camera& camera);
+  void uploadSpaceLines(const Camera& camera);
   std::vector<std::size_t> writeGraticuleUniforms(double fade,
                                                   double devicePixelRatio);
   void drawGraticule(std::size_t index);
@@ -250,6 +306,9 @@ private:
   std::vector<VectorLayerDraw> m_vectorLayers;
   GlobeStyle m_style;
   std::vector<GlobeMarker> m_markers;
+  std::vector<SpaceLine> m_spaceLines;
+  bool m_spaceLinesDirty = true;
+  bool m_spaceLinesMorphed = false;
   bool m_markersDirty = true;
   bool m_markersMorphed = false;
   double m_morph = 0.0;

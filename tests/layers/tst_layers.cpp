@@ -515,6 +515,44 @@ private slots:
     QVERIFY(!oddLoaded->time.isValid());
   }
 
+  void projectClock()
+  {
+    // How the clock ran: an optional member of the view, left out (and
+    // nothing when read) for files without it.
+    ts::Project project;
+    QVERIFY(!ts::projectToJson(project).contains("\"clock\""));
+    QString error;
+    std::optional<ts::Project> loaded =
+        ts::projectFromJson(ts::projectToJson(project), &error);
+    if (!loaded) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(!loaded->clock);
+    project.clock = ts::ClockState{false, true, 3600.0};
+    const QByteArray json = ts::projectToJson(project);
+    QVERIFY2(json.contains("\"clock\""), json.constData());
+    loaded = ts::projectFromJson(json, &error);
+    if (!loaded || !loaded->clock) {
+      QFAIL("clock not read back");
+    }
+    QCOMPARE(*loaded->clock, *project.clock);
+    QCOMPARE(ts::projectToJson(*loaded), json);
+    project.clock = ts::ClockState{true, true, 1.0};
+    loaded = ts::projectFromJson(ts::projectToJson(project), &error);
+    if (!loaded || !loaded->clock) {
+      QFAIL("real-time clock not read back");
+    }
+    QVERIFY(loaded->clock->realTime);
+    // A rate of 0 isn't one: 1 instead.
+    QByteArray zero = ts::projectToJson(project);
+    zero.replace("\"rate\": 1", "\"rate\": 0");
+    loaded = ts::projectFromJson(zero, &error);
+    if (!loaded || !loaded->clock) {
+      QFAIL("zero-rate clock not read");
+    }
+    QCOMPARE(loaded->clock->rate, 1.0);
+  }
+
   void projectVersions()
   {
     // Every earlier format version keeps loading: each has a fixture.

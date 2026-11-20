@@ -64,6 +64,11 @@ std::vector<VectorLayerDraw> vectorDrawsForStack(const LayerStack& stack,
   std::vector<VectorLayerDraw> draws;
   // The stack lists vectors from the bottom, like imagery.
   for (const VectorStackEntry& entry : stack.vectors) {
+    // Satellites are drawn by the application (markers and tracks).
+    if (entry.definition.source.value(QStringLiteral("kind")).toString() ==
+        QLatin1String("satellites")) {
+      continue;
+    }
     VectorLayerDraw draw;
     draw.style = VectorStyle::fromJson(entry.definition.style);
     draw.alpha = entry.alpha;

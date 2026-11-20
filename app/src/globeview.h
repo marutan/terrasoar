@@ -43,6 +43,7 @@
 
 #include "ts/camera/cameracontroller.h"
 #include "ts/geo/geodetic.h"
+#include "ts/globe/globerenderer.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/globe/tilerenderer.h"
 #include "ts/kml/kmldocument.h"
@@ -341,6 +342,52 @@ public:
   /** Returns how many raised shapes the last frame drew (for tests). */
   int32_t raisedShapesDrawn() const { return m_raisedDrawn; }
 
+  /**
+   * Sets the round markers drawn on the GPU, instanced (satellites): at
+   * their place on the globe, at the point below on the maps, hidden
+   * behind the Earth by depth.
+   */
+  void setMarkers(std::vector<GlobeMarker> markers);
+
+  /** Returns the markers set (for tests). */
+  const std::vector<GlobeMarker>& markers() const { return m_markers; }
+
+  /** Sets the lines through space (satellite tracks, footprints). */
+  void setSpaceLines(std::vector<SpaceLine> lines);
+
+  /**
+   * Sets the satellites' labels: billboards without icons, drawn before the
+   * KML ones.
+   */
+  void setSatelliteLabels(std::vector<BillboardDraw> labels);
+
+  /** Returns the satellites' labels set (for tests). */
+  const std::vector<BillboardDraw>& satelliteLabels() const
+  {
+    return m_satelliteLabels;
+  }
+
+  /**
+   * Returns the marker nearest @p positionPx within a few pixels of its
+   * edge, −1 if none.
+   */
+  int32_t markerAt(QPointF positionPx) const;
+
+  /** Returns where @p marker is on the screen; nothing if hidden. */
+  std::optional<QPointF> markerOnScreen(const GlobeMarker& marker) const;
+
+  /** Returns the lines set (for tests). */
+  const std::vector<SpaceLine>& spaceLines() const { return m_spaceLines; }
+
+  /** Returns how many line segments the last frame drew (for tests). */
+  int32_t spaceSegmentsDrawn() const;
+
+  /**
+   * Returns true if the Earth (the ellipsoid) hides @p pointEcef from the
+   * eye.
+   */
+  bool hiddenByEarth(const Vec3& pointEcef) const;
+
   /** Returns the billboards set (for tests). */
   const std::vector<BillboardDraw>& billboards() const { return m_billboards; }
 
@@ -457,6 +504,12 @@ signals:
    */
   void pointClicked(ts::LonLat point, double degreesPerPixel);
 
+  /**
+   * The user clicked marker @p index (setMarkers()); pointClicked() isn't
+   * emitted then.
+   */
+  void markerClicked(int32_t index);
+
   /** The user dragged edit handle @p index to @p to (setEditHandles()). */
   void handleMoved(int32_t index, ts::LonLat to);
 
@@ -569,6 +622,9 @@ private:
   /** True while dragging out a rectangle. */
   bool m_drawingDrag = false;
   std::vector<BillboardDraw> m_billboards;
+  std::vector<GlobeMarker> m_markers;
+  std::vector<BillboardDraw> m_satelliteLabels;
+  std::vector<SpaceLine> m_spaceLines;
   std::vector<RaisedShapeDraw> m_raised;
   std::vector<ScreenOverlayDraw> m_screens;
   std::vector<EditHandleDraw> m_editHandles;

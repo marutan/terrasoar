@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <utility>
 
 #include "ts/camera/camera.h"
 #include "ts/geo/geodetic.h"
@@ -60,6 +61,22 @@ struct MarkerInstance {
 };
 
 static_assert(sizeof(MarkerInstance) == 32, "marker instance stride");
+
+/** One segment of a space line in the vertex buffer. */
+struct LineInstance {
+  /** Start: high xyz, low xyz. */
+  std::array<float, 6> a{};
+  /** End: high xyz, low xyz. */
+  std::array<float, 6> b{};
+  /** Along at the start and end, width in logical px, dashed (0 or 1). */
+  std::array<float, 4> params{};
+  /** Colour at the start, RGBA, read as normalised floats. */
+  std::array<std::uint8_t, 4> rgbaA{};
+  /** Colour at the end. */
+  std::array<std::uint8_t, 4> rgbaB{};
+};
+
+static_assert(sizeof(LineInstance) == 72, "line instance stride");
 
 // A triangle covering the viewport; each pixel gets its view ray.
 const char* const globeVertexGlsl = R"(
@@ -222,7 +239,10 @@ void main()
   // nearer so the ground doesn't cut the disc.
   float metresPerPx = 2.0 * depthParams.z * viewport.w * clip.w;
   vDepthW = max(clip.w - 4.0 * extent * metresPerPx, 0.5 * clip.w);
-  gl_Position = clip;
+  // The depth is written in the fragment shader; z = 0 keeps markers in
+  // space beyond the far plane (satellites past the Earth's edge) from
+  // being clipped. Those behind the Earth get the far depth and lose to it.
+  gl_Position = vec4(clip.xy, 0.0, clip.w);
 }
 )";
 
@@ -243,6 +263,106 @@ void main()
   float fill = clamp(vRadiusPx - 0.5 - r, 0.0, 1.0);
   vec3 rgb = vColor.rgb * fill;
   fragColor = vec4(rgb * alpha, alpha);
+  gl_FragDepth = clamp(log2(1.0 + vDepthW) * depthParams.x, 0.0, 1.0);
+}
+)";
+
+// A segment as a quad in screen space, a capsule in the fragment shader
+// (round ends join the segments of a line without gaps), at its points'
+// depth brought nearer by a few pixels' worth, as markers are, so lines on
+// the ground aren't cut by it.
+const char* const lineVertexGlsl = R"(
+layout(location = 0) in vec2 corner;
+layout(location = 1) in vec3 aHigh;
+layout(location = 2) in vec3 aLow;
+layout(location = 3) in vec3 bHigh;
+layout(location = 4) in vec3 bLow;
+layout(location = 5) in vec4 params;
+layout(location = 6) in vec4 colorA;
+layout(location = 7) in vec4 colorB;
+out vec4 vColor;
+out float vAlong;
+out float vDepthW;
+flat out vec2 vA;
+flat out vec2 vB;
+flat out float vHalfWidth;
+flat out float vDashed;
+
+vec2 toScreen(vec4 clip)
+{
+  return (clip.xy / clip.w * 0.5 + 0.5) * viewport.xy;
+}
+
+void main()
+{
+  vec3 relA = (aHigh - eyeHigh.xyz) + (aLow - eyeLow.xyz);
+  vec3 relB = (bHigh - eyeHigh.xyz) + (bLow - eyeLow.xyz);
+  vec4 clipA = viewProjection * vec4(relA, 1.0);
+  vec4 clipB = viewProjection * vec4(relB, 1.0);
+  float nearW = 1.0;
+  if (clipA.w < nearW && clipB.w < nearW) {
+    gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
+    return;
+  }
+  float alongA = params.x;
+  float alongB = params.y;
+  if (clipA.w < nearW) {
+    float f = (nearW - clipA.w) / (clipB.w - clipA.w);
+    clipA = mix(clipA, clipB, f);
+    alongA = mix(alongA, alongB, f);
+  } else if (clipB.w < nearW) {
+    float f = (nearW - clipB.w) / (clipA.w - clipB.w);
+    clipB = mix(clipB, clipA, f);
+    alongB = mix(alongB, alongA, f);
+  }
+  vec2 sa = toScreen(clipA);
+  vec2 sb = toScreen(clipB);
+  vec2 d = sb - sa;
+  float len = length(d);
+  vec2 dir = len > 1e-6 ? d / len : vec2(1.0, 0.0);
+  vec2 normal = vec2(-dir.y, dir.x);
+  float halfWidth = 0.5 * params.z * depthParams.y;
+  float extent = halfWidth + 1.0;
+  bool atB = corner.x > 0.0;
+  vec2 screen = (atB ? sb + dir * extent : sa - dir * extent)
+              + normal * corner.y * extent;
+  vec4 clip = atB ? clipB : clipA;
+  float metresPerPx = 2.0 * depthParams.z * viewport.w * clip.w;
+  vDepthW = max(clip.w - 4.0 * extent * metresPerPx, 0.5 * clip.w);
+  gl_Position = vec4((screen / viewport.xy * 2.0 - 1.0) * clip.w,
+                     0.0, clip.w);
+  vColor = atB ? colorB : colorA;
+  vAlong = atB ? alongB : alongA;
+  vA = sa;
+  vB = sb;
+  vHalfWidth = halfWidth;
+  vDashed = params.w;
+}
+)";
+
+const char* const lineFragmentGlsl = R"(
+in vec4 vColor;
+in float vAlong;
+in float vDepthW;
+flat in vec2 vA;
+flat in vec2 vB;
+flat in float vHalfWidth;
+flat in float vDashed;
+out vec4 fragColor;
+void main()
+{
+  if (vDashed > 0.5 && fract(vAlong) > 0.5) {
+    discard;
+  }
+  vec2 p = gl_FragCoord.xy;
+  vec2 ab = vB - vA;
+  float t = clamp(dot(p - vA, ab) / max(dot(ab, ab), 1e-12), 0.0, 1.0);
+  float distance = length(p - (vA + t * ab));
+  float coverage = clamp(vHalfWidth + 0.5 - distance, 0.0, 1.0) * vColor.a;
+  if (coverage <= 0.0) {
+    discard;
+  }
+  fragColor = vec4(vColor.rgb * coverage, coverage);
   gl_FragDepth = clamp(log2(1.0 + vDepthW) * depthParams.x, 0.0, 1.0);
 }
 )";
@@ -304,6 +424,11 @@ struct GlobeRenderer::Resources {
   std::size_t globeOffset = 0;
   std::size_t markerCapacity = 0;
   int32_t markerCount = 0;
+  std::unique_ptr<ShaderProgram> lineShader;
+  std::unique_ptr<Pipeline> linePipeline;
+  std::unique_ptr<GpuBuffer> lineInstances;
+  std::size_t lineCapacity = 0;
+  int32_t lineCount = 0;
 };
 
 GlobeRenderer::GlobeRenderer(RenderDevice& device)
@@ -359,7 +484,14 @@ bool GlobeRenderer::initialise(QString* errorString)
   marker.fragmentSource = QByteArray(frameBlockGlsl) + markerFragmentGlsl;
   marker.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding}};
   r->markerShader = m_device.createShaderProgram(marker, errorString);
-  if (!r->globeShader || !r->graticuleShader || !r->markerShader) {
+  ShaderDesc line;
+  line.label = QStringLiteral("space line");
+  line.vertexSource = QByteArray(frameBlockGlsl) + lineVertexGlsl;
+  line.fragmentSource = QByteArray(frameBlockGlsl) + lineFragmentGlsl;
+  line.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding}};
+  r->lineShader = m_device.createShaderProgram(line, errorString);
+  if (!r->globeShader || !r->graticuleShader || !r->markerShader ||
+      !r->lineShader) {
     return false;
   }
 
@@ -394,6 +526,16 @@ bool GlobeRenderer::initialise(QString* errorString)
   markerPipeline.blend = BlendMode::PremultipliedAlpha;
   r->markerPipeline = m_device.createPipeline(markerPipeline);
 
+  PipelineDesc linePipeline = markerPipeline;
+  linePipeline.shader = r->lineShader.get();
+  linePipeline.bufferLayouts = {{8, false}, {sizeof(LineInstance), true}};
+  linePipeline.attributes = {
+      {0, VertexFormat::Float2, 0, 0},    {1, VertexFormat::Float3, 1, 0},
+      {2, VertexFormat::Float3, 1, 12},   {3, VertexFormat::Float3, 1, 24},
+      {4, VertexFormat::Float3, 1, 36},   {5, VertexFormat::Float4, 1, 48},
+      {6, VertexFormat::UNorm8x4, 1, 64}, {7, VertexFormat::UNorm8x4, 1, 68}};
+  r->linePipeline = m_device.createPipeline(linePipeline);
+
   const std::array<float, 8> corners = {-1.0F, -1.0F, 1.0F, -1.0F,
                                         -1.0F, 1.0F,  1.0F, 1.0F};
   r->markerCorners = m_device.createBuffer(
@@ -404,7 +546,7 @@ bool GlobeRenderer::initialise(QString* errorString)
       m_device.createBuffer(BufferType::Uniform, BufferUsage::Dynamic,
                             r->globeOffset + sizeof(GlobeBlock), nullptr);
   if (!r->globePipeline || !r->graticulePipeline || !r->markerPipeline ||
-      !r->markerCorners || !r->uniforms) {
+      !r->linePipeline || !r->markerCorners || !r->uniforms) {
     if (errorString) {
       *errorString = QStringLiteral("globe: could not create GPU resources");
     }
@@ -425,6 +567,7 @@ bool GlobeRenderer::initialise(QString* errorString)
   m_vectors = std::move(vectors);
   m_resources = std::move(r);
   m_markersDirty = true;
+  m_spaceLinesDirty = true;
   return true;
 }
 
@@ -494,6 +637,201 @@ void GlobeRenderer::setMarkers(const std::vector<GlobeMarker>& markers)
 {
   m_markers = markers;
   m_markersDirty = true;
+}
+
+void GlobeRenderer::setSpaceLines(std::vector<SpaceLine> lines)
+{
+  m_spaceLines = std::move(lines);
+  m_spaceLinesDirty = true;
+}
+
+int32_t GlobeRenderer::spaceSegmentsDrawn() const
+{
+  return m_resources ? m_resources->lineCount : 0;
+}
+
+namespace
+{
+
+/** Where a line's point is drawn: on the globe, or moving to the map. */
+struct PlacedPoint {
+  Vec3 position;
+  /** False where it is off the map. */
+  bool shown = true;
+  /** Its map position (morphing), offset from the centre, metres. */
+  MapPoint map;
+};
+
+std::array<std::uint8_t, 4> withAlpha(std::array<std::uint8_t, 4> rgba,
+                                      float alpha)
+{
+  rgba[3] = static_cast<std::uint8_t>(std::lround(
+      std::clamp(static_cast<float>(rgba[3]) * alpha, 0.0F, 255.0F)));
+  return rgba;
+}
+
+LineInstance lineInstance(const Vec3& a, const Vec3& b,
+                          std::array<float, 4> params,
+                          std::array<std::uint8_t, 4> rgbaA,
+                          std::array<std::uint8_t, 4> rgbaB)
+{
+  const SplitVec3 sa = splitVec3(a);
+  const SplitVec3 sb = splitVec3(b);
+  LineInstance instance;
+  instance.a = {sa.highX, sa.highY, sa.highZ, sa.lowX, sa.lowY, sa.lowZ};
+  instance.b = {sb.highX, sb.highY, sb.highZ, sb.lowX, sb.lowY, sb.lowZ};
+  instance.params = params;
+  instance.rgbaA = rgbaA;
+  instance.rgbaB = rgbaB;
+  return instance;
+}
+
+/** Places the points of @p line for @p camera (morphing to the map). */
+std::vector<PlacedPoint> placeLine(const SpaceLine& line, const Camera& camera,
+                                   const MapFrame& frame)
+{
+  std::vector<PlacedPoint> placed;
+  placed.reserve(line.points.size());
+  const double morph = camera.morph();
+  for (const SpaceLinePoint& p : line.points) {
+    PlacedPoint point;
+    point.position = p.positionEcef;
+    if (morph > 0.0) {
+      point.shown = frame.projection->contains(p.latDeg, p.lonDeg);
+      point.map = frame.offsetOf(p.latDeg, p.lonDeg);
+      const Vec3 onGlobe = p.positionEcef - camera.eyeEcef();
+      const Vec3 onMap = camera.mapPlanePoint(point.map);
+      point.position =
+          camera.eyeEcef() + onGlobe * (1.0 - morph) + onMap * morph;
+    }
+    placed.push_back(point);
+  }
+  return placed;
+}
+
+/**
+ * Returns true if the segment from @p a to @p b crosses where the map
+ * wraps around or jumps (its ends far apart on the map).
+ */
+bool breaksOnMap(const PlacedPoint& a, const PlacedPoint& b,
+                 const MapFrame& frame)
+{
+  if (!a.shown || !b.shown) {
+    return true;
+  }
+  const double dx = std::fabs(a.map.xM - b.map.xM);
+  const double dy = std::fabs(a.map.yM - b.map.yM);
+  if (frame.worldWidthM > 0.0) {
+    return dx > 0.5 * frame.worldWidthM;
+  }
+  // Maps that don't repeat: a jump of a quarter of the map's size is an
+  // edge (a polar map's rim, an interrupted map's lobes).
+  const MapRect bounds = frame.projection->bounds();
+  return dx > 0.25 * bounds.widthM() || dy > 0.25 * bounds.heightM();
+}
+
+/**
+ * Where a segment crossing the map's seam meets it on each side: the
+ * point at the seam's longitude, placed by each end's side.
+ */
+std::pair<PlacedPoint, PlacedPoint> seamPoints(const SpaceLinePoint& a,
+                                               const SpaceLinePoint& b,
+                                               const Camera& camera,
+                                               const MapFrame& frame)
+{
+  const double seam = normaliseLonDeg(frame.centreLonDeg + 180.0);
+  double lonB = b.lonDeg;
+  double delta = normaliseLonDeg(lonB - a.lonDeg);
+  lonB = a.lonDeg + delta;
+  double seamA = seam;
+  while (seamA < std::min(a.lonDeg, lonB)) {
+    seamA += 360.0;
+  }
+  while (seamA > std::max(a.lonDeg, lonB)) {
+    seamA -= 360.0;
+  }
+  const double f =
+      delta != 0.0 ? std::clamp((seamA - a.lonDeg) / delta, 0.0, 1.0) : 0.5;
+  const double latDeg = a.latDeg + f * (b.latDeg - a.latDeg);
+  const double nudge = delta > 0.0 ? 1e-7 : -1e-7;
+  const Vec3 space =
+      a.positionEcef + (b.positionEcef - a.positionEcef) * f - camera.eyeEcef();
+  std::pair<PlacedPoint, PlacedPoint> ends;
+  ends.first.map = frame.offsetOf(latDeg, seamA - nudge);
+  ends.second.map = frame.offsetOf(latDeg, seamA + nudge);
+  const double morph = camera.morph();
+  ends.first.position = camera.eyeEcef() + space * (1.0 - morph) +
+                        camera.mapPlanePoint(ends.first.map) * morph;
+  ends.second.position = camera.eyeEcef() + space * (1.0 - morph) +
+                         camera.mapPlanePoint(ends.second.map) * morph;
+  return ends;
+}
+
+/** Appends @p line's segments for @p camera (broken where a map wraps). */
+void appendLine(const SpaceLine& line, const Camera& camera,
+                const MapFrame& frame, std::vector<LineInstance>& instances)
+{
+  const std::size_t n = line.points.size();
+  if (n < 2) {
+    return;
+  }
+  const bool morphed = camera.morph() > 0.0;
+  const std::vector<PlacedPoint> placed = placeLine(line, camera, frame);
+  const std::size_t segments = line.closed ? n : n - 1;
+  for (std::size_t i = 0; i < segments; ++i) {
+    const std::size_t j = (i + 1) % n;
+    const SpaceLinePoint& a = line.points[i];
+    const SpaceLinePoint& b = line.points[j];
+    const std::array<float, 4> params{a.along, b.along, line.widthPx,
+                                      line.dashed ? 1.0F : 0.0F};
+    const std::array<std::uint8_t, 4> rgbaA = withAlpha(line.rgba, a.alpha);
+    const std::array<std::uint8_t, 4> rgbaB = withAlpha(line.rgba, b.alpha);
+    if (!morphed || !breaksOnMap(placed[i], placed[j], frame)) {
+      instances.push_back(lineInstance(placed[i].position, placed[j].position,
+                                       params, rgbaA, rgbaB));
+      continue;
+    }
+    // Across the seam of a repeating map: to the edge on each side.
+    if (placed[i].shown && placed[j].shown && frame.worldWidthM > 0.0) {
+      const std::pair<PlacedPoint, PlacedPoint> seam =
+          seamPoints(a, b, camera, frame);
+      instances.push_back(lineInstance(placed[i].position, seam.first.position,
+                                       params, rgbaA, rgbaB));
+      instances.push_back(lineInstance(seam.second.position, placed[j].position,
+                                       params, rgbaA, rgbaB));
+    }
+  }
+}
+
+} // namespace
+
+void GlobeRenderer::uploadSpaceLines(const Camera& camera)
+{
+  const bool morphed = camera.morph() > 0.0;
+  if (!m_spaceLinesDirty && !morphed && !m_spaceLinesMorphed) {
+    return;
+  }
+  m_spaceLinesMorphed = morphed;
+  Resources& r = *m_resources;
+  std::vector<LineInstance> instances;
+  const MapFrame frame = morphed ? camera.mapFrame() : MapFrame();
+  for (const SpaceLine& line : m_spaceLines) {
+    if (!morphed || !line.globeOnly) {
+      appendLine(line, camera, frame, instances);
+    }
+  }
+  if (instances.size() > r.lineCapacity) {
+    r.lineCapacity = std::max<std::size_t>(instances.size(), 64);
+    r.lineInstances =
+        m_device.createBuffer(BufferType::Vertex, BufferUsage::Dynamic,
+                              r.lineCapacity * sizeof(LineInstance), nullptr);
+  }
+  if (!instances.empty() && r.lineInstances) {
+    r.lineInstances->update(0, instances.data(),
+                            instances.size() * sizeof(LineInstance));
+  }
+  r.lineCount = static_cast<int32_t>(instances.size());
+  m_spaceLinesDirty = false;
 }
 
 void GlobeRenderer::uploadMarkers(const Camera& camera)
@@ -661,6 +999,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   m_morph = camera.morph();
 
   uploadMarkers(camera);
+  uploadSpaceLines(camera);
 
   const Vec3& eye = camera.eyeEcef();
   const SplitVec3 eyeSplit = splitVec3(eye);
@@ -785,6 +1124,12 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
     }
   }
 
+  if (r.lineCount > 0 && r.lineInstances) {
+    m_device.setPipeline(*r.linePipeline);
+    m_device.setVertexBuffer(0, *r.markerCorners, 0);
+    m_device.setVertexBuffer(1, *r.lineInstances, 0);
+    m_device.draw(4, 0, r.lineCount);
+  }
   if (r.markerCount > 0 && r.markerInstances) {
     m_device.setPipeline(*r.markerPipeline);
     m_device.setVertexBuffer(0, *r.markerCorners, 0);

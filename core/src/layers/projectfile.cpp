@@ -20,6 +20,7 @@
 
 #include "ts/layers/projectfile.h"
 
+#include <cmath>
 #include <cstdint>
 
 #include <QCoreApplication>
@@ -114,6 +115,13 @@ QByteArray projectToJson(const Project& project)
     view.insert(QStringLiteral("time"),
                 project.time.toUTC().toString(Qt::ISODateWithMs));
   }
+  if (project.clock) {
+    QJsonObject clock;
+    clock.insert(QStringLiteral("realTime"), project.clock->realTime);
+    clock.insert(QStringLiteral("running"), project.clock->running);
+    clock.insert(QStringLiteral("rate"), project.clock->rate);
+    view.insert(QStringLiteral("clock"), clock);
+  }
   document.insert(QStringLiteral("view"), view);
   document.insert(QStringLiteral("layers"), project.layers);
   if (!project.kml.isEmpty()) {
@@ -178,6 +186,15 @@ std::optional<Project> projectFromJson(const QByteArray& json,
   if (time && !view.value(QStringLiteral("time")).toString().isEmpty() &&
       time->isValid()) {
     project.time = *time;
+  }
+  if (view.value(QStringLiteral("clock")).isObject()) {
+    const QJsonObject clock = view.value(QStringLiteral("clock")).toObject();
+    ClockState state;
+    state.realTime = clock.value(QStringLiteral("realTime")).toBool(false);
+    state.running = clock.value(QStringLiteral("running")).toBool(false);
+    const double rate = clock.value(QStringLiteral("rate")).toDouble(1.0);
+    state.rate = rate != 0.0 && std::isfinite(rate) ? rate : 1.0;
+    project.clock = state;
   }
   project.layers = object.value(QStringLiteral("layers")).toArray();
   project.kml = object.value(QStringLiteral("kml")).toArray();
