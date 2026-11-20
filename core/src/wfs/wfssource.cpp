@@ -101,57 +101,58 @@ std::vector<std::vector<GeoPoint>> jsonLines(const QJsonValue& value)
   return lines;
 }
 
+/** Adds a feature of @p type with @p parts, if it has any. */
+void addParts(Feature::Type type, std::vector<std::vector<GeoPoint>> parts,
+              const Feature& base, std::vector<Feature>& features)
+{
+  if (parts.empty()) {
+    return;
+  }
+  Feature feature = base;
+  feature.type = type;
+  feature.parts = std::move(parts);
+  features.push_back(std::move(feature));
+}
+
 /** Adds @p geometry's features (with @p base's id and attributes). */
 void addJsonGeometry(const QJsonObject& geometry, const Feature& base,
                      std::vector<Feature>& features)
 {
   const QString type = geometry.value(QStringLiteral("type")).toString();
   const QJsonValue coordinates = geometry.value(QStringLiteral("coordinates"));
-  Feature feature = base;
-  if (type == QLatin1String("Point")) {
-    const std::optional<GeoPoint> point = jsonPoint(coordinates);
-    if (point) {
-      feature.type = Feature::Type::Points;
-      feature.parts = {{*point}};
-      features.push_back(std::move(feature));
+  if (type == QLatin1String("Point") || type == QLatin1String("MultiPoint")) {
+    std::vector<GeoPoint> points;
+    if (type == QLatin1String("Point")) {
+      const std::optional<GeoPoint> point = jsonPoint(coordinates);
+      if (point) {
+        points.push_back(*point);
+      }
+    } else {
+      points = jsonLine(coordinates);
     }
-  } else if (type == QLatin1String("MultiPoint")) {
-    feature.type = Feature::Type::Points;
-    for (const GeoPoint& point : jsonLine(coordinates)) {
-      feature.parts.push_back({point});
+    std::vector<std::vector<GeoPoint>> parts;
+    parts.reserve(points.size());
+    for (const GeoPoint& point : points) {
+      parts.push_back({point});
     }
-    if (!feature.parts.empty()) {
-      features.push_back(std::move(feature));
-    }
+    addParts(Feature::Type::Points, std::move(parts), base, features);
   } else if (type == QLatin1String("LineString")) {
-    feature.type = Feature::Type::LineStrings;
     std::vector<GeoPoint> line = jsonLine(coordinates);
     if (line.size() >= 2) {
-      feature.parts.push_back(std::move(line));
-      features.push_back(std::move(feature));
+      addParts(Feature::Type::LineStrings, {std::move(line)}, base, features);
     }
   } else if (type == QLatin1String("MultiLineString")) {
-    feature.type = Feature::Type::LineStrings;
-    feature.parts = jsonLines(coordinates);
-    if (!feature.parts.empty()) {
-      features.push_back(std::move(feature));
-    }
+    addParts(Feature::Type::LineStrings, jsonLines(coordinates), base,
+             features);
   } else if (type == QLatin1String("Polygon")) {
-    feature.type = Feature::Type::Polygon;
-    feature.parts = jsonLines(coordinates);
-    if (!feature.parts.empty()) {
-      features.push_back(std::move(feature));
-    }
+    addParts(Feature::Type::Polygon, jsonLines(coordinates), base, features);
   } else if (type == QLatin1String("MultiPolygon")) {
+    // One feature per polygon, with the same id and attributes.
     const QJsonArray polygons = coordinates.toArray();
     // NOLINTNEXTLINE(modernize-loop-convert)
     for (int32_t i = 0; i < polygons.size(); ++i) {
-      Feature part = base;
-      part.type = Feature::Type::Polygon;
-      part.parts = jsonLines(polygons.at(i));
-      if (!part.parts.empty()) {
-        features.push_back(std::move(part));
-      }
+      addParts(Feature::Type::Polygon, jsonLines(polygons.at(i)), base,
+               features);
     }
   } else if (type == QLatin1String("GeometryCollection")) {
     const QJsonArray geometries =
@@ -353,82 +354,101 @@ bool isGeometry(const QString& name)
   });
 }
 
-/** Adds the geometry @p node as features based on @p base. */
-void addGmlGeometry(const XmlNode& node, bool latFirst, int32_t dimension,
-                    const Feature& base, std::vector<Feature>& features)
+/** How a GML geometry's coordinates are read. */
+struct GmlAxes {
+  bool latitudeFirst = true;
+  int32_t dimension = 2;
+};
+
+/** @p axes as @p node's own srsName and srsDimension change them. */
+GmlAxes axesOf(const XmlNode& node, GmlAxes axes)
 {
   const QString srs = node.attribute("srsName");
-  const bool order = srs.isEmpty() ? latFirst : latitudeFirst(srs, latFirst);
-  const int32_t ownDimension = node.attribute("srsDimension").toInt();
-  const int32_t dim = ownDimension >= 2 ? ownDimension : dimension;
-  const QString& name = node.name;
-  Feature feature = base;
-  if (name == QLatin1String("Point")) {
-    const std::vector<GeoPoint> points = readLine(node, order, dim);
-    if (!points.empty()) {
-      feature.type = Feature::Type::Points;
-      feature.parts = {{points.front()}};
-      features.push_back(std::move(feature));
-    }
-    return;
+  if (!srs.isEmpty()) {
+    axes.latitudeFirst = latitudeFirst(srs, axes.latitudeFirst);
   }
-  if (name == QLatin1String("LineString") || name == QLatin1String("Curve") ||
-      name == QLatin1String("LinearRing")) {
-    std::vector<GeoPoint> line = readLine(node, order, dim);
-    if (line.size() >= 2) {
-      feature.type = Feature::Type::LineStrings;
-      feature.parts.push_back(std::move(line));
-      features.push_back(std::move(feature));
-    }
-    return;
+  const int32_t dimension = node.attribute("srsDimension").toInt();
+  if (dimension >= 2) {
+    axes.dimension = dimension;
   }
-  if (name == QLatin1String("Polygon") || name == QLatin1String("Surface")) {
-    // Rings: exterior (outerBoundaryIs) first, then interiors; a Surface's
-    // PolygonPatch has them inside.
-    feature.type = Feature::Type::Polygon;
-    const std::function<void(const XmlNode&)> rings = [&](const XmlNode& n) {
-      for (const std::unique_ptr<XmlNode>& child : n.children) {
-        const bool outer = child->name == QLatin1String("exterior") ||
-                           child->name == QLatin1String("outerBoundaryIs");
-        const bool inner = child->name == QLatin1String("interior") ||
-                           child->name == QLatin1String("innerBoundaryIs");
-        if (outer || inner) {
-          for (const std::unique_ptr<XmlNode>& ring : child->children) {
-            std::vector<GeoPoint> points = readLine(*ring, order, dim);
-            if (points.size() >= 3) {
-              if (outer) {
-                feature.parts.insert(feature.parts.begin(), std::move(points));
-              } else {
-                feature.parts.push_back(std::move(points));
-              }
-            }
-          }
-        } else if (child->name == QLatin1String("patches") ||
-                   child->name == QLatin1String("PolygonPatch")) {
-          rings(*child);
-        }
-      }
-    };
-    rings(node);
-    if (!feature.parts.empty()) {
-      features.push_back(std::move(feature));
-    }
-    return;
-  }
-  // Multi geometries and composites: each member.
+  return axes;
+}
+
+/**
+ * Adds the rings of a Polygon or Surface (or a PolygonPatch in one):
+ * exterior (outerBoundaryIs) first, then interiors.
+ */
+void addRings(const XmlNode& node, GmlAxes axes,
+              std::vector<std::vector<GeoPoint>>& rings)
+{
   for (const std::unique_ptr<XmlNode>& child : node.children) {
-    if (isGeometry(child->name)) {
-      addGmlGeometry(*child, order, dim, base, features);
-    } else {
+    const bool outer = child->name == QLatin1String("exterior") ||
+                       child->name == QLatin1String("outerBoundaryIs");
+    const bool inner = child->name == QLatin1String("interior") ||
+                       child->name == QLatin1String("innerBoundaryIs");
+    if (child->name == QLatin1String("patches") ||
+        child->name == QLatin1String("PolygonPatch")) {
+      addRings(*child, axes, rings);
+      continue;
+    }
+    if (!outer && !inner) {
+      continue;
+    }
+    for (const std::unique_ptr<XmlNode>& ring : child->children) {
+      std::vector<GeoPoint> points =
+          readLine(*ring, axes.latitudeFirst, axes.dimension);
+      if (points.size() < 3) {
+        continue;
+      }
+      if (outer) {
+        rings.insert(rings.begin(), std::move(points));
+      } else {
+        rings.push_back(std::move(points));
+      }
+    }
+  }
+}
+
+/** Adds the geometry @p node as features based on @p base. */
+void addGmlGeometry(const XmlNode& node, GmlAxes axes, const Feature& base,
+                    std::vector<Feature>& features)
+{
+  axes = axesOf(node, axes);
+  const QString& name = node.name;
+  if (name == QLatin1String("Point")) {
+    const std::vector<GeoPoint> points =
+        readLine(node, axes.latitudeFirst, axes.dimension);
+    if (!points.empty()) {
+      addParts(Feature::Type::Points, {{points.front()}}, base, features);
+    }
+  } else if (name == QLatin1String("LineString") ||
+             name == QLatin1String("Curve") ||
+             name == QLatin1String("LinearRing")) {
+    std::vector<GeoPoint> line =
+        readLine(node, axes.latitudeFirst, axes.dimension);
+    if (line.size() >= 2) {
+      addParts(Feature::Type::LineStrings, {std::move(line)}, base, features);
+    }
+  } else if (name == QLatin1String("Polygon") ||
+             name == QLatin1String("Surface")) {
+    std::vector<std::vector<GeoPoint>> rings;
+    addRings(node, axes, rings);
+    addParts(Feature::Type::Polygon, std::move(rings), base, features);
+  } else {
+    // Multi geometries and composites: each member, directly inside or in
+    // a member property.
+    for (const std::unique_ptr<XmlNode>& child : node.children) {
+      if (isGeometry(child->name)) {
+        addGmlGeometry(*child, axes, base, features);
+        continue;
+      }
       for (const std::unique_ptr<XmlNode>& member : child->children) {
         if (isGeometry(member->name)) {
-          addGmlGeometry(*member, order, dim, base, features);
+          addGmlGeometry(*member, axes, base, features);
         }
       }
     }
   }
-  // Points of a MultiPoint come one feature each; join them.
-  (void)name;
 }
 
 /** The geometry element inside a property, or null. */
@@ -462,8 +482,47 @@ void addGmlFeature(const XmlNode& node, bool latFirst, WfsPage& page)
     }
   }
   for (const XmlNode* geometry : geometries) {
-    addGmlGeometry(*geometry, latFirst, 2, base, page.features);
+    addGmlGeometry(*geometry, GmlAxes{latFirst, 2}, base, page.features);
   }
+}
+
+/** The messages of an exception report. */
+QString exceptionText(const XmlNode& node)
+{
+  QStringList messages;
+  if (node.name == QLatin1String("ExceptionText") ||
+      node.name == QLatin1String("ServiceException")) {
+    messages.append(node.text.simplified());
+  }
+  for (const std::unique_ptr<XmlNode>& child : node.children) {
+    const QString inner = exceptionText(*child);
+    if (!inner.isEmpty()) {
+      messages.append(inner);
+    }
+  }
+  return messages.join(QLatin1Char(' '));
+}
+
+/** Adds the features of a collection's members; returns how many. */
+int64_t addMembers(const XmlNode& root, bool latFirst, WfsPage& page)
+{
+  int64_t count = 0;
+  for (const std::unique_ptr<XmlNode>& child : root.children) {
+    if (child->name != QLatin1String("member") &&
+        child->name != QLatin1String("featureMember") &&
+        child->name != QLatin1String("featureMembers")) {
+      continue;
+    }
+    for (const std::unique_ptr<XmlNode>& feature : child->children) {
+      if (feature->name == QLatin1String("FeatureCollection") ||
+          feature->name == QLatin1String("AdditionalObjects")) {
+        continue;
+      }
+      addGmlFeature(*feature, latFirst, page);
+      ++count;
+    }
+  }
+  return count;
 }
 
 std::optional<WfsPage> parseGml(const QByteArray& body, QString* errorString)
@@ -486,21 +545,10 @@ std::optional<WfsPage> parseGml(const QByteArray& body, QString* errorString)
                          .arg(reader.errorString()));
   }
   if (root->name.contains(QLatin1String("ExceptionReport"))) {
-    QStringList messages;
-    const std::function<void(const XmlNode&)> collect = [&](const XmlNode& n) {
-      if (n.name == QLatin1String("ExceptionText") ||
-          n.name == QLatin1String("ServiceException")) {
-        messages.append(n.text.simplified());
-      }
-      for (const std::unique_ptr<XmlNode>& child : n.children) {
-        collect(*child);
-      }
-    };
-    collect(*root);
     return failWith<WfsPage>(
         errorString, QCoreApplication::translate(
                          "ts::WfsSource", "The server reported an error: %1")
-                         .arg(messages.join(QLatin1Char(' '))));
+                         .arg(exceptionText(*root)));
   }
   WfsPage page;
   // The collection's own srsName, if any, is the default for its members.
@@ -510,21 +558,7 @@ std::optional<WfsPage> parseGml(const QByteArray& body, QString* errorString)
       latFirst = latitudeFirst(envelope->attribute("srsName"), latFirst);
     }
   }
-  int64_t count = 0;
-  for (const std::unique_ptr<XmlNode>& child : root->children) {
-    if (child->name == QLatin1String("member") ||
-        child->name == QLatin1String("featureMember") ||
-        child->name == QLatin1String("featureMembers")) {
-      for (const std::unique_ptr<XmlNode>& feature : child->children) {
-        if (feature->name == QLatin1String("FeatureCollection") ||
-            feature->name == QLatin1String("AdditionalObjects")) {
-          continue;
-        }
-        addGmlFeature(*feature, latFirst, page);
-        ++count;
-      }
-    }
-  }
+  const int64_t count = addMembers(*root, latFirst, page);
   const QString returned = root->attribute("numberReturned");
   bool ok = false;
   const int64_t number = returned.toLongLong(&ok);

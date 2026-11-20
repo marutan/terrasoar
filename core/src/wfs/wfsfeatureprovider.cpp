@@ -64,8 +64,9 @@ QString notFeaturesMessage(const HttpResponse& response)
 }
 
 /** Distance from @p p to segment @p a–@p b in degrees, longitude scaled. */
-double segmentDistance(const GeoPoint& p, const GeoPoint& a, const GeoPoint& b,
-                       double lonScale)
+// The point, then the segment's ends, then the scale of longitude.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+double segmentDistance(GeoPoint p, GeoPoint a, GeoPoint b, double lonScale)
 {
   const double ax = (a.lonDeg - p.lonDeg) * lonScale;
   const double ay = a.latDeg - p.latDeg;
@@ -81,7 +82,7 @@ double segmentDistance(const GeoPoint& p, const GeoPoint& a, const GeoPoint& b,
 }
 
 /** True if @p p is inside ring @p ring (even-odd). */
-bool insideRing(const GeoPoint& p, const std::vector<GeoPoint>& ring)
+bool insideRing(GeoPoint p, const std::vector<GeoPoint>& ring)
 {
   bool inside = false;
   for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++) {
@@ -97,41 +98,59 @@ bool insideRing(const GeoPoint& p, const std::vector<GeoPoint>& ring)
   return inside;
 }
 
-bool under(const Feature& feature, const GeoPoint& p, double tolerance)
+/** Degrees of longitude to degrees of distance at @p p. */
+double lonScaleAt(GeoPoint p)
 {
-  const double lonScale = std::max(std::cos(p.latDeg * pi / 180.0), 0.01);
+  return std::max(std::cos(p.latDeg * pi / 180.0), 0.01);
+}
+
+bool nearPoints(const Feature& feature, GeoPoint p, double tolerance)
+{
+  const double lonScale = lonScaleAt(p);
+  for (const std::vector<GeoPoint>& part : feature.parts) {
+    for (const GeoPoint& point : part) {
+      if (segmentDistance(p, point, point, lonScale) <= tolerance) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool nearLines(const Feature& feature, GeoPoint p, double tolerance)
+{
+  const double lonScale = lonScaleAt(p);
+  for (const std::vector<GeoPoint>& part : feature.parts) {
+    for (std::size_t i = 0; i + 1 < part.size(); ++i) {
+      if (segmentDistance(p, part[i], part[i + 1], lonScale) <= tolerance) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+bool insidePolygon(const Feature& feature, GeoPoint p)
+{
+  if (feature.parts.empty() || feature.parts.front().size() < 3 ||
+      !insideRing(p, feature.parts.front())) {
+    return false;
+  }
+  return std::none_of(feature.parts.begin() + 1, feature.parts.end(),
+                      [p](const std::vector<GeoPoint>& hole) {
+                        return hole.size() >= 3 && insideRing(p, hole);
+                      });
+}
+
+bool under(const Feature& feature, GeoPoint p, double tolerance)
+{
   switch (feature.type) {
   case Feature::Type::Points:
-    for (const std::vector<GeoPoint>& part : feature.parts) {
-      for (const GeoPoint& point : part) {
-        if (segmentDistance(p, point, point, lonScale) <= tolerance) {
-          return true;
-        }
-      }
-    }
-    return false;
+    return nearPoints(feature, p, tolerance);
   case Feature::Type::LineStrings:
-    for (const std::vector<GeoPoint>& part : feature.parts) {
-      for (std::size_t i = 0; i + 1 < part.size(); ++i) {
-        if (segmentDistance(p, part[i], part[i + 1], lonScale) <= tolerance) {
-          return true;
-        }
-      }
-    }
-    return false;
-  case Feature::Type::Polygon: {
-    if (feature.parts.empty() || feature.parts.front().size() < 3 ||
-        !insideRing(p, feature.parts.front())) {
-      return false;
-    }
-    for (std::size_t hole = 1; hole < feature.parts.size(); ++hole) {
-      if (feature.parts[hole].size() >= 3 &&
-          insideRing(p, feature.parts[hole])) {
-        return false;
-      }
-    }
-    return true;
-  }
+    return nearLines(feature, p, tolerance);
+  case Feature::Type::Polygon:
+    return insidePolygon(feature, p);
   }
   return false;
 }
@@ -267,7 +286,7 @@ void WfsFeatureProvider::keep(const FeatureTile& tile)
   }
 }
 
-std::vector<Feature> WfsFeatureProvider::featuresAt(const GeoPoint& point,
+std::vector<Feature> WfsFeatureProvider::featuresAt(GeoPoint point,
                                                     double toleranceDeg) const
 {
   const std::lock_guard<std::mutex> lock(m_keptMutex);
@@ -325,7 +344,7 @@ WfsFeatureProvider::fetchForRegion(TileKey key, int64_t region,
   const GeoRect rect = stored.bounds();
   for (int32_t page = 0; page < m_source.maximumPages; ++page) {
     int64_t returned = 0;
-    const RegionTileResult result = m_fetcher->fetchForRegion(
+    RegionTileResult result = m_fetcher->fetchForRegion(
         pageKey(stored, page),
         getFeatureUrl(m_source, rect,
                       static_cast<int64_t>(page) * m_source.pageSize),

@@ -160,6 +160,7 @@ private:
   void accept() override;
   std::optional<WmsSource> chosenSource(QString* errorString) const;
   void fillTime(const WmsLayer* layer);
+  void showDetails(const WmsSource& chosen);
   void setStatus(const QString& text, bool error);
 
   std::shared_ptr<NetworkClient> m_network;

@@ -299,4 +299,6 @@ QString TimeBar::timeText() const
   return m_timeText;
 }
 
+TimeBar::~TimeBar() = default;
+
 } // namespace ts

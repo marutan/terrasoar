@@ -71,7 +71,7 @@ LayerTreeDock::LayerTreeDock(LayerTreeModel* model, QWidget* parent)
   m_view->expandAll();
   m_view->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_view, &QTreeView::customContextMenuRequested, this,
-          [this](const QPoint& position) {
+          [this](QPoint position) {
             QMenu* menu = timeMenu(m_view->indexAt(position));
             if (menu != nullptr) {
               menu->popup(m_view->viewport()->mapToGlobal(position));
@@ -355,6 +355,7 @@ QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)
   if (!time || time->times().isEmpty()) {
     return nullptr;
   }
+  const LayerTime current = *time;
   if (m_timeMenu == nullptr) {
     m_timeMenu = new QMenu(this);
     m_timeMenu->setObjectName(QStringLiteral("layerTimeMenu"));
@@ -365,15 +366,15 @@ QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)
   }
   m_timeMenu->setTitle(tr("Time"));
   const QPersistentModelIndex layer(index);
-  const std::function<void(LayerTime)> choose = [this,
-                                                 layer](LayerTime chosen) {
-    if (!layer.isValid()) {
-      return;
-    }
-    LayerDefinition changed = m_model->layerDefinition(layer);
-    changed.source.insert(QStringLiteral("time"), chosen.toJson());
-    m_model->setLayerDefinition(layer, changed);
-  };
+  const std::function<void(const LayerTime&)> choose =
+      [this, layer](const LayerTime& chosen) {
+        if (!layer.isValid()) {
+          return;
+        }
+        LayerDefinition changed = m_model->layerDefinition(layer);
+        changed.source.insert(QStringLiteral("time"), chosen.toJson());
+        m_model->setLayerDefinition(layer, changed);
+      };
   QActionGroup* group = new QActionGroup(m_timeMenu);
   const std::function<QAction*(const QString&, LayerTime::Mode, const QString&)>
       add =
@@ -382,9 +383,9 @@ QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)
             action->setCheckable(true);
             action->setActionGroup(group);
             action->setChecked(
-                time->mode == mode &&
-                (mode != LayerTime::Mode::Fixed || time->value == value));
-            LayerTime chosen = *time;
+                current.mode == mode &&
+                (mode != LayerTime::Mode::Fixed || current.value == value));
+            LayerTime chosen = current;
             chosen.mode = mode;
             chosen.value = value;
             connect(action, &QAction::triggered, this,
@@ -393,7 +394,7 @@ QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)
           };
   add(tr("Follow the program's clock"), LayerTime::Mode::Clock, QString())
       ->setObjectName(QStringLiteral("timeFollowClockAction"));
-  const TimeExtent extent = time->times();
+  const TimeExtent extent = current.times();
   if (LayerTime::isMonthly(extent)) {
     add(tr("The clock's month, any year"), LayerTime::Mode::MonthOfYear,
         QString())
@@ -401,11 +402,9 @@ QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)
   }
   m_timeMenu->addSeparator();
   // Its latest times (at most 24), latest first.
-  std::optional<QDateTime> next = extent.last();
-  for (int32_t i = 0; next && i < 24; ++i) {
-    const QString value = extent.format(*next);
+  for (const QDateTime& latest : extent.latest(24)) {
+    const QString value = extent.format(latest);
     add(value, LayerTime::Mode::Fixed, value);
-    next = extent.before(*next);
   }
   return m_timeMenu;
 }

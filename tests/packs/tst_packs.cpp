@@ -496,7 +496,9 @@ private slots:
     registry.setInstalledPacks({pack});
     const std::shared_ptr<const ts::HorizontalShiftGrid> grid =
         ts::datumShiftGrid(QStringLiteral("ostn15"));
-    QVERIFY(grid != nullptr);
+    if (!grid) {
+      QFAIL("grid is missing");
+    }
     QCOMPARE(grid->path(), dir.filePath(QStringLiteral("ostn15.tif")));
     // The same file again: the grid already read.
     registry.setInstalledPacks({pack});
@@ -927,7 +929,9 @@ private slots:
     QCOMPARE(registry.basePackVariants(QStringLiteral("bluemarble")),
              QStringLiteral("2004-01,2004-07"));
     const std::optional<ts::LayerTime> time = registry.basePackTime(plain);
-    QVERIFY(time.has_value());
+    if (!time) {
+      QFAIL("time is missing");
+    }
     QCOMPARE(time->mode, ts::LayerTime::Mode::MonthOfYear);
     QCOMPARE(time->dimension, QStringLiteral("month"));
 
@@ -945,9 +949,11 @@ private slots:
     QJsonObject timed = plain;
     timed.insert(QStringLiteral("time"), time->toJson());
     const QDateTime januaryClock =
-        ts::parseIsoTime(QStringLiteral("2031-01-15"), QDateTime()).value();
+        ts::parseIsoTime(QStringLiteral("2031-01-15"), QDateTime())
+            .value_or(QDateTime());
     const QDateTime julyClock =
-        ts::parseIsoTime(QStringLiteral("1999-07-04"), QDateTime()).value();
+        ts::parseIsoTime(QStringLiteral("1999-07-04"), QDateTime())
+            .value_or(QDateTime());
     QCOMPARE(colourOf(ts::sourceAtTime(timed, januaryClock)),
              QColor(240, 240, 250));
     QCOMPARE(colourOf(ts::sourceAtTime(timed, julyClock)), QColor(30, 120, 40));

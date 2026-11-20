@@ -70,9 +70,12 @@ ts::NetworkSettings testNetwork()
 }
 
 /** A source for @p type of the mock at @p server, in @p format. */
+// A feature type's name, then a format: hard to confuse in the calls.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 ts::WfsSource
 mockSource(const MockHttpServer& server, const QString& type,
            const QString& format = QStringLiteral("application/json"))
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   QString error;
   const std::optional<ts::WfsCapabilities> capabilities =
@@ -185,12 +188,19 @@ private slots:
     QString error;
     const std::optional<ts::WfsCapabilities> pdok = ts::parseWfsCapabilities(
         fixture(QStringLiteral("wfs/pdok-200.xml")), &error);
-    QVERIFY(pdok.has_value());
+    if (!pdok) {
+      QFAIL("pdok is missing");
+    }
     QCOMPARE(pdok->countDefault, int64_t{1000});
     QCOMPARE(pdok->providerName, QStringLiteral("PDOK"));
     const ts::WfsFeatureType* province = pdok->findFeatureType(
         QStringLiteral("bestuurlijkegebieden:Provinciegebied"));
-    QVERIFY(province != nullptr && province->wgs84Bounds.has_value());
+    if (province == nullptr) {
+      QFAIL("province is missing");
+    }
+    if (!province->wgs84Bounds) {
+      QFAIL("no bounds");
+    }
     // The Netherlands.
     QVERIFY(province->wgs84Bounds->westDeg > 2.0 &&
             province->wgs84Bounds->eastDeg < 8.0);
@@ -322,7 +332,9 @@ private slots:
     QString error;
     const std::optional<ts::WfsSource> back =
         ts::WfsSource::fromJson(source.toJson(), &error);
-    QVERIFY2(back.has_value(), qPrintable(error));
+    if (!back) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(back->toJson(), source.toJson());
     QCOMPARE(back->id(), source.id());
     // The levels: none below the minimum, the maximum's ancestor beyond it.
@@ -349,11 +361,15 @@ private slots:
     const std::optional<ts::WfsPage> json = ts::parseWfsFeatures(
         fixture(QStringLiteral("wfs/emodnet-features.json")),
         QStringLiteral("application/json"), &error);
-    QVERIFY2(json.has_value(), qPrintable(error));
+    if (!json) {
+      QFAIL(qPrintable(error));
+    }
     const std::optional<ts::WfsPage> gml = ts::parseWfsFeatures(
         fixture(QStringLiteral("wfs/emodnet-features.xml")),
         QStringLiteral("application/gml+xml; version=3.2"), &error);
-    QVERIFY2(gml.has_value(), qPrintable(error));
+    if (!gml) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(json->features.size(), std::size_t{2});
     QCOMPARE(gml->features.size(), std::size_t{2});
     QCOMPARE(json->returned, int64_t{2});
@@ -386,7 +402,9 @@ private slots:
     // PDOK's GML 3.2 polygon (thinned): Zuid-Holland, latitude first.
     const std::optional<ts::WfsPage> pdok = ts::parseWfsFeatures(
         fixture(QStringLiteral("wfs/pdok-features.xml")), QString(), &error);
-    QVERIFY2(pdok.has_value(), qPrintable(error));
+    if (!pdok) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(pdok->features.size(), std::size_t{1});
     const ts::Feature& province = pdok->features.front();
     QCOMPARE(province.type, ts::Feature::Type::Polygon);
@@ -436,7 +454,9 @@ private slots:
     QString error;
     const std::optional<ts::WfsPage> page =
         ts::parseWfsFeatures(document, QStringLiteral("text/xml"), &error);
-    QVERIFY2(page.has_value(), qPrintable(error));
+    if (!page) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(page->features.size(), std::size_t{1});
     const ts::GeoPoint point = page->features.front().parts.front().front();
     QCOMPARE(point.latDeg, latitudeFirst ? 10.0 : 50.0);
@@ -460,7 +480,9 @@ private slots:
         "</t:name></t:lake></gml:featureMember></wfs:FeatureCollection>";
     const std::optional<ts::WfsPage> page =
         ts::parseWfsFeatures(gml2, QStringLiteral("GML2"), &error);
-    QVERIFY2(page.has_value(), qPrintable(error));
+    if (!page) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(page->features.size(), std::size_t{1});
     QCOMPARE(page->features.front().parts.size(), std::size_t{2});
     QCOMPARE(page->features.front().parts.front().at(1).lonDeg, 1.0);
@@ -477,7 +499,9 @@ private slots:
         "</wfs:FeatureCollection>";
     const std::optional<ts::WfsPage> lines =
         ts::parseWfsFeatures(curve, QStringLiteral("text/xml"), &error);
-    QVERIFY2(lines.has_value(), qPrintable(error));
+    if (!lines) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(lines->features.size(), std::size_t{1});
     QCOMPARE(lines->features.front().parts.front().size(), std::size_t{3});
     QCOMPARE(lines->features.front().parts.front().back().latDeg, 5.0);
@@ -522,24 +546,47 @@ private slots:
                                   QStringLiteral("#123456"));
     features[4].attributes.insert(QStringLiteral("fill-opacity"), 0.5);
     ts::applyStyleRules(features, rules);
-    QCOMPARE(features[0].style->outline.value(), QColor(255, 0, 0));
-    QCOMPARE(features[0].style->outlineWidthPx.value(), 3.0);
-    QCOMPARE(features[1].style->fill.value(), QColor(0, 0, 255, 128));
+    QCOMPARE(features[0]
+                 .style.value_or(ts::FeatureStyle())
+                 .outline.value_or(QColor()),
+             QColor(255, 0, 0));
+    QCOMPARE(features[0]
+                 .style.value_or(ts::FeatureStyle())
+                 .outlineWidthPx.value_or(0.0),
+             3.0);
+    QCOMPARE(
+        features[1].style.value_or(ts::FeatureStyle()).fill.value_or(QColor()),
+        QColor(0, 0, 255, 128));
     // Beyond the range: the catch-all rule.
-    QCOMPARE(features[2].style->pointSizePx.value(), 9.0);
-    QVERIFY(!features[2].style->fill.has_value());
-    QCOMPARE(features[3].style->pointSizePx.value(), 9.0);
+    QCOMPARE(features[2]
+                 .style.value_or(ts::FeatureStyle())
+                 .pointSizePx.value_or(0.0),
+             9.0);
+    QVERIFY(!features[2].style.value_or(ts::FeatureStyle()).fill.has_value());
+    QCOMPARE(features[3]
+                 .style.value_or(ts::FeatureStyle())
+                 .pointSizePx.value_or(0.0),
+             9.0);
     // Without rules: their own simplestyle colours.
     ts::applyStyleRules(features, {});
     QVERIFY(!features[0].style.has_value());
-    QCOMPARE(features[3].style->outline.value(), QColor(0, 255, 0));
-    QCOMPARE(features[4].style->fill.value().alpha(), 128);
+    QCOMPARE(features[3]
+                 .style.value_or(ts::FeatureStyle())
+                 .outline.value_or(QColor()),
+             QColor(0, 255, 0));
+    QCOMPARE(features[4]
+                 .style.value_or(ts::FeatureStyle())
+                 .fill.value_or(QColor())
+                 .alpha(),
+             128);
     // JSON round trip.
     const std::optional<ts::StyleRule> back =
         ts::StyleRule::fromJson(rules.at(1).toJson());
-    QVERIFY(back.has_value());
+    if (!back) {
+      QFAIL("back is missing");
+    }
     QVERIFY(back->style == rules.at(1).style);
-    QCOMPARE(back->minimum.value(), 100.0);
+    QCOMPARE(back->minimum.value_or(0.0), 100.0);
   }
 
   void meshRunsAndPoints()
@@ -568,7 +615,9 @@ private slots:
     ts::VectorMesher mesher;
     const std::optional<ts::VectorTileMesh> mesh =
         mesher.build(tile, notCancelled);
-    QVERIFY(mesh.has_value());
+    if (!mesh) {
+      QFAIL("mesh is missing");
+    }
     QCOMPARE(mesh->styles.size(), std::size_t{1});
     // Layer-style lines, red lines, then the points.
     QCOMPARE(mesh->segmentRuns.size(), std::size_t{3});
@@ -614,7 +663,9 @@ private slots:
     QCOMPARE(provider.storedKey(key).level, 2);
     const std::optional<ts::FeatureTile> tile =
         provider.loadFeatures(key, notCancelled);
-    QVERIFY(tile.has_value());
+    if (!tile) {
+      QFAIL("tile is missing");
+    }
     QCOMPARE(tile->key, provider.storedKey(key));
     // The grid's north-east quarter: 10 × 10 cells.
     QCOMPARE(static_cast<int32_t>(tile->features.size()), 100);
@@ -642,7 +693,9 @@ private slots:
         world.loadFeatures(ts::TileKey{0, 0, 0}, notCancelled);
     const std::optional<ts::FeatureTile> east =
         world.loadFeatures(ts::TileKey{0, 1, 0}, notCancelled);
-    QVERIFY(west.has_value() && east.has_value());
+    if (!west || !east) {
+      QFAIL("a half is missing");
+    }
     QCOMPARE(
         static_cast<int32_t>(west->features.size() + east->features.size()),
         400);
@@ -655,7 +708,9 @@ private slots:
         source, std::make_shared<ts::NetworkClient>(testNetwork()));
     const std::optional<ts::FeatureTile> part =
         capped.loadFeatures(ts::TileKey{0, 1, 0}, notCancelled);
-    QVERIFY(part.has_value());
+    if (!part) {
+      QFAIL("part is missing");
+    }
     QCOMPARE(static_cast<int32_t>(part->features.size()), 200);
     QVERIFY2(capped.status().message.contains(QLatin1String("zoom in")),
              qPrintable(capped.status().message));
@@ -694,13 +749,17 @@ private slots:
         a.loadFeatures(key, notCancelled);
     const std::optional<ts::FeatureTile> fromGml =
         b.loadFeatures(key, notCancelled);
-    QVERIFY(fromJson.has_value() && fromGml.has_value());
-    QVERIFY(!fromJson->features.empty());
-    QCOMPARE(fromJson->features.size(), fromGml->features.size());
-    QCOMPARE(countParts(fromJson->features), countParts(fromGml->features));
-    for (std::size_t i = 0; i < fromJson->features.size(); ++i) {
-      const ts::Feature& x = fromJson->features.at(i);
-      const ts::Feature& y = fromGml->features.at(i);
+    if (!fromJson || !fromGml) {
+      QFAIL("features are missing");
+    }
+    const std::vector<ts::Feature>& jsonFeatures = fromJson->features;
+    const std::vector<ts::Feature>& gmlFeatures = fromGml->features;
+    QVERIFY(!jsonFeatures.empty());
+    QCOMPARE(jsonFeatures.size(), gmlFeatures.size());
+    QCOMPARE(countParts(jsonFeatures), countParts(gmlFeatures));
+    for (std::size_t i = 0; i < jsonFeatures.size(); ++i) {
+      const ts::Feature& x = jsonFeatures.at(i);
+      const ts::Feature& y = gmlFeatures.at(i);
       QCOMPARE(x.id, y.id);
       QCOMPARE(x.type, y.type);
       QCOMPARE(x.parts.front().front().lonDeg, y.parts.front().front().lonDeg);
@@ -751,7 +810,9 @@ private slots:
         source, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
     const std::optional<ts::FeatureTile> tile =
         offline.loadFeatures(key, notCancelled);
-    QVERIFY(tile.has_value());
+    if (!tile) {
+      QFAIL("tile is missing");
+    }
     QVERIFY(!tile->features.empty());
   }
 
@@ -815,7 +876,9 @@ private slots:
     const std::optional<ts::FeatureTile> tile = provider.loadFeatures(
         ts::TileKey::containing(3, ts::Geodetic{-5.0, -5.0, 0.0}),
         notCancelled);
-    QVERIFY(tile.has_value());
+    if (!tile) {
+      QFAIL("tile is missing");
+    }
     int32_t styled = 0;
     for (const ts::Feature& feature : tile->features) {
       const bool odd =
@@ -829,7 +892,9 @@ private slots:
     ts::VectorMesher mesher;
     const std::optional<ts::VectorTileMesh> mesh =
         mesher.build(*tile, notCancelled);
-    QVERIFY(mesh.has_value());
+    if (!mesh) {
+      QFAIL("mesh is missing");
+    }
     QCOMPARE(mesh->styles.size(), std::size_t{1});
     QCOMPARE(mesh->fillRuns.size(), std::size_t{2});
   }

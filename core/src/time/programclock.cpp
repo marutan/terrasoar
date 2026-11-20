@@ -45,4 +45,6 @@ void ProgramClock::setNow()
   setTime(QDateTime::currentDateTimeUtc());
 }
 
+ProgramClock::~ProgramClock() = default;
+
 } // namespace ts

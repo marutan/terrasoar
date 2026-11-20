@@ -125,6 +125,8 @@ QString xyzFormatFor(const QString& urlTemplate);
  * (counted from the north) of @p source: the template with its variables
  * filled in.
  */
+// Zoom, column, row: the order of the template's {z}/{x}/{y}.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 QUrl xyzTileUrl(const XyzSource& source, int32_t zoom, int64_t column,
                 int64_t row);
 

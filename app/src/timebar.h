@@ -69,6 +69,9 @@ public:
   /** Creates the bar for @p clock (which must outlive it). */
   TimeBar(ProgramClock* clock, QWidget* parent);
 
+  /** Destroys it. */
+  ~TimeBar() override;
+
   /**
    * Sets the times to move through (the layers' times joined); an empty
    * extent disables the bar.

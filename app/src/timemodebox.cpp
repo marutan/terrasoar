@@ -84,4 +84,6 @@ void TimeModeBox::retranslateUi()
   }
 }
 
+TimeModeBox::~TimeModeBox() = default;
+
 } // namespace ts

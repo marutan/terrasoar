@@ -129,6 +129,9 @@ public:
   /** Returns the latest time before @p time, or nothing. */
   std::optional<QDateTime> before(const QDateTime& time) const;
 
+  /** Returns up to @p count of the latest times, latest first. */
+  std::vector<QDateTime> latest(int64_t count) const;
+
   /** Returns the number of times (intervals counted step by step). */
   int64_t count() const;
 

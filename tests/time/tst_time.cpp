@@ -152,19 +152,24 @@ private slots:
     const ts::TimeExtent extent = ts::TimeExtent::parse(
         QStringLiteral("2004-03-01, 2004-01-01,2004-02-01"));
     QCOMPARE(extent.count(), int64_t{3});
-    QCOMPARE(extent.first().value(), utc("2004-01-01"));
-    QCOMPARE(extent.last().value(), utc("2004-03-01"));
-    QCOMPARE(extent.format(extent.atOrBefore(utc("2004-02-15")).value()),
+    QCOMPARE(extent.first().value_or(QDateTime()), utc("2004-01-01"));
+    QCOMPARE(extent.last().value_or(QDateTime()), utc("2004-03-01"));
+    QCOMPARE(extent.format(
+                 extent.atOrBefore(utc("2004-02-15")).value_or(QDateTime())),
              QStringLiteral("2004-02-01"));
     // Before the first: the first; after the last: the last.
-    QCOMPARE(extent.atOrBefore(utc("1999-01-01")).value(), utc("2004-01-01"));
-    QCOMPARE(extent.atOrBefore(utc("2030-01-01")).value(), utc("2004-03-01"));
-    QCOMPARE(extent.after(utc("2004-01-01")).value(), utc("2004-02-01"));
+    QCOMPARE(extent.atOrBefore(utc("1999-01-01")).value_or(QDateTime()),
+             utc("2004-01-01"));
+    QCOMPARE(extent.atOrBefore(utc("2030-01-01")).value_or(QDateTime()),
+             utc("2004-03-01"));
+    QCOMPARE(extent.after(utc("2004-01-01")).value_or(QDateTime()),
+             utc("2004-02-01"));
     QVERIFY(!extent.after(utc("2004-03-01")).has_value());
-    QCOMPARE(extent.before(utc("2004-02-01")).value(), utc("2004-01-01"));
+    QCOMPARE(extent.before(utc("2004-02-01")).value_or(QDateTime()),
+             utc("2004-01-01"));
     QVERIFY(!extent.before(utc("2004-01-01")).has_value());
-    QVERIFY(std::abs(extent.shortestStepSeconds().value() - 29 * 86400.0) <
-            1.0);
+    QVERIFY(std::abs(extent.shortestStepSeconds().value_or(0.0) -
+                     29 * 86400.0) < 1.0);
     QVERIFY(ts::TimeExtent::parse(QString()).isEmpty());
     QVERIFY(!ts::TimeExtent().atOrBefore(utc("2004-01-01")).has_value());
     // Unreadable parts are left out.
@@ -180,18 +185,25 @@ private slots:
         ts::TimeExtent::parse(QStringLiteral("2000-02-24/2026-11-20/P1D"));
     QCOMPARE(extent.count(),
              QDate(2000, 2, 24).daysTo(QDate(2026, 11, 20)) + 1);
-    QCOMPARE(extent.format(extent.atOrBefore(utc("2010-06-15T18:00Z")).value()),
-             QStringLiteral("2010-06-15"));
-    QCOMPARE(extent.atOrBefore(utc("2030-01-01")).value(), utc("2026-11-20"));
-    QCOMPARE(extent.after(utc("2010-06-15T18:00Z")).value(), utc("2010-06-16"));
-    QCOMPARE(extent.before(utc("2010-06-15")).value(), utc("2010-06-14"));
-    QCOMPARE(extent.shortestStepSeconds().value(), 86400.0);
+    QCOMPARE(
+        extent.format(
+            extent.atOrBefore(utc("2010-06-15T18:00Z")).value_or(QDateTime())),
+        QStringLiteral("2010-06-15"));
+    QCOMPARE(extent.atOrBefore(utc("2030-01-01")).value_or(QDateTime()),
+             utc("2026-11-20"));
+    QCOMPARE(extent.after(utc("2010-06-15T18:00Z")).value_or(QDateTime()),
+             utc("2010-06-16"));
+    QCOMPARE(extent.before(utc("2010-06-15")).value_or(QDateTime()),
+             utc("2010-06-14"));
+    QCOMPARE(extent.shortestStepSeconds().value_or(0.0), 86400.0);
     // Several intervals with a gap.
     const ts::TimeExtent gaps = ts::TimeExtent::parse(
         QStringLiteral("2020-01-01/2020-01-03/P1D,2020-02-01/2020-02-02/P1D"));
     QCOMPARE(gaps.count(), int64_t{5});
-    QCOMPARE(gaps.atOrBefore(utc("2020-01-20")).value(), utc("2020-01-03"));
-    QCOMPARE(gaps.after(utc("2020-01-03")).value(), utc("2020-02-01"));
+    QCOMPARE(gaps.atOrBefore(utc("2020-01-20")).value_or(QDateTime()),
+             utc("2020-01-03"));
+    QCOMPARE(gaps.after(utc("2020-01-03")).value_or(QDateTime()),
+             utc("2020-02-01"));
   }
 
   void monthlyAndHourly()
@@ -199,7 +211,8 @@ private slots:
     const ts::TimeExtent months =
         ts::TimeExtent::parse(QStringLiteral("2004-01-01/2004-12-01/P1M"));
     QCOMPARE(months.count(), int64_t{12});
-    QCOMPARE(months.format(months.atOrBefore(utc("2004-05-17")).value()),
+    QCOMPARE(months.format(
+                 months.atOrBefore(utc("2004-05-17")).value_or(QDateTime())),
              QStringLiteral("2004-05-01"));
     QVERIFY(ts::LayerTime::isMonthly(months));
     QVERIFY(ts::LayerTime::isMonthly(ts::TimeExtent::parse(QStringLiteral(
@@ -211,20 +224,24 @@ private slots:
     const ts::TimeExtent hours = ts::TimeExtent::parse(
         QStringLiteral("2026-11-20T00:00:00Z/2026-11-21T00:00:00Z/PT6H"));
     QCOMPARE(hours.count(), int64_t{5});
-    QCOMPARE(hours.format(hours.atOrBefore(utc("2026-11-20T13:10Z")).value()),
-             QStringLiteral("2026-11-20T12:00:00Z"));
+    QCOMPARE(
+        hours.format(
+            hours.atOrBefore(utc("2026-11-20T13:10Z")).value_or(QDateTime())),
+        QStringLiteral("2026-11-20T12:00:00Z"));
     // Continuous: any time in it.
     const ts::TimeExtent continuous =
         ts::TimeExtent::parse(QStringLiteral("2000-01-01/2001-01-01"));
-    QCOMPARE(continuous.atOrBefore(utc("2000-06-01T06:00Z")).value(),
-             utc("2000-06-01T06:00Z"));
+    QCOMPARE(
+        continuous.atOrBefore(utc("2000-06-01T06:00Z")).value_or(QDateTime()),
+        utc("2000-06-01T06:00Z"));
     QCOMPARE(continuous.format(utc("2000-06-01T06:00Z")),
              QStringLiteral("2000-06-01T06:00:00Z"));
     // Up to "current".
     const ts::TimeExtent current = ts::TimeExtent::parse(
         QStringLiteral("2020/current/P1Y"), utc("2026-11-20T09:00Z"));
     QCOMPARE(current.count(), int64_t{7});
-    QCOMPARE(current.format(current.last().value()), QStringLiteral("2026"));
+    QCOMPARE(current.format(current.last().value_or(QDateTime())),
+             QStringLiteral("2026"));
   }
 
   void layerTimes()
@@ -251,7 +268,9 @@ private slots:
     QJsonObject source;
     source.insert(QStringLiteral("time"), time.toJson());
     const std::optional<ts::LayerTime> back = ts::LayerTime::fromSource(source);
-    QVERIFY(back.has_value());
+    if (!back) {
+      QFAIL("back is missing");
+    }
     QCOMPARE(back->mode, ts::LayerTime::Mode::MonthOfYear);
     QCOMPARE(back->extent, time.extent);
     QCOMPARE(back->defaultValue, time.defaultValue);
@@ -292,7 +311,9 @@ private slots:
     QVERIFY(wms->id().endsWith(QStringLiteral("|time=") + expected));
     const std::optional<ts::WmsSource> plain =
         ts::WmsSource::fromJson(source, &error);
-    QVERIFY(plain.has_value());
+    if (!plain) {
+      QFAIL("plain is missing");
+    }
     QVERIFY(plain->id() != wms->id());
     // Without dimensions the id is as before Phase 12 (existing caches).
     QVERIFY(!plain->id().contains(QLatin1String("time")));
@@ -366,7 +387,7 @@ private slots:
           for (int32_t i = 0; i < 200; ++i) {
             const QDateTime t =
                 utc("2001-01-01").addDays(int64_t{thread} * 300 + i);
-            if (extent.atOrBefore(t.addSecs(3600)).value() != t) {
+            if (extent.atOrBefore(t.addSecs(3600)).value_or(QDateTime()) != t) {
               return false;
             }
           }

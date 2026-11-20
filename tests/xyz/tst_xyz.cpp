@@ -304,7 +304,7 @@ private slots:
     QCOMPARE(back->tileSizePx, 512);
     QCOMPARE(back->format, QStringLiteral("image/jpeg"));
     QVERIFY(back->bounds.has_value());
-    QCOMPARE(back->bounds->northDeg, 60.0);
+    QCOMPARE(back->bounds.value_or(ts::GeoRect{}).northDeg, 60.0);
     QCOMPARE(back->title, source.title);
     QCOMPARE(back->attribution, source.attribution);
     QCOMPARE(back->service, source.service);
@@ -390,7 +390,9 @@ private slots:
             "{\"title\": \"C\", \"template\": \"https://c/{z}/{x}/{y}\", "
             "\"maxZoom\": 99}]}",
             &error);
-    QVERIFY(partly.has_value());
+    if (!partly) {
+      QFAIL("partly is missing");
+    }
     QCOMPARE(static_cast<int32_t>(partly->size()), 1);
     QCOMPARE(partly->front().maximumZoom, 30);
   }

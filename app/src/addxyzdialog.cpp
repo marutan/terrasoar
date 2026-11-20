@@ -69,8 +69,8 @@ QUrl catalogueSourceUrl()
 QStringList subdomainList(const QString& text)
 {
   QStringList list;
-  const QStringList parts = text.split(
-      QRegularExpression(QStringLiteral("[,\\s]+")), Qt::SkipEmptyParts);
+  static const QRegularExpression separators(QStringLiteral("[,\\s]+"));
+  const QStringList parts = text.split(separators, Qt::SkipEmptyParts);
   for (const QString& part : parts) {
     list.append(part.trimmed());
   }

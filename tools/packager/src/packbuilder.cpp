@@ -254,6 +254,31 @@ bool readCountries(const QJsonObject& json, PackConfig* config,
   return true;
 }
 
+/** An imagery entry of @p config's; nothing if it can't be used. */
+std::optional<ImagerySpec> readImagery(const PackConfig& config,
+                                       const QJsonObject& entry)
+{
+  ImagerySpec spec;
+  spec.dataset = text(entry, "dataset");
+  spec.source = text(entry, "source");
+  spec.name = text(entry, "name");
+  spec.licence = text(entry, "licence");
+  spec.attribution = text(entry, "attribution");
+  spec.replaces = text(entry, "replaces");
+  spec.variantOf = text(entry, "variantOf");
+  spec.variant = text(entry, "variant");
+  spec.tiling.maxLevel = integer(entry, "maxLevel", 4);
+  spec.tiling.tileSizePx = integer(entry, "tileSize", 256);
+  spec.tiling.jpegQuality = integer(entry, "jpegQuality", 85);
+  if (findSource(config, spec.source) == nullptr || spec.dataset.isEmpty() ||
+      spec.tiling.maxLevel < 0 || spec.tiling.maxLevel > 8 ||
+      spec.tiling.tileSizePx < 16 ||
+      spec.variantOf.isEmpty() != spec.variant.isEmpty()) {
+    return std::nullopt;
+  }
+  return spec;
+}
+
 } // namespace
 
 std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
@@ -278,32 +303,9 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     config.sources.push_back(std::move(*source));
   }
 
-  const std::function<std::optional<ImagerySpec>(const QJsonObject&)>
-      readImagery =
-          [&config](const QJsonObject& imagery) -> std::optional<ImagerySpec> {
-    ImagerySpec spec;
-    spec.dataset = text(imagery, "dataset");
-    spec.source = text(imagery, "source");
-    spec.name = text(imagery, "name");
-    spec.licence = text(imagery, "licence");
-    spec.attribution = text(imagery, "attribution");
-    spec.replaces = text(imagery, "replaces");
-    spec.variantOf = text(imagery, "variantOf");
-    spec.variant = text(imagery, "variant");
-    spec.tiling.maxLevel = integer(imagery, "maxLevel", 4);
-    spec.tiling.tileSizePx = integer(imagery, "tileSize", 256);
-    spec.tiling.jpegQuality = integer(imagery, "jpegQuality", 85);
-    if (findSource(config, spec.source) == nullptr || spec.dataset.isEmpty() ||
-        spec.tiling.maxLevel < 0 || spec.tiling.maxLevel > 8 ||
-        spec.tiling.tileSizePx < 16 ||
-        spec.variantOf.isEmpty() != spec.variant.isEmpty()) {
-      return std::nullopt;
-    }
-    return spec;
-  };
   const QJsonObject imagery = json.value(QStringLiteral("imagery")).toObject();
   if (!imagery.isEmpty()) {
-    const std::optional<ImagerySpec> spec = readImagery(imagery);
+    const std::optional<ImagerySpec> spec = readImagery(config, imagery);
     if (!spec) {
       fail(errorString, QStringLiteral("Bad imagery entry"));
       return std::nullopt;
@@ -315,7 +317,7 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
   // NOLINTNEXTLINE(modernize-loop-convert)
   for (int32_t i = 0; i < variants.size(); ++i) {
     const std::optional<ImagerySpec> spec =
-        readImagery(variants.at(i).toObject());
+        readImagery(config, variants.at(i).toObject());
     if (!spec || spec->variantOf.isEmpty()) {
       fail(errorString, QStringLiteral("Bad imagery variant %1").arg(i));
       return std::nullopt;
@@ -515,12 +517,9 @@ private:
     if (m_config->imagery && !buildImagery(*m_config->imagery)) {
       return false;
     }
-    for (const ImagerySpec& spec : m_config->imageryVariants) {
-      if (!buildImagery(spec)) {
-        return false;
-      }
-    }
-    return true;
+    return std::all_of(
+        m_config->imageryVariants.begin(), m_config->imageryVariants.end(),
+        [this](const ImagerySpec& spec) { return buildImagery(spec); });
   }
 
   bool buildImagery(const ImagerySpec& spec)

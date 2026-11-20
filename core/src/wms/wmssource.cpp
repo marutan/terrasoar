@@ -428,8 +428,11 @@ QString chooseInfoFormat(const QStringList& offered)
   return QString();
 }
 
+// Longitude then latitude, as everywhere in WMS requests.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 QUrl getFeatureInfoUrl(const WmsSource& source, TileKey key, double lonDeg,
                        double latDeg, int32_t featureCount)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   if (source.featureInfoUrl.isEmpty() || source.infoFormat.isEmpty()) {
     return QUrl();

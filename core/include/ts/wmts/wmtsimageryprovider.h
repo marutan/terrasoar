@@ -83,7 +83,8 @@ class WmtsImageryProvider : public ImageryProvider, public RegionTileSource
 {
 public:
   /** Requests @p source's tiles through @p network. */
-  WmtsImageryProvider(WmtsSource source, std::shared_ptr<NetworkClient> network,
+  WmtsImageryProvider(const WmtsSource& source,
+                      std::shared_ptr<NetworkClient> network,
                       WebTileSettings settings = {});
 
   /** Closes the disk cache. */

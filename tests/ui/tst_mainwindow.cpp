@@ -565,7 +565,9 @@ private slots:
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
     QAction* quit = window.findChild<QAction*>(QStringLiteral("quitAction"));
-    QVERIFY(quit != nullptr);
+    if (!quit) {
+      QFAIL("quit is missing");
+    }
     quit->trigger();
     QVERIFY(!window.isVisible());
   }
@@ -575,10 +577,14 @@ private slots:
     ts::MainWindow window;
     QCOMPARE(window.windowTitle(), QStringLiteral("Terra Soar"));
     QLabel* status = window.findChild<QLabel*>(QStringLiteral("statusLabel"));
-    QVERIFY(status != nullptr);
+    if (!status) {
+      QFAIL("status is missing");
+    }
     QCOMPARE(status->text(), QStringLiteral("Ready"));
     QMenu* file = window.findChild<QMenu*>(QStringLiteral("fileMenu"));
-    QVERIFY(file != nullptr);
+    if (!file) {
+      QFAIL("file is missing");
+    }
     QCOMPARE(file->title(), QStringLiteral("&File"));
     QAction* about = window.findChild<QAction*>(QStringLiteral("aboutAction"));
     QCOMPARE(about->text(), QStringLiteral("&About Terra Soar"));
@@ -1124,7 +1130,9 @@ private slots:
     }
     QVERIFY(globe->terrainShown());
     QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
-    QVERIFY(pointer != nullptr);
+    if (!pointer) {
+      QFAIL("pointer is missing");
+    }
     // The start view's centre, 20° N 10° E, is on the DEM: 1500 m (the
     // fixture pack has no geoid, so sea level is the ellipsoid).
     const QString metres = QLocale().toString(1500) + QStringLiteral(" m");
@@ -1395,7 +1403,9 @@ private slots:
 
     // The pointer readout works on the map: the centre is where it was.
     QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
-    QVERIFY(pointer != nullptr);
+    if (!pointer) {
+      QFAIL("pointer is missing");
+    }
     const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
     sendMouse(globe, QEvent::MouseMove, centre, Qt::NoButton, Qt::NoButton);
     QVERIFY2(pointer->text().startsWith(QStringLiteral("48.0")),
@@ -1580,7 +1590,9 @@ private slots:
     // fills the centre and azimuth; the same place twice says why not.
     const ts::Projection* rotated =
         ts::projectionById(QStringLiteral("rotated-mercator"));
-    QVERIFY(rotated != nullptr);
+    if (!rotated) {
+      QFAIL("rotated is missing");
+    }
     ts::ProjectionSettingsDialog dialog(nullptr, rotated);
     QPushButton* use =
         dialog.findChild<QPushButton*>(QStringLiteral("projectionUsePoints"));
@@ -1755,7 +1767,9 @@ private slots:
     QCOMPARE(dialog.catalogue().size(), std::size_t{1});
     QComboBox* services =
         dialog.findChild<QComboBox*>(QStringLiteral("wmsServiceBox"));
-    QVERIFY(services != nullptr);
+    if (!services) {
+      QFAIL("services is missing");
+    }
     QCOMPARE(services->count(), 1);
     QCOMPARE(services->itemText(0), QStringLiteral("Mock service"));
     services->setCurrentIndex(0);
@@ -1805,7 +1819,9 @@ private slots:
     QString error;
     const std::optional<ts::WmsSource> source =
         ts::WmsSource::fromJson(definition.source, &error);
-    QVERIFY2(source.has_value(), qPrintable(error));
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
     const ts::WmsSource added = source.value_or(ts::WmsSource{});
     QCOMPARE(added.layers, QStringList{QStringLiteral("background")});
     QCOMPARE(added.format, QStringLiteral("image/jpeg"));
@@ -2282,11 +2298,16 @@ private slots:
     QVERIFY(dialog.timeModeBox()->isVisibleTo(&dialog));
     QCOMPARE(dialog.timeModeBox()->mode(), ts::LayerTime::Mode::Clock);
     const std::optional<ts::LayerTime> chosen = dialog.chosenTime();
-    QVERIFY(chosen.has_value());
+    if (!chosen) {
+      QFAIL("chosen is missing");
+    }
     QCOMPARE(chosen->extent, QStringLiteral("2026-11-01/2026-11-05/P1D"));
     QComboBox* values =
         dialog.findChild<QComboBox*>(QStringLiteral("wmsTimeValueBox"));
-    QVERIFY(values != nullptr && !values->isEnabled());
+    if (values == nullptr) {
+      QFAIL("values is missing");
+    }
+    QVERIFY(!values->isEnabled());
     // A layer without TIME hides the choice.
     QVERIFY(dialog.selectLayer(QStringLiteral("pattern")));
     QVERIFY(!dialog.timeModeBox()->isVisibleTo(&dialog));
@@ -2294,17 +2315,23 @@ private slots:
     QVERIFY(dialog.selectLayer(QStringLiteral("clouds")));
     QPushButton* add =
         dialog.findChild<QPushButton*>(QStringLiteral("wmsAddButton"));
-    QVERIFY(add != nullptr && add->isEnabled());
+    if (add == nullptr) {
+      QFAIL("add is missing");
+    }
+    QVERIFY(add->isEnabled());
     add->click();
-    QVERIFY(dialog.layerDefinition().has_value());
-    const ts::LayerDefinition definition = *dialog.layerDefinition();
+    const std::optional<ts::LayerDefinition> added = dialog.layerDefinition();
+    if (!added) {
+      QFAIL("no layer definition");
+    }
+    const ts::LayerDefinition& definition = *added;
     QVERIFY(definition.source.contains(QStringLiteral("time")));
 
     // Before the layer: no slider.
     QVERIFY(!window.timeBar()->isVisible());
     window.clock()->setTime(
         ts::parseIsoTime(QStringLiteral("2026-11-03T12:00Z"), QDateTime())
-            .value());
+            .value_or(QDateTime()));
     window.layerModel()->addLayer(definition);
     QVERIFY(window.timeBar()->isVisible());
     QCOMPARE(window.timeBar()->extent().count(), int64_t{5});
@@ -2341,7 +2368,7 @@ private slots:
       const QString day = QStringLiteral("2026-11-0%1").arg(position + 1);
       QCOMPARE(window.timeBar()->timeText(), day);
       QCOMPARE(window.clock()->time(),
-               ts::parseIsoTime(day, QDateTime()).value());
+               ts::parseIsoTime(day, QDateTime()).value_or(QDateTime()));
       if (globe != nullptr) {
         QVERIFY2(QTest::qWaitFor(
                      [&]() { return requestedTimes().contains(day); }, 10000),
@@ -2368,18 +2395,24 @@ private slots:
     // The layer's Time menu fixes it at a day; the clock no longer moves it.
     const QModelIndex layer = window.layerModel()->index(0, 0);
     QMenu* menu = window.findChild<ts::LayerTreeDock*>()->timeMenu(layer);
-    QVERIFY(menu != nullptr);
+    if (!menu) {
+      QFAIL("menu is missing");
+    }
     QAction* second = nullptr;
     for (QAction* action : menu->actions()) {
       if (action->text() == QLatin1String("2026-11-02")) {
         second = action;
       }
     }
-    QVERIFY(second != nullptr);
+    if (!second) {
+      QFAIL("second is missing");
+    }
     second->trigger();
     const std::optional<ts::LayerTime> fixed = ts::LayerTime::fromSource(
         window.layerModel()->layerDefinition(layer).source);
-    QVERIFY(fixed.has_value());
+    if (!fixed) {
+      QFAIL("fixed is missing");
+    }
     QCOMPARE(fixed->mode, ts::LayerTime::Mode::Fixed);
     QCOMPARE(fixed->valueAt(window.clock()->time()),
              QStringLiteral("2026-11-02"));
@@ -2448,10 +2481,16 @@ private slots:
     dialog.setColour(QColor(10, 200, 30));
     QPushButton* add =
         dialog.findChild<QPushButton*>(QStringLiteral("wfsAddButton"));
-    QVERIFY(add != nullptr && add->isEnabled());
+    if (add == nullptr) {
+      QFAIL("add is missing");
+    }
+    QVERIFY(add->isEnabled());
     add->click();
-    QVERIFY(dialog.layerDefinition().has_value());
-    const ts::LayerDefinition definition = *dialog.layerDefinition();
+    const std::optional<ts::LayerDefinition> added = dialog.layerDefinition();
+    if (!added) {
+      QFAIL("no layer definition");
+    }
+    const ts::LayerDefinition& definition = *added;
     QCOMPARE(definition.type, ts::LayerType::Vector);
     QCOMPARE(definition.source.value(QStringLiteral("kind")).toString(),
              QStringLiteral("wfs"));
@@ -2491,7 +2530,9 @@ private slots:
     // What Is Here: the square under the point, from the features loaded.
     QCOMPARE(window.identifyAt(ts::LonLat{-5.5, -5.5}, 0.002), 1);
     ts::FeatureInfoWindow* results = window.featureInfoWindow();
-    QVERIFY(results != nullptr);
+    if (!results) {
+      QFAIL("results is missing");
+    }
     const QString text = results->resultsText();
     QVERIFY2(text.contains(QStringLiteral("cell -6 -6")), qPrintable(text));
     QVERIFY2(text.startsWith(QStringLiteral("Grid areas")), qPrintable(text));
@@ -2534,7 +2575,9 @@ private slots:
                                      server.url(QStringLiteral("/wms")),
                                      QStringLiteral("EPSG:4326"), false, true),
                                  &error);
-    QVERIFY2(capabilities.has_value(), qPrintable(error));
+    if (!capabilities) {
+      QFAIL(qPrintable(error));
+    }
     // No layer to ask: nothing happens.
     QCOMPARE(window.identifyAt(ts::LonLat{-2.0, 51.0}, 0.01), 0);
     QVERIFY(window.featureInfoWindow() == nullptr);
@@ -2542,7 +2585,9 @@ private slots:
          {QStringLiteral("background"), QStringLiteral("pattern")}) {
       const std::optional<ts::WmsSource> source = ts::wmsSourceFor(
           *capabilities, {name}, {QString()}, QString(), &error);
-      QVERIFY2(source.has_value(), qPrintable(error));
+      if (!source) {
+        QFAIL(qPrintable(error));
+      }
       QCOMPARE(source->featureInfoUrl.isEmpty(),
                name == QLatin1String("background"));
       ts::LayerDefinition definition;
@@ -2570,15 +2615,18 @@ private slots:
                                               changed);
       QCOMPARE(window.identifyAt(ts::LonLat{-2.3, 51.4}, 0.01), 1);
       ts::FeatureInfoWindow* results = window.featureInfoWindow();
-      QVERIFY(results != nullptr && results->isVisible());
-      QSignalSpy finished(results, &ts::FeatureInfoWindow::finished);
+      if (results == nullptr) {
+        QFAIL("results is missing");
+      }
+      QVERIFY(results->isVisible());
+      QSignalSpy finished(results, &ts::FeatureInfoWindow::allAnswered);
       QVERIFY(results->pendingCount() == 0 || finished.wait(5000));
       const QString text = results->resultsText();
       QVERIFY2(text.startsWith(QLatin1String("Test pattern")),
                qPrintable(text));
       // The point asked about, to the pixel of the tile it was asked in.
-      const QRegularExpression lon(QStringLiteral("lon: (-?[0-9.]+)"));
-      const QRegularExpression lat(QStringLiteral("lat: (-?[0-9.]+)"));
+      static const QRegularExpression lon(QStringLiteral("lon: (-?[0-9.]+)"));
+      static const QRegularExpression lat(QStringLiteral("lat: (-?[0-9.]+)"));
       const double answeredLon = lon.match(text).captured(1).toDouble();
       const double answeredLat = lat.match(text).captured(1).toDouble();
       QVERIFY2(std::abs(answeredLon + 2.3) < 0.02 &&
@@ -2602,7 +2650,10 @@ private slots:
     // Turned off: nothing is asked.
     QAction* action =
         window.findChild<QAction*>(QStringLiteral("featureInfoAction"));
-    QVERIFY(action != nullptr && action->isChecked());
+    if (action == nullptr) {
+      QFAIL("action is missing");
+    }
+    QVERIFY(action->isChecked());
     action->setChecked(false);
     QCOMPARE(window.identifyAt(ts::LonLat{-2.3, 51.4}, 0.01), 0);
     action->setChecked(true);

@@ -60,6 +60,8 @@ std::optional<XyzSource> fail(QString* errorString, const QString& message)
 }
 
 /** Column of the tile at zoom @p zoom holding longitude @p lonDeg. */
+// A longitude, then the number of columns.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 int64_t columnAt(double lonDeg, int64_t tiles)
 {
   const double x = (lonDeg + 180.0) / 360.0 * static_cast<double>(tiles);
@@ -67,6 +69,8 @@ int64_t columnAt(double lonDeg, int64_t tiles)
 }
 
 /** Row (from the north) of the tile holding latitude @p latDeg. */
+// A latitude, then the number of rows.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 int64_t rowAt(double latDeg, int64_t tiles)
 {
   const double lat =
@@ -153,6 +157,8 @@ QString xyzFormatFor(const QString& urlTemplate)
   return QStringLiteral("image/png");
 }
 
+// Zoom, column, row: the order of the template's {z}/{x}/{y}.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 QUrl xyzTileUrl(const XyzSource& source, int32_t zoom, int64_t column,
                 int64_t row)
 {

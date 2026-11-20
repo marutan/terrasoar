@@ -94,7 +94,7 @@ public:
   TileKey storedKey(TileKey key) const override;
 
   /** Returns the kept features under @p point (see FeatureProvider). */
-  std::vector<Feature> featuresAt(const GeoPoint& point,
+  std::vector<Feature> featuresAt(GeoPoint point,
                                   double toleranceDeg) const override;
 
   /** Returns the service's address (WfsSource::service, else url). */

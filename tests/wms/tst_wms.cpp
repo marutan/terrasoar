@@ -167,7 +167,9 @@ private slots:
     QString error;
     const std::optional<ts::WmsCapabilities> parsed =
         ts::parseWmsCapabilities(fixture(file), &error);
-    QVERIFY2(parsed.has_value(), qPrintable(error));
+    if (!parsed) {
+      QFAIL(qPrintable(error));
+    }
     const ts::WmsCapabilities caps = parsed.value_or(ts::WmsCapabilities{});
     QCOMPARE(caps.version, version);
     QVERIFY(!caps.title.isEmpty());
@@ -178,14 +180,18 @@ private slots:
              qPrintable(QString::number(named.size())));
     const ts::WmsLayer* chosen =
         layer.isEmpty() ? named.at(1) : caps.findLayer(layer);
-    QVERIFY(chosen != nullptr);
+    if (!chosen) {
+      QFAIL("chosen is missing");
+    }
     QVERIFY(!chosen->title.isEmpty());
     // Every one can be requested as tiles, geographic where offered.
     QCOMPARE(ts::chooseCrs(chosen->crs, caps.version), crs);
     QString sourceError;
     const std::optional<ts::WmsSource> source = ts::wmsSourceFor(
         caps, QStringList{chosen->name}, {}, QString(), &sourceError);
-    QVERIFY2(source.has_value(), qPrintable(sourceError));
+    if (!source) {
+      QFAIL(qPrintable(sourceError));
+    }
     const ts::WmsSource s = source.value_or(ts::WmsSource{});
     QCOMPARE(s.crs, crs);
     QCOMPARE(s.url, caps.getMapUrl);
@@ -203,7 +209,9 @@ private slots:
     QVERIFY(terrestris.accessConstraints.contains(
         QStringLiteral("OpenStreetMap contributors")));
     const ts::WmsLayer* osm = terrestris.findLayer(QStringLiteral("OSM-WMS"));
-    QVERIFY(osm != nullptr);
+    if (!osm) {
+      QFAIL("osm is missing");
+    }
     QVERIFY(osm->geographicBounds.has_value());
     QVERIFY(osm->supportsCrs(QStringLiteral("EPSG:3857")));
     // The same server in 1.1.1 offers the same layers.
@@ -258,7 +266,9 @@ private slots:
     QVERIFY(caps.layers.front().children.front().name.isEmpty());
 
     const ts::WmsLayer* relief = caps.findLayer(QStringLiteral("relief"));
-    QVERIFY(relief != nullptr);
+    if (!relief) {
+      QFAIL("relief is missing");
+    }
     // SRS: two from one element at the root, one from the group.
     QCOMPARE(relief->crs, (QStringList{QStringLiteral("EPSG:4326"),
                                        QStringLiteral("EPSG:3857"),
@@ -303,9 +313,13 @@ private slots:
     const ts::WmsCapabilities gibs = capabilitiesOf("gibs-4326-130.xml");
     const ts::WmsLayer* merra =
         gibs.findLayer(QStringLiteral("MERRA2_2m_Air_Temperature_Monthly"));
-    QVERIFY(merra != nullptr);
+    if (!merra) {
+      QFAIL("merra is missing");
+    }
     const ts::WmsDimension* time = merra->timeDimension();
-    QVERIFY(time != nullptr);
+    if (!time) {
+      QFAIL("time is missing");
+    }
     QCOMPARE(time->units, QStringLiteral("ISO8601"));
     QCOMPARE(time->defaultValue, QStringLiteral("2026-08-01"));
     QVERIFY(!time->nearestValue);
@@ -314,12 +328,15 @@ private slots:
     const ts::TimeExtent months = ts::TimeExtent::parse(time->extent);
     QCOMPARE(months.format(
                  months.atOrBefore(QDateTime::fromMSecsSinceEpoch(0).toUTC())
-                     .value()),
+                     .value_or(QDateTime())),
              QStringLiteral("1980-01-01"));
     const ts::WmsCapabilities nowcoast = capabilitiesOf("nowcoast-130.xml");
     const ts::WmsLayer* radar = nowcoast.findLayer(
         QStringLiteral("weather_radar:conus_base_reflectivity_mosaic"));
-    QVERIFY(radar != nullptr && radar->timeDimension() != nullptr);
+    if (radar == nullptr) {
+      QFAIL("radar is missing");
+    }
+    QVERIFY(radar->timeDimension() != nullptr);
     QVERIFY(radar->timeDimension()->nearestValue);
     QCOMPARE(ts::TimeExtent::parse(radar->timeDimension()->extent).count(),
              int64_t{125});
@@ -334,14 +351,20 @@ private slots:
         capabilitiesOf("synthetic-111-time.xml");
     const ts::WmsLayer* monthly =
         synthetic.findLayer(QStringLiteral("monthly"));
-    QVERIFY(monthly != nullptr && monthly->timeDimension() != nullptr);
+    if (monthly == nullptr) {
+      QFAIL("monthly is missing");
+    }
+    QVERIFY(monthly->timeDimension() != nullptr);
     QCOMPARE(monthly->timeDimension()->extent,
              QStringLiteral("2004-01-01/2004-12-01/P1M"));
     QCOMPARE(monthly->timeDimension()->defaultValue,
              QStringLiteral("2004-07-01"));
     QCOMPARE(monthly->timeDimension()->units, QStringLiteral("ISO8601"));
     const ts::WmsLayer* daily = synthetic.findLayer(QStringLiteral("daily"));
-    QVERIFY(daily != nullptr && daily->timeDimension() != nullptr);
+    if (daily == nullptr) {
+      QFAIL("daily is missing");
+    }
+    QVERIFY(daily->timeDimension() != nullptr);
     QCOMPARE(daily->timeDimension()->extent,
              QStringLiteral("2020-01-01/2020-01-03/P1D"));
     QVERIFY(daily->timeDimension()->nearestValue);
@@ -391,16 +414,22 @@ private slots:
         queryable = layer;
       }
     }
-    QVERIFY(queryable != nullptr);
+    if (!queryable) {
+      QFAIL("queryable is missing");
+    }
     const std::optional<ts::WmsSource> source = ts::wmsSourceFor(
         gebco, {queryable->name}, {QString()}, QString(), &error);
-    QVERIFY2(source.has_value(), qPrintable(error));
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(source->featureInfoUrl.host(), QStringLiteral("wms.gebco.net"));
     QCOMPARE(source->infoFormat, QStringLiteral("application/vnd.ogc.gml"));
     // Kept in JSON, and not part of the id.
     const std::optional<ts::WmsSource> back =
         ts::WmsSource::fromJson(source->toJson(), &error);
-    QVERIFY(back.has_value());
+    if (!back) {
+      QFAIL("back is missing");
+    }
     QCOMPARE(back->featureInfoUrl, source->featureInfoUrl);
     QCOMPARE(back->infoFormat, source->infoFormat);
     ts::WmsSource closedSource = *source;
@@ -418,7 +447,9 @@ private slots:
     close(closedCaps.layers);
     const std::optional<ts::WmsSource> notQueryable = ts::wmsSourceFor(
         closedCaps, {queryable->name}, {QString()}, QString(), &error);
-    QVERIFY(notQueryable.has_value());
+    if (!notQueryable) {
+      QFAIL("notQueryable is missing");
+    }
     QVERIFY(notQueryable->featureInfoUrl.isEmpty());
     QVERIFY(!notQueryable->toJson().contains(QStringLiteral("featureInfo")));
   }
@@ -588,7 +619,9 @@ private slots:
     const std::optional<ts::WmsFeatureInfo> json = ts::parseFeatureInfo(
         fixture(QStringLiteral("featureinfo/geoserver.json")),
         QStringLiteral("application/json"), &error);
-    QVERIFY(json.has_value());
+    if (!json) {
+      QFAIL("json is missing");
+    }
     std::map<QString, QString> values(json->features.front().attributes.begin(),
                                       json->features.front().attributes.end());
     QCOMPARE(values.at(QStringLiteral("LAND_KM")), QStringLiteral("143986.61"));
@@ -600,7 +633,9 @@ private slots:
     const std::optional<ts::WmsFeatureInfo> table = ts::parseFeatureInfo(
         fixture(QStringLiteral("featureinfo/geoserver.html")),
         QStringLiteral("text/html"), &error);
-    QVERIFY(table.has_value());
+    if (!table) {
+      QFAIL("table is missing");
+    }
     QCOMPARE(table->features.at(1).attributes.at(1).second,
              QStringLiteral("Indiana & more"));
     QCOMPARE(table->features.at(1).attributes.at(0),
@@ -609,7 +644,9 @@ private slots:
     const std::optional<ts::WmsFeatureInfo> prose =
         ts::parseFeatureInfo(fixture(QStringLiteral("featureinfo/prose.html")),
                              QStringLiteral("text/html"), &error);
-    QVERIFY(prose.has_value());
+    if (!prose) {
+      QFAIL("prose is missing");
+    }
     QVERIFY(prose->features.empty());
     QCOMPARE(prose->text,
              QStringLiteral("Sea surface temperature\nAt this point: 14.2 °C "
@@ -628,7 +665,9 @@ private slots:
     const std::optional<ts::WmsFeatureInfo> other =
         ts::parseFeatureInfo("<Result><Depth>-30 m</Depth></Result>",
                              QStringLiteral("text/xml"), &error);
-    QVERIFY(other.has_value());
+    if (!other) {
+      QFAIL("other is missing");
+    }
     QCOMPARE(other->text, QStringLiteral("-30 m"));
   }
 
@@ -920,7 +959,9 @@ private slots:
     std::optional<ts::WmsSource> source = ts::wmsSourceFor(
         synthetic, {QStringLiteral("relief"), QStringLiteral("rivers")},
         {QStringLiteral("grey")}, QString(), &error);
-    QVERIFY2(source.has_value(), qPrintable(error));
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
     ts::WmsSource s = source.value_or(ts::WmsSource{});
     QCOMPARE(s.version, QStringLiteral("1.1.1"));
     QCOMPARE(s.crs, QStringLiteral("EPSG:4326"));
@@ -995,7 +1036,9 @@ private slots:
     QString error;
     const std::optional<ts::WmsSource> back =
         ts::WmsSource::fromJson(json, &error);
-    QVERIFY2(back.has_value(), qPrintable(error));
+    if (!back) {
+      QFAIL(qPrintable(error));
+    }
     const ts::WmsSource b = back.value_or(ts::WmsSource{});
     QCOMPARE(b.id(), source.id());
     QCOMPARE(b.toJson(), json);
@@ -1012,7 +1055,9 @@ private slots:
     QVERIFY(other.id() != source.id());
     const std::optional<ts::WmsSource> timed =
         ts::WmsSource::fromJson(other.toJson(), &error);
-    QVERIFY2(timed.has_value(), qPrintable(error));
+    if (!timed) {
+      QFAIL(qPrintable(error));
+    }
     QCOMPARE(timed->dimensions, other.dimensions);
     QCOMPARE(timed->id(), other.id());
     const QUrlQuery dimensionQuery(ts::getMapUrl(other, ts::TileKey{1, 2, 0}));
@@ -1044,7 +1089,9 @@ private slots:
     QString error;
     const std::optional<std::vector<ts::WmsCatalogueEntry>> entries =
         ts::parseWmsCatalogue(file.readAll(), &error);
-    QVERIFY2(entries.has_value(), qPrintable(error));
+    if (!entries) {
+      QFAIL(qPrintable(error));
+    }
     const std::vector<ts::WmsCatalogueEntry> list =
         entries.value_or(std::vector<ts::WmsCatalogueEntry>{});
     QVERIFY(list.size() >= 3);

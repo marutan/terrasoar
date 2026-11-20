@@ -49,20 +49,20 @@ QString LayerTime::valueAt(const QDateTime& clock) const
   if (mode == Mode::Fixed) {
     return value.isEmpty() ? defaultValue : value;
   }
-  const TimeExtent extent = times();
-  if (extent.isEmpty()) {
+  const TimeExtent known = times();
+  if (known.isEmpty()) {
     return defaultValue;
   }
   const QDateTime utc = clock.toUTC();
   if (mode == Mode::MonthOfYear) {
-    for (const QDateTime& candidate : extent.values(400)) {
+    for (const QDateTime& candidate : known.values(400)) {
       if (candidate.date().month() == utc.date().month()) {
-        return extent.format(candidate);
+        return known.format(candidate);
       }
     }
   }
-  const std::optional<QDateTime> chosen = extent.atOrBefore(utc);
-  return chosen ? extent.format(*chosen) : defaultValue;
+  const std::optional<QDateTime> chosen = known.atOrBefore(utc);
+  return chosen ? known.format(*chosen) : defaultValue;
 }
 
 bool LayerTime::followsClock() const

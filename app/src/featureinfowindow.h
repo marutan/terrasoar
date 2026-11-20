@@ -111,7 +111,7 @@ public:
 
 signals:
   /** Every answer of the last query has arrived (or failed). */
-  void finished();
+  void allAnswered();
 
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */
@@ -126,8 +126,8 @@ private:
 
   void retranslateUi();
   void poll();
-  void answered(const Pending& pending);
-  void showInfo(QTreeWidgetItem* item, const WmsFeatureInfo& info);
+  static void answered(const Pending& pending);
+  static void showInfo(QTreeWidgetItem* item, const WmsFeatureInfo& info);
 
   std::shared_ptr<NetworkClient> m_network;
   QLabel* m_placeLabel = nullptr;

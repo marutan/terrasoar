@@ -509,7 +509,9 @@ private slots:
     odd.replace("2004-07-06T00:00:00.123Z", "next Tuesday");
     const std::optional<ts::Project> oddLoaded =
         ts::projectFromJson(odd, &error);
-    QVERIFY(oddLoaded.has_value());
+    if (!oddLoaded) {
+      QFAIL("oddLoaded is missing");
+    }
     QVERIFY(!oddLoaded->time.isValid());
   }
 
@@ -576,7 +578,9 @@ private slots:
       QString error;
       const std::optional<ts::LayerDefinition> back =
           ts::LayerDefinition::fromJson(definition.toJson(), &error);
-      QVERIFY2(back.has_value(), qPrintable(error));
+      if (!back) {
+        QFAIL(qPrintable(error));
+      }
       QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
       const QString kind =
           definition.source.value(QStringLiteral("kind")).toString();
@@ -638,7 +642,9 @@ private slots:
     QString error;
     const std::optional<ts::LayerDefinition> back =
         ts::LayerDefinition::fromJson(definition.toJson(), &error);
-    QVERIFY(back.has_value());
+    if (!back) {
+      QFAIL("back is missing");
+    }
     QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
   }
 

@@ -154,7 +154,7 @@ void FeatureInfoWindow::query(LonLat point,
   if (!m_pending.empty()) {
     m_pollTimer->start();
   } else {
-    emit finished();
+    emit allAnswered();
   }
 }
 
@@ -171,7 +171,7 @@ void FeatureInfoWindow::poll()
   m_pending = std::move(still);
   if (m_pending.empty()) {
     m_pollTimer->stop();
-    emit finished();
+    emit allAnswered();
   }
 }
 

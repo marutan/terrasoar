@@ -47,7 +47,7 @@ QDateTime utcFromMs(int64_t ms)
 }
 
 /** Returns @p date at @p time, UTC, @p offsetS east of UTC. */
-QDateTime utcAt(const QDate& date, const QTime& time, int64_t offsetS)
+QDateTime utcAt(QDate date, QTime time, int64_t offsetS)
 {
   const int64_t days = QDate(1970, 1, 1).daysTo(date);
   return utcFromMs(days * secondsPerDay * msPerSecond +
@@ -366,6 +366,18 @@ std::optional<QDateTime> TimeExtent::before(const QDateTime& time) const
   return best;
 }
 
+std::vector<QDateTime> TimeExtent::latest(int64_t count) const
+{
+  std::vector<QDateTime> list;
+  std::optional<QDateTime> next = last();
+  while (next && static_cast<int64_t>(list.size()) < count) {
+    const QDateTime time = *next;
+    list.push_back(time);
+    next = before(time);
+  }
+  return list;
+}
+
 int64_t TimeExtent::count() const
 {
   int64_t total = 0;
@@ -405,8 +417,10 @@ const TimeExtent::Part* TimeExtent::partOf(const QDateTime& time) const
       found = &part;
     }
   }
-  return found != nullptr ? found
-                          : (m_parts.empty() ? nullptr : &m_parts.front());
+  if (found != nullptr || m_parts.empty()) {
+    return found;
+  }
+  return &m_parts.front();
 }
 
 QString TimeExtent::format(const QDateTime& time) const

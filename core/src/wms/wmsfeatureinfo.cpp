@@ -25,6 +25,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <utility>
 
 #include <QCoreApplication>
 #include <QJsonArray>
@@ -204,66 +205,75 @@ FeatureInfoFeature gmlFeature(const XmlNode& node, const QString& layer)
   return feature;
 }
 
+/** ArcGIS's <FeatureInfo><Field><FieldName/><FieldValue/></Field>…. */
+FeatureInfoFeature arcgisFields(const XmlNode& node, const QString& layer)
+{
+  FeatureInfoFeature feature;
+  feature.layer = layer;
+  for (const std::unique_ptr<XmlNode>& field : node.children) {
+    QString name;
+    QString value;
+    for (const std::unique_ptr<XmlNode>& part : field->children) {
+      if (part->name == QLatin1String("FieldName")) {
+        name = part->allText();
+      } else if (part->name == QLatin1String("FieldValue")) {
+        value = part->allText();
+      }
+    }
+    if (!name.isEmpty()) {
+      feature.attributes.emplace_back(name, value);
+    }
+  }
+  return feature;
+}
+
+/** The layer @p node names for what is inside it, else @p layer. */
+QString layerWithin(const XmlNode& node, const QString& layer)
+{
+  QString named = node.attribute("layername");
+  if (!named.isEmpty()) {
+    return named;
+  }
+  if (!node.name.endsWith(QLatin1String("_layer"))) {
+    return layer;
+  }
+  // MapServer: <x_layer><gml:name>x</gml:name>….
+  QString inner = node.name.left(node.name.size() - 6);
+  for (const std::unique_ptr<XmlNode>& child : node.children) {
+    if (child->name == QLatin1String("name")) {
+      inner = child->text.trimmed();
+    }
+  }
+  return inner;
+}
+
+bool isMemberList(const QString& name)
+{
+  return name == QLatin1String("featureMember") ||
+         name == QLatin1String("featureMembers") ||
+         name == QLatin1String("member");
+}
+
 void collectFeatures(const XmlNode& node, const QString& layer,
                      std::vector<FeatureInfoFeature>& features)
 {
-  // ArcGIS: <FIELDS name="value" …/>.
   if (node.name.compare(QLatin1String("FIELDS"), Qt::CaseInsensitive) == 0) {
-    FeatureInfoFeature feature;
-    feature.layer = layer;
-    feature.attributes = node.attributes;
-    features.push_back(feature);
-    return;
-  }
-  // ArcGIS: <FeatureInfo><Field><FieldName/><FieldValue/></Field>…
-  if (node.name == QLatin1String("FeatureInfo")) {
-    FeatureInfoFeature feature;
-    feature.layer = layer;
-    for (const std::unique_ptr<XmlNode>& field : node.children) {
-      QString name;
-      QString value;
-      for (const std::unique_ptr<XmlNode>& part : field->children) {
-        if (part->name == QLatin1String("FieldName")) {
-          name = part->allText();
-        } else if (part->name == QLatin1String("FieldValue")) {
-          value = part->allText();
-        }
-      }
-      if (!name.isEmpty()) {
-        feature.attributes.emplace_back(name, value);
-      }
-    }
-    features.push_back(feature);
-    return;
-  }
-  // GML: each member is a feature.
-  if (node.name == QLatin1String("featureMember") ||
-      node.name == QLatin1String("featureMembers") ||
-      node.name == QLatin1String("member")) {
+    // ArcGIS: <FIELDS name="value" …/>.
+    features.push_back(FeatureInfoFeature{layer, QString(), node.attributes});
+  } else if (node.name == QLatin1String("FeatureInfo")) {
+    features.push_back(arcgisFields(node, layer));
+  } else if (isMemberList(node.name)) {
+    // GML: each member is a feature.
     for (const std::unique_ptr<XmlNode>& member : node.children) {
       features.push_back(gmlFeature(*member, QString()));
     }
-    return;
-  }
-  // MapServer: <x_layer><gml:name>x</gml:name><x_feature>…</x_feature>.
-  if (node.name.endsWith(QLatin1String("_feature"))) {
+  } else if (node.name.endsWith(QLatin1String("_feature"))) {
     features.push_back(gmlFeature(node, layer));
-    return;
-  }
-  QString childLayer = layer;
-  const QString named = node.attribute("layername");
-  if (!named.isEmpty()) {
-    childLayer = named;
-  } else if (node.name.endsWith(QLatin1String("_layer"))) {
-    childLayer = node.name.left(node.name.size() - 6);
+  } else {
+    const QString inner = layerWithin(node, layer);
     for (const std::unique_ptr<XmlNode>& child : node.children) {
-      if (child->name == QLatin1String("name")) {
-        childLayer = child->text.trimmed();
-      }
+      collectFeatures(*child, inner, features);
     }
-  }
-  for (const std::unique_ptr<XmlNode>& child : node.children) {
-    collectFeatures(*child, childLayer, features);
   }
 }
 
@@ -401,6 +411,77 @@ QString htmlText(const QString& html, bool keepLines)
   return lines.join(QLatin1Char('\n'));
 }
 
+/** The rows of a table's HTML: whether each is a header row, its cells. */
+std::vector<std::pair<bool, QStringList>> tableRows(const QString& content)
+{
+  static const QRegularExpression row(
+      QStringLiteral("<tr\\b[^>]*>(.*?)</tr\\s*>"),
+      QRegularExpression::CaseInsensitiveOption |
+          QRegularExpression::DotMatchesEverythingOption);
+  static const QRegularExpression cell(
+      QStringLiteral("<(t[hd])\\b[^>]*>(.*?)</t[hd]\\s*>"),
+      QRegularExpression::CaseInsensitiveOption |
+          QRegularExpression::DotMatchesEverythingOption);
+  std::vector<std::pair<bool, QStringList>> rows;
+  QRegularExpressionMatchIterator rowMatches = row.globalMatch(content);
+  while (rowMatches.hasNext()) {
+    const QString rowHtml = rowMatches.next().captured(1);
+    QStringList cells;
+    bool header = true;
+    QRegularExpressionMatchIterator cellMatches = cell.globalMatch(rowHtml);
+    while (cellMatches.hasNext()) {
+      const QRegularExpressionMatch match = cellMatches.next();
+      header = header && match.captured(1).toLower() == QLatin1String("th");
+      cells.append(htmlText(match.captured(2), false));
+    }
+    if (!cells.isEmpty()) {
+      rows.emplace_back(header, cells);
+    }
+  }
+  return rows;
+}
+
+/** Adds a table's features: one per row under a header, or name–value. */
+void addTableFeatures(const QString& content,
+                      std::vector<FeatureInfoFeature>& features)
+{
+  static const QRegularExpression caption(
+      QStringLiteral("<caption\\b[^>]*>(.*?)</caption\\s*>"),
+      QRegularExpression::CaseInsensitiveOption |
+          QRegularExpression::DotMatchesEverythingOption);
+  const QString layer = htmlText(caption.match(content).captured(1), false);
+  const std::vector<std::pair<bool, QStringList>> rows = tableRows(content);
+  if (rows.empty()) {
+    return;
+  }
+  if (rows.front().first && rows.size() > 1) {
+    const QStringList& headers = rows.front().second;
+    for (std::size_t r = 1; r < rows.size(); ++r) {
+      FeatureInfoFeature feature;
+      feature.layer = layer;
+      const QStringList& values = rows.at(r).second;
+      for (int32_t c = 0; c < values.size(); ++c) {
+        feature.attributes.emplace_back(
+            headers.value(c, QString::number(c + 1)), values.at(c));
+      }
+      features.push_back(feature);
+    }
+    return;
+  }
+  const bool pairs = std::all_of(rows.begin(), rows.end(),
+                                 [](const std::pair<bool, QStringList>& r) {
+                                   return r.second.size() == 2;
+                                 });
+  if (pairs) {
+    FeatureInfoFeature feature;
+    feature.layer = layer;
+    for (const std::pair<bool, QStringList>& r : rows) {
+      feature.attributes.emplace_back(r.second.at(0), r.second.at(1));
+    }
+    features.push_back(feature);
+  }
+}
+
 std::optional<WmsFeatureInfo> parseHtml(const QByteArray& body)
 {
   QString html = QString::fromUtf8(body);
@@ -417,67 +498,10 @@ std::optional<WmsFeatureInfo> parseHtml(const QByteArray& body)
       QStringLiteral("<table\\b[^>]*>(.*?)</table\\s*>"),
       QRegularExpression::CaseInsensitiveOption |
           QRegularExpression::DotMatchesEverythingOption);
-  static const QRegularExpression row(
-      QStringLiteral("<tr\\b[^>]*>(.*?)</tr\\s*>"),
-      QRegularExpression::CaseInsensitiveOption |
-          QRegularExpression::DotMatchesEverythingOption);
-  static const QRegularExpression cell(
-      QStringLiteral("<(t[hd])\\b[^>]*>(.*?)</t[hd]\\s*>"),
-      QRegularExpression::CaseInsensitiveOption |
-          QRegularExpression::DotMatchesEverythingOption);
-  static const QRegularExpression caption(
-      QStringLiteral("<caption\\b[^>]*>(.*?)</caption\\s*>"),
-      QRegularExpression::CaseInsensitiveOption |
-          QRegularExpression::DotMatchesEverythingOption);
   WmsFeatureInfo info;
   QRegularExpressionMatchIterator tables = table.globalMatch(html);
   while (tables.hasNext()) {
-    const QString content = tables.next().captured(1);
-    const QString layer = htmlText(caption.match(content).captured(1), false);
-    std::vector<std::pair<bool, QStringList>> rows;
-    QRegularExpressionMatchIterator rowMatches = row.globalMatch(content);
-    while (rowMatches.hasNext()) {
-      const QString rowHtml = rowMatches.next().captured(1);
-      QStringList cells;
-      bool header = true;
-      QRegularExpressionMatchIterator cells2 = cell.globalMatch(rowHtml);
-      while (cells2.hasNext()) {
-        const QRegularExpressionMatch match = cells2.next();
-        header = header && match.captured(1).toLower() == QLatin1String("th");
-        cells.append(htmlText(match.captured(2), false));
-      }
-      if (!cells.isEmpty()) {
-        rows.emplace_back(header, cells);
-      }
-    }
-    if (rows.empty()) {
-      continue;
-    }
-    if (rows.front().first && rows.size() > 1) {
-      // A header row: one feature per row below it.
-      const QStringList& headers = rows.front().second;
-      for (std::size_t r = 1; r < rows.size(); ++r) {
-        FeatureInfoFeature feature;
-        feature.layer = layer;
-        const QStringList& values = rows.at(r).second;
-        for (int32_t c = 0; c < values.size(); ++c) {
-          feature.attributes.emplace_back(
-              headers.value(c, QStringLiteral("%1").arg(c + 1)), values.at(c));
-        }
-        info.features.push_back(feature);
-      }
-    } else if (std::all_of(rows.begin(), rows.end(),
-                           [](const std::pair<bool, QStringList>& r) {
-                             return r.second.size() == 2;
-                           })) {
-      // Name and value side by side: one feature.
-      FeatureInfoFeature feature;
-      feature.layer = layer;
-      for (const std::pair<bool, QStringList>& r : rows) {
-        feature.attributes.emplace_back(r.second.at(0), r.second.at(1));
-      }
-      info.features.push_back(feature);
-    }
+    addTableFeatures(tables.next().captured(1), info.features);
   }
   if (info.features.empty()) {
     info.text = htmlText(html, true);
@@ -487,61 +511,89 @@ std::optional<WmsFeatureInfo> parseHtml(const QByteArray& body)
 
 // --- Plain text --------------------------------------------------------
 
-std::optional<WmsFeatureInfo> parsePlain(const QByteArray& body)
+/** Reads plain-text answers line by line. */
+class PlainReader
 {
-  static const QRegularExpression layerLine(
-      QStringLiteral("^\\s*(?:Results for FeatureType|Layer)\\s+'([^']+)'"));
-  static const QRegularExpression featureLine(
-      QStringLiteral("^\\s*Feature\\s+(\\S+?):?\\s*$"));
-  static const QRegularExpression rule(QStringLiteral("^\\s*[-=]{3,}\\s*$"));
-  static const QRegularExpression pair(
-      QStringLiteral("^\\s*([^=]+?)\\s*=\\s*(.*?)\\s*$"));
-  const QString text = QString::fromUtf8(body);
-  WmsFeatureInfo info;
-  QString layer;
-  std::optional<FeatureInfoFeature> current;
-  const std::function<void()> finish = [&]() {
-    if (current && !current->attributes.empty()) {
-      info.features.push_back(*current);
-    }
-    current.reset();
-  };
-  const QStringList lines = text.split(QLatin1Char('\n'));
-  for (const QString& raw : lines) {
+public:
+  /** Takes one line. */
+  void read(const QString& raw)
+  {
+    static const QRegularExpression layerLine(
+        QStringLiteral("^\\s*(?:Results for FeatureType|Layer)\\s+'([^']+)'"));
+    static const QRegularExpression featureLine(
+        QStringLiteral("^\\s*Feature\\s+(\\S+?):?\\s*$"));
+    static const QRegularExpression rule(QStringLiteral("^\\s*[-=]{3,}\\s*$"));
     const QString line = raw.trimmed();
     QRegularExpressionMatch match = layerLine.match(line);
     if (match.hasMatch()) {
       finish();
-      layer = match.captured(1);
-      continue;
+      m_layer = match.captured(1);
+      return;
     }
     match = featureLine.match(line);
     if (match.hasMatch()) {
       finish();
-      current = FeatureInfoFeature{layer, match.captured(1), {}};
-      continue;
+      m_current = FeatureInfoFeature{m_layer, match.captured(1), {}};
+      return;
     }
     if (rule.match(line).hasMatch()) {
       finish();
-      continue;
+      return;
     }
-    match = pair.match(line);
-    if (match.hasMatch()) {
-      QString value = match.captured(2);
-      if (value.size() >= 2 && value.startsWith(QLatin1Char('\'')) &&
-          value.endsWith(QLatin1Char('\''))) {
-        value = value.mid(1, value.size() - 2);
-      }
-      if (value.startsWith(QLatin1String("[GEOMETRY"))) {
-        continue;
-      }
-      if (!current) {
-        current = FeatureInfoFeature{layer, QString(), {}};
-      }
-      current->attributes.emplace_back(match.captured(1), value);
-    }
+    attribute(line);
   }
-  finish();
+
+  /** Ends the feature being read. */
+  void finish()
+  {
+    if (m_current && !m_current->attributes.empty()) {
+      m_features.push_back(*m_current);
+    }
+    m_current.reset();
+  }
+
+  /** Returns the features read. */
+  std::vector<FeatureInfoFeature>& features() { return m_features; }
+
+private:
+  void attribute(const QString& line)
+  {
+    static const QRegularExpression pair(
+        QStringLiteral("^\\s*([^=]+?)\\s*=\\s*(.*?)\\s*$"));
+    const QRegularExpressionMatch match = pair.match(line);
+    if (!match.hasMatch()) {
+      return;
+    }
+    QString value = match.captured(2);
+    if (value.size() >= 2 && value.startsWith(QLatin1Char('\'')) &&
+        value.endsWith(QLatin1Char('\''))) {
+      value = value.mid(1, value.size() - 2);
+    }
+    if (value.startsWith(QLatin1String("[GEOMETRY"))) {
+      return;
+    }
+    if (!m_current) {
+      m_current = FeatureInfoFeature{m_layer, QString(), {}};
+    }
+    m_current->attributes.emplace_back(match.captured(1), value);
+  }
+
+  QString m_layer;
+  std::optional<FeatureInfoFeature> m_current;
+  std::vector<FeatureInfoFeature> m_features;
+};
+
+std::optional<WmsFeatureInfo> parsePlain(const QByteArray& body)
+{
+  const QString text = QString::fromUtf8(body);
+  PlainReader reader;
+  const QStringList lines = text.split(QLatin1Char('\n'));
+  for (const QString& line : lines) {
+    reader.read(line);
+  }
+  reader.finish();
+  WmsFeatureInfo info;
+  info.features = std::move(reader.features());
   if (info.features.empty()) {
     const QString trimmed = text.trimmed();
     // "no features were found", "Search returned no results": nothing.

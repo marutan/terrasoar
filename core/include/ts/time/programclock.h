@@ -48,6 +48,9 @@ public:
   /** Starts at the current time. */
   explicit ProgramClock(QObject* parent = nullptr);
 
+  /** Destroys it. */
+  ~ProgramClock() override;
+
   /** Returns the time (UTC). */
   QDateTime time() const { return m_time; }
 

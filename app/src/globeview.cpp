@@ -150,7 +150,8 @@ uint32_t keyMotion(int32_t key)
 
 } // namespace
 
-GlobeView::GlobeView(QWidget* parent) : QOpenGLWidget(parent)
+GlobeView::GlobeView(QWidget* parent)
+    : QOpenGLWidget(parent), m_clickTimer(new QTimer(this))
 {
   setObjectName(QStringLiteral("globeView"));
   // Qt 5 needs the type registered by name for queued connections and
@@ -158,7 +159,6 @@ GlobeView::GlobeView(QWidget* parent) : QOpenGLWidget(parent)
   qRegisterMetaType<ts::RegionGeometry>("ts::RegionGeometry");
   qRegisterMetaType<std::vector<ts::LonLat>>("std::vector<ts::LonLat>");
   qRegisterMetaType<ts::LonLat>("ts::LonLat");
-  m_clickTimer = new QTimer(this);
   m_clickTimer->setSingleShot(true);
   connect(m_clickTimer, &QTimer::timeout, this, &GlobeView::reportClick);
   QSurfaceFormat format = QSurfaceFormat::defaultFormat();

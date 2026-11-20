@@ -196,6 +196,8 @@ QString chooseInfoFormat(const QStringList& offered);
  * An empty URL if the source can't be queried or the point is outside
  * the tile or the source's area.
  */
+// Longitude then latitude, as everywhere in WMS requests.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 QUrl getFeatureInfoUrl(const WmsSource& source, TileKey key, double lonDeg,
                        double latDeg, int32_t featureCount = 10);
 

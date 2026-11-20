@@ -359,7 +359,7 @@ public:
    * latitude; longitude scaled by the latitude). For picking: a source
    * that keeps no features after meshing returns none (the default).
    */
-  virtual std::vector<Feature> featuresAt(const GeoPoint& point,
+  virtual std::vector<Feature> featuresAt(GeoPoint point,
                                           double toleranceDeg) const
   {
     (void)point;

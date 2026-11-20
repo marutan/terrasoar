@@ -157,7 +157,7 @@ ImageLoadResult outcome(ImageLoadResult::Outcome kind)
 
 } // namespace
 
-WmtsImageryProvider::WmtsImageryProvider(WmtsSource source,
+WmtsImageryProvider::WmtsImageryProvider(const WmtsSource& source,
                                          std::shared_ptr<NetworkClient> network,
                                          WebTileSettings settings)
     : WmtsImageryProvider(source, source.id(), hostOf(source),

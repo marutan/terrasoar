@@ -53,6 +53,9 @@ public:
   /** Creates the box with the modes for no times (clock and fixed). */
   explicit TimeModeBox(QWidget* parent);
 
+  /** Destroys it. */
+  ~TimeModeBox() override;
+
   /** Offers the modes that suit @p extent, and chooses the clock. */
   void setExtent(const TimeExtent& extent);
 

@@ -118,8 +118,10 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
       m_statusLabel(new QLabel(this)), m_layersLabel(new QLabel(this)),
       m_layerTree(new QTreeWidget(this)), m_styleLabel(new QLabel(this)),
       m_styleBox(new QComboBox(this)), m_formatLabel(new QLabel(this)),
-      m_formatBox(new QComboBox(this)), m_detailsLabel(new QLabel(this)),
-      m_buttons(new QDialogButtonBox(this)), m_pollTimer(new QTimer(this))
+      m_formatBox(new QComboBox(this)), m_timeLabel(new QLabel(this)),
+      m_timeModeBox(new TimeModeBox(this)), m_timeValueBox(new QComboBox(this)),
+      m_detailsLabel(new QLabel(this)), m_buttons(new QDialogButtonBox(this)),
+      m_pollTimer(new QTimer(this))
 {
   QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
   connect(help, &QShortcut::activated, this,
@@ -145,10 +147,7 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
   m_styleLabel->setBuddy(m_styleBox);
   m_formatBox->setObjectName(QStringLiteral("wmsFormatBox"));
   m_formatLabel->setBuddy(m_formatBox);
-  m_timeLabel = new QLabel(this);
-  m_timeModeBox = new TimeModeBox(this);
   m_timeModeBox->setObjectName(QStringLiteral("wmsTimeModeBox"));
-  m_timeValueBox = new QComboBox(this);
   m_timeValueBox->setObjectName(QStringLiteral("wmsTimeValueBox"));
   m_timeValueBox->setEditable(true);
   m_timeValueBox->setInsertPolicy(QComboBox::NoInsert);
@@ -509,6 +508,12 @@ void AddWmsDialog::layerChosen()
     m_detailsLabel->setText(error);
     return;
   }
+  showDetails(*source);
+}
+
+void AddWmsDialog::showDetails(const WmsSource& chosen)
+{
+  const WmsSource* source = &chosen;
   QStringList details;
   details << (source->imageProjection() == TileImageProjection::WebMercator
                   ? tr("Drawn from Web Mercator images (%1), reprojected.")
@@ -522,11 +527,11 @@ void AddWmsDialog::layerChosen()
     details << tr("Its time follows the program's clock (View → Time "
                   "Slider).");
   }
-  if (!m_capabilities->accessConstraints.isEmpty() &&
-      m_capabilities->accessConstraints.compare(QLatin1String("none"),
-                                                Qt::CaseInsensitive) != 0) {
-    details << tr("The server's terms: %1")
-                   .arg(m_capabilities->accessConstraints.left(400));
+  const QString terms =
+      m_capabilities ? m_capabilities->accessConstraints : QString();
+  if (!terms.isEmpty() &&
+      terms.compare(QLatin1String("none"), Qt::CaseInsensitive) != 0) {
+    details << tr("The server's terms: %1").arg(terms.left(400));
   }
   m_detailsLabel->setText(details.join(QLatin1Char('\n')));
 }
@@ -553,13 +558,11 @@ void AddWmsDialog::fillTime(const WmsLayer* layer)
   if (!dimension->defaultValue.isEmpty()) {
     listed.append(dimension->defaultValue);
   }
-  std::optional<QDateTime> next = extent.last();
-  while (next && listed.size() < 500) {
-    const QString value = extent.format(*next);
+  for (const QDateTime& time : extent.latest(500)) {
+    const QString value = extent.format(time);
     if (!listed.contains(value)) {
       listed.append(value);
     }
-    next = extent.before(*next);
   }
   m_timeValueBox->addItems(listed);
   m_timeValueBox->setCurrentIndex(listed.isEmpty() ? -1 : 0);
