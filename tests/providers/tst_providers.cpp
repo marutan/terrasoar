@@ -18,7 +18,10 @@
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
+#include <array>
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -28,12 +31,16 @@
 #include <QBuffer>
 #include <QColor>
 #include <QImage>
+#include <QJsonObject>
 #include <QTemporaryDir>
 #include <QtTest>
 
 #include "concurrency.h"
 #include "ts/deps/sqliteconnection.h"
+#include "ts/projection/arc.h"
+#include "ts/providers/gdalimageryprovider.h"
 #include "ts/providers/geopackagefeatureprovider.h"
+#include "ts/providers/providerregistry.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
 
@@ -175,6 +182,61 @@ bool writeFeaturePackage(const QString& path)
 } // namespace
 
 /** Unit tests for ts/providers: test imagery, tile stores, GeoPackages. */
+/** GDAL's RPF test data (tests/data/rpf/README.md). */
+QString rpfData(const char* name)
+{
+  return QStringLiteral(TS_TEST_DATA_DIR "/rpf/") + QLatin1String(name);
+}
+
+/** The share of @p image's pixels that are opaque. */
+double opaqueShare(const QImage& image)
+{
+  int32_t opaque = 0;
+  for (int32_t y = 0; y < image.height(); ++y) {
+    for (int32_t x = 0; x < image.width(); ++x) {
+      opaque += image.pixelColor(x, y).alpha() == 255 ? 1 : 0;
+    }
+  }
+  return static_cast<double>(opaque) / (image.width() * image.height());
+}
+
+/**
+ * The colour of the checker (tools/fixtures/make_rpf_fixtures.cpp) at
+ * @p at, @p lonSquaresPerDeg squares a degree of longitude.
+ */
+QColor checkerColour(const ts::Geodetic& at, double lonSquaresPerDeg = 4.0)
+{
+  static const std::array<QColor, 8> colours = {
+      QColor(230, 25, 75),  QColor(60, 180, 75),  QColor(255, 225, 25),
+      QColor(0, 130, 200),  QColor(245, 130, 48), QColor(145, 30, 180),
+      QColor(70, 240, 240), QColor(250, 250, 250)};
+  const int32_t i =
+      static_cast<int32_t>(std::floor((at.lonDeg + 180.0) * lonSquaresPerDeg));
+  const int32_t j = static_cast<int32_t>(std::floor((at.latDeg + 90.0) * 4.0));
+  return colours.at(static_cast<std::size_t>((i + 3 * j) % 8));
+}
+
+/** The colour of @p tile, @p key's image, at @p at. */
+QColor colourAt(const QImage& tile, ts::TileKey key, const ts::Geodetic& at)
+{
+  const ts::GeoRect bounds = key.bounds();
+  const int32_t x = static_cast<int32_t>((at.lonDeg - bounds.westDeg) /
+                                         bounds.widthDeg() * tile.width());
+  const int32_t y = static_cast<int32_t>((bounds.northDeg - at.latDeg) /
+                                         bounds.heightDeg() * tile.height());
+  return tile.pixelColor(std::clamp(x, 0, tile.width() - 1),
+                         std::clamp(y, 0, tile.height() - 1));
+}
+
+/** True if @p a and @p b are opaque and close (CADRG's colours are
+ *  quantised). */
+bool closeColours(const QColor& a, const QColor& b)
+{
+  return a.alpha() == 255 && std::abs(a.red() - b.red()) <= 24 &&
+         std::abs(a.green() - b.green()) <= 24 &&
+         std::abs(a.blue() - b.blue()) <= 24;
+}
+
 class TestProviders : public QObject
 {
   Q_OBJECT
@@ -553,6 +615,174 @@ private slots:
             }
           }
           return true;
+        });
+    QCOMPARE(failures, 0);
+  }
+
+  void rpfTableOfContents()
+  {
+    // A CADRG chart (GNC, 1:5M) of one frame in ARC zone 2, its A.TOC's
+    // subdatasets read through GDAL: the checker (tests/data/rpf) over 2°
+    // to 3.5° E, 34.5° to 36° N, in a frame of 1536 × 1536 pixels.
+    ts::GdalImageryProvider provider(rpfData("zone2/RPF/A.TOC"));
+    QVERIFY2(provider.isValid(), qPrintable(provider.errorString()));
+    QCOMPARE(provider.name(), QStringLiteral("A.TOC"));
+    const std::vector<ts::GdalImageryProvider::Coverage> parts =
+        provider.coverage();
+    QCOMPARE(parts.size(), std::size_t{1});
+    QVERIFY(parts.front().name.startsWith(QLatin1String("NITF_TOC_ENTRY:")));
+    const ts::GeoRect& extent = parts.front().extent;
+    QVERIFY(extent.westDeg <= 2.0 && extent.eastDeg >= 3.5);
+    // The frame's: its pixels are a whole frame, wider than the chart.
+    QVERIFY(extent.southDeg <= 34.5 && extent.northDeg >= 36.0);
+    // The frame's pixels are those of ARC zone 2 at 1:5M (11e-1), and
+    // the deepest level's texels no larger.
+    const std::array<double, 2> pixel = ts::arc::pixelSizeDeg(2, 5.0e6);
+    QVERIFY(std::abs(parts.front().pixelSizeDeg - pixel[1]) < 1e-12);
+    QVERIFY(ts::TileKey::sizeDeg(provider.maximumLevel()) / 256.0 <= pixel[1]);
+    QVERIFY(ts::TileKey::sizeDeg(provider.maximumLevel() - 1) / 256.0 >
+            pixel[1]);
+  }
+
+  void rpfChartDrawnWhereItIs()
+  {
+    ts::GdalImageryProvider provider(rpfData("zone2/RPF/A.TOC"));
+    const int32_t level = provider.maximumLevel();
+    // Inside the chart: all of it (a tile smaller than the chart), each
+    // square the colour it should be.
+    const ts::TileKey inside =
+        ts::TileKey::containing(level + 2, ts::Geodetic{35.3, 2.9, 0.0});
+    const QImage image = provider.loadImage(inside, notCancelled);
+    QVERIFY(!image.isNull());
+    QCOMPARE(image.size(), QSize(256, 256));
+    QCOMPARE(opaqueShare(image), 1.0);
+    for (const ts::Geodetic& at :
+         {ts::Geodetic{35.125, 2.625, 0.0}, ts::Geodetic{35.375, 2.875, 0.0},
+          ts::Geodetic{34.875, 3.375, 0.0}, ts::Geodetic{35.875, 2.125, 0.0}}) {
+      const ts::TileKey key = ts::TileKey::containing(level, at);
+      const QImage tile = provider.loadImage(key, notCancelled);
+      QVERIFY(!tile.isNull());
+      const QColor drawn = colourAt(tile, key, at);
+      const QColor expected = checkerColour(at);
+      QVERIFY2(closeColours(drawn, expected),
+               qPrintable(QStringLiteral("%1 at %2, %3; expected %4")
+                              .arg(drawn.name())
+                              .arg(at.latDeg)
+                              .arg(at.lonDeg)
+                              .arg(expected.name())));
+    }
+    // Elsewhere: nothing.
+    QVERIFY(provider
+                .loadImage(ts::TileKey::containing(
+                               level, ts::Geodetic{10.0, 3.0, 0.0}),
+                           notCancelled)
+                .isNull());
+    // Across its west edge, 2° E: transparent west of it, opaque east.
+    const ts::TileKey edge =
+        ts::TileKey::containing(level - 2, ts::Geodetic{35.0, 2.0, 0.0});
+    const QImage across = provider.loadImage(edge, notCancelled);
+    QVERIFY(!across.isNull());
+    QCOMPARE(colourAt(across, edge, ts::Geodetic{35.0, 1.97, 0.0}).alpha(), 0);
+    QCOMPARE(colourAt(across, edge, ts::Geodetic{35.0, 2.03, 0.0}).alpha(),
+             255);
+  }
+
+  void rpfChartOverviews()
+  {
+    // Shallower than its pixels: averaged down, the whole chart in a few
+    // tiles, the checker's colours mixed.
+    ts::GdalImageryProvider provider(rpfData("zone2/RPF/A.TOC"));
+    const ts::TileKey key =
+        ts::TileKey::containing(3, ts::Geodetic{35.0, 3.0, 0.0});
+    const QImage image = provider.loadImage(key, notCancelled);
+    QVERIFY(!image.isNull());
+    QVERIFY(opaqueShare(image) > 0.0);
+    QVERIFY(opaqueShare(image) < 0.2);
+  }
+
+  void rpfPolarChart()
+  {
+    // A chart in ARC zone 9, the north polar zone, whose frames are in
+    // its own azimuthal projection (metres about the pole): reprojected
+    // into latitude and longitude, the squares where they should be.
+    ts::GdalImageryProvider provider(rpfData("zone9/RPF/A.TOC"));
+    QVERIFY2(provider.isValid(), qPrintable(provider.errorString()));
+    const std::vector<ts::GdalImageryProvider::Coverage> parts =
+        provider.coverage();
+    // Its frame, read directly (framesIfPolar()).
+    QCOMPARE(parts.size(), std::size_t{1});
+    QVERIFY(parts.front().name.endsWith(QLatin1String(".GN9")));
+    QVERIFY(parts.front().extent.southDeg <= 85.0 &&
+            parts.front().extent.northDeg >= 86.5);
+    QVERIFY(std::abs(parts.front().pixelSizeDeg -
+                     ts::arc::polarPixelSizeM(5.0e6) / 111320.0) < 1e-3);
+    const int32_t level = provider.maximumLevel();
+    for (const ts::Geodetic& at :
+         {ts::Geodetic{85.375, 1.25, 0.0}, ts::Geodetic{86.125, 8.75, 0.0},
+          ts::Geodetic{85.625, 6.25, 0.0}}) {
+      const ts::TileKey key = ts::TileKey::containing(level, at);
+      const QImage tile = provider.loadImage(key, notCancelled);
+      QVERIFY(!tile.isNull());
+      const QColor drawn = colourAt(tile, key, at);
+      QVERIFY2(closeColours(drawn, checkerColour(at, 0.4)),
+               qPrintable(drawn.name()));
+    }
+  }
+
+  void unusableRasters()
+  {
+    // Missing, not a raster, and a raster without georeferencing.
+    const QTemporaryDir dir;
+    ts::GdalImageryProvider missing(dir.filePath(QStringLiteral("none.tif")));
+    QVERIFY(!missing.isValid());
+    QVERIFY(!missing.errorString().isEmpty());
+    ts::GdalImageryProvider text(
+        QStringLiteral(TS_TEST_DATA_DIR "/sample.wkt"));
+    QVERIFY(!text.isValid());
+    const QString plain = dir.filePath(QStringLiteral("plain.png"));
+    QImage pixels(8, 8, QImage::Format_RGB32);
+    pixels.fill(Qt::red);
+    QVERIFY(pixels.save(plain));
+    ts::GdalImageryProvider unplaced(plain);
+    QVERIFY(!unplaced.isValid());
+    QVERIFY(unplaced.errorString().contains(QLatin1String("georeferencing")));
+  }
+
+  void fileImageryFromTheRegistry()
+  {
+    // Layer sources {"kind": "file", "path": …} are GDAL imagery.
+    ts::ProviderRegistry registry;
+    QJsonObject source;
+    source.insert(QStringLiteral("kind"), QStringLiteral("file"));
+    source.insert(QStringLiteral("path"), rpfData("zone2/RPF/A.TOC"));
+    QString error;
+    const std::shared_ptr<ts::ImageryProvider> provider =
+        registry.imagery(source, &error);
+    QVERIFY2(provider != nullptr, qPrintable(error));
+    QCOMPARE(provider->id(),
+             QStringLiteral("file:") + rpfData("zone2/RPF/A.TOC"));
+    source.insert(QStringLiteral("path"), QStringLiteral("/no/such/file.tif"));
+    QVERIFY(registry.imagery(source, &error) == nullptr);
+    QVERIFY(error.contains(QLatin1String("file.tif")));
+  }
+
+  void gdalConcurrentSharedProvider()
+  {
+    // One provider, many loader threads: the same tiles as on one.
+    ts::GdalImageryProvider provider(rpfData("zone2/RPF/A.TOC"));
+    const ts::TileKey first = ts::TileKey::containing(
+        provider.maximumLevel(), ts::Geodetic{35.3, 2.9, 0.0});
+    const QImage expected = provider.loadImage(first, notCancelled);
+    QVERIFY(!expected.isNull());
+    const int32_t failures = ts::test::runConcurrently(
+        ts::test::concurrentThreadCount,
+        [&provider, &expected, first](int32_t thread) {
+          for (int32_t i = 0; i < 8; ++i) {
+            const ts::TileKey key{first.level, first.x + (thread + i) % 3 - 1,
+                                  first.y + i % 3 - 1};
+            provider.loadImage(key, notCancelled);
+          }
+          return provider.loadImage(first, notCancelled) == expected;
         });
     QCOMPARE(failures, 0);
   }

@@ -157,6 +157,8 @@ What is new is the capabilities model, tile matrix sets, and fitting their tiles
 
 Goal: the flat map in the projections people need for regional, national, navigation and world maps. The first roadmap delivered Mercator, Web Mercator and Miller Cylindrical.
 
+**Status (2026-11-19):** delivered in parts 11a to 11e. RPF data is read through GDAL (File → Add Imagery File…, an `A.TOC`), but resampled into the quadtree's tiles, not drawn pixel for pixel in its zone; drawing on the frames' own grid waits for Phase 22 (`docs/design/rpf.md`).
+
 **Deliverables**
 
 Projections, grouped by kind. Each is in View → Map Projection, with its parameters (centre, central meridian, standard parallels, zone) in a Map Projection Settings dialog where it has any.

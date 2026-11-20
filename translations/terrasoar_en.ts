@@ -884,6 +884,10 @@
             <source>WMTS Layer…</source>
             <translation>WMTS Layer…</translation>
         </message>
+        <message>
+            <source>Imagery File…</source>
+            <translation>Imagery File…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -1201,6 +1205,22 @@
         <message>
             <source>Change the settings of the flat map's projection, such as its standard parallel</source>
             <translation>Change the settings of the flat map's projection, such as its standard parallel</translation>
+        </message>
+        <message>
+            <source>Add Imagery File</source>
+            <translation>Add Imagery File</translation>
+        </message>
+        <message>
+            <source>Images (*.tif *.tiff *.jp2 *.vrt *.img *.ntf *.nitf *.toc);;All files (*)</source>
+            <translation>Images (*.tif *.tiff *.jp2 *.vrt *.img *.ntf *.nitf *.toc);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Add &amp;Imagery File…</source>
+            <translation>Add &amp;Imagery File…</translation>
+        </message>
+        <message>
+            <source>Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and imagery through their A.TOC) as a layer</source>
+            <translation>Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and imagery through their A.TOC) as a layer</translation>
         </message>
     </context>
     <context>
@@ -1927,6 +1947,10 @@
         <message>
             <source>Cannot read the geoid "%1": %2</source>
             <translation>Cannot read the geoid "%1": %2</translation>
+        </message>
+        <message>
+            <source>Cannot use "%1" as imagery: %2</source>
+            <translation>Cannot use "%1" as imagery: %2</translation>
         </message>
     </context>
     <context>

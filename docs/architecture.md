@@ -64,7 +64,7 @@ Subsections so far:
 | `network` | The HTTP client on its own thread (in-flight limit, retries, timeouts, cancellation, proxies), HTTP freshness rules, the SQLite tile disk cache with tiles pinned for offline regions (`docs/design/network-and-cache.md`) |
 | `perf` | Frame-time statistics, process memory and CPU readings |
 | `projection` | Map projections for the 2D views (Mercator, Web Mercator, Miller): forward and inverse, domains, scale factors, and each projection as GLSL (`docs/design/projections.md`) |
-| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers (`docs/design/providers.md`) |
+| `providers` | Tile source interfaces (`ImageryProvider`, `ElevationProvider`, `FeatureProvider`), the registry that shares providers between layers, generated test imagery, SQLite tile stores and tiled GeoPackages with their writers, local raster imagery through GDAL, RPF charts included (`docs/design/providers.md`, `docs/design/rpf.md`) |
 | `regions` | Offline regions: rectangles and polygons (across the antimeridian) to quadtree tiles, tile counts and size estimates, the background download that pins tiles in the disk cache, the list of regions (`docs/design/offline-regions.md`) |
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling on the globe and on the flat map, worker-thread loader, LRU cache (`docs/design/tiling.md`) |

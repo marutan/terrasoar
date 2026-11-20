@@ -92,6 +92,9 @@ signals:
   /** The user asked to add a WMTS layer (the window opens the dialog). */
   void addWmtsLayerRequested();
 
+  /** The user asked to add an imagery file (the window asks for it). */
+  void addImageryFileRequested();
+
   /** The user asked to add an elevation file (the window asks for it). */
   void addElevationFileRequested();
 

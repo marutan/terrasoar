@@ -58,6 +58,7 @@
 #include "ts/network/tilediskcache.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
+#include "ts/providers/gdalimageryprovider.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/testproviders.h"
@@ -1176,6 +1177,74 @@ private slots:
                                   QColor(40, 80, 130), 64, 12),
                               1.0, -1},
          ts::ImageryLayerDraw{mockWms(crs), 0.5, -1}},
+        {});
+    const QImage image = renderSettled(camera);
+    const ts::TileStatistics tiles = m_renderer->tileStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QVERIFY(!image.isNull());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("%d tiles drawn, deepest level %d", tiles.rendered,
+          tiles.deepestLevel);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void rpfGolden_data()
+  {
+    QTest::addColumn<QString>("chart");
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    // The synthetic CADRG charts (tests/data/rpf): on the globe, on the
+    // ARC zones (following the view, so zone 2) and on the north polar
+    // zone, each square of the checker 0.25° on a side.
+    QTest::newRow("rpf-zone2-globe")
+        << QStringLiteral("zone2") << QString() << 35.25 << 2.75 << 3.0e5;
+    QTest::newRow("rpf-zone2-arc")
+        << QStringLiteral("zone2") << QStringLiteral("rpf-arc") << 35.25 << 2.75
+        << 3.0e5;
+    QTest::newRow("rpf-zone9-arc-north")
+        << QStringLiteral("zone9") << QStringLiteral("rpf-arc-north") << 85.75
+        << 5.0 << 4.0e5;
+  }
+
+  void rpfGolden()
+  {
+    // An RPF chart, read through its A.TOC by GDAL, over plain imagery.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(QString, chart);
+    QFETCH(QString, projection);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    const std::shared_ptr<ts::GdalImageryProvider> provider =
+        std::make_shared<ts::GdalImageryProvider>(
+            QStringLiteral(TS_TEST_DATA_DIR "/rpf/") + chart +
+            QStringLiteral("/RPF/A.TOC"));
+    QVERIFY2(provider->isValid(), qPrintable(provider->errorString()));
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    if (!projection.isEmpty()) {
+      camera.setMapProjection(projectionFromSpec(projection));
+      camera.setMorph(1.0);
+    }
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryLayers(
+        {ts::ImageryLayerDraw{std::make_shared<ts::SolidColorImageryProvider>(
+                                  QColor(40, 80, 130), 64, 12),
+                              1.0, -1},
+         ts::ImageryLayerDraw{provider, 1.0, -1}},
         {});
     const QImage image = renderSettled(camera);
     const ts::TileStatistics tiles = m_renderer->tileStatistics();
