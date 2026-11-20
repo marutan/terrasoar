@@ -39,7 +39,9 @@
 
 #include "globeview.h"
 #include "helpwindow.h"
+#include "kmlexport.h"
 #include "offlineregionmanager.h"
+#include "ts/kml/kmlwriter.h"
 
 namespace ts
 {
@@ -73,6 +75,7 @@ OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
       m_list(new QTreeWidget(this)), m_emptyLabel(new QLabel(this)),
       m_newButton(new QPushButton(this)), m_pauseButton(new QPushButton(this)),
       m_deleteButton(new QPushButton(this)),
+      m_exportButton(new QPushButton(this)),
       m_closeButton(new QPushButton(this))
 {
   QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
@@ -83,6 +86,7 @@ OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
   m_newButton->setObjectName(QStringLiteral("newRegionButton"));
   m_pauseButton->setObjectName(QStringLiteral("pauseRegionButton"));
   m_deleteButton->setObjectName(QStringLiteral("deleteRegionButton"));
+  m_exportButton->setObjectName(QStringLiteral("exportRegionButton"));
   m_list->setColumnCount(ColumnCount);
   m_list->setRootIsDecorated(false);
   m_list->setUniformRowHeights(true);
@@ -93,6 +97,7 @@ OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
   buttons->addWidget(m_newButton);
   buttons->addWidget(m_pauseButton);
   buttons->addWidget(m_deleteButton);
+  buttons->addWidget(m_exportButton);
   buttons->addStretch();
   buttons->addWidget(m_closeButton);
   QVBoxLayout* layout = new QVBoxLayout(this);
@@ -106,6 +111,8 @@ OfflineRegionsDialog::OfflineRegionsDialog(OfflineRegionManager& manager,
           &OfflineRegionsDialog::pauseOrResume);
   connect(m_deleteButton, &QPushButton::clicked, this,
           &OfflineRegionsDialog::deleteRegion);
+  connect(m_exportButton, &QPushButton::clicked, this,
+          &OfflineRegionsDialog::exportRegion);
   connect(m_closeButton, &QPushButton::clicked, this, &QDialog::accept);
   connect(m_list, &QTreeWidget::currentItemChanged, this, [this]() {
     updateButtons();
@@ -149,6 +156,7 @@ void OfflineRegionsDialog::retranslateUi()
          "this computer, so the area can be seen without a network."));
   m_newButton->setText(tr("&New Region…"));
   m_deleteButton->setText(tr("&Delete"));
+  m_exportButton->setText(tr("&Export as KML…"));
   m_closeButton->setText(tr("Close"));
   updateProgress();
 }
@@ -268,6 +276,7 @@ void OfflineRegionsDialog::updateButtons()
       tr("Update fetches the tiles that are missing or out of date"));
   m_pauseButton->setEnabled(region != nullptr);
   m_deleteButton->setEnabled(region != nullptr);
+  m_exportButton->setEnabled(region != nullptr);
 }
 
 void OfflineRegionsDialog::showOutline()
@@ -294,6 +303,21 @@ void OfflineRegionsDialog::pauseOrResume()
     QMessageBox::warning(this, tr("Offline Regions"), error);
   }
   updateProgress();
+}
+
+KmlDocument OfflineRegionsDialog::regionKml(const OfflineRegion& region)
+{
+  return kmlDocumentOf(region.name, {{region.name, kmlAreaOf(region.geometry)}},
+                       QColor(255, 200, 40));
+}
+
+void OfflineRegionsDialog::exportRegion()
+{
+  const OfflineRegion* region = m_manager.region(selectedRegion());
+  if (region != nullptr) {
+    saveKmlAs(this, regionKml(*region), tr("Export Region"),
+              region->name + QStringLiteral(".kml"));
+  }
 }
 
 void OfflineRegionsDialog::deleteRegion()

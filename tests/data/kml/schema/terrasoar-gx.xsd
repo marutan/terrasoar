@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The gx: extension elements Terra Soar writes, for checking its KML
+  against the OGC KML 2.2 schema (ogckml22.xsd). Written for Terra Soar's
+  tests from Google's KML reference; not Google's schema.
+-->
+<schema xmlns="http://www.w3.org/2001/XMLSchema"
+  xmlns:kml="http://www.opengis.net/kml/2.2"
+  xmlns:gx="http://www.google.com/kml/ext/2.2"
+  targetNamespace="http://www.google.com/kml/ext/2.2"
+  elementFormDefault="qualified">
+
+  <import namespace="http://www.opengis.net/kml/2.2"
+    schemaLocation="ogckml22.xsd"/>
+
+  <simpleType name="altitudeModeEnumType">
+    <restriction base="string">
+      <enumeration value="clampToSeaFloor"/>
+      <enumeration value="relativeToSeaFloor"/>
+    </restriction>
+  </simpleType>
+  <element name="altitudeMode" type="gx:altitudeModeEnumType"
+    substitutionGroup="kml:altitudeModeGroup"/>
+
+  <element name="LatLonQuad" type="gx:LatLonQuadType"
+    substitutionGroup="kml:GroundOverlayObjectExtensionGroup"/>
+  <complexType name="LatLonQuadType">
+    <complexContent>
+      <extension base="kml:AbstractObjectType">
+        <sequence>
+          <element ref="kml:coordinates" minOccurs="0"/>
+        </sequence>
+      </extension>
+    </complexContent>
+  </complexType>
+
+  <element name="Track" type="gx:TrackType"
+    substitutionGroup="kml:AbstractGeometryGroup"/>
+  <complexType name="TrackType">
+    <complexContent>
+      <extension base="kml:AbstractGeometryType">
+        <sequence>
+          <element ref="kml:altitudeModeGroup" minOccurs="0"/>
+          <element ref="kml:when" minOccurs="0" maxOccurs="unbounded"/>
+          <element ref="gx:coord" minOccurs="0" maxOccurs="unbounded"/>
+        </sequence>
+      </extension>
+    </complexContent>
+  </complexType>
+  <element name="coord" type="string"/>
+</schema>

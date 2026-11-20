@@ -77,6 +77,7 @@
 #include "fixturepack.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "kmlexport.h"
 #include "kmllinks.h"
 #include "layertreedock.h"
 #include "mainwindow.h"
@@ -95,12 +96,15 @@
 #include "timemodebox.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
+#include "ts/kml/kmlreader.h"
+#include "ts/kml/kmlwriter.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
 #include "ts/network/regiontilesource.h"
 #include "ts/network/tilediskcache.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/regions/offlineregionstore.h"
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
@@ -2879,6 +2883,81 @@ private slots:
         QDateTime(QDate(2026, 11, 21), QTime(0, 0), QTimeZone::utc()));
     QTRY_VERIFY(labels().contains(QStringLiteral("Stamped")));
     QVERIFY(!labels().contains(QStringLiteral("Track")));
+  }
+
+  void kmlSaving()
+  {
+    // A KML entry saved as it was read; a folder alone; a profile line and
+    // a region as KML.
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    const QString documentId =
+        model->data(document, ts::LayerTreeModel::NodeIdRole).toString();
+    const std::optional<ts::KmlDocument> whole =
+        window.kmlNodeDocument(documentId, &error);
+    if (!whole) {
+      QFAIL(qPrintable(error));
+    }
+    QFile file(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QVERIFY(QString::fromUtf8(ts::writeKml(*whole))
+                .endsWith(QString::fromUtf8(file.readAll())
+                              .section(QLatin1String("?>"), 1)));
+    const QString shapesId =
+        model
+            ->data(model->index(0, 0, document), ts::LayerTreeModel::NodeIdRole)
+            .toString();
+    const std::optional<ts::KmlDocument> folder =
+        window.kmlNodeDocument(shapesId, &error);
+    QVERIFY(folder.has_value());
+    QCOMPARE(folder.value_or(ts::KmlDocument{}).root.children.size(),
+             std::size_t{1});
+    QVERIFY(!window.kmlNodeDocument(QStringLiteral("nothing"), &error));
+    // Saved to a file and read back.
+    QTemporaryDir out;
+    const QString path = out.filePath(QStringLiteral("shapes.kmz"));
+    QVERIFY(ts::writeKmlFile(folder.value_or(ts::KmlDocument{}), path, &error));
+    const std::optional<ts::KmlDocument> again = ts::readKmlFile(path, &error);
+    QVERIFY2(again.has_value(), qPrintable(error));
+    // The entry's menu offers it.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(model->index(0, 0, document));
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(
+                                   QStringLiteral("saveKmlAction")) != nullptr);
+    // A profile line and a region.
+    ts::ElevationProfile profile;
+    for (int32_t i = 0; i < 3; ++i) {
+      ts::ProfilePoint point;
+      point.position = ts::GeoPoint{51.0 + i, 179.0 + i};
+      profile.points.push_back(point);
+    }
+    const ts::KmlDocument line = ts::ElevationProfileDialog::toKml(profile);
+    const ts::KmlGeometry path3 =
+        line.root.children.front().geometry.value_or(ts::KmlGeometry{});
+    QCOMPARE(path3.coordinates.size(), std::size_t{3});
+    QCOMPARE(path3.coordinates.back().lonDeg, -179.0);
+    QVERIFY(path3.tessellate);
+    ts::OfflineRegion region;
+    region.name = QStringLiteral("Wales");
+    region.geometry = ts::RegionGeometry::rectangle(-5.0, 51.0, -3.0, 53.0);
+    const ts::KmlDocument area = ts::OfflineRegionsDialog::regionKml(region);
+    QCOMPARE(area.root.name, QStringLiteral("Wales"));
+    const ts::KmlGeometry polygon =
+        area.root.children.front().geometry.value_or(ts::KmlGeometry{});
+    QCOMPARE(polygon.kind, ts::KmlGeometry::Kind::Polygon);
+    QCOMPARE(polygon.coordinates.size(), std::size_t{5});
+    QCOMPARE(polygon.coordinates.front(), polygon.coordinates.back());
+    // Saved without a word when nothing is missing.
+    const QString regionPath = out.filePath(QStringLiteral("wales.kml"));
+    QVERIFY(ts::saveKmlTo(&window, area, regionPath, QStringLiteral("test")));
+    QVERIFY(QFileInfo::exists(regionPath));
   }
 
   void wmsWhatIsHere()

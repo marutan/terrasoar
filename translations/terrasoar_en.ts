@@ -714,6 +714,22 @@
             <source>Point at the chart to see where a height is on the globe.</source>
             <translation>Point at the chart to see where a height is on the globe.</translation>
         </message>
+        <message>
+            <source>Elevation profile</source>
+            <translation>Elevation profile</translation>
+        </message>
+        <message>
+            <source>Profile line</source>
+            <translation>Profile line</translation>
+        </message>
+        <message>
+            <source>profile.kml</source>
+            <translation>profile.kml</translation>
+        </message>
+        <message>
+            <source>Save as &amp;KML…</source>
+            <translation>Save as &amp;KML…</translation>
+        </message>
     </context>
     <context>
         <name>ts::FeatureInfoWindow</name>
@@ -1006,6 +1022,19 @@
         </message>
     </context>
     <context>
+        <name>ts::KmlExport</name>
+        <message>
+            <source>KML (*.kml);;KMZ with its pictures (*.kmz)</source>
+            <translation>KML (*.kml);;KMZ with its pictures (*.kmz)</translation>
+        </message>
+        <message>
+            <source>Saved "%1", but these files it uses couldn't be read and aren't in it:
+%2</source>
+            <translation>Saved "%1", but these files it uses couldn't be read and aren't in it:
+%2</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::KmlLinks</name>
         <message>
             <source>"%1" can't be read.</source>
@@ -1049,6 +1078,17 @@
         <message>
             <source>Cannot read "%1".</source>
             <translation>Cannot read "%1".</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::KmlWriter</name>
+        <message>
+            <source>Cannot write "%1": %2</source>
+            <translation>Cannot write "%1": %2</translation>
+        </message>
+        <message>
+            <source>it can't be replaced.</source>
+            <translation>it can't be replaced.</translation>
         </message>
     </context>
     <context>
@@ -1597,6 +1637,14 @@
             <source>Refresh</source>
             <translation>Refresh</translation>
         </message>
+        <message>
+            <source>Save As KML or KMZ…</source>
+            <translation>Save As KML or KMZ…</translation>
+        </message>
+        <message>
+            <source>Save As KML or KMZ</source>
+            <translation>Save As KML or KMZ</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -1861,6 +1909,14 @@
         <message>
             <source>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</source>
             <translation>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</translation>
+        </message>
+        <message>
+            <source>&amp;Export as KML…</source>
+            <translation>&amp;Export as KML…</translation>
+        </message>
+        <message>
+            <source>Export Region</source>
+            <translation>Export Region</translation>
         </message>
     </context>
     <context>

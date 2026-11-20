@@ -37,6 +37,18 @@
 namespace ts
 {
 
+/** How a document is read. */
+struct KmlReadOptions {
+  /**
+   * Keep the text and where each element is in it (KmlDocument::sourceText,
+   * KmlFeature::source), so writeKml() writes back what didn't change as
+   * it was. For documents to be edited or saved; it takes about twice the
+   * file's size in memory. Files in encodings other than UTF-8 and
+   * Latin-1 are read without it.
+   */
+  bool keepSource = false;
+};
+
 /**
  * Reads a KML 2.2 document (2.0 and 2.1 too), matching elements by local
  * name so the namespace prefixes (kml:, gx:) don't matter. @p base is
@@ -49,7 +61,8 @@ namespace ts
  * @reentrant
  */
 std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
-                                    QString* errorString);
+                                    QString* errorString,
+                                    const KmlReadOptions& options = {});
 
 /**
  * Reads a .kml file, or a .kmz archive (its doc.kml, else the first .kml
@@ -59,7 +72,8 @@ std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
  * @reentrant
  */
 std::optional<KmlDocument> readKmlFile(const QString& path,
-                                       QString* errorString);
+                                       QString* errorString,
+                                       const KmlReadOptions& options = {});
 
 /**
  * Returns where @p href points for @p document: unchanged if it is a web

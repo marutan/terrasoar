@@ -44,6 +44,8 @@
 #include <QVBoxLayout>
 
 #include "helpwindow.h"
+#include "kmlexport.h"
+#include "ts/kml/kmlwriter.h"
 
 namespace ts
 {
@@ -248,7 +250,7 @@ ElevationProfileDialog::ElevationProfileDialog(QWidget* parent)
     : QDialog(parent), m_chart(new ElevationProfileChart(this)),
       m_summaryLabel(new QLabel(this)), m_statusLabel(new QLabel(this)),
       m_drawButton(new QPushButton(this)), m_saveButton(new QPushButton(this)),
-      m_closeButton(new QPushButton(this))
+      m_kmlButton(new QPushButton(this)), m_closeButton(new QPushButton(this))
 {
   QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
   connect(help, &QShortcut::activated, this,
@@ -261,10 +263,13 @@ ElevationProfileDialog::ElevationProfileDialog(QWidget* parent)
   m_summaryLabel->setWordWrap(true);
   m_statusLabel->setWordWrap(true);
   m_saveButton->setEnabled(false);
+  m_kmlButton->setObjectName(QStringLiteral("profileKmlButton"));
+  m_kmlButton->setEnabled(false);
 
   QHBoxLayout* buttons = new QHBoxLayout;
   buttons->addWidget(m_drawButton);
   buttons->addWidget(m_saveButton);
+  buttons->addWidget(m_kmlButton);
   buttons->addStretch(1);
   buttons->addWidget(m_closeButton);
   QVBoxLayout* layout = new QVBoxLayout(this);
@@ -277,6 +282,8 @@ ElevationProfileDialog::ElevationProfileDialog(QWidget* parent)
           &ElevationProfileDialog::drawAnotherRequested);
   connect(m_saveButton, &QPushButton::clicked, this,
           &ElevationProfileDialog::saveCsv);
+  connect(m_kmlButton, &QPushButton::clicked, this,
+          &ElevationProfileDialog::saveKml);
   connect(m_closeButton, &QPushButton::clicked, this, &QDialog::close);
   connect(m_chart, &ElevationProfileChart::hovered, this,
           [this](int32_t index) {
@@ -311,6 +318,7 @@ void ElevationProfileDialog::setProfile(const ElevationProfile& profile)
   m_chart->setProfile(profile);
   m_state = State::Ready;
   m_saveButton->setEnabled(true);
+  m_kmlButton->setEnabled(true);
   retranslateUi();
 }
 
@@ -375,6 +383,27 @@ void ElevationProfileDialog::saveCsv()
   }
 }
 
+KmlDocument ElevationProfileDialog::toKml(const ElevationProfile& profile)
+{
+  std::vector<GeoPoint> points;
+  points.reserve(profile.points.size());
+  for (const ProfilePoint& point : profile.points) {
+    points.push_back(point.position);
+  }
+  return kmlDocumentOf(tr("Elevation profile"),
+                       {{tr("Profile line"), kmlLineThrough(points)}},
+                       QColor(255, 200, 40));
+}
+
+void ElevationProfileDialog::saveKml()
+{
+  const std::optional<ElevationProfile>& profile = m_chart->profile();
+  if (profile.has_value()) {
+    saveKmlAs(this, toKml(*profile), tr("Save Elevation Profile"),
+              tr("profile.kml"));
+  }
+}
+
 void ElevationProfileDialog::changeEvent(QEvent* event)
 {
   if (event->type() == QEvent::LanguageChange) {
@@ -388,6 +417,7 @@ void ElevationProfileDialog::retranslateUi()
   setWindowTitle(tr("Elevation Profile"));
   m_drawButton->setText(tr("&Draw Another Line"));
   m_saveButton->setText(tr("&Save as CSV…"));
+  m_kmlButton->setText(tr("Save as &KML…"));
   m_closeButton->setText(tr("Close"));
   m_summaryLabel->setText(summaryText());
   switch (m_state) {

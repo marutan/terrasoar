@@ -173,6 +173,14 @@ tests/data/kml/gdal/, KML test files from GDAL's autotest suite (MIT
 licence), among them Google's "KML Samples" from the KML documentation
 (Google, CC BY 4.0).
 
+tests/data/kml/schema/, schemas for checking the KML Terra Soar writes:
+ogckml22.xsd and atom-author-link.xsd, the OGC KML 2.2 schema (Copyright
+(c) 2008 Open Geospatial Consortium; OGC Software Notice,
+https://www.ogc.org/legal/), with its xAL import pointed at the local
+copy; xAL.xsd, OASIS xAL 2.0 (Copyright (c) OASIS Open 2002; OASIS
+copyright notice). terrasoar-gx.xsd and kml-and-gx.xsd are Terra Soar's
+own.
+
 Build-time tools (not distributed)
 ----------------------------------
 

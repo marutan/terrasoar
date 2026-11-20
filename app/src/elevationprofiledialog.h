@@ -33,6 +33,7 @@
 #include <QWidget>
 
 #include "ts/elevation/elevationprofile.h"
+#include "ts/kml/kmldocument.h"
 
 class QEvent;
 class QLabel;
@@ -137,6 +138,9 @@ public:
    */
   static QByteArray toCsv(const ElevationProfile& profile);
 
+  /** Returns @p profile's line as a KML document (a path on the ground). */
+  static KmlDocument toKml(const ElevationProfile& profile);
+
 signals:
   /** The user asked to draw another line. */
   void drawAnotherRequested();
@@ -150,12 +154,14 @@ protected:
 private:
   void retranslateUi();
   void saveCsv();
+  void saveKml();
 
   ElevationProfileChart* m_chart = nullptr;
   QLabel* m_summaryLabel = nullptr;
   QLabel* m_statusLabel = nullptr;
   QPushButton* m_drawButton = nullptr;
   QPushButton* m_saveButton = nullptr;
+  QPushButton* m_kmlButton = nullptr;
   QPushButton* m_closeButton = nullptr;
   /** What the status label says, so it can be retranslated. */
   enum class State { Waiting, Drawing, Computing, Ready, Failed };

@@ -69,6 +69,7 @@
 #include "globeview.h"
 #include "helpwindow.h"
 #include "iconcache.h"
+#include "kmlexport.h"
 #include "kmllinks.h"
 #include "layertreedock.h"
 #include "newregiondialog.h"
@@ -91,6 +92,7 @@
 #include "ts/kml/kmloverlays.h"
 #include "ts/kml/kmlpresentation.h"
 #include "ts/kml/kmlreader.h"
+#include "ts/kml/kmlwriter.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/layers/projectfile.h"
 #include "ts/packs/basepack.h"
@@ -1668,7 +1670,52 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   }
   const std::vector<QAction*> fly = flyThereActions(id, parent);
   actions.insert(actions.end(), fly.begin(), fly.end());
+  if (m_kmlNodes.count(id) != 0) {
+    QAction* save = new QAction(tr("Save As KML or KMZ…"), parent);
+    save->setObjectName(QStringLiteral("saveKmlAction"));
+    connect(save, &QAction::triggered, this, [this, id]() {
+      QString error;
+      const std::optional<KmlDocument> document = kmlNodeDocument(id, &error);
+      if (!document) {
+        QMessageBox::warning(this, tr("Save As KML or KMZ"), error);
+        return;
+      }
+      const QString name =
+          document->root.children.size() == 1 &&
+                  !document->root.children.front().name.isEmpty()
+              ? document->root.children.front().name
+              : QFileInfo(document->path).completeBaseName();
+      saveKmlAs(this, *document, tr("Save As KML or KMZ"),
+                name + QStringLiteral(".kml"));
+    });
+    actions.push_back(save);
+  }
   return actions;
+}
+
+std::optional<KmlDocument>
+MainWindow::kmlNodeDocument(const QString& nodeId, QString* errorString) const
+{
+  const std::map<QString, std::pair<QString, QString>>::const_iterator found =
+      m_kmlNodes.find(nodeId);
+  if (found == m_kmlNodes.end()) {
+    return std::nullopt;
+  }
+  // Read again keeping the text, so what is saved is the file as it was.
+  KmlReadOptions options;
+  options.keepSource = true;
+  std::optional<KmlDocument> document =
+      readKmlFile(found->second.first, errorString, options);
+  if (!document) {
+    return std::nullopt;
+  }
+  const std::shared_ptr<const KmlDocument> shown =
+      sharedKmlDocument(found->second.first, nullptr);
+  document->webBase = shown ? shown->webBase : QString();
+  if (found->second.second.isEmpty()) {
+    return document;
+  }
+  return kmlExtract(*document, found->second.second);
 }
 
 std::vector<QAction*> MainWindow::flyThereActions(const QString& id,

@@ -27,17 +27,26 @@
 #include <QFile>
 #include <QImage>
 #include <QJsonObject>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QTimeZone>
 #include <QUrlQuery>
 #include <QtTest>
 
+#include <gdal.h>
+#include <ogr_api.h>
+
 #include "concurrency.h"
+
 #include "ts/kml/kmlactivity.h"
 #include "ts/kml/kmldocument.h"
 #include "ts/kml/kmlfeatureprovider.h"
 #include "ts/kml/kmloverlays.h"
 #include "ts/kml/kmlpresentation.h"
 #include "ts/kml/kmlreader.h"
+#include "ts/kml/kmlwriter.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/time/timeextent.h"
 
@@ -47,6 +56,76 @@ namespace
 QString fixture(const QString& name)
 {
   return QStringLiteral(TS_TEST_DATA_DIR "/kml/") + name;
+}
+
+/** Reading options that keep the source. */
+ts::KmlReadOptions keeping()
+{
+  ts::KmlReadOptions options;
+  options.keepSource = true;
+  return options;
+}
+
+/** @p kml without its XML declaration and surrounding space. */
+QString withoutDeclaration(const QByteArray& kml)
+{
+  static const QRegularExpression declaration(
+      QStringLiteral("^\\s*<\\?xml[^>]*\\?>"));
+  return QString::fromUtf8(kml).remove(declaration).trimmed();
+}
+
+/** The feature named @p name in @p feature, to change; null if none. */
+ts::KmlFeature* findEditable(ts::KmlFeature& feature, const QString& name)
+{
+  if (feature.name == name) {
+    return &feature;
+  }
+  for (ts::KmlFeature& child : feature.children) {
+    ts::KmlFeature* found = findEditable(child, name);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+/** How many features @p feature is and holds. */
+std::size_t countFeatures(const ts::KmlFeature& feature)
+{
+  std::size_t count = 1;
+  for (const ts::KmlFeature& child : feature.children) {
+    count += countFeatures(child);
+  }
+  return count;
+}
+
+/**
+ * Checks @p kml against the OGC KML 2.2 schema (with the gx: elements
+ * Terra Soar writes) with xmllint; skipped where xmllint isn't installed.
+ */
+void validate(const QByteArray& kml)
+{
+  const QString xmllint =
+      QStandardPaths::findExecutable(QStringLiteral("xmllint"));
+  if (xmllint.isEmpty()) {
+    qWarning("xmllint not found: KML not checked against the schema");
+    return;
+  }
+  QTemporaryDir folder;
+  QFile file(folder.filePath(QStringLiteral("check.kml")));
+  QVERIFY(file.open(QIODevice::WriteOnly));
+  file.write(kml);
+  file.close();
+  QProcess process;
+  process.start(xmllint,
+                {QStringLiteral("--noout"), QStringLiteral("--nonet"),
+                 QStringLiteral("--schema"),
+                 QStringLiteral(TS_TEST_DATA_DIR "/kml/schema/kml-and-gx.xsd"),
+                 file.fileName()});
+  QVERIFY(process.waitForFinished(60000));
+  QVERIFY2(process.exitCode() == 0,
+           qPrintable(QString::fromUtf8(process.readAllStandardError()) +
+                      QString::fromUtf8(kml.left(3000))));
 }
 
 /**
@@ -1214,6 +1293,290 @@ private slots:
                  .value(QStringLiteral("deep"))
                  .toBool(),
              true);
+  }
+
+  void roundTripUnchanged()
+  {
+    // Read keeping the source and written straight back: the same text
+    // (only the XML declaration is Terra Soar's).
+    const QStringList files{
+        QStringLiteral("everything.kml"),
+        QStringLiteral("styles.kml"),
+        QStringLiteral("heights.kml"),
+        QStringLiteral("links.kml"),
+        QStringLiteral("gdal/samples.kml"),
+        QStringLiteral("gdal/geometries.kml"),
+        QStringLiteral("gdal/gxtrack.kml"),
+        QStringLiteral("gdal/gxmultitrack.kml"),
+        QStringLiteral("gdal/extended_data_without_schema_data.kml"),
+        QStringLiteral("gdal/placemark_with_kml_prefix.kml"),
+        QStringLiteral("gdal/kml_with_space_content_in_coordinates.kml"),
+        QStringLiteral("gdal/tab_separated_coord_triplet.kml"),
+        QStringLiteral("gdal/point_with_external_style.kml")};
+    for (const QString& name : files) {
+      QFile file(fixture(name));
+      QVERIFY(file.open(QIODevice::ReadOnly));
+      const QByteArray original = file.readAll();
+      QString error;
+      const std::optional<ts::KmlDocument> document =
+          ts::readKmlFile(fixture(name), &error, keeping());
+      if (!document) {
+        QFAIL(qPrintable(name + QStringLiteral(": ") + error));
+      }
+      QVERIFY2(document->sourceText != nullptr, qPrintable(name));
+      QCOMPARE(withoutDeclaration(ts::writeKml(*document)),
+               withoutDeclaration(original));
+    }
+  }
+
+  void roundTripEdited()
+  {
+    // Only what changed is written anew; the rest as it was.
+    QFile file(fixture(QStringLiteral("everything.kml")));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString original = QString::fromUtf8(file.readAll());
+    QString error;
+    std::optional<ts::KmlDocument> document = ts::readKmlFile(
+        fixture(QStringLiteral("everything.kml")), &error, keeping());
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    ts::KmlFeature* point =
+        findEditable(document->root, QStringLiteral("A point"));
+    if (point == nullptr) {
+      QFAIL("no point");
+    }
+    point->name = QStringLiteral("Renamed & moved");
+    point->geometry->coordinates.front().lonDeg = -1.5;
+    const QString written = QString::fromUtf8(ts::writeKml(*document));
+    QString expected = original;
+    expected.replace(QStringLiteral("<name>A point</name>"),
+                     QStringLiteral("<name>Renamed &amp; moved</name>"));
+    QVERIFY2(
+        written.contains(QLatin1String("<name>Renamed &amp; moved</name>")),
+        qPrintable(written.left(2000)));
+    QVERIFY(!written.contains(QLatin1String("-1.8904,52.4862")));
+    QVERIFY(written.contains(QLatin1String("<coordinates>-1.5,52.4862")));
+    // Unknown elements and the rest untouched.
+    QVERIFY(written.contains(QLatin1String("atom:author")));
+    QVERIFY(written.contains(QLatin1String("<PhotoOverlay>")));
+    // Read back: the edits, and as many features as before.
+    const std::optional<ts::KmlDocument> again =
+        ts::parseKml(written.toUtf8(), document->base, &error);
+    if (!again) {
+      QFAIL(qPrintable(error));
+    }
+    const ts::KmlFeature* renamed =
+        find(again->root, QStringLiteral("Renamed & moved"));
+    QVERIFY(renamed != nullptr);
+    QCOMPARE(renamed->geometry.value_or(ts::KmlGeometry{})
+                 .coordinates.front()
+                 .lonDeg,
+             -1.5);
+    QCOMPARE(countFeatures(again->root), countFeatures(document->root));
+    // A new placemark goes in its folder; a removed one goes.
+    ts::KmlFeature added;
+    added.name = QStringLiteral("Added");
+    ts::KmlGeometry where;
+    where.coordinates = {ts::KmlCoordinate{1.0, 2.0, 0.0}};
+    added.geometry = where;
+    document->root.children.front().children.push_back(added);
+    document->root.children.at(1).children.erase(
+        document->root.children.at(1).children.begin());
+    const std::optional<ts::KmlDocument> third =
+        ts::parseKml(ts::writeKml(*document), document->base, &error);
+    if (!third) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(third->root.children.front().children.back().name,
+             QStringLiteral("Added"));
+    QVERIFY(find(third->root, QStringLiteral("Stamped")) == nullptr);
+    // A changed style is written anew, its id kept.
+    document->root.styles.front().line->color = QColor(1, 2, 3);
+    const QString styled = QString::fromUtf8(ts::writeKml(*document));
+    QVERIFY(styled.contains(QLatin1String("<color>ff030201</color>")));
+    QVERIFY(styled.contains(QLatin1String("<Style id=\"red\">")));
+  }
+
+  void writeNew()
+  {
+    // A document made in Terra Soar: KML 2.2's order, read back the same.
+    ts::KmlGeometry line;
+    line.kind = ts::KmlGeometry::Kind::LineString;
+    line.tessellate = true;
+    line.coordinates = {ts::KmlCoordinate{-1.0, 51.0, 0.0},
+                        ts::KmlCoordinate{0.0, 52.0, 0.0}};
+    ts::KmlGeometry area;
+    area.kind = ts::KmlGeometry::Kind::Polygon;
+    area.coordinates = {
+        ts::KmlCoordinate{0.0, 0.0, 0.0}, ts::KmlCoordinate{1.0, 0.0, 0.0},
+        ts::KmlCoordinate{1.0, 1.0, 0.0}, ts::KmlCoordinate{0.0, 0.0, 0.0}};
+    area.inner = {
+        {ts::KmlCoordinate{0.2, 0.2, 0.0}, ts::KmlCoordinate{0.4, 0.2, 0.0},
+         ts::KmlCoordinate{0.2, 0.4, 0.0}, ts::KmlCoordinate{0.2, 0.2, 0.0}}};
+    ts::KmlDocument document = ts::kmlDocumentOf(
+        QStringLiteral("Mine"),
+        {{QStringLiteral("A line"), line}, {QStringLiteral("An area"), area}},
+        QColor(255, 0, 0));
+    ts::KmlFeature& first = document.root.children.front();
+    first.description = QStringLiteral("<b>bold</b> & more");
+    first.visibility = false;
+    ts::KmlTime when;
+    when.begin = QDateTime(QDate(2026, 1, 1), QTime(0, 0), QTimeZone::utc());
+    first.time = when;
+    first.extendedData = {{QStringLiteral("depth"), QStringLiteral("5")}};
+    ts::KmlView view;
+    view.latDeg = 51.5;
+    first.view = view;
+    const QByteArray kml = ts::writeKml(document);
+    QString error;
+    const std::optional<ts::KmlDocument> parsed =
+        ts::parseKml(kml, QString(), &error);
+    if (!parsed) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(parsed->root.name, QStringLiteral("Mine"));
+    QCOMPARE(parsed->root.styles.size(), std::size_t{1});
+    const ts::KmlFeature& back = parsed->root.children.front();
+    QCOMPARE(back.description, QStringLiteral("<b>bold</b> & more"));
+    QVERIFY(!back.visibility);
+    QCOMPARE(back.time.value_or(ts::KmlTime{}).begin.value_or(QDateTime()),
+             when.begin.value_or(QDateTime()));
+    QVERIFY(!back.time.value_or(ts::KmlTime{}).end.has_value());
+    QCOMPARE(back.extendedData.front().second, QStringLiteral("5"));
+    QCOMPARE(back.view.value_or(ts::KmlView{}).latDeg, 51.5);
+    QVERIFY(back.geometry.value_or(ts::KmlGeometry{}).tessellate);
+    QCOMPARE(parsed->root.children.at(1)
+                 .geometry.value_or(ts::KmlGeometry{})
+                 .inner.size(),
+             std::size_t{1});
+    validate(kml);
+    // everything.kml written without its source: valid KML 2.2 too.
+    validate(ts::writeKml(read(QStringLiteral("everything.kml"))));
+  }
+
+  void writeKmz()
+  {
+    // A KMZ keeps the files it uses: relative ones where they were, others
+    // in files/.
+    QTemporaryDir folder;
+    QVERIFY(folder.isValid());
+    QString error;
+    std::optional<ts::KmlDocument> document = ts::readKmlFile(
+        fixture(QStringLiteral("archive.kmz")), &error, keeping());
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    // A picture from elsewhere on disk too.
+    ts::KmlFeature overlay;
+    overlay.kind = ts::KmlFeature::Kind::ScreenOverlay;
+    overlay.name = QStringLiteral("Legend");
+    overlay.iconHref = fixture(QStringLiteral("images/legend.png"));
+    ts::KmlScreenPlacement placement;
+    overlay.screen = placement;
+    document->root.children.push_back(overlay);
+    ts::KmlFeature missing;
+    missing.kind = ts::KmlFeature::Kind::ScreenOverlay;
+    missing.iconHref = QStringLiteral("nowhere.png");
+    document->root.children.push_back(missing);
+    const QString path = folder.filePath(QStringLiteral("out.kmz"));
+    QStringList absent;
+    QVERIFY2(ts::writeKmlFile(*document, path, &error, &absent),
+             qPrintable(error));
+    QCOMPARE(absent, QStringList{QStringLiteral("nowhere.png")});
+    const std::optional<ts::KmlDocument> again = ts::readKmlFile(path, &error);
+    if (!again) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(again->kmz);
+    const ts::KmlFeature* legend = find(again->root, QStringLiteral("Legend"));
+    QVERIFY(legend != nullptr);
+    QCOMPARE(legend->iconHref, QStringLiteral("files/legend.png"));
+    QVERIFY(
+        !QImage::fromData(ts::readKmlResource(*again, legend->iconHref, &error))
+             .isNull());
+    QVERIFY(
+        !QImage::fromData(ts::readKmlResource(
+                              *again, QStringLiteral("files/icon.png"), &error))
+             .isNull());
+    // A plain KML file too; an unwritable place is an error.
+    QVERIFY(ts::writeKmlFile(
+        *document, folder.filePath(QStringLiteral("out.kml")), &error));
+    QVERIFY(!ts::writeKmlFile(
+        *document, folder.filePath(QStringLiteral("no/such/out.kml")), &error));
+    QVERIFY(!error.isEmpty());
+  }
+
+  void gdalReadsExports()
+  {
+    // GDAL's KML driver reads what Terra Soar writes, with the same shapes.
+    GDALAllRegister();
+    if (GDALGetDriverByName("KML") == nullptr) {
+      QSKIP("GDAL has no KML driver here");
+    }
+    QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("shapes.kml"));
+    QString error;
+    QVERIFY(
+        ts::writeKmlFile(read(QStringLiteral("heights.kml")), path, &error));
+    GDALDatasetH dataset = GDALOpenEx(path.toUtf8().constData(), GDAL_OF_VECTOR,
+                                      nullptr, nullptr, nullptr);
+    QVERIFY(dataset != nullptr);
+    int64_t features = 0;
+    std::vector<QString> types;
+    for (int32_t l = 0; l < GDALDatasetGetLayerCount(dataset); ++l) {
+      OGRLayerH layer = GDALDatasetGetLayer(dataset, l);
+      OGR_L_ResetReading(layer);
+      for (OGRFeatureH feature = OGR_L_GetNextFeature(layer);
+           feature != nullptr; feature = OGR_L_GetNextFeature(layer)) {
+        ++features;
+        OGRGeometryH geometry = OGR_F_GetGeometryRef(feature);
+        types.push_back(QString::fromUtf8(OGR_G_GetGeometryName(geometry)));
+        if (types.back() == QLatin1String("POLYGON")) {
+          OGRGeometryH ring = OGR_G_GetGeometryRef(geometry, 0);
+          QCOMPARE(OGR_G_GetPointCount(ring), 5);
+          QCOMPARE(OGR_G_GetX(ring, 0), -0.13);
+          QCOMPARE(OGR_G_GetZ(ring, 0), 40000.0);
+        }
+        OGR_F_Destroy(feature);
+      }
+    }
+    GDALClose(dataset);
+    QCOMPARE(features, int64_t{4});
+    QVERIFY(std::find(types.begin(), types.end(), QStringLiteral("POLYGON")) !=
+            types.end());
+  }
+
+  void extract()
+  {
+    // A folder on its own, with the shared styles it uses.
+    QString error;
+    const std::optional<ts::KmlDocument> document = ts::readKmlFile(
+        fixture(QStringLiteral("everything.kml")), &error, keeping());
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    const ts::KmlDocument shapes =
+        ts::kmlExtract(*document, QStringLiteral("0"));
+    QCOMPARE(shapes.root.kind, ts::KmlFeature::Kind::Document);
+    QCOMPARE(shapes.root.children.size(), std::size_t{1});
+    QCOMPARE(shapes.root.children.front().name, QStringLiteral("Shapes"));
+    std::vector<QString> ids;
+    for (const ts::KmlStyle& style : shapes.root.styles) {
+      ids.push_back(style.id);
+    }
+    QVERIFY(std::find(ids.begin(), ids.end(), QStringLiteral("red")) !=
+            ids.end());
+    // Written: the folder as it was in the file.
+    const QString written = QString::fromUtf8(ts::writeKml(shapes));
+    QVERIFY(
+        written.contains(QLatin1String("<name>A polygon with a hole</name>")));
+    QVERIFY(!written.contains(QLatin1String("Times and places")));
+    const std::optional<ts::KmlDocument> back =
+        ts::parseKml(written.toUtf8(), document->base, &error);
+    QVERIFY2(back.has_value(), qPrintable(error));
+    QVERIFY(
+        ts::kmlExtract(*document, QStringLiteral("9")).root.children.empty());
   }
 
   void registryCreatesKml()

@@ -33,3 +33,16 @@ documentation (Google, CC BY 4.0), as GDAL ships it.
 | `truncated.kml` | A file cut short |
 | `extended_data_without_schema_data.kml`, `test_schema.kml` | ExtendedData forms |
 | `point_with_external_style.kml`, `style_of_point_with_external_style/style.kml` | A styleUrl into another file |
+
+## Schemas (`schema/`)
+
+For checking the KML Terra Soar writes with `xmllint --schema
+schema/kml-and-gx.xsd` (the `validate()` test helper; `--nonet`, nothing
+is fetched).
+
+| File | What |
+| --- | --- |
+| `ogckml22.xsd`, `atom-author-link.xsd` | The OGC KML 2.2 schema from http://schemas.opengis.net/kml/2.2.0/ (OGC Software Notice), fetched on 2026-11-20. One change: the xAL import's `schemaLocation` points at `xAL.xsd` here instead of OASIS's site |
+| `xAL.xsd` | OASIS xAL 2.0, which the KML schema imports, from http://docs.oasis-open.org/election/external/xAL.xsd |
+| `terrasoar-gx.xsd` | Terra Soar's own schema for the `gx:` elements it writes (Track, coord, altitudeMode, LatLonQuad), written from Google's KML reference; not Google's schema |
+| `kml-and-gx.xsd` | Imports the two, so a file using both can be checked |

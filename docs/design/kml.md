@@ -285,6 +285,66 @@ view, `kmlFeaturePose()` frames the geometry or the overlay's box. A
 folder's or layer's context menu has Fly There, and a balloon has a Fly
 there link.
 
+## Writing
+
+`ts::writeKml()` writes a document; `ts::writeKmlFile()` writes it to a
+`.kml`, or a `.kmz` (`CPLCreateZip`: doc.kml first, then the files it
+uses).
+
+**Documents made in Terra Soar** are written in KML 2.2's element order
+(the schema's), with only what isn't the default, the `kml`, `gx` and
+`atom` namespaces declared on the root, HTML descriptions and balloon
+texts in CDATA, numbers without exponents or needless digits, times in
+UTC. Unknown elements of a document read without its text go back after
+the element they followed.
+
+**Round trips.** A document to be saved is read with
+`KmlReadOptions::keepSource`: the text is kept (`KmlDocument::sourceText`,
+decoded from UTF-8 or Latin-1; files in other encodings are read without
+it) and each feature notes where it is in the text (`KmlSource`): its
+start and end tags, and each element inside it in order
+(`KmlSourcePart`: a known element by *slot* – `kmlSlotOf()`, e.g. "view"
+for LookAt or Camera – an unknown element, or a child feature). For each
+known element the reader keeps a hash of how Terra Soar would write it
+from what was read (`kmlFeatureElement()`, `kmlTextHash()`). The writer
+then goes through each feature's parts in the order of the text:
+
+- the text between parts (space, line ends, comments) as it was;
+- a known element whose hash still matches as it was in the text, else
+  written anew from the model (and left out if it is gone);
+- unknown elements as they were;
+- child features where children were, each written the same way, new
+  ones after the last;
+- elements the feature didn't have, where KML 2.2's order puts them;
+- the start and end tags as they were, unless the id changed.
+
+So a document read and written without changes comes back as it was
+(but for Terra Soar's XML declaration), whatever the program that wrote
+it, and an edit changes only the elements it touches: other programs'
+extensions, `ExtendedData` with `SchemaData`, comments and layout stay.
+Elements written anew lose what the model doesn't hold (`colorMode`, an
+Icon's refresh settings). `gx:` elements written anew declare the `gx`
+namespace on themselves if the root doesn't.
+
+The positions come from the stream reader's position after each tag;
+where a tag starts is found by looking back for its `<` (the reader's
+position before a token may already be past it).
+
+**KMZ.** The files the document uses (icons in its styles, overlay
+pictures) go in the archive: those given by relative address at that
+address (a KMZ saved again keeps its layout), others (absolute paths)
+in `files/`, the document changed to point there. Web addresses stay as
+they are; local files that can't be read are reported (not an error).
+
+**Exporting.** `ts::kmlExtract()` makes a document of one folder (or
+overlay or link) with the shared styles it uses, keeping its text.
+`ts::kmlDocumentOf()` makes a document of named geometries in one style.
+In the window: Save As KML or KMZ… on a KML entry of the layer tree
+(the file read again with its text kept: the whole document for its top
+entry, else that folder), Save as KML… in the elevation profile window
+(the line, along the ground) and Export as KML… in Offline Regions (the
+area, its first ring the outside and the others holes).
+
 ## Tests
 
 `tests/kml`: every element of `everything.kml` (structure, geometries,
@@ -306,7 +366,11 @@ antimeridian, markers), Regions (size on the screen from near and far,
 out of sight, on the way to a feature), link addresses (view bounds,
 viewFormat, httpQuery, relative to a file or a web copy), deep layers,
 the provider (tiles without points,
-picking order), the registry, view poses and balloon HTML. `tests/ui`: a
+picking order), the registry, view poses and balloon HTML; writing: every fixture read and written back unchanged (the same text),
+edits written as the only changes, new documents (read back the same and
+valid against the OGC KML 2.2 schema with `xmllint`, `tests/data/kml/schema`),
+KMZ archives with their files, GDAL reading what is written with the same
+shapes, a folder extracted with its styles. `tests/ui`: a
 KML opened into the layer tree, a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
 is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,

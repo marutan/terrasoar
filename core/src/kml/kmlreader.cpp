@@ -19,9 +19,11 @@
  */
 #include "ts/kml/kmlreader.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <utility>
 
 #include <QCoreApplication>
@@ -36,6 +38,7 @@
 #include <cpl_string.h>
 #include <cpl_vsi.h>
 
+#include "ts/kml/kmlwriter.h"
 #include "ts/time/timeextent.h"
 
 namespace ts
@@ -141,10 +144,51 @@ std::optional<QDateTime> time(const QString& text)
 class Reader
 {
 public:
-  Reader(QXmlStreamReader& xml, KmlDocument& document)
-      : m_xml(&xml), m_document(&document)
+  Reader(QXmlStreamReader& xml, KmlDocument& document, bool keepSource)
+      : m_xml(&xml), m_document(&document), m_keep(keepSource)
   {
   }
+
+  /**
+   * Moves to the next start element inside the current one, setting
+   * @p begin to where it starts; returns false at the end of the current
+   * one, setting @p endBegin to where its end tag starts.
+   */
+  bool nextStart(int64_t* begin, int64_t* endBegin)
+  {
+    for (;;) {
+      const QXmlStreamReader::TokenType token = m_xml->readNext();
+      if (token == QXmlStreamReader::StartElement) {
+        *begin = tagStart();
+        return true;
+      }
+      if (token == QXmlStreamReader::EndElement ||
+          token == QXmlStreamReader::EndDocument ||
+          token == QXmlStreamReader::Invalid) {
+        *endBegin = tagStart();
+        return false;
+      }
+    }
+  }
+
+  /**
+   * Returns where the tag just read starts in the kept text: the "<" before
+   * the reader's position ("<" can't be inside a tag). 0 if nothing is kept.
+   */
+  int64_t tagStart() const
+  {
+    if (m_text == nullptr || m_xml->characterOffset() <= 0) {
+      return 0;
+    }
+    return m_text->lastIndexOf(
+        QLatin1Char('<'), static_cast<qsizetype>(m_xml->characterOffset()) - 1);
+  }
+
+  /** Sets the text being read (kept), to find where elements start. */
+  void setText(const QString* text) { m_text = text; }
+
+  /** Sets where the next feature read starts (for its source). */
+  void setFeatureBegin(int64_t begin) { m_featureBegin = begin; }
 
   /** Reads the feature whose start element the reader is at. */
   KmlFeature feature(KmlFeature::Kind kind)
@@ -152,17 +196,39 @@ public:
     KmlFeature f;
     f.kind = kind;
     f.id = m_xml->attributes().value(QLatin1String("id")).toString();
+    KmlSource source;
+    source.id = f.id;
+    source.begin = m_featureBegin;
+    source.startEnd = m_xml->characterOffset();
     QString last;
-    while (m_xml->readNextStartElement()) {
+    int64_t at = 0;
+    while (nextStart(&at, &source.endBegin)) {
       const QString n = m_xml->name().toString();
+      const std::size_t children = f.children.size();
+      m_featureBegin = at;
+      KmlSourcePart part;
+      part.begin = at;
       if (common(f, n) || (isContainer(kind) && container(f, n)) ||
           (kind == KmlFeature::Kind::Placemark && placemark(f, n)) ||
           (isOverlay(kind) && overlay(f, n)) ||
           (kind == KmlFeature::Kind::NetworkLink && networkLink(f, n))) {
         last = n;
-        continue;
+        part.kind = f.children.size() > children ? KmlSourcePart::Kind::Child
+                                                 : KmlSourcePart::Kind::Known;
+        part.slot = kmlSlotOf(n);
+      } else {
+        f.unknown.emplace_back(last, keep(n));
+        part.kind = KmlSourcePart::Kind::Unknown;
+        part.slot = n;
       }
-      f.unknown.emplace_back(last, keep(n));
+      if (m_keep) {
+        part.end = m_xml->characterOffset();
+        source.parts.push_back(std::move(part));
+      }
+    }
+    if (m_keep) {
+      source.end = m_xml->characterOffset();
+      kept(f, std::move(source));
     }
     return f;
   }
@@ -190,6 +256,19 @@ public:
   }
 
 private:
+  /** Notes @p f's source, with each known element's ordinal and hash. */
+  static void kept(KmlFeature& f, KmlSource source)
+  {
+    std::map<QString, int32_t> counts;
+    for (KmlSourcePart& part : source.parts) {
+      if (part.kind == KmlSourcePart::Kind::Known) {
+        part.ordinal = counts[part.slot]++;
+        part.hash = kmlTextHash(kmlFeatureElement(f, part.slot, part.ordinal));
+      }
+    }
+    f.source = std::make_shared<const KmlSource>(std::move(source));
+  }
+
   static bool isContainer(KmlFeature::Kind kind)
   {
     return kind == KmlFeature::Kind::Document ||
@@ -777,6 +856,9 @@ private:
 
   QXmlStreamReader* m_xml;
   KmlDocument* m_document;
+  bool m_keep = false;
+  const QString* m_text = nullptr;
+  int64_t m_featureBegin = 0;
 };
 
 std::optional<KmlFeature::Kind> featureKind(const QString& n)
@@ -851,14 +933,97 @@ QString kmzMain(const QString& archive)
 
 } // namespace
 
-std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
-                                    QString* errorString)
+namespace
 {
-  QXmlStreamReader stream(xml);
+
+/**
+ * Returns @p bytes as text for keeping (KmlReadOptions::keepSource): UTF-8
+ * (with or without a byte order mark) or Latin-1 as its declaration says;
+ * nothing for other encodings.
+ */
+std::optional<QString> decodedKml(const QByteArray& bytes)
+{
+  if (bytes.startsWith("\xEF\xBB\xBF")) {
+    return QString::fromUtf8(bytes.mid(3));
+  }
+  if (bytes.startsWith("\xFF\xFE") || bytes.startsWith("\xFE\xFF")) {
+    return std::nullopt;
+  }
+  static const QRegularExpression declared(
+      QStringLiteral("^\\s*<\\?xml[^>]*encoding\\s*=\\s*[\"']([^\"']+)[\"']"));
+  const QRegularExpressionMatch match =
+      declared.match(QString::fromLatin1(bytes.left(200)));
+  const QString encoding =
+      match.hasMatch() ? match.captured(1).toLower() : QStringLiteral("utf-8");
+  if (encoding == QLatin1String("utf-8") || encoding == QLatin1String("utf8")) {
+    return QString::fromUtf8(bytes);
+  }
+  if (encoding == QLatin1String("iso-8859-1") ||
+      encoding == QLatin1String("latin1") ||
+      encoding == QLatin1String("us-ascii")) {
+    return QString::fromLatin1(bytes);
+  }
+  return std::nullopt;
+}
+
+/** Reads the kml element's children into @p document. */
+bool readKmlElement(QXmlStreamReader& stream, Reader& reader,
+                    KmlDocument& document, bool keep, int64_t begin)
+{
+  KmlSource kml;
+  kml.begin = begin;
+  kml.startEnd = stream.characterOffset();
+  bool found = false;
+  int64_t at = 0;
+  while (reader.nextStart(&at, &kml.endBegin)) {
+    const QString n = stream.name().toString();
+    const std::optional<KmlFeature::Kind> kind = featureKind(n);
+    KmlSourcePart part;
+    part.begin = at;
+    if (kind && !found) {
+      reader.setFeatureBegin(at);
+      document.root = reader.feature(*kind);
+      found = true;
+      part.kind = KmlSourcePart::Kind::Child;
+    } else {
+      document.unknownTopLevel.push_back(reader.keep(n));
+      part.kind = KmlSourcePart::Kind::Unknown;
+      part.slot = n;
+    }
+    part.end = stream.characterOffset();
+    kml.parts.push_back(std::move(part));
+  }
+  kml.end = stream.characterOffset();
+  if (keep) {
+    document.kmlSource = std::make_shared<const KmlSource>(std::move(kml));
+  }
+  return found;
+}
+
+} // namespace
+
+std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
+                                    QString* errorString,
+                                    const KmlReadOptions& options)
+{
+  // Kept text is read as text, so positions in it are the reader's.
+  std::optional<QString> text;
+  if (options.keepSource) {
+    text = decodedKml(xml);
+  }
+  QXmlStreamReader stream;
+  if (text) {
+    stream.addData(*text);
+  } else {
+    stream.addData(xml);
+  }
   KmlDocument document;
   document.base = base;
-  Reader reader(stream, document);
-  if (!stream.readNextStartElement()) {
+  Reader reader(stream, document, text.has_value());
+  reader.setText(text ? &*text : nullptr);
+  int64_t begin = 0;
+  int64_t ignored = 0;
+  if (!reader.nextStart(&begin, &ignored)) {
     return fail(errorString,
                 QCoreApplication::translate("ts::KmlReader",
                                             "The file is not KML: %1 (line %2, "
@@ -870,17 +1035,9 @@ std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
   const QString root = stream.name().toString();
   bool found = false;
   if (root == QLatin1String("kml")) {
-    while (stream.readNextStartElement()) {
-      const QString n = stream.name().toString();
-      const std::optional<KmlFeature::Kind> kind = featureKind(n);
-      if (kind && !found) {
-        document.root = reader.feature(*kind);
-        found = true;
-      } else {
-        document.unknownTopLevel.push_back(reader.keep(n));
-      }
-    }
+    found = readKmlElement(stream, reader, document, text.has_value(), begin);
   } else if (const std::optional<KmlFeature::Kind> kind = featureKind(root)) {
+    reader.setFeatureBegin(begin);
     document.root = reader.feature(*kind);
     found = true;
   } else {
@@ -900,11 +1057,21 @@ std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
   if (!found) {
     document.root.kind = KmlFeature::Kind::Document;
   }
+  if (text) {
+    document.sourceText = std::make_shared<const QString>(std::move(*text));
+    // Just after the XML declaration, if there is one.
+    const QString& kept = *document.sourceText;
+    document.prologueBegin =
+        kept.startsWith(QLatin1String("<?xml"))
+            ? std::max<int64_t>(0, kept.indexOf(QLatin1String("?>")) + 2)
+            : 0;
+  }
   return document;
 }
 
 std::optional<KmlDocument> readKmlFile(const QString& path,
-                                       QString* errorString)
+                                       QString* errorString,
+                                       const KmlReadOptions& options)
 {
   QFile file(path);
   if (!file.open(QIODevice::ReadOnly)) {
@@ -925,8 +1092,9 @@ std::optional<KmlDocument> readKmlFile(const QString& path,
                       "\"%1\" is a KMZ archive without a KML file in it.")
                       .arg(QDir::toNativeSeparators(path)));
     }
-    std::optional<KmlDocument> document = parseKml(
-        readVsi(archive + QLatin1Char('/') + main), archive, errorString);
+    std::optional<KmlDocument> document =
+        parseKml(readVsi(archive + QLatin1Char('/') + main), archive,
+                 errorString, options);
     if (document) {
       document->path = path;
       document->kmz = true;
@@ -936,8 +1104,8 @@ std::optional<KmlDocument> readKmlFile(const QString& path,
   if (!file.open(QIODevice::ReadOnly)) {
     return fail(errorString, file.errorString());
   }
-  std::optional<KmlDocument> document =
-      parseKml(file.readAll(), QFileInfo(path).absolutePath(), errorString);
+  std::optional<KmlDocument> document = parseKml(
+      file.readAll(), QFileInfo(path).absolutePath(), errorString, options);
   if (document) {
     document->path = path;
   }

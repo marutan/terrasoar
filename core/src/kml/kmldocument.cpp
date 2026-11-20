@@ -20,6 +20,7 @@
 #include "ts/kml/kmldocument.h"
 
 #include <functional>
+#include <map>
 
 namespace ts
 {
@@ -95,6 +96,48 @@ const KmlStyleMap* KmlDocument::findStyleMap(const QString& id) const
       root, id, [](const KmlFeature& f) -> const std::vector<KmlStyleMap>& {
         return f.styleMaps;
       });
+}
+
+QString kmlSlotOf(const QString& localName)
+{
+  static const std::map<QString, QString> slotNames{
+      {QStringLiteral("LookAt"), QStringLiteral("view")},
+      {QStringLiteral("Camera"), QStringLiteral("view")},
+      {QStringLiteral("TimeStamp"), QStringLiteral("time")},
+      {QStringLiteral("TimeSpan"), QStringLiteral("time")},
+      {QStringLiteral("Point"), QStringLiteral("geometry")},
+      {QStringLiteral("LineString"), QStringLiteral("geometry")},
+      {QStringLiteral("LinearRing"), QStringLiteral("geometry")},
+      {QStringLiteral("Polygon"), QStringLiteral("geometry")},
+      {QStringLiteral("MultiGeometry"), QStringLiteral("geometry")},
+      {QStringLiteral("Track"), QStringLiteral("geometry")},
+      {QStringLiteral("MultiTrack"), QStringLiteral("geometry")},
+      {QStringLiteral("snippet"), QStringLiteral("Snippet")},
+      {QStringLiteral("Url"), QStringLiteral("Link")},
+  };
+  const std::map<QString, QString>::const_iterator found =
+      slotNames.find(localName);
+  return found != slotNames.end() ? found->second : localName;
+}
+
+QStringList kmlElementsOfSlot(const QString& slot)
+{
+  static const std::map<QString, QStringList> names{
+      {QStringLiteral("view"),
+       {QStringLiteral("LookAt"), QStringLiteral("Camera")}},
+      {QStringLiteral("time"),
+       {QStringLiteral("TimeStamp"), QStringLiteral("TimeSpan")}},
+      {QStringLiteral("geometry"),
+       {QStringLiteral("Point"), QStringLiteral("LineString"),
+        QStringLiteral("LinearRing"), QStringLiteral("Polygon"),
+        QStringLiteral("MultiGeometry"), QStringLiteral("Track"),
+        QStringLiteral("MultiTrack")}},
+      {QStringLiteral("Snippet"),
+       {QStringLiteral("Snippet"), QStringLiteral("snippet")}},
+      {QStringLiteral("Link"), {QStringLiteral("Link"), QStringLiteral("Url")}},
+  };
+  const std::map<QString, QStringList>::const_iterator found = names.find(slot);
+  return found != names.end() ? found->second : QStringList{slot};
 }
 
 QString kmlAltitudeModeName(KmlAltitudeMode mode)

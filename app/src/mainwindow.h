@@ -149,6 +149,15 @@ public:
    */
   void updateKmlRegions();
 
+  /**
+   * Returns the KML of the layer tree's entry @p nodeId as it would be
+   * saved: the file read again with its text kept, the whole document for
+   * its top entry, else a document holding just that folder, overlay or
+   * link. Nothing (with @p errorString) if it isn't KML or can't be read.
+   */
+  std::optional<KmlDocument> kmlNodeDocument(const QString& nodeId,
+                                             QString* errorString) const;
+
   /** Returns the KML nodes out of their Regions' sight (for tests). */
   QStringList kmlHiddenNodes() const
   {

@@ -67,6 +67,7 @@ HEADERS += \
     include/ts/kml/kmloverlays.h \
     include/ts/kml/kmlpresentation.h \
     include/ts/kml/kmlreader.h \
+    include/ts/kml/kmlwriter.h \
     include/ts/layers/layerdefinition.h \
     include/ts/layers/layertreemodel.h \
     include/ts/layers/projectfile.h \
@@ -178,6 +179,7 @@ SOURCES += \
     src/kml/kmloverlays.cpp \
     src/kml/kmlpresentation.cpp \
     src/kml/kmlreader.cpp \
+    src/kml/kmlwriter.cpp \
     src/layers/layerdefinition.cpp \
     src/layers/layertreemodel.cpp \
     src/layers/projectfile.cpp \

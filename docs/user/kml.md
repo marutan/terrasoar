@@ -78,14 +78,26 @@ you to it.
 Right-click a folder or a Places layer and choose **Fly There** to go to
 its view, or to see all of it.
 
+## Saving
+
+- Right-click a KML entry in the Layers panel and choose **Save As KML
+  or KMZ…**: the whole file for its top entry, or just that folder (or
+  picture or link) for an entry inside it. What Terra Soar doesn't show
+  or change is saved as it was, so files from other programs lose
+  nothing.
+- A **KMZ** holds the icons and pictures the KML uses, so it works on
+  another computer. If any of them can't be found, you are told which.
+- In the **Elevation Profile** window, **Save as KML…** saves the line.
+- In **Offline Regions**, **Export as KML…** saves the selected region's
+  area.
+
 ## Things to know
 
 - Elements Terra Soar doesn't show yet are skipped; the status bar says
   how many.
 - A file that isn't valid KML is refused with the line and column where
   it goes wrong.
-- Creating and editing your own KML, and saving to KML and KMZ, come
-  later in this phase.
+- Creating and editing your own KML comes later in this phase.
 - Not shown: photo overlays, 3D models, tours, and sounds.
 - Paths and areas in the air, and icons, are drawn over the view: a
   hill in front of them doesn't hide them.

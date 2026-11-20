@@ -28,6 +28,7 @@
 #define TS_KML_KMLDOCUMENT_H
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -330,6 +331,50 @@ struct KmlLink {
 };
 
 /**
+ * Where an element of a feature (or of the kml element) is in the text a
+ * document was read from (KmlReadOptions::keepSource).
+ */
+struct KmlSourcePart {
+  /** What the element is. */
+  enum class Kind : uint8_t {
+    Known,   ///< One Terra Soar reads, in slot.
+    Unknown, ///< One it doesn't: written back as it was.
+    Child,   ///< A feature inside a container.
+  };
+  /** What the element is. */
+  Kind kind = Kind::Known;
+  /** A known element's slot (kmlSlotOf()); an unknown one's name. */
+  QString slot;
+  /** Which of the feature's elements in that slot, from 0. */
+  int32_t ordinal = 0;
+  /** Where it starts in the text. */
+  int64_t begin = 0;
+  /** Just after where it ends. */
+  int64_t end = 0;
+  /**
+   * kmlTextHash() of kmlFeatureElement() as read: the element is unchanged
+   * while it still matches.
+   */
+  uint64_t hash = 0;
+};
+
+/** Where a feature (or the kml element) is in the text it was read from. */
+struct KmlSource {
+  /** Its id as read. */
+  QString id;
+  /** Where its start tag starts. */
+  int64_t begin = 0;
+  /** Just after its start tag. */
+  int64_t startEnd = 0;
+  /** Where its end tag starts. */
+  int64_t endBegin = 0;
+  /** Just after its end tag. */
+  int64_t end = 0;
+  /** Its elements in order. */
+  std::vector<KmlSourcePart> parts;
+};
+
+/**
  * One feature: a Document, Folder, Placemark, GroundOverlay,
  * ScreenOverlay or NetworkLink, with what every feature has (name,
  * visibility, description, style, view, region, time, extended data) and
@@ -411,6 +456,11 @@ struct KmlFeature {
    * written back in place.
    */
   std::vector<std::pair<QString, QString>> unknown;
+  /**
+   * Where it is in the text it was read from (KmlReadOptions::keepSource);
+   * null if it wasn't read so, or was made in Terra Soar.
+   */
+  std::shared_ptr<const KmlSource> source;
 };
 
 /**
@@ -441,6 +491,15 @@ struct KmlDocument {
    * name, line and column (for the user, not an error).
    */
   QStringList skipped;
+  /**
+   * The text it was read from (KmlReadOptions::keepSource), so writeKml()
+   * can write what didn't change as it was; null otherwise.
+   */
+  std::shared_ptr<const QString> sourceText;
+  /** Where the kml element is in sourceText; null if none. */
+  std::shared_ptr<const KmlSource> kmlSource;
+  /** Where the text after the XML declaration starts in sourceText. */
+  int64_t prologueBegin = 0;
 
   /** Returns the shared style with @p id, or null. */
   const KmlStyle* findStyle(const QString& id) const;
@@ -450,6 +509,16 @@ struct KmlDocument {
 
 /** Returns @p mode's name as written in KML. */
 QString kmlAltitudeModeName(KmlAltitudeMode mode);
+
+/**
+ * Returns the slot of a feature's element named @p localName: "view" for
+ * LookAt and Camera, "time" for TimeStamp and TimeSpan, "geometry" for the
+ * geometries, "Snippet" for snippet, "Link" for Url; else the name.
+ */
+QString kmlSlotOf(const QString& localName);
+
+/** Returns the element names of @p slot (see kmlSlotOf()). */
+QStringList kmlElementsOfSlot(const QString& slot);
 
 /** Reads a KML colour (aabbggrr hex); invalid if it isn't one. */
 QColor kmlColor(const QString& text);
