@@ -130,6 +130,9 @@ public:
    */
   void addWmtsLayer(const QString& address = QString());
 
+  /** Opens the Add XYZ Tile Layer dialog and adds what the user chooses. */
+  void addXyzLayer();
+
   /**
    * Asks for a raster file (a GeoTIFF, an RPF A.TOC, …) and adds it as an
    * imagery layer.
@@ -316,6 +319,7 @@ private:
   std::unique_ptr<ProviderRegistry> m_registry;
   QAction* m_addWmsAction = nullptr;
   QAction* m_addWmtsAction = nullptr;
+  QAction* m_addXyzAction = nullptr;
   QAction* m_offlineRegionsAction = nullptr;
   /** Destroyed before the registry. */
   std::unique_ptr<OfflineRegionManager> m_offlineRegions;

@@ -93,8 +93,8 @@ OfflineRegionManager::providerFor(const QJsonObject& source,
           m_registry.imagery(source, &error));
   if (!provider && errorString) {
     *errorString = error.isEmpty()
-                       ? tr("Only layers from WMS and WMTS servers can be "
-                            "kept for offline use.")
+                       ? tr("Only layers from WMS, WMTS and XYZ tile "
+                            "servers can be kept for offline use.")
                        : error;
   }
   if (provider && !provider->diskCache() && errorString) {

@@ -77,7 +77,10 @@ around, under ThreadSanitizer in CI.
 tile through the shared `ts::NetworkClient`, keeps responses in a
 `ts::TileDiskCache`, and reports Offline or Error. Created by the registry
 for sources `{"kind": "wms", …}`; see [wms.md](wms.md) and
-[network-and-cache.md](network-and-cache.md).
+[network-and-cache.md](network-and-cache.md). `ts::WmtsImageryProvider`
+(`{"kind": "wmts", …}`, [wmts.md](wmts.md)) and `ts::XyzImageryProvider`
+(`{"kind": "xyz", …}`, [xyz.md](xyz.md)) share that client, cache and
+offline handling.
 
 ## File providers
 

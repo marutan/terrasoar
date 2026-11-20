@@ -151,6 +151,23 @@ public:
   /** Returns what it has done so far (counted per WMTS tile). */
   WebTileStatistics statistics() const;
 
+protected:
+  /**
+   * For sources described another way (XYZ tile services): requests
+   * @p source's tiles with the id @p id (for the disk cache and the
+   * registry) from @p host (for the offline state), addresses from
+   * tileUrl().
+   */
+  WmtsImageryProvider(WmtsSource source, QString id, QString host,
+                      std::shared_ptr<NetworkClient> network,
+                      WebTileSettings settings);
+
+  /**
+   * Returns the address of @p tile; getTileUrl() unless overridden. Called
+   * on loader threads.
+   */
+  virtual QUrl tileUrl(const WmtsTileIndex& tile) const;
+
 private:
   /**
    * A window's WMTS tiles side by side, and what became of them. Drawn
@@ -187,6 +204,7 @@ private:
   void returnTransform(std::unique_ptr<WmtsCrsTransform> transform) const;
 
   const WmtsSource m_source;
+  const QString m_id;
   const std::unique_ptr<CachedTileFetcher> m_fetcher;
   /** PROJ transformations not in use (each used by one thread at a time). */
   mutable std::mutex m_transformMutex;

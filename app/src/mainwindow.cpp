@@ -58,6 +58,7 @@
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
+#include "addxyzdialog.h"
 #include "elevationprofiledialog.h"
 #include "globeview.h"
 #include "helpwindow.h"
@@ -194,6 +195,8 @@ MainWindow::MainWindow(QWidget* parent)
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
           [this]() { addWmtsLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addXyzLayerRequested, this,
+          [this]() { addXyzLayer(); });
   connect(m_layerDock, &LayerTreeDock::addImageryFileRequested, this,
           [this]() { addImageryFile(); });
   connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
@@ -529,6 +532,10 @@ void MainWindow::createActions()
   m_addWmtsAction->setObjectName(QStringLiteral("addWmtsAction"));
   connect(m_addWmtsAction, &QAction::triggered, this,
           [this]() { addWmtsLayer(); });
+  m_addXyzAction = new QAction(this);
+  m_addXyzAction->setObjectName(QStringLiteral("addXyzAction"));
+  connect(m_addXyzAction, &QAction::triggered, this,
+          [this]() { addXyzLayer(); });
 
   m_addWebTerrainAction = new QAction(this);
   m_addWebTerrainAction->setObjectName(QStringLiteral("addWebTerrainAction"));
@@ -804,6 +811,7 @@ void MainWindow::createMenus()
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addWmtsAction);
+  m_fileMenu->addAction(m_addXyzAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
@@ -913,9 +921,13 @@ void MainWindow::retranslateUi()
   m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
   m_addWmtsAction->setStatusTip(
       tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
+  m_addXyzAction->setText(tr("Add &XYZ Tile Layer…"));
+  m_addXyzAction->setStatusTip(
+      tr("Add a layer from an XYZ or TMS tile service, such as "
+         "OpenStreetMap, to the layer tree"));
   m_offlineRegionsAction->setText(tr("Offline &Regions…"));
   m_offlineRegionsAction->setStatusTip(
-      tr("Keep areas of WMS and WMTS layers on this computer for use "
+      tr("Keep areas of WMS, WMTS and XYZ layers on this computer for use "
          "without a network"));
   m_dataPacksAction->setText(tr("&Data Packs…"));
   m_dataPacksAction->setStatusTip(
@@ -1141,6 +1153,18 @@ void MainWindow::addWmtsLayer(const QString& address)
   }
 }
 
+void MainWindow::addXyzLayer()
+{
+  AddXyzDialog dialog(m_registry->network(), this);
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
+  }
+}
+
 ElevationProfileDialog* MainWindow::showElevationProfile()
 {
   if (m_globeView == nullptr) {
@@ -1272,14 +1296,16 @@ NewRegionDialog* MainWindow::newOfflineRegion()
     m_newRegionDialog->raise();
     return m_newRegionDialog;
   }
-  // The WMS and WMTS layers of the project, each source once, top first.
+  // The WMS, WMTS and XYZ layers of the project, each source once, top
+  // first.
   std::vector<RegionLayerChoice> layers;
   const LayerStack stack = m_layers->layerStack();
   for (std::size_t i = stack.imagery.size(); i-- > 0;) {
     const LayerDefinition& definition = stack.imagery[i].definition;
     const QString kind =
         definition.source.value(QStringLiteral("kind")).toString();
-    if (kind != QLatin1String("wms") && kind != QLatin1String("wmts")) {
+    if (kind != QLatin1String("wms") && kind != QLatin1String("wmts") &&
+        kind != QLatin1String("xyz")) {
       continue;
     }
     const bool seen = std::any_of(layers.begin(), layers.end(),
@@ -1293,9 +1319,9 @@ NewRegionDialog* MainWindow::newOfflineRegion()
   if (layers.empty()) {
     QMessageBox::information(
         this, tr("New Offline Region"),
-        tr("Only layers from WMS and WMTS servers can be kept for offline "
-           "use. Add one first (File → Add WMS Layer… or Add WMTS "
-           "Layer…)."));
+        tr("Only layers from WMS, WMTS and XYZ tile servers can be kept for "
+           "offline use. Add one first (File → Add WMS Layer…, Add WMTS "
+           "Layer… or Add XYZ Tile Layer…)."));
     return nullptr;
   }
   if (!m_countries && !m_countriesFile.isEmpty()) {

@@ -26,6 +26,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QDirIterator>
@@ -48,6 +49,7 @@
 #include <QShortcut>
 #include <QSignalSpy>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QTabWidget>
@@ -63,6 +65,7 @@
 #include "addwebterraindialog.h"
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
+#include "addxyzdialog.h"
 #include "appsettings.h"
 #include "elevationprofiledialog.h"
 #include "fixturepack.h"
@@ -90,6 +93,7 @@
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "userguide.h"
+#include "wmscataloguefile.h"
 
 namespace
 {
@@ -437,6 +441,7 @@ private slots:
     // catalogue isn't fetched from the internet.
     QStandardPaths::setTestModeEnabled(true);
     qputenv("TS_WMS_CATALOGUE_URL", QByteArray());
+    qputenv("TS_XYZ_CATALOGUE_URL", QByteArray());
     // No offline regions left over from an earlier run.
     QFile::remove(
         QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
@@ -612,10 +617,13 @@ private slots:
                          nullptr);
     ts::AddWmtsDialog wmts(std::make_shared<ts::NetworkClient>(settings),
                            nullptr);
+    ts::AddXyzDialog xyz(std::make_shared<ts::NetworkClient>(settings),
+                         nullptr);
     ts::AddWebTerrainDialog terrain(nullptr);
     const std::vector<std::pair<QDialog*, QString>> dialogs{
         {&wms, ts::AddWmsDialog::helpTarget()},
         {&wmts, ts::AddWmtsDialog::helpTarget()},
+        {&xyz, ts::AddXyzDialog::helpTarget()},
         {&terrain, ts::AddWebTerrainDialog::helpTarget()}};
     for (const std::pair<QDialog*, QString>& entry : dialogs) {
       QVERIFY2(helpKeyOpens(entry.first, entry.second),
@@ -1935,6 +1943,111 @@ private slots:
     QVERIFY(failed.wait(5000));
     QVERIFY2(wrong.statusText().contains(QStringLiteral("Add WMS Layer")),
              qPrintable(wrong.statusText()));
+  }
+
+  void addXyzDialog()
+  {
+    // The current catalogue arrives; choosing a service fills the fields;
+    // a template the program can't use is explained and Add stays off;
+    // Add makes the layer's definition.
+    ts::test::MockHttpServer server;
+    server.setHandler([](const ts::test::MockHttpRequest& request) {
+      if (request.url.path() == QLatin1String("/catalogue.json")) {
+        return ts::test::mockResponse(
+            200,
+            "{\"format\": \"terrasoar-xyz-catalogue\", \"version\": 1, "
+            "\"services\": [{\"title\": \"Mock tiles\", \"template\": "
+            "\"https://{s}.tiles.example.invalid/{z}/{x}/{y}.png\", "
+            "\"subdomains\": [\"a\", \"b\"], \"maxZoom\": 12, "
+            "\"description\": \"Circles and lines\", \"attribution\": "
+            "\"Mock Mapping Agency\", \"terms\": "
+            "\"https://example.invalid/terms\", \"allowBulkDownload\": "
+            "false}]}",
+            "application/json");
+      }
+      return ts::test::mockResponse(404, "Not Found", "text/plain");
+    });
+    // The copy an earlier run fetched would stand in for the built-in one.
+    QFile::remove(ts::xyzCatalogueCachePath());
+    qputenv("TS_XYZ_CATALOGUE_URL",
+            server.url(QStringLiteral("/catalogue.json")).toString().toUtf8());
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::AddXyzDialog dialog(std::make_shared<ts::NetworkClient>(settings),
+                            nullptr);
+    qputenv("TS_XYZ_CATALOGUE_URL", QByteArray());
+    // Built in until the current one arrives.
+    QVERIFY(dialog.catalogue().size() >= 4);
+    QSignalSpy catalogueUpdated(&dialog, &ts::AddXyzDialog::catalogueUpdated);
+    QVERIFY(catalogueUpdated.wait(5000));
+    QCOMPARE(dialog.catalogue().size(), std::size_t{1});
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("xyzAddButton"));
+    QLineEdit* address =
+        dialog.findChild<QLineEdit*>(QStringLiteral("xyzTemplateEdit"));
+    QLineEdit* subdomains =
+        dialog.findChild<QLineEdit*>(QStringLiteral("xyzSubdomainsEdit"));
+    QLineEdit* name =
+        dialog.findChild<QLineEdit*>(QStringLiteral("xyzNameEdit"));
+    QCheckBox* tms = dialog.findChild<QCheckBox*>(QStringLiteral("xyzTmsBox"));
+    QSpinBox* maximumZoom =
+        dialog.findChild<QSpinBox*>(QStringLiteral("xyzMaximumZoomBox"));
+    QLabel* about = dialog.findChild<QLabel*>(QStringLiteral("xyzAboutLabel"));
+    if (add == nullptr || address == nullptr || subdomains == nullptr ||
+        name == nullptr || tms == nullptr || maximumZoom == nullptr ||
+        about == nullptr) {
+      QFAIL("widgets missing");
+    }
+    QVERIFY(!add->isEnabled());
+
+    QVERIFY(dialog.chooseService(0));
+    QCOMPARE(name->text(), QStringLiteral("Mock tiles"));
+    QCOMPARE(subdomains->text(), QStringLiteral("a, b"));
+    QCOMPARE(maximumZoom->value(), 12);
+    QVERIFY(about->text().contains(QStringLiteral("Circles and lines")));
+    QVERIFY(about->text().contains(QStringLiteral("offline")));
+    QVERIFY(add->isEnabled());
+
+    // {s} without subdomains, then a variable it doesn't know.
+    subdomains->clear();
+    QVERIFY(!add->isEnabled());
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("{s}")),
+             qPrintable(dialog.statusText()));
+    address->setText(QStringLiteral(
+        "https://tiles.example.invalid/{z}/{x}/{y}.png?k={key}"));
+    QVERIFY(!add->isEnabled());
+    QVERIFY(dialog.statusText().contains(QStringLiteral("{key}")));
+    address->setText(
+        QStringLiteral("https://tiles.example.invalid/{z}/{x}/{y}.jpg"));
+    QVERIFY(add->isEnabled());
+    QVERIFY(dialog.statusText().isEmpty());
+    tms->setChecked(true);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      dialog.show();
+      dialog.grab().save(
+          QDir(shots).filePath(QStringLiteral("add-xyz-dialog.png")));
+    }
+    add->click();
+    const std::optional<ts::LayerDefinition>& definition =
+        dialog.layerDefinition();
+    if (!definition) {
+      QFAIL("no layer definition");
+    }
+    QCOMPARE(definition->type, ts::LayerType::Imagery);
+    QCOMPARE(definition->name, QStringLiteral("Mock tiles"));
+    QString error;
+    const std::optional<ts::XyzSource> source =
+        ts::XyzSource::fromJson(definition->source, &error);
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(source->tms);
+    QVERIFY(source->subdomains.isEmpty());
+    QCOMPARE(source->maximumZoom, 12);
+    QCOMPARE(source->format, QStringLiteral("image/jpeg"));
+    QCOMPARE(source->attribution, QStringLiteral("Mock Mapping Agency"));
+    QCOMPARE(source->service.host(), QStringLiteral("tiles.example.invalid"));
   }
 
   void addWmsDialogErrors()

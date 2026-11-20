@@ -413,6 +413,73 @@
         </message>
     </context>
     <context>
+        <name>ts::AddXyzDialog</name>
+        <message>
+            <source>Add XYZ Tile Layer</source>
+            <translation>Add XYZ Tile Layer</translation>
+        </message>
+        <message>
+            <source>&amp;Service (choose one, or fill in the fields):</source>
+            <translation>&amp;Service (choose one, or fill in the fields):</translation>
+        </message>
+        <message>
+            <source>Another service</source>
+            <translation>Another service</translation>
+        </message>
+        <message>
+            <source>&amp;Name:</source>
+            <translation>&amp;Name:</translation>
+        </message>
+        <message>
+            <source>&amp;Address:</source>
+            <translation>&amp;Address:</translation>
+        </message>
+        <message>
+            <source>https://tile.example.org/{z}/{x}/{y}.png</source>
+            <translation>https://tile.example.org/{z}/{x}/{y}.png</translation>
+        </message>
+        <message>
+            <source>S&amp;ubdomains for {s}:</source>
+            <translation>S&amp;ubdomains for {s}:</translation>
+        </message>
+        <message>
+            <source>a, b, c</source>
+            <translation>a, b, c</translation>
+        </message>
+        <message>
+            <source>Rows are counted from the south (&amp;TMS)</source>
+            <translation>Rows are counted from the south (&amp;TMS)</translation>
+        </message>
+        <message>
+            <source>&amp;Zoom levels:</source>
+            <translation>&amp;Zoom levels:</translation>
+        </message>
+        <message>
+            <source>&amp;Credit:</source>
+            <translation>&amp;Credit:</translation>
+        </message>
+        <message>
+            <source>&amp;Add</source>
+            <translation>&amp;Add</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>Its terms don't allow keeping areas for offline use.</source>
+            <translation>Its terms don't allow keeping areas for offline use.</translation>
+        </message>
+        <message>
+            <source>The first zoom level can't be deeper than the last.</source>
+            <translation>The first zoom level can't be deeper than the last.</translation>
+        </message>
+        <message>
+            <source>Give the layer a name.</source>
+            <translation>Give the layer a name.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BuiltinLayers</name>
         <message>
             <source>Checkerboard</source>
@@ -888,6 +955,10 @@
             <source>Imagery File…</source>
             <translation>Imagery File…</translation>
         </message>
+        <message>
+            <source>XYZ Tile Layer…</source>
+            <translation>XYZ Tile Layer…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -1191,14 +1262,6 @@
             <translation>Add a layer from a web map tile server (WMTS) to the layer tree</translation>
         </message>
         <message>
-            <source>Keep areas of WMS and WMTS layers on this computer for use without a network</source>
-            <translation>Keep areas of WMS and WMTS layers on this computer for use without a network</translation>
-        </message>
-        <message>
-            <source>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</source>
-            <translation>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</translation>
-        </message>
-        <message>
             <source>Projection &amp;Settings…</source>
             <translation>Projection &amp;Settings…</translation>
         </message>
@@ -1221,6 +1284,22 @@
         <message>
             <source>Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and imagery through their A.TOC) as a layer</source>
             <translation>Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and imagery through their A.TOC) as a layer</translation>
+        </message>
+        <message>
+            <source>Add &amp;XYZ Tile Layer…</source>
+            <translation>Add &amp;XYZ Tile Layer…</translation>
+        </message>
+        <message>
+            <source>Add a layer from an XYZ or TMS tile service, such as OpenStreetMap, to the layer tree</source>
+            <translation>Add a layer from an XYZ or TMS tile service, such as OpenStreetMap, to the layer tree</translation>
+        </message>
+        <message>
+            <source>Keep areas of WMS, WMTS and XYZ layers on this computer for use without a network</source>
+            <translation>Keep areas of WMS, WMTS and XYZ layers on this computer for use without a network</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer… or Add XYZ Tile Layer…).</source>
+            <translation>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer… or Add XYZ Tile Layer…).</translation>
         </message>
     </context>
     <context>
@@ -1371,8 +1450,8 @@
             <translation>Downloading “%1”: %2 %</translation>
         </message>
         <message>
-            <source>Only layers from WMS and WMTS servers can be kept for offline use.</source>
-            <translation>Only layers from WMS and WMTS servers can be kept for offline use.</translation>
+            <source>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use.</source>
+            <translation>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use.</translation>
         </message>
     </context>
     <context>
@@ -2236,6 +2315,45 @@
         <message>
             <source>Layer %1 is only offered in coordinate systems that can't be drawn (%2): they aren't EPSG codes PROJ knows.</source>
             <translation>Layer %1 is only offered in coordinate systems that can't be drawn (%2): they aren't EPSG codes PROJ knows.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::XyzSource</name>
+        <message>
+            <source>The address must start with http:// or https://.</source>
+            <translation>The address must start with http:// or https://.</translation>
+        </message>
+        <message>
+            <source>The address has a variable {%1} this program doesn't know. It understands {z}, {x}, {y}, {-y} and {s}.</source>
+            <translation>The address has a variable {%1} this program doesn't know. It understands {z}, {x}, {y}, {-y} and {s}.</translation>
+        </message>
+        <message>
+            <source>The address must contain {z}, {x} and {y} (or {-y}) where the zoom, column and row go.</source>
+            <translation>The address must contain {z}, {x} and {y} (or {-y}) where the zoom, column and row go.</translation>
+        </message>
+        <message>
+            <source>The address contains {s}: give the subdomains it stands for (such as a, b, c).</source>
+            <translation>The address contains {s}: give the subdomains it stands for (such as a, b, c).</translation>
+        </message>
+        <message>
+            <source>This is not an XYZ source.</source>
+            <translation>This is not an XYZ source.</translation>
+        </message>
+        <message>
+            <source>The zoom levels must be from 0 to %1, the first no deeper than the last.</source>
+            <translation>The zoom levels must be from 0 to %1, the first no deeper than the last.</translation>
+        </message>
+        <message>
+            <source>The tile size must be from 64 to 1024 pixels.</source>
+            <translation>The tile size must be from 64 to 1024 pixels.</translation>
+        </message>
+        <message>
+            <source>This is not an XYZ catalogue.</source>
+            <translation>This is not an XYZ catalogue.</translation>
+        </message>
+        <message>
+            <source>The XYZ catalogue is of a newer format than this program reads.</source>
+            <translation>The XYZ catalogue is of a newer format than this program reads.</translation>
         </message>
     </context>
 </TS>

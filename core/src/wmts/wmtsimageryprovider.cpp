@@ -160,10 +160,18 @@ ImageLoadResult outcome(ImageLoadResult::Outcome kind)
 WmtsImageryProvider::WmtsImageryProvider(WmtsSource source,
                                          std::shared_ptr<NetworkClient> network,
                                          WebTileSettings settings)
-    : m_source(std::move(source)),
+    : WmtsImageryProvider(source, source.id(), hostOf(source),
+                          std::move(network), std::move(settings))
+{
+}
+
+WmtsImageryProvider::WmtsImageryProvider(WmtsSource source, QString id,
+                                         QString host,
+                                         std::shared_ptr<NetworkClient> network,
+                                         WebTileSettings settings)
+    : m_source(std::move(source)), m_id(std::move(id)),
       m_fetcher(std::make_unique<CachedTileFetcher>(
-          m_source.id(), hostOf(m_source), std::move(network),
-          std::move(settings),
+          m_id, std::move(host), std::move(network), std::move(settings),
           CachedTileFetcher::Messages{statusErrorMessage, notAnImageMessage,
                                       true},
           [this](const ProviderStatus& status) { reportStatus(status); }))
@@ -174,7 +182,12 @@ WmtsImageryProvider::~WmtsImageryProvider() = default;
 
 QString WmtsImageryProvider::id() const
 {
-  return m_source.id();
+  return m_id;
+}
+
+QUrl WmtsImageryProvider::tileUrl(const WmtsTileIndex& tile) const
+{
+  return getTileUrl(m_source, tile);
 }
 
 QString WmtsImageryProvider::name() const
@@ -251,7 +264,7 @@ WmtsImageryProvider::fetchMosaic(const WmtsTileWindow& window,
                              static_cast<int32_t>(tileIndex.column),
                              static_cast<int32_t>(tileIndex.row)};
       const FetchOutcome fetched = m_fetcher->fetch(
-          cacheKey, getTileUrl(m_source, tileIndex),
+          cacheKey, tileUrl(tileIndex),
           [&tile](const QByteArray& data) {
             tile.loadFromData(data);
             return !tile.isNull();
@@ -555,7 +568,7 @@ WmtsImageryProvider::fetchForRegion(TileKey key, int64_t region,
       const RegionTileResult result = m_fetcher->fetchForRegion(
           TileKey{matrix, static_cast<int32_t>(tile.column),
                   static_cast<int32_t>(tile.row)},
-          getTileUrl(m_source, tile), region,
+          tileUrl(tile), region,
           [](const QByteArray& data) {
             QImage image;
             return image.loadFromData(data);

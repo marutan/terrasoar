@@ -123,6 +123,8 @@ HEADERS += \
     include/ts/wmts/wmtscrs.h \
     include/ts/wmts/wmtsimageryprovider.h \
     include/ts/wmts/wmtssource.h \
+    include/ts/xyz/xyzimageryprovider.h \
+    include/ts/xyz/xyzsource.h \
     src/globe/globeuniforms.h \
     src/providers/sqlitestatementpool.h
 
@@ -211,4 +213,6 @@ SOURCES += \
     src/wmts/wmtscapabilities.cpp \
     src/wmts/wmtscrs.cpp \
     src/wmts/wmtsimageryprovider.cpp \
-    src/wmts/wmtssource.cpp
+    src/wmts/wmtssource.cpp \
+    src/xyz/xyzimageryprovider.cpp \
+    src/xyz/xyzsource.cpp

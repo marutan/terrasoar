@@ -198,6 +198,8 @@ private:
                                                     QString* errorString);
   std::shared_ptr<ImageryProvider> createWmtsImagery(const QJsonObject& source,
                                                      QString* errorString);
+  std::shared_ptr<ImageryProvider> createXyzImagery(const QJsonObject& source,
+                                                    QString* errorString);
   std::shared_ptr<NetworkClient> networkLocked();
   std::shared_ptr<const GeoidModel> geoidLocked(const QString& dataset,
                                                 QString* errorString);

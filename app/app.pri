@@ -35,6 +35,7 @@ HEADERS += \
     $$PWD/src/projectionsettingsdialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
+    $$PWD/src/addxyzdialog.h \
     $$PWD/src/elevationprofiledialog.h \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
@@ -57,6 +58,7 @@ SOURCES += \
     $$PWD/src/projectionsettingsdialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
+    $$PWD/src/addxyzdialog.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \

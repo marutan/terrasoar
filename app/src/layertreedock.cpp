@@ -181,6 +181,9 @@ void LayerTreeDock::rebuildAddLayerMenu()
   wmts->setObjectName(QStringLiteral("addWmtsLayerAction"));
   connect(wmts, &QAction::triggered, this,
           &LayerTreeDock::addWmtsLayerRequested);
+  QAction* xyz = m_addLayerMenu->addAction(tr("XYZ Tile Layer…"));
+  xyz->setObjectName(QStringLiteral("addXyzLayerAction"));
+  connect(xyz, &QAction::triggered, this, &LayerTreeDock::addXyzLayerRequested);
   QAction* imagery = m_addLayerMenu->addAction(tr("Imagery File…"));
   imagery->setObjectName(QStringLiteral("addImageryFileAction"));
   connect(imagery, &QAction::triggered, this,

@@ -48,6 +48,8 @@
 #include "ts/wms/wmssource.h"
 #include "ts/wmts/wmtsimageryprovider.h"
 #include "ts/wmts/wmtssource.h"
+#include "ts/xyz/xyzimageryprovider.h"
+#include "ts/xyz/xyzsource.h"
 
 namespace ts
 {
@@ -186,6 +188,18 @@ ProviderRegistry::createWmtsImagery(const QJsonObject& source,
   // concurrent requests, one cache directory.
   return std::make_shared<WmtsImageryProvider>(*wmts, networkLocked(),
                                                *m_wmsSettings);
+}
+
+std::shared_ptr<ImageryProvider>
+ProviderRegistry::createXyzImagery(const QJsonObject& source,
+                                   QString* errorString)
+{
+  const std::optional<XyzSource> xyz = XyzSource::fromJson(source, errorString);
+  if (!xyz) {
+    return nullptr;
+  }
+  return std::make_shared<XyzImageryProvider>(*xyz, networkLocked(),
+                                              *m_wmsSettings);
 }
 
 std::shared_ptr<ImageryProvider>
@@ -617,7 +631,8 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
 {
   const QString kind = source.value(QStringLiteral("kind")).toString();
   if (kind == QLatin1String("wms") || kind == QLatin1String("wmts") ||
-      kind == QLatin1String("web") || kind == QLatin1String("file")) {
+      kind == QLatin1String("xyz") || kind == QLatin1String("web") ||
+      kind == QLatin1String("file")) {
     return source.value(QStringLiteral("attribution")).toString();
   }
   const std::lock_guard<std::mutex> lock(m_mutex);
@@ -694,6 +709,9 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("wmts")) {
     provider = createWmtsImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("xyz")) {
+    provider = createXyzImagery(source, errorString);
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("file")) {
     provider = createFileImagery(source, errorString);
