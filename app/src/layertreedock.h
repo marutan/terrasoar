@@ -33,6 +33,7 @@
 
 #include <QDockWidget>
 #include <QJsonObject>
+#include <QPointer>
 
 #include "ts/time/layertime.h"
 
@@ -182,7 +183,7 @@ private:
   std::function<std::optional<LayerTime>(const QJsonObject&)> m_timeLookup;
   QMenu* m_timeMenu = nullptr;
   QMenu* m_contextMenu = nullptr;
-  std::vector<QAction*> m_contextActions;
+  std::vector<QPointer<QAction>> m_contextActions;
   std::function<std::vector<QAction*>(const QModelIndex&, QObject*)>
       m_nodeActions;
   std::function<bool(const QModelIndex&)> m_doubleClick;

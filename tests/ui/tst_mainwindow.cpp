@@ -4371,6 +4371,41 @@ private slots:
       QTest::qWait(50);
     }
   }
+
+  void layerMenuOpenedAgain()
+  {
+    // A layer's menu opened again and again (right-clicks on a satellite
+    // layer, whose menu has actions of its own): the last menu's actions
+    // were deleted twice, and the second, deferred deletion reached freed
+    // memory in the event loop.
+    ts::MainWindow window;
+    const QString path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/stations.tle");
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    for (int32_t i = 0; i < 5; ++i) {
+      QMenu* menu = dock->contextMenu(layer);
+      if (menu == nullptr) {
+        QFAIL("no menu");
+      }
+      QAction* list =
+          menu->findChild<QAction*>(QStringLiteral("satelliteListAction"));
+      if (list == nullptr) {
+        QFAIL("no Satellites… action");
+      }
+      QVERIFY(menu->actions().contains(list));
+      QCOMPARE(
+          menu->findChildren<QAction*>(QStringLiteral("satelliteListAction"))
+              .size(),
+          1);
+      // Deferred deletions are delivered between clicks.
+      QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+      QCoreApplication::processEvents();
+    }
+  }
 };
 
 QTEST_MAIN(TestMainWindow)
