@@ -17,6 +17,7 @@
   You should have received a copy of the GNU General Public License
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdint>
@@ -634,6 +635,78 @@ private slots:
     // A container with no placemarks of its own has none.
     ts::KmlFeatureProvider root(document, QString());
     QCOMPARE(root.featureCount(), std::size_t{1}); // "External style"
+  }
+
+  void billboards()
+  {
+    // A point's icon, tint, scale, heading, hot spot and label.
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
+                              &error);
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    ts::KmlFeatureProvider shapes(document, QStringLiteral("0"));
+    // The point and the two of the MultiGeometry; only the first of a
+    // placemark's points is labelled.
+    QCOMPARE(shapes.billboards().size(), std::size_t{3});
+    const ts::KmlBillboard& point = shapes.billboards().front();
+    QCOMPARE(point.label, QStringLiteral("A point"));
+    QVERIFY(point.icon.endsWith(QLatin1String("icons/pin.png")));
+    QCOMPARE(point.tint, QColor(255, 0, 0));
+    QCOMPARE(point.scale, 1.5);
+    QCOMPARE(point.headingDeg, 45.0);
+    QCOMPARE(point.hotSpot.x, 0.5);
+    QCOMPARE(point.hotSpot.y, 0.0);
+    QCOMPARE(point.labelColor, QColor(255, 255, 0));
+    QCOMPARE(point.labelScale, 0.8);
+    QCOMPARE(point.lonDeg, -1.8904);
+    QVERIFY(point.placemark != nullptr);
+    QVERIFY(!shapes.billboards().at(1).label.isEmpty());
+    QVERIFY(shapes.billboards().at(2).label.isEmpty());
+    // Points come as billboards, not as dots in tiles; picking still finds
+    // them.
+    const std::atomic<bool> cancelled{false};
+    const ts::FeatureTile tile =
+        shapes
+            .loadFeatures(
+                ts::TileKey::containing(5, ts::Geodetic{52.5, -1.5, 0.0}),
+                cancelled)
+            .value_or(ts::FeatureTile{});
+    QVERIFY(std::none_of(tile.features.begin(), tile.features.end(),
+                         [](const ts::Feature& feature) {
+                           return feature.type == ts::Feature::Type::Points;
+                         }));
+    QVERIFY(!shapes.placemarksAt(ts::GeoPoint{52.4862, -1.8904}, 0.01).empty());
+    // A KMZ's icon is inside the archive, and can be read.
+    const std::shared_ptr<const ts::KmlDocument> kmz =
+        ts::sharedKmlDocument(fixture(QStringLiteral("archive.kmz")), &error);
+    if (!kmz) {
+      QFAIL(qPrintable(error));
+    }
+    ts::KmlFeatureProvider pinned(kmz, QString());
+    QCOMPARE(pinned.billboards().size(), std::size_t{1});
+    const QString icon = pinned.billboards().front().icon;
+    QVERIFY2(icon.startsWith(QLatin1String("/vsizip/")), qPrintable(icon));
+    QVERIFY(!QImage::fromData(ts::readKmlLocalFile(icon)).isNull());
+    QVERIFY(ts::readKmlLocalFile(icon + QStringLiteral(".none")).isEmpty());
+    // No style: the default pushpin (no icon address), the name in white.
+    ts::KmlFeature plain;
+    plain.name = QStringLiteral("Plain");
+    ts::KmlGeometry at;
+    at.kind = ts::KmlGeometry::Kind::Point;
+    at.coordinates = {ts::KmlCoordinate{1.0, 2.0, 300.0}};
+    at.altitudeMode = ts::KmlAltitudeMode::Absolute;
+    plain.geometry = at;
+    const std::vector<ts::KmlBillboard> one =
+        ts::kmlBillboards(*kmz, plain, ts::KmlStyle{});
+    QCOMPARE(one.size(), std::size_t{1});
+    QVERIFY(one.front().icon.isEmpty());
+    QCOMPARE(one.front().labelColor, QColor(255, 255, 255));
+    QCOMPARE(one.front().altM, 300.0);
+    QCOMPARE(one.front().altitudeMode, ts::KmlAltitudeMode::Absolute);
+    QVERIFY(ts::kmlBillboards(*kmz, ts::KmlFeature{}, ts::KmlStyle{}).empty());
   }
 
   void registryCreatesKml()

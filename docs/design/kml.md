@@ -70,8 +70,8 @@ placemarks directly in one container (child indices from the root).
 - lines in LineStyle's colour and width; polygons filled with PolyStyle's
   colour (unless `fill` is 0) and outlined in the line's (unless
   `outline` is 0);
-- points as dots in IconStyle's colour, sized by its scale, yellow for
-  the default pushpin (icons and labels come in 16a-3);
+- points as icons with labels (below), kept as features only for
+  picking;
 - a MultiGeometry as one feature per member.
 
 Longitudes are made continuous along each ring and line (no jump across
@@ -80,6 +80,39 @@ each side's tiles clip their part: a line from 170° E to 170° W draws
 both halves, the short way. The features are in memory; a tile gets
 those whose extent meets it, stored at level 6 at most. All documents
 with one path share one copy (`sharedKmlDocument()`).
+
+## Icons and labels
+
+Each point of a placemark (a MultiGeometry's too) is a
+`ts::KmlBillboard` (`kmlBillboards()`): its icon's address (resolved
+against the document, so inside a KMZ), IconStyle's colour, scale,
+heading and hotSpot, and the placemark's name in LabelStyle's colour and
+scale, on the first point only. The main window turns the visible KML
+layers' billboards into `BillboardDraw`s whenever the layers change, and
+`GlobeView` paints them with `QPainter` over each frame, upright on the
+globe, the maps and through the morph:
+
+- the icon (32 pixels times the scale) turned by the heading, with its
+  hot spot on the place (KML counts y from the bottom; the default
+  pushpin's needle is at its bottom centre), tinted by multiplying its
+  colours and opacity by IconStyle's colour;
+- the label to the right of the icon, with a dark halo so it reads on any
+  imagery.
+
+On the globe a place on the far side (its ellipsoid normal facing away
+from the eye) is hidden. Where they crowd, one icon is drawn per 6-pixel
+cell and labels that would overlap one already drawn are left out, with
+at most 400 labels, so a file with tens of thousands of places stays
+smooth. Heights: clampToGround places sit on the ellipsoid; others at
+their altitude (16a-4 adds the terrain).
+
+`IconCache` (app) holds the icons: KMZ members and local files read at
+once (`readKmlLocalFile()`), web icons fetched in the background through
+the program's network client and kept in the cache directory
+(`kml-icons/`, by the address's SHA-1) so they show again offline. Until
+an icon arrives, and for one that can't be had, the default pushpin
+(drawn by the program: yellow, 32 pixels) stands in; tinted copies are
+kept per colour.
 
 ## In the window
 
@@ -122,6 +155,9 @@ colours, a KMZ with its icon and image, GDAL's KML test files (Google's
 KML Samples, every geometry, gx:Track and gx:MultiTrack, prefixes, odd
 whitespace, extended data, external styles) and broken files; the vector
 features of placemarks (styles, default icon, MultiGeometry, the
-antimeridian), the provider (tiles, picking order), the registry, view
-poses and balloon HTML. `tests/ui`: a KML opened into the layer tree, a
-balloon on click, Fly There, a KMZ.
+antimeridian), billboards (icon, tint, scale, heading, hot spot, label, a
+KMZ's icon read from the archive), the provider (tiles without points,
+picking order), the registry, view poses and balloon HTML. `tests/ui`: a
+KML opened into the layer tree, a balloon on click, Fly There, icons and
+labels drawn (not from the far side of the Earth, not when their folder
+is off), a KMZ.

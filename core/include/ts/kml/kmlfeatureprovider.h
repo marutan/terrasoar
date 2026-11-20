@@ -75,6 +75,53 @@ std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
                                           const KmlStyle& style);
 
 /**
+ * An icon and label at a placemark's point: drawn on the screen over the
+ * view, upright, whatever the projection.
+ *
+ * @reentrant
+ */
+struct KmlBillboard {
+  /** Where: longitude and latitude, degrees. */
+  double lonDeg = 0.0;
+  /** As lonDeg. */
+  double latDeg = 0.0;
+  /** Height as the placemark gives it, metres (see altitudeMode). */
+  double altM = 0.0;
+  /** How altM is measured. */
+  KmlAltitudeMode altitudeMode = KmlAltitudeMode::ClampToGround;
+  /**
+   * The icon: a local path (or KMZ member) or web address
+   * (resolveKmlHref()); empty for the default pushpin.
+   */
+  QString icon;
+  /** Tint (IconStyle color: white leaves the icon as it is). */
+  QColor tint = QColor(255, 255, 255);
+  /** Icon size as a factor of 32 pixels; 0 hides the icon. */
+  double scale = 1.0;
+  /** Degrees clockwise from north. */
+  double headingDeg = 0.0;
+  /** The point of the icon on the position. */
+  KmlVec2 hotSpot;
+  /** The label (the placemark's name); empty for none. */
+  QString label;
+  /** The label's colour. */
+  QColor labelColor = QColor(255, 255, 255);
+  /** The label's size as a factor; 0 hides it. */
+  double labelScale = 1.0;
+  /** The placemark (in the provider's document). */
+  const KmlFeature* placemark = nullptr;
+};
+
+/**
+ * Returns @p placemark's billboards with @p style: one per point of its
+ * geometry (a MultiGeometry's points too), the label on the first.
+ * Icons resolve against @p document.
+ */
+std::vector<KmlBillboard> kmlBillboards(const KmlDocument& document,
+                                        const KmlFeature& placemark,
+                                        const KmlStyle& style);
+
+/**
  * The placemarks directly in one container of a KML document, as vector
  * features: their styles from the document (KmlStyleResolver), served by
  * tile from memory (a tile gets the features whose extent meets it), and
@@ -123,6 +170,12 @@ public:
   /** Returns how many features it has. */
   std::size_t featureCount() const { return m_entries.size(); }
 
+  /**
+   * Returns the icons and labels of its points, drawn over the view
+   * (their features are kept for picking, not drawn as dots).
+   */
+  const std::vector<KmlBillboard>& billboards() const { return m_billboards; }
+
 private:
   struct Entry {
     Feature feature;
@@ -134,6 +187,7 @@ private:
   const QString m_containerPath;
   QString m_name;
   std::vector<Entry> m_entries;
+  std::vector<KmlBillboard> m_billboards;
 };
 
 } // namespace ts

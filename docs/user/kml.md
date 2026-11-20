@@ -21,8 +21,13 @@ unticked. If the file has its own view, Terra Soar flies there.
 
 - **Paths and areas** in the colours and widths the file gives them.
   Areas are filled and outlined as their style says.
-- **Places** (points) as dots in their icon's colour, yellow for the
-  standard pushpin, larger for larger icons.
+- **Places** (points) with their icons, in the colours, sizes and
+  angles the file gives, and their names beside them. Icons inside a KMZ
+  or next to the file show at once; icons from the web are fetched and
+  kept, so they show offline next time. Until then, and for icons that
+  can't be found, a yellow pushpin stands in.
+- Where places crowd together, some icons and names are left out so
+  the rest stay readable; zoom in to see them all.
 - Paths and areas crossing the 180° meridian are drawn the short way
   round, on the globe and on every map.
 
@@ -43,6 +48,6 @@ its view, or to see all of it.
   how many.
 - A file that isn't valid KML is refused with the line and column where
   it goes wrong.
-- More is coming in this phase: icons and labels, heights and walls,
+- More is coming in this phase: heights and walls,
   pictures over the ground, links to online KML, time, and creating and
   editing your own KML.

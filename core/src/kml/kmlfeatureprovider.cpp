@@ -192,6 +192,57 @@ QJsonObject kmlLayerSource(const QString& path, const QString& containerPath)
                      {QStringLiteral("container"), containerPath}};
 }
 
+namespace
+{
+
+void addBillboards(const KmlGeometry& geometry, const KmlBillboard& base,
+                   std::vector<KmlBillboard>& billboards)
+{
+  if (geometry.kind == KmlGeometry::Kind::Point &&
+      !geometry.coordinates.empty()) {
+    KmlBillboard billboard = base;
+    billboard.lonDeg = geometry.coordinates.front().lonDeg;
+    billboard.latDeg = geometry.coordinates.front().latDeg;
+    billboard.altM = geometry.coordinates.front().altM;
+    billboard.altitudeMode = geometry.altitudeMode;
+    if (!billboards.empty() && billboards.back().placemark == base.placemark) {
+      billboard.label.clear(); // the label once, on the first
+    }
+    billboards.push_back(billboard);
+  }
+  for (const KmlGeometry& child : geometry.children) {
+    addBillboards(child, base, billboards);
+  }
+}
+
+} // namespace
+
+std::vector<KmlBillboard> kmlBillboards(const KmlDocument& document,
+                                        const KmlFeature& placemark,
+                                        const KmlStyle& style)
+{
+  std::vector<KmlBillboard> billboards;
+  if (!placemark.geometry) {
+    return billboards;
+  }
+  KmlBillboard base;
+  base.placemark = &placemark;
+  base.label = placemark.name;
+  if (style.icon) {
+    base.icon = resolveKmlHref(document, style.icon->href);
+    base.tint = style.icon->color;
+    base.scale = style.icon->scale;
+    base.headingDeg = style.icon->heading;
+    base.hotSpot = style.icon->hotSpot;
+  }
+  if (style.label) {
+    base.labelColor = style.label->color;
+    base.labelScale = style.label->scale;
+  }
+  addBillboards(*placemark.geometry, base, billboards);
+  return billboards;
+}
+
 std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
                                           const KmlStyle& style)
 {
@@ -261,11 +312,14 @@ KmlFeatureProvider::KmlFeatureProvider(
   KmlStyleResolver resolver(*m_document);
   const std::function<void(const KmlFeature&)> add =
       [&](const KmlFeature& placemark) {
-        for (Feature& feature :
-             kmlPlacemarkFeatures(placemark, resolver.resolve(placemark))) {
+        const KmlStyle style = resolver.resolve(placemark);
+        for (Feature& feature : kmlPlacemarkFeatures(placemark, style)) {
           const GeoRect bounds = boundsOf(feature);
           m_entries.push_back(Entry{std::move(feature), bounds, &placemark});
         }
+        std::vector<KmlBillboard> points =
+            kmlBillboards(*m_document, placemark, style);
+        m_billboards.insert(m_billboards.end(), points.begin(), points.end());
       };
   for (const KmlFeature& child : container->children) {
     if (child.kind == KmlFeature::Kind::Placemark) {
@@ -309,7 +363,9 @@ KmlFeatureProvider::loadFeatures(TileKey key,
     if (cancelled.load()) {
       return std::nullopt;
     }
-    if (overlaps(entry.bounds, rect)) {
+    // Points are drawn as billboards over the view, not as dots.
+    if (entry.feature.type != Feature::Type::Points &&
+        overlaps(entry.bounds, rect)) {
       tile.features.push_back(entry.feature);
     }
   }

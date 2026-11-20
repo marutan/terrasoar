@@ -77,6 +77,12 @@ QByteArray readKmlResource(const KmlDocument& document, const QString& href,
                            QString* errorString);
 
 /**
+ * Reads the local file at @p where (a path, or a /vsizip/ member, as
+ * resolveKmlHref() gives); empty if it can't.
+ */
+QByteArray readKmlLocalFile(const QString& where);
+
+/**
  * Resolves features' styles: the styleUrl's Style or StyleMap (its
  * normal or highlight style) in the document, or in another local KML
  * file ("other.kml\#id", read once and kept), with the feature's inline

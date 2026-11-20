@@ -24,9 +24,11 @@
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <unordered_set>
 
 #include <QFocusEvent>
 #include <QFontDatabase>
+#include <QFontMetricsF>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QLineF>
@@ -34,6 +36,7 @@
 #include <QMouseEvent>
 #include <QOpenGLContext>
 #include <QPainter>
+#include <QPainterPath>
 #include <QScreen>
 #include <QStringList>
 #include <QStyleHints>
@@ -463,6 +466,7 @@ void GlobeView::paintGL()
   m_cpuFrameStats.addFrame(nowS() - startS);
   ++m_framesRendered;
 
+  drawBillboards();
   drawAttributions();
   drawScaleBar();
   drawRegions();
@@ -933,6 +937,109 @@ GlobeView::outlineOnScreen(const std::vector<LonLat>& points, bool closed) const
                      [](const QPolygonF& piece) { return piece.size() < 2; }),
       pieces.end());
   return pieces;
+}
+
+void GlobeView::setBillboards(std::vector<BillboardDraw> billboards)
+{
+  m_billboards = std::move(billboards);
+  update();
+}
+
+void GlobeView::drawBillboards()
+{
+  m_billboardsDrawn = 0;
+  m_labelsDrawn = 0;
+  if (m_billboards.empty()) {
+    return;
+  }
+  constexpr double cellPx = 6.0;
+  constexpr int32_t mostLabels = 400;
+  constexpr double marginPx = 64.0;
+  const Camera& camera = m_controller.camera();
+  const bool onMap = camera.morph() > 0.0;
+  const Vec3& eye = camera.eyeEcef();
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  QFont font = painter.font();
+  const double basePt = font.pointSizeF() > 0.0 ? font.pointSizeF() : 10.0;
+  std::unordered_set<int64_t> cells;
+  std::vector<QRectF> labels;
+  const QRectF visible =
+      QRectF(rect()).adjusted(-marginPx, -marginPx, marginPx, marginPx);
+  for (const BillboardDraw& billboard : m_billboards) {
+    if (!onMap) {
+      // Behind the globe: the ellipsoid faces away from the eye there.
+      const Vec3 normal = surfaceNormalEcef(billboard.latDeg, billboard.lonDeg);
+      if (dot(normal, eye - billboard.ecef) <= 0.0) {
+        continue;
+      }
+    }
+    const std::optional<ScreenPoint> screen =
+        onMap ? camera.projectGeodetic(billboard.latDeg, billboard.lonDeg)
+              : camera.project(billboard.ecef);
+    if (!screen) {
+      continue;
+    }
+    const QPointF at(screen->xPx, screen->yPx);
+    if (!visible.contains(at)) {
+      continue;
+    }
+    // One icon per cell where they crowd.
+    const int64_t cell =
+        (static_cast<int64_t>(std::floor(at.x() / cellPx)) << 32) ^
+        static_cast<int64_t>(std::floor(at.y() / cellPx));
+    if (!cells.insert(cell).second) {
+      continue;
+    }
+    ++m_billboardsDrawn;
+    QRectF iconRect;
+    if (!billboard.icon.isNull() && billboard.sizePx > 0.0) {
+      const QSizeF size =
+          QSizeF(billboard.icon.size())
+              .scaled(billboard.sizePx, billboard.sizePx, Qt::KeepAspectRatio);
+      iconRect = QRectF(QPointF(-billboard.hotSpot.x() * size.width(),
+                                -billboard.hotSpot.y() * size.height()),
+                        size);
+      painter.save();
+      painter.translate(at);
+      painter.rotate(billboard.headingDeg);
+      painter.drawImage(iconRect, billboard.icon);
+      painter.restore();
+      iconRect.translate(at);
+    }
+    if (billboard.label.isEmpty() || billboard.labelScale <= 0.0 ||
+        m_labelsDrawn >= mostLabels) {
+      continue;
+    }
+    font.setPointSizeF(basePt * billboard.labelScale);
+    painter.setFont(font);
+    const QFontMetricsF metrics(font);
+    const QPointF origin =
+        iconRect.isNull()
+            ? at + QPointF(4.0, metrics.ascent() / 2.0)
+            : QPointF(iconRect.right() + 2.0,
+                      iconRect.center().y() + metrics.ascent() / 2.0 - 1.0);
+    const QRectF labelRect(origin.x(), origin.y() - metrics.ascent(),
+                           metrics.horizontalAdvance(billboard.label),
+                           metrics.height());
+    const bool crowded =
+        std::any_of(labels.begin(), labels.end(), [&](const QRectF& other) {
+          return other.intersects(labelRect);
+        });
+    if (crowded) {
+      continue;
+    }
+    labels.push_back(labelRect);
+    ++m_labelsDrawn;
+    // A dark halo keeps the label legible on any imagery.
+    QPainterPath path;
+    path.addText(origin, font, billboard.label);
+    painter.setPen(QPen(QColor(0, 0, 0, 170), 2.5));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(path);
+    painter.fillPath(path, billboard.labelColor);
+  }
 }
 
 void GlobeView::drawRegions()

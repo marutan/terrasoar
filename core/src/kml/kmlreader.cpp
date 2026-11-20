@@ -970,6 +970,11 @@ QByteArray readKmlResource(const KmlDocument& document, const QString& href,
   return data;
 }
 
+QByteArray readKmlLocalFile(const QString& where)
+{
+  return readVsi(where);
+}
+
 KmlStyleResolver::KmlStyleResolver(const KmlDocument& document)
     : m_document(document)
 {

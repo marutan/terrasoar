@@ -2608,6 +2608,22 @@ private slots:
       QFAIL("no Fly There");
     }
     fly->trigger();
+    // The point's icons and labels are drawn over the view where they
+    // are in sight.
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
+    QTRY_VERIFY(view->billboardsDrawn() >= 1);
+    QVERIFY(view->labelsDrawn() >= 1);
+    // From the other side of the Earth they are hidden.
+    view->setPose(ts::CameraPose{-52.0, 178.0, 400000.0, 0.0, 0.0});
+    QTRY_COMPARE(view->billboardsDrawn(), 0);
+    // Switched off with their folder: none.
+    view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
+    model->setData(shapes, Qt::Unchecked, Qt::CheckStateRole);
+    QTRY_COMPARE(view->billboardsDrawn(), 0);
+    model->setData(shapes, Qt::Checked, Qt::CheckStateRole);
+    QTRY_VERIFY(view->billboardsDrawn() >= 1);
     // A KMZ, through the same door.
     QVERIFY2(window.openFile(
                  QStringLiteral(TS_TEST_DATA_DIR "/kml/archive.kmz"), &error),

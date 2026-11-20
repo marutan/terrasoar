@@ -30,7 +30,9 @@
 #include <optional>
 #include <vector>
 
+#include <QColor>
 #include <QElapsedTimer>
+#include <QImage>
 #include <QMetaType>
 #include <QOpenGLWidget>
 #include <QPointF>
@@ -59,6 +61,33 @@ namespace ts
 class GlRenderDevice;
 class GlobeRenderer;
 class Projection;
+
+/**
+ * An icon with its label drawn on the screen at a place (KML placemarks):
+ * upright on the globe, the maps and through the morph.
+ */
+struct BillboardDraw {
+  /** The place, ECEF metres (at its height). */
+  Vec3 ecef;
+  /** Its latitude, degrees. */
+  double latDeg = 0.0;
+  /** Its longitude, degrees. */
+  double lonDeg = 0.0;
+  /** The icon, already tinted; null for none. */
+  QImage icon;
+  /** Its size on the screen, logical pixels (the larger side). */
+  double sizePx = 32.0;
+  /** The point of the icon on the place, as fractions from the top left. */
+  QPointF hotSpot{0.5, 1.0};
+  /** Degrees clockwise from north (the icon turns, not the label). */
+  double headingDeg = 0.0;
+  /** The label; empty for none. */
+  QString label;
+  /** Its colour. */
+  QColor labelColor = QColor(255, 255, 255);
+  /** Its size as a factor of the normal; 0 hides it. */
+  double labelScale = 1.0;
+};
 
 /**
  * Shows the globe and turns mouse and keyboard input into camera motion.
@@ -206,6 +235,19 @@ public:
    */
   const QString& scaleBarText() const { return m_scaleBarText; }
 
+  /**
+   * Sets the icons and labels drawn over the view (KML placemarks). They
+   * are hidden behind the globe, and thinned where they crowd: one icon
+   * per few pixels, labels that don't overlap, at most a few hundred.
+   */
+  void setBillboards(std::vector<BillboardDraw> billboards);
+
+  /** Returns how many billboards the last frame drew (for tests). */
+  int32_t billboardsDrawn() const { return m_billboardsDrawn; }
+
+  /** Returns how many labels the last frame drew (for tests). */
+  int32_t labelsDrawn() const { return m_labelsDrawn; }
+
   /** Moves the camera to @p pose at once, stopping any motion. */
   void setPose(const CameraPose& pose);
 
@@ -349,6 +391,7 @@ private:
   void onFrameTimer();
   void releaseGl();
   void updatePointerReadout();
+  void drawBillboards();
   void reportClick();
   void drawOverlay();
   void drawAttributions();
@@ -404,6 +447,9 @@ private:
   std::vector<LonLat> m_drawnPoints;
   /** True while dragging out a rectangle. */
   bool m_drawingDrag = false;
+  std::vector<BillboardDraw> m_billboards;
+  int32_t m_billboardsDrawn = 0;
+  int32_t m_labelsDrawn = 0;
   /** Where a left press that may become a click was. */
   std::optional<QPointF> m_clickPressPx;
   /** Waits out a double click before reporting a click. */

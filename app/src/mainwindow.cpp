@@ -68,6 +68,7 @@
 #include "featureinfowindow.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "iconcache.h"
 #include "layertreedock.h"
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
@@ -229,6 +230,11 @@ MainWindow::MainWindow(QWidget* parent)
         return nodeActions(index, parent);
       });
   setAcceptDrops(true);
+  m_icons = new IconCache(m_registry->network(), this);
+  connect(m_icons, &IconCache::iconsChanged, this, [this]() {
+    m_tintedIcons.clear();
+    refreshBillboards(m_layers->layerStack());
+  });
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
@@ -1130,6 +1136,7 @@ void MainWindow::refreshLayers()
       projectionWith(projection->id(), projection->parameterValues()));
   QStringList errors;
   applyImageryDraws(stack, &errors);
+  refreshBillboards(stack);
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setElevationDraw(
       elevationDrawForStack(stack, *m_registry, &errors));
@@ -1310,6 +1317,89 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   connect(fly, &QAction::triggered, this,
           [this, target]() { m_globeView->flyTo(target, 0.0); });
   return {fly};
+}
+
+QImage MainWindow::tintedIcon(const QString& where, const QColor& tint)
+{
+  const std::pair<QString, QRgb> key{where, tint.rgba()};
+  const std::map<std::pair<QString, QRgb>, QImage>::const_iterator known =
+      m_tintedIcons.find(key);
+  if (known != m_tintedIcons.end()) {
+    return known->second;
+  }
+  QImage icon = m_icons->icon(where).convertToFormat(QImage::Format_ARGB32);
+  if (tint != QColor(255, 255, 255)) {
+    // KML multiplies the icon's colours (and opacity) by the tint.
+    for (int32_t y = 0; y < icon.height(); ++y) {
+      QRgb* row = reinterpret_cast<QRgb*>(icon.scanLine(y));
+      for (int32_t x = 0; x < icon.width(); ++x) {
+        const QRgb p = row[x];
+        row[x] =
+            qRgba(qRed(p) * tint.red() / 255, qGreen(p) * tint.green() / 255,
+                  qBlue(p) * tint.blue() / 255, qAlpha(p) * tint.alpha() / 255);
+      }
+    }
+  }
+  m_tintedIcons[key] = icon;
+  return icon;
+}
+
+void MainWindow::refreshBillboards(const LayerStack& stack)
+{
+  if (m_globeView == nullptr || m_icons == nullptr) {
+    return;
+  }
+  constexpr double iconPx = 32.0;
+  std::vector<BillboardDraw> draws;
+  for (const VectorStackEntry& entry : stack.vectors) {
+    if (entry.definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const std::shared_ptr<KmlFeatureProvider> provider =
+        std::dynamic_pointer_cast<KmlFeatureProvider>(
+            m_registry->features(entry.definition.source, nullptr));
+    if (!provider) {
+      continue;
+    }
+    for (const KmlBillboard& billboard : provider->billboards()) {
+      BillboardDraw draw;
+      draw.latDeg = billboard.latDeg;
+      draw.lonDeg = billboard.lonDeg;
+      const double height =
+          billboard.altitudeMode == KmlAltitudeMode::ClampToGround ||
+                  billboard.altitudeMode == KmlAltitudeMode::ClampToSeaFloor
+              ? 0.0
+              : billboard.altM;
+      draw.ecef =
+          geodeticToEcef(Geodetic{billboard.latDeg, billboard.lonDeg, height});
+      draw.icon = tintedIcon(billboard.icon, billboard.tint);
+      draw.sizePx = iconPx * billboard.scale;
+      draw.headingDeg = billboard.headingDeg;
+      // KML's hot spot counts y from the bottom; the default pushpin's
+      // needle is at its bottom centre.
+      if (billboard.icon.isEmpty()) {
+        draw.hotSpot = QPointF(0.5, 1.0);
+      } else {
+        const QSizeF size(draw.icon.size());
+        const KmlVec2& h = billboard.hotSpot;
+        const double x = h.xUnits == KmlVec2::Units::Fraction ? h.x
+                         : h.xUnits == KmlVec2::Units::Pixels
+                             ? h.x / std::max(size.width(), 1.0)
+                             : 1.0 - h.x / std::max(size.width(), 1.0);
+        const double y = h.yUnits == KmlVec2::Units::Fraction ? h.y
+                         : h.yUnits == KmlVec2::Units::Pixels
+                             ? h.y / std::max(size.height(), 1.0)
+                             : 1.0 - h.y / std::max(size.height(), 1.0);
+        draw.hotSpot = QPointF(x, 1.0 - y);
+      }
+      draw.label = billboard.label;
+      draw.labelColor = billboard.labelColor;
+      draw.labelScale = billboard.labelScale;
+      draws.push_back(std::move(draw));
+    }
+  }
+  m_globeView->setBillboards(std::move(draws));
 }
 
 bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)

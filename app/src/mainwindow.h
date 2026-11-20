@@ -60,6 +60,7 @@ namespace ts
 {
 
 class BalloonWindow;
+class IconCache;
 class ElevationProfileDialog;
 class FeatureInfoWindow;
 struct AboutDataRow;
@@ -329,6 +330,8 @@ private:
                      int32_t row);
   std::vector<QAction*> nodeActions(const QModelIndex& index, QObject* parent);
   bool showBalloonAt(LonLat point, double degreesPerPixel);
+  void refreshBillboards(const LayerStack& stack);
+  QImage tintedIcon(const QString& where, const QColor& tint);
   LayerStack timedStack() const;
   void updateTimeBar(const LayerStack& stack);
   void applyImageryDraws(const LayerStack& stack, QStringList* errors);
@@ -388,6 +391,9 @@ private:
   QAction* m_addWfsAction = nullptr;
   QAction* m_openKmlAction = nullptr;
   BalloonWindow* m_balloon = nullptr;
+  IconCache* m_icons = nullptr;
+  /** Icons tinted by their IconStyle colour: address and colour → image. */
+  std::map<std::pair<QString, QRgb>, QImage> m_tintedIcons;
   /** KML nodes of the layer tree: node id → file and feature path. */
   std::map<QString, std::pair<QString, QString>> m_kmlNodes;
   QAction* m_featureInfoAction = nullptr;
