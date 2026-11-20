@@ -1319,6 +1319,26 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   return {fly};
 }
 
+namespace
+{
+
+OverlayHeight overlayHeight(KmlAltitudeMode mode)
+{
+  switch (mode) {
+  case KmlAltitudeMode::ClampToGround:
+  case KmlAltitudeMode::ClampToSeaFloor:
+    return OverlayHeight::Ground;
+  case KmlAltitudeMode::RelativeToGround:
+  case KmlAltitudeMode::RelativeToSeaFloor:
+    return OverlayHeight::Relative;
+  case KmlAltitudeMode::Absolute:
+    break;
+  }
+  return OverlayHeight::Absolute;
+}
+
+} // namespace
+
 QImage MainWindow::tintedIcon(const QString& where, const QColor& tint)
 {
   const std::pair<QString, QRgb> key{where, tint.rgba()};
@@ -1351,6 +1371,7 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
   }
   constexpr double iconPx = 32.0;
   std::vector<BillboardDraw> draws;
+  std::vector<RaisedShapeDraw> raised;
   for (const VectorStackEntry& entry : stack.vectors) {
     if (entry.definition.source.value(QStringLiteral("kind")).toString() !=
         QLatin1String("kml")) {
@@ -1366,13 +1387,10 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
       BillboardDraw draw;
       draw.latDeg = billboard.latDeg;
       draw.lonDeg = billboard.lonDeg;
-      const double height =
-          billboard.altitudeMode == KmlAltitudeMode::ClampToGround ||
-                  billboard.altitudeMode == KmlAltitudeMode::ClampToSeaFloor
-              ? 0.0
-              : billboard.altM;
-      draw.ecef =
-          geodeticToEcef(Geodetic{billboard.latDeg, billboard.lonDeg, height});
+      draw.height = overlayHeight(billboard.altitudeMode);
+      draw.heightM = billboard.altM;
+      draw.stalk = billboard.extrude;
+      draw.stalkColor = billboard.stalkColor;
       draw.icon = tintedIcon(billboard.icon, billboard.tint);
       draw.sizePx = iconPx * billboard.scale;
       draw.headingDeg = billboard.headingDeg;
@@ -1398,8 +1416,29 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
       draw.labelScale = billboard.labelScale;
       draws.push_back(std::move(draw));
     }
+    for (const KmlRaisedShape& shape : provider->raisedShapes()) {
+      RaisedShapeDraw draw;
+      draw.height =
+          shape.relative ? OverlayHeight::Relative : OverlayHeight::Absolute;
+      draw.closed = shape.closed;
+      draw.surface = shape.surface;
+      draw.walls = shape.extrude;
+      draw.line = shape.line;
+      draw.widthPx = shape.widthPx;
+      draw.fill = shape.fill;
+      for (const std::vector<KmlCoordinate>& ring : shape.rings) {
+        std::vector<Geodetic> points;
+        points.reserve(ring.size());
+        for (const KmlCoordinate& c : ring) {
+          points.push_back(Geodetic{c.latDeg, c.lonDeg, c.altM});
+        }
+        draw.rings.push_back(std::move(points));
+      }
+      raised.push_back(std::move(draw));
+    }
   }
   m_globeView->setBillboards(std::move(draws));
+  m_globeView->setRaisedShapes(std::move(raised));
 }
 
 bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)

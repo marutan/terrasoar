@@ -108,9 +108,55 @@ struct KmlBillboard {
   QColor labelColor = QColor(255, 255, 255);
   /** The label's size as a factor; 0 hides it. */
   double labelScale = 1.0;
+  /** A stalk from the ground up to it (extrude, not clamped). */
+  bool extrude = false;
+  /** The stalk's colour (LineStyle's). */
+  QColor stalkColor = QColor(255, 255, 255);
   /** The placemark (in the provider's document). */
   const KmlFeature* placemark = nullptr;
 };
+
+/**
+ * A line or polygon above the ground (altitude mode other than clamped):
+ * drawn in 3D over the view, with walls down to the ground if extruded.
+ *
+ * @reentrant
+ */
+struct KmlRaisedShape {
+  /**
+   * The line, or the polygon's outer boundary then its holes: longitudes
+   * made continuous, edges longer than a degree divided so they follow the
+   * curve of the Earth, heights interpolated.
+   */
+  std::vector<std::vector<KmlCoordinate>> rings;
+  /** True for a polygon or ring (closed), false for a line. */
+  bool closed = false;
+  /** True for a polygon: its top is filled. */
+  bool surface = false;
+  /** Heights from the ground (relativeToGround) rather than sea level. */
+  bool relative = false;
+  /** Walls down to the ground. */
+  bool extrude = false;
+  /** The line's (or outline's) colour; transparent for none. */
+  QColor line = QColor(255, 255, 255);
+  /** The line's width, pixels. */
+  double widthPx = 1.0;
+  /**
+   * The fill of a polygon's top and of walls (PolyStyle's colour);
+   * transparent for none.
+   */
+  QColor fill = QColor(255, 255, 255);
+  /** The placemark (in the provider's document). */
+  const KmlFeature* placemark = nullptr;
+};
+
+/**
+ * Returns @p placemark's lines and polygons that are above the ground
+ * (absolute or relativeToGround, and the gx sea-floor modes), with
+ * @p style. Clamped ones are drawn on the ground (kmlPlacemarkFeatures()).
+ */
+std::vector<KmlRaisedShape> kmlRaisedShapes(const KmlFeature& placemark,
+                                            const KmlStyle& style);
 
 /**
  * Returns @p placemark's billboards with @p style: one per point of its
@@ -176,8 +222,16 @@ public:
    */
   const std::vector<KmlBillboard>& billboards() const { return m_billboards; }
 
+  /**
+   * Returns its lines and polygons above the ground, drawn over the view
+   * (their features are kept for picking, not drawn on the ground).
+   */
+  const std::vector<KmlRaisedShape>& raisedShapes() const { return m_raised; }
+
 private:
   struct Entry {
+    /** Drawn over the view (a raised shape or a point), not in tiles. */
+    bool overlay = false;
     Feature feature;
     GeoRect bounds;
     const KmlFeature* placemark = nullptr;
@@ -188,6 +242,7 @@ private:
   QString m_name;
   std::vector<Entry> m_entries;
   std::vector<KmlBillboard> m_billboards;
+  std::vector<KmlRaisedShape> m_raised;
 };
 
 } // namespace ts

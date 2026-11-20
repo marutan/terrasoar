@@ -80,8 +80,14 @@ std::vector<GeoPoint> unwrapped(const std::vector<KmlCoordinate>& coordinates)
   return points;
 }
 
+bool isRaised(KmlAltitudeMode mode)
+{
+  return mode != KmlAltitudeMode::ClampToGround &&
+         mode != KmlAltitudeMode::ClampToSeaFloor;
+}
+
 void addGeometry(const KmlGeometry& geometry, const Feature& base,
-                 std::vector<Feature>& features)
+                 std::vector<Feature>& features, std::vector<bool>* raised)
 {
   Feature feature = base;
   switch (geometry.kind) {
@@ -106,14 +112,78 @@ void addGeometry(const KmlGeometry& geometry, const Feature& base,
     break;
   case KmlGeometry::Kind::MultiGeometry:
     for (const KmlGeometry& child : geometry.children) {
-      addGeometry(child, base, features);
+      addGeometry(child, base, features, raised);
     }
     return;
   }
   const std::size_t needed = feature.type == Feature::Type::LineStrings ? 2 : 1;
   if (!feature.parts.empty() && feature.parts.front().size() >= needed) {
     features.push_back(std::move(feature));
+    if (raised != nullptr) {
+      raised->push_back(geometry.kind != KmlGeometry::Kind::Point &&
+                        isRaised(geometry.altitudeMode));
+    }
   }
+}
+
+/** @p coordinates with continuous longitudes and no edge over a degree. */
+std::vector<KmlCoordinate>
+densified(const std::vector<KmlCoordinate>& coordinates)
+{
+  constexpr double stepDeg = 1.0;
+  const std::vector<GeoPoint> points = unwrapped(coordinates);
+  std::vector<KmlCoordinate> out;
+  for (std::size_t i = 0; i < points.size(); ++i) {
+    const KmlCoordinate here{points[i].lonDeg, points[i].latDeg,
+                             coordinates[i].altM};
+    if (i > 0) {
+      const KmlCoordinate& last = out.back();
+      const double span = std::max(std::abs(here.lonDeg - last.lonDeg),
+                                   std::abs(here.latDeg - last.latDeg));
+      const int32_t steps = static_cast<int32_t>(std::ceil(span / stepDeg));
+      const KmlCoordinate from = last;
+      for (int32_t k = 1; k < steps; ++k) {
+        const double t = static_cast<double>(k) / steps;
+        out.push_back(
+            KmlCoordinate{from.lonDeg + t * (here.lonDeg - from.lonDeg),
+                          from.latDeg + t * (here.latDeg - from.latDeg),
+                          from.altM + t * (here.altM - from.altM)});
+      }
+    }
+    out.push_back(here);
+  }
+  return out;
+}
+
+void addRaised(const KmlGeometry& geometry, const KmlRaisedShape& base,
+               std::vector<KmlRaisedShape>& shapes)
+{
+  if (geometry.kind == KmlGeometry::Kind::MultiGeometry) {
+    for (const KmlGeometry& child : geometry.children) {
+      addRaised(child, base, shapes);
+    }
+    return;
+  }
+  if (geometry.kind == KmlGeometry::Kind::Point ||
+      !isRaised(geometry.altitudeMode) || geometry.coordinates.size() < 2) {
+    return;
+  }
+  KmlRaisedShape shape = base;
+  shape.relative = geometry.altitudeMode == KmlAltitudeMode::RelativeToGround ||
+                   geometry.altitudeMode == KmlAltitudeMode::RelativeToSeaFloor;
+  shape.extrude = geometry.extrude;
+  shape.surface = geometry.kind == KmlGeometry::Kind::Polygon;
+  shape.closed =
+      shape.surface || geometry.kind == KmlGeometry::Kind::LinearRing;
+  shape.rings.push_back(densified(geometry.coordinates));
+  for (const std::vector<KmlCoordinate>& hole : geometry.inner) {
+    shape.rings.push_back(densified(hole));
+  }
+  // Lines and rings fill nothing but their walls.
+  if (!shape.surface && !shape.extrude) {
+    shape.fill = QColor(0, 0, 0, 0);
+  }
+  shapes.push_back(std::move(shape));
 }
 
 GeoRect boundsOf(const Feature& feature)
@@ -205,6 +275,7 @@ void addBillboards(const KmlGeometry& geometry, const KmlBillboard& base,
     billboard.latDeg = geometry.coordinates.front().latDeg;
     billboard.altM = geometry.coordinates.front().altM;
     billboard.altitudeMode = geometry.altitudeMode;
+    billboard.extrude = geometry.extrude && isRaised(geometry.altitudeMode);
     if (!billboards.empty() && billboards.back().placemark == base.placemark) {
       billboard.label.clear(); // the label once, on the first
     }
@@ -239,12 +310,43 @@ std::vector<KmlBillboard> kmlBillboards(const KmlDocument& document,
     base.labelColor = style.label->color;
     base.labelScale = style.label->scale;
   }
+  base.stalkColor = style.line.value_or(KmlLineStyle{}).color;
   addBillboards(*placemark.geometry, base, billboards);
   return billboards;
 }
 
-std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
-                                          const KmlStyle& style)
+std::vector<KmlRaisedShape> kmlRaisedShapes(const KmlFeature& placemark,
+                                            const KmlStyle& style)
+{
+  std::vector<KmlRaisedShape> shapes;
+  if (!placemark.geometry) {
+    return shapes;
+  }
+  const KmlLineStyle line = style.line.value_or(KmlLineStyle{});
+  const KmlPolyStyle poly = style.poly.value_or(KmlPolyStyle{});
+  KmlRaisedShape base;
+  base.placemark = &placemark;
+  base.line = line.color;
+  base.widthPx = line.width;
+  base.fill = poly.fill ? poly.color : QColor(0, 0, 0, 0);
+  addRaised(*placemark.geometry, base, shapes);
+  // A polygon's outline only if PolyStyle says so.
+  if (!poly.outline) {
+    for (KmlRaisedShape& shape : shapes) {
+      if (shape.closed) {
+        shape.line = QColor(0, 0, 0, 0);
+      }
+    }
+  }
+  return shapes;
+}
+
+namespace
+{
+
+std::vector<Feature> placemarkFeatures(const KmlFeature& placemark,
+                                       const KmlStyle& style,
+                                       std::vector<bool>* overlay)
 {
   std::vector<Feature> features;
   if (!placemark.geometry) {
@@ -274,8 +376,11 @@ std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
     }
   }
   std::vector<Feature> parts;
-  addGeometry(*placemark.geometry, base, parts);
-  for (Feature& feature : parts) {
+  std::vector<bool> raised;
+  addGeometry(*placemark.geometry, base, parts, &raised);
+  for (std::size_t i = 0; i < parts.size(); ++i) {
+    Feature& feature = parts[i];
+    const std::size_t before = features.size();
     FeatureStyle own = look;
     if (feature.type == Feature::Type::Points) {
       // Dots in the icon's colour, yellow for the default pushpin.
@@ -295,8 +400,23 @@ std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
       features.push_back(shifted(feature, 360.0));
     }
     features.push_back(std::move(feature));
+    if (overlay != nullptr) {
+      // Points are billboards, raised shapes drawn in 3D: both over the
+      // view.
+      const bool over =
+          raised[i] || features.back().type == Feature::Type::Points;
+      overlay->insert(overlay->end(), features.size() - before, over);
+    }
   }
   return features;
+}
+
+} // namespace
+
+std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
+                                          const KmlStyle& style)
+{
+  return placemarkFeatures(placemark, style, nullptr);
 }
 
 KmlFeatureProvider::KmlFeatureProvider(
@@ -313,10 +433,16 @@ KmlFeatureProvider::KmlFeatureProvider(
   const std::function<void(const KmlFeature&)> add =
       [&](const KmlFeature& placemark) {
         const KmlStyle style = resolver.resolve(placemark);
-        for (Feature& feature : kmlPlacemarkFeatures(placemark, style)) {
-          const GeoRect bounds = boundsOf(feature);
-          m_entries.push_back(Entry{std::move(feature), bounds, &placemark});
+        std::vector<bool> overlay;
+        std::vector<Feature> features =
+            placemarkFeatures(placemark, style, &overlay);
+        for (std::size_t i = 0; i < features.size(); ++i) {
+          const GeoRect bounds = boundsOf(features[i]);
+          m_entries.push_back(
+              Entry{overlay[i], std::move(features[i]), bounds, &placemark});
         }
+        std::vector<KmlRaisedShape> raised = kmlRaisedShapes(placemark, style);
+        m_raised.insert(m_raised.end(), raised.begin(), raised.end());
         std::vector<KmlBillboard> points =
             kmlBillboards(*m_document, placemark, style);
         m_billboards.insert(m_billboards.end(), points.begin(), points.end());
@@ -363,9 +489,8 @@ KmlFeatureProvider::loadFeatures(TileKey key,
     if (cancelled.load()) {
       return std::nullopt;
     }
-    // Points are drawn as billboards over the view, not as dots.
-    if (entry.feature.type != Feature::Type::Points &&
-        overlaps(entry.bounds, rect)) {
+    // Points and raised shapes are drawn over the view, not in tiles.
+    if (!entry.overlay && overlaps(entry.bounds, rect)) {
       tile.features.push_back(entry.feature);
     }
   }

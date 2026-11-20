@@ -9,6 +9,7 @@ the network.
 | --- | --- |
 | `everything.kml` | Every element Terra Soar reads: shared and inline styles, a StyleMap, ListStyle, nested folders, each geometry (with altitude modes, extrude and tessellate), ExtendedData (Data and SchemaData), LookAt, Camera, Region and Lod, TimeStamp, TimeSpan, gx:Track, GroundOverlay (LatLonBox with rotation, gx:LatLonQuad), ScreenOverlay, NetworkLink, an external style, and unknown elements (atom:author, PhotoOverlay) |
 | `styles.kml` | The external style `everything.kml` refers to |
+| `heights.kml` | Shapes above the ground near London: an extruded polygon at an absolute height, an extruded line relative to the ground with a 2.4° edge, a point on a stalk, and a draped line |
 | `broken.kml` | Malformed XML (an unclosed element) |
 | `archive.kmz` | A KMZ: doc.kml with an icon and a ground overlay image inside the archive |
 

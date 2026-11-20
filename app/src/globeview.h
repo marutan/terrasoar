@@ -42,6 +42,7 @@
 #include <QTimer>
 
 #include "ts/camera/cameracontroller.h"
+#include "ts/geo/geodetic.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/globe/tilerenderer.h"
 #include "ts/perf/frametimestats.h"
@@ -62,13 +63,29 @@ class GlRenderDevice;
 class GlobeRenderer;
 class Projection;
 
+/** How the heights of shapes drawn over the view are measured. */
+enum class OverlayHeight : uint8_t {
+  /** On the ground (the terrain where shown); heights ignored. */
+  Ground,
+  /** Above the ground (the terrain where shown). */
+  Relative,
+  /** Above sea level (the ellipsoid). */
+  Absolute
+};
+
 /**
  * An icon with its label drawn on the screen at a place (KML placemarks):
  * upright on the globe, the maps and through the morph.
  */
 struct BillboardDraw {
-  /** The place, ECEF metres (at its height). */
-  Vec3 ecef;
+  /** Its height, metres (see height). */
+  double heightM = 0.0;
+  /** How heightM is measured. */
+  OverlayHeight height = OverlayHeight::Ground;
+  /** A stalk from the ground up to it, in stalkColor. */
+  bool stalk = false;
+  /** The stalk's colour. */
+  QColor stalkColor = QColor(255, 255, 255);
   /** Its latitude, degrees. */
   double latDeg = 0.0;
   /** Its longitude, degrees. */
@@ -87,6 +104,32 @@ struct BillboardDraw {
   QColor labelColor = QColor(255, 255, 255);
   /** Its size as a factor of the normal; 0 hides it. */
   double labelScale = 1.0;
+};
+
+/**
+ * A line or polygon above the ground drawn over the view (KML), with walls
+ * down to the ground if extruded. Not hidden by terrain in front of it.
+ */
+struct RaisedShapeDraw {
+  /**
+   * The line, or the polygon's outer boundary then its holes: longitude,
+   * latitude (degrees) and height (metres, see height) per point.
+   */
+  std::vector<std::vector<Geodetic>> rings;
+  /** How the heights are measured (Relative or Absolute). */
+  OverlayHeight height = OverlayHeight::Absolute;
+  /** Closed (a polygon or ring). */
+  bool closed = false;
+  /** A polygon: its top is filled with fill. */
+  bool surface = false;
+  /** Walls down to the ground, filled with fill. */
+  bool walls = false;
+  /** The line's colour; transparent for none. */
+  QColor line;
+  /** The line's width, pixels. */
+  double widthPx = 1.0;
+  /** The fill of the top and walls; transparent for none. */
+  QColor fill;
 };
 
 /**
@@ -242,6 +285,15 @@ public:
    */
   void setBillboards(std::vector<BillboardDraw> billboards);
 
+  /**
+   * Sets the lines and polygons above the ground drawn over the view (KML),
+   * nearest last; flat on the maps.
+   */
+  void setRaisedShapes(std::vector<RaisedShapeDraw> shapes);
+
+  /** Returns how many raised shapes the last frame drew (for tests). */
+  int32_t raisedShapesDrawn() const { return m_raisedDrawn; }
+
   /** Returns how many billboards the last frame drew (for tests). */
   int32_t billboardsDrawn() const { return m_billboardsDrawn; }
 
@@ -392,6 +444,10 @@ private:
   void releaseGl();
   void updatePointerReadout();
   void drawBillboards();
+  void drawRaisedShapes();
+  double groundHeightM(double latDeg, double lonDeg);
+  Vec3 overlayEcef(double latDeg, double lonDeg, double heightM,
+                   OverlayHeight height);
   void reportClick();
   void drawOverlay();
   void drawAttributions();
@@ -448,6 +504,8 @@ private:
   /** True while dragging out a rectangle. */
   bool m_drawingDrag = false;
   std::vector<BillboardDraw> m_billboards;
+  std::vector<RaisedShapeDraw> m_raised;
+  int32_t m_raisedDrawn = 0;
   int32_t m_billboardsDrawn = 0;
   int32_t m_labelsDrawn = 0;
   /** Where a left press that may become a click was. */

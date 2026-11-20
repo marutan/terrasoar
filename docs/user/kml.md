@@ -28,6 +28,12 @@ unticked. If the file has its own view, Terra Soar flies there.
   can't be found, a yellow pushpin stands in.
 - Where places crowd together, some icons and names are left out so
   the rest stay readable; zoom in to see them all.
+- **Heights.** Paths and areas the file puts above the ground are drawn
+  in the air, at a height above sea level or above the terrain, with
+  walls down to the ground where the file asks for them ("extruded"),
+  so buildings, flight paths and fences stand up. Places in the air can
+  stand on a line down to the ground. On the flat maps they lie flat.
+  Hills and mountains in front of them don't hide them.
 - Paths and areas crossing the 180° meridian are drawn the short way
   round, on the globe and on every map.
 
@@ -48,6 +54,6 @@ its view, or to see all of it.
   how many.
 - A file that isn't valid KML is refused with the line and column where
   it goes wrong.
-- More is coming in this phase: heights and walls,
+- More is coming in this phase:
   pictures over the ground, links to online KML, time, and creating and
   editing your own KML.

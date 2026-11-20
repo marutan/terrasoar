@@ -709,6 +709,80 @@ private slots:
     QVERIFY(ts::kmlBillboards(*kmz, ts::KmlFeature{}, ts::KmlStyle{}).empty());
   }
 
+  void heights()
+  {
+    // Shapes above the ground: drawn over the view, not in the tiles.
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::sharedKmlDocument(fixture(QStringLiteral("heights.kml")), &error);
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    ts::KmlFeatureProvider provider(document, QString());
+    const std::vector<ts::KmlRaisedShape>& raised = provider.raisedShapes();
+    QCOMPARE(raised.size(), std::size_t{2});
+    const ts::KmlRaisedShape& block = raised.at(0);
+    QVERIFY(block.closed);
+    QVERIFY(block.surface);
+    QVERIFY(block.extrude);
+    QVERIFY(!block.relative);
+    QCOMPARE(block.fill, QColor(0, 128, 255, 192));
+    QCOMPARE(block.line, QColor(0, 0, 0));
+    QCOMPARE(block.widthPx, 2.0);
+    QCOMPARE(block.rings.size(), std::size_t{1});
+    QCOMPARE(block.rings.front().front().altM, 40000.0);
+    const ts::KmlRaisedShape& wall = raised.at(1);
+    QVERIFY(!wall.closed);
+    QVERIFY(!wall.surface);
+    QVERIFY(wall.relative);
+    QCOMPARE(wall.fill, QColor(255, 0, 0, 128));
+    // The 2.4° edge is divided into three, heights kept.
+    QCOMPARE(wall.rings.front().size(), std::size_t{5});
+    QCOMPARE(wall.rings.front().at(1).altM, 30000.0);
+    QCOMPARE(wall.rings.front().back().lonDeg, 2.7);
+    // The stalk under the point.
+    QCOMPARE(provider.billboards().size(), std::size_t{1});
+    QVERIFY(provider.billboards().front().extrude);
+    QCOMPARE(provider.billboards().front().stalkColor, QColor(255, 0, 0));
+    // The tiles have only the draped line; picking finds all four.
+    const std::atomic<bool> cancelled{false};
+    const ts::FeatureTile tile =
+        provider
+            .loadFeatures(
+                ts::TileKey::containing(4, ts::Geodetic{51.4, 0.0, 0.0}),
+                cancelled)
+            .value_or(ts::FeatureTile{});
+    QCOMPARE(tile.features.size(), std::size_t{1});
+    QCOMPARE(tile.features.front().attributes.value(QStringLiteral("name")),
+             QVariant(QStringLiteral("Draped")));
+    QCOMPARE(
+        provider.placemarksAt(ts::GeoPoint{51.53, -0.08}, 0.001).front()->name,
+        QStringLiteral("A block"));
+    QCOMPARE(provider.featureCount(), std::size_t{4});
+    // A line without extrude: no walls, so no fill; a polygon with outline
+    // 0: no line.
+    ts::KmlFeature line;
+    ts::KmlGeometry geometry;
+    geometry.kind = ts::KmlGeometry::Kind::LineString;
+    geometry.altitudeMode = ts::KmlAltitudeMode::Absolute;
+    geometry.coordinates = {ts::KmlCoordinate{0.0, 0.0, 10.0},
+                            ts::KmlCoordinate{0.5, 0.0, 10.0}};
+    line.geometry = geometry;
+    QCOMPARE(ts::kmlRaisedShapes(line, ts::KmlStyle{}).front().fill.alpha(), 0);
+    geometry.kind = ts::KmlGeometry::Kind::Polygon;
+    geometry.coordinates.push_back(ts::KmlCoordinate{0.5, 0.5, 10.0});
+    line.geometry = geometry;
+    ts::KmlStyle noOutline;
+    ts::KmlPolyStyle poly;
+    poly.outline = false;
+    noOutline.poly = poly;
+    QCOMPARE(ts::kmlRaisedShapes(line, noOutline).front().line.alpha(), 0);
+    // Clamped: none.
+    geometry.altitudeMode = ts::KmlAltitudeMode::ClampToGround;
+    line.geometry = geometry;
+    QVERIFY(ts::kmlRaisedShapes(line, ts::KmlStyle{}).empty());
+  }
+
   void registryCreatesKml()
   {
     ts::ProviderRegistry registry;

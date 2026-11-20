@@ -103,8 +103,8 @@ On the globe a place on the far side (its ellipsoid normal facing away
 from the eye) is hidden. Where they crowd, one icon is drawn per 6-pixel
 cell and labels that would overlap one already drawn are left out, with
 at most 400 labels, so a file with tens of thousands of places stays
-smooth. Heights: clampToGround places sit on the ellipsoid; others at
-their altitude (16a-4 adds the terrain).
+smooth. Their heights are as for raised shapes (below); an extruded
+point has a stalk down to the ground in LineStyle's colour.
 
 `IconCache` (app) holds the icons: KMZ members and local files read at
 once (`readKmlLocalFile()`), web icons fetched in the background through
@@ -113,6 +113,35 @@ the program's network client and kept in the cache directory
 an icon arrives, and for one that can't be had, the default pushpin
 (drawn by the program: yellow, 32 pixels) stands in; tinted copies are
 kept per colour.
+
+## Heights
+
+Clamped geometry (clampToGround, the default, and gx:clampToSeaFloor) is
+drawn on the ground through the tiles, as above; tessellate makes no
+difference there, since draped lines follow the ground anyway. Lines,
+rings and polygons with heights (absolute, relativeToGround and
+gx:relativeToSeaFloor) are `ts::KmlRaisedShape`s instead
+(`kmlRaisedShapes()`): edges over a degree are divided, with their
+heights interpolated, so long ones follow the curve of the Earth rather
+than cutting through it. Their features stay with the provider for
+picking (by their footprint) but are left out of the tiles.
+
+`GlobeView` draws them with `QPainter` over each frame (`RaisedShapeDraw`):
+
+- each point at its height above the ellipsoid (absolute) or above the
+  terrain's loaded height there (relative; the terrain as drawn, so
+  exaggerated when it is), points facing away from the eye hidden;
+- extruded shapes have a wall from each edge down to the ground, filled
+  with PolyStyle's colour; a polygon's top is filled with it too when the
+  whole of it is in sight (holes left open);
+- the line (and polygon outline unless PolyStyle's `outline` is 0) in
+  LineStyle's colour and width, over the walls it tops;
+- walls, tops and lines from all shapes sorted by depth and drawn far to
+  near.
+
+Terrain in front of a shape doesn't hide it: they are drawn over the
+frame, like the billboards. On the maps they are drawn flat, without
+walls.
 
 ## In the window
 
@@ -156,8 +185,11 @@ KML Samples, every geometry, gx:Track and gx:MultiTrack, prefixes, odd
 whitespace, extended data, external styles) and broken files; the vector
 features of placemarks (styles, default icon, MultiGeometry, the
 antimeridian), billboards (icon, tint, scale, heading, hot spot, label, a
-KMZ's icon read from the archive), the provider (tiles without points,
+KMZ's icon read from the archive), raised shapes (modes, walls, fill
+and outline rules, long edges divided, left out of tiles but picked),
+the provider (tiles without points,
 picking order), the registry, view poses and balloon HTML. `tests/ui`: a
 KML opened into the layer tree, a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
-is off), a KMZ.
+is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,
+a stalk) drawn and hidden from the far side.

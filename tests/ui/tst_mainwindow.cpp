@@ -2636,6 +2636,26 @@ private slots:
                 .contains(QStringLiteral("Places")));
   }
 
+  void kmlHeights()
+  {
+    // Shapes above the ground, with walls, drawn over the globe; flat on
+    // the map.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(window.openFile(
+                 QStringLiteral(TS_TEST_DATA_DIR "/kml/heights.kml"), &error),
+             qPrintable(error));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    view->setPose(ts::CameraPose{51.5, 0.5, 600000.0, 0.0, 50.0});
+    QTRY_COMPARE(view->raisedShapesDrawn(), 2);
+    QTRY_VERIFY(view->billboardsDrawn() >= 1);
+    view->setPose(ts::CameraPose{-51.5, 179.0, 600000.0, 0.0, 0.0});
+    QTRY_COMPARE(view->raisedShapesDrawn(), 0);
+  }
+
   void wmsWhatIsHere()
   {
     // A click on the globe reports the point; asking a queryable WMS layer
