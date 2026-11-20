@@ -31,16 +31,19 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <thread>
 #include <utility>
 #include <vector>
 
+#include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QPointer>
 #include <QString>
 
+#include "ts/camera/camera.h"
 #include "ts/layers/layerdefinition.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/tileprovider.h"
@@ -61,6 +64,8 @@ namespace ts
 
 class BalloonWindow;
 class IconCache;
+class KmlLinks;
+struct KmlViewParameters;
 class ElevationProfileDialog;
 class FeatureInfoWindow;
 struct AboutDataRow;
@@ -131,6 +136,22 @@ public:
    * if it can't be read.
    */
   bool openKml(const QString& path, QString* errorString);
+
+  /** Returns the NetworkLinks of the layer tree. */
+  KmlLinks* kmlLinks() const { return m_kmlLinks; }
+
+  /**
+   * Checks the Regions of the KML in the layer tree against the view now
+   * (it is done when the view stops moving): layers out of sight are left
+   * out, links that come into sight are fetched.
+   */
+  void updateKmlRegions();
+
+  /** Returns the KML nodes out of their Regions' sight (for tests). */
+  QStringList kmlHiddenNodes() const
+  {
+    return QStringList(m_kmlInactive.begin(), m_kmlInactive.end());
+  }
 
   /** Returns the balloon window, or null before the first balloon. */
   BalloonWindow* balloonWindow() const { return m_balloon; }
@@ -333,6 +354,22 @@ private:
   void refreshBillboards(const LayerStack& stack);
   QImage tintedIcon(const QString& where, const QColor& tint,
                     bool pushpin = true);
+  void addKmlChildren(const KmlDocument& document, const KmlFeature& container,
+                      const QString& featurePath,
+                      const QModelIndex& collection);
+  void addKmlPlaces(const KmlDocument& document, const QString& featurePath,
+                    const QModelIndex& collection, int32_t row, bool deep);
+  void addKmlLink(const KmlDocument& document, const KmlFeature& link,
+                  const QString& featurePath, const QModelIndex& parent,
+                  int32_t row);
+  KmlViewParameters currentViewParameters() const;
+  void kmlLinkLoaded(const QString& nodeId, const QString& path,
+                     bool flyToView);
+  void forgetRemovedKmlNodes();
+  void kmlCameraMoved();
+  void kmlCheckChanged(const QModelIndex& topLeft);
+  const std::vector<QDateTime>& kmlBoundaries(const QJsonObject& source) const;
+  std::vector<QAction*> flyThereActions(const QString& id, QObject* parent);
   void addKmlOverlay(const KmlDocument& document, const KmlFeature& overlay,
                      const QString& featurePath, const QModelIndex& parent,
                      int32_t row);
@@ -396,6 +433,20 @@ private:
   QAction* m_openKmlAction = nullptr;
   BalloonWindow* m_balloon = nullptr;
   IconCache* m_icons = nullptr;
+  KmlLinks* m_kmlLinks = nullptr;
+  /** Waits for the view to stop before checking KML Regions. */
+  QTimer* m_kmlViewTimer = nullptr;
+  std::optional<CameraPose> m_lastKmlPose;
+  /** KML layers out of their Regions' sight: left out of the stack. */
+  std::set<QString> m_kmlInactive;
+  /** KML radio folders (ListStyle radioFolder) by node id. */
+  std::set<QString> m_kmlRadio;
+  /** Set while the main window changes KML nodes itself. */
+  bool m_refreshingKml = false;
+  /** The vector sources drawn (KML's change with the clock). */
+  QJsonArray m_drawnVectors;
+  /** Each KML layer's time boundaries, by path, container and depth. */
+  mutable std::map<QString, std::vector<QDateTime>> m_kmlBoundaries;
   /** Icons tinted by their IconStyle colour: address and colour → image. */
   std::map<std::pair<QString, QRgb>, QImage> m_tintedIcons;
   /** KML nodes of the layer tree: node id → file and feature path. */

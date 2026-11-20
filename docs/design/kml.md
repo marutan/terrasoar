@@ -6,7 +6,7 @@ balloons and views. Code: `core/include/ts/kml/`. For users:
 [kml.md](../user/kml.md).
 
 Phase 16 is delivered in parts: 16a (import and display) and 16b
-(authoring and export). This page grows with each part.
+(authoring and export).
 
 ## The model
 
@@ -177,6 +177,81 @@ bottom left, insetPixels from the top right), turned `rotation` degrees
 anticlockwise about rotationXY on the view. They are drawn over
 everything but the attributions and scale bar.
 
+## Time
+
+A feature shows at the program's clock (`ts/time`, [wms.md](wms.md#time))
+if its TimeStamp is at or before it (from then on, the way Google Earth
+shows stamped features up to the slider's time) or the clock is within its
+TimeSpan, from begin up to (not including) end; a container's time
+narrows its children's (`kmlShownAt()`, `kmlNarrowTime()`).
+
+So that tiles aren't rebuilt as the clock runs, a KML layer's source gets
+an `"at"` member only from the main window (`timedStack()`), and only one
+of a few values: the latest of the layer's *boundaries* (every begin, end
+and stamp in it, `kmlTimeBoundaries()`) at or before the clock
+(`kmlTimeKey()`). What shows is the same anywhere between two boundaries,
+so the source, the provider (which filters its placemarks by `at`) and the
+tiles change only as the clock crosses one. `clockMoved()` compares the
+vector sources as it does the imagery's.
+
+The time bar is offered the layers' boundaries, and each gx:Track's span
+in hundredths, as part of its extent (`kmlTimeExtent()`), so it steps to
+the moments something changes.
+
+**gx:Track.** A track is drawn as its line all the time; a marker (the
+placemark's icon and label) shows where it is at the clock, interpolated
+between its points, and nothing before its first time or after its last
+(`kmlTrackPosition()`, `KmlFeatureProvider::trackMarkersAt()`). The
+billboards are made again whenever the clock moves.
+
+## Regions
+
+A Region is active when some of its LatLonAltBox is in sight and its size
+on the screen (the square root of the area of the screen rectangle its
+sample points cover, `kmlRegionPixels()`) is between minLodPixels and
+maxLodPixels. Regions are checked on the layer tree's KML entries when the
+view has been still for 300 ms (`updateKmlRegions()`): an entry whose own
+Region or a container's is inactive, and everything under it in the tree
+(a link's document included), is left out of the stack until it is
+active again. A NetworkLink with a Region is fetched the first time its
+Region becomes active (superoverlays load level by level as the view
+comes closer). A Region on a single placemark inside a Places layer is
+not used (the layer is the unit); minAltitude places the box's sample
+points, maxAltitude and the fade extents are not used.
+
+## NetworkLinks
+
+Each NetworkLink is a collection in the tree; `KmlLinks` (app) fetches
+what it links to and the main window puts that document inside the
+collection, replacing what was there:
+
+- the address is the Link's href resolved against its document (a file
+  next to it or in its KMZ, or the web), with viewFormat (by default
+  `BBOX=[bboxWest],[bboxSouth],[bboxEast],[bboxNorth]` when the link
+  refreshes with the view) and httpQuery filled in from the view and the
+  program (`kmlLinkUrl()`, `kmlViewParameters()`: the view's bounds from
+  where its edges meet the ground, scaled by viewBoundScale);
+- local files are read where they are; web documents (and KMZ members)
+  are written to a temporary folder for the session, each fetch a file of
+  its own, and remembered as copies of their address (`setKmlWebBase()`),
+  so relative addresses inside them (icons, more links) point at the web
+  (`KmlDocument::webBase`);
+- refreshMode onInterval fetches again every refreshInterval;
+  viewRefreshMode onStop fetches viewRefreshTime after the view stops;
+  onRequest and the rest only when asked (Refresh in the entry's menu);
+  onExpire is treated as onChange (once);
+- flyToView flies to the new document's view; a failure is shown in the
+  status bar and what was there stays;
+- links inside links are followed eight deep at most.
+
+## Lists (ListStyle)
+
+A container's ListStyle `listItemType` shapes its entries: `radioFolder`
+keeps at most one child on (the first the file shows; switching one on
+switches the others off); `checkHideChildren` lists it as one entry, a
+Places layer of everything inside (`"deep": true`); `check` and
+`checkOffOnly` list children as usual.
+
 ## In the window
 
 **Opening.** File → Open KML or KMZ…, files dropped on the window, and
@@ -225,10 +300,19 @@ and outline rules, long edges divided, left out of tiles but picked),
 ground overlays (box, rotation, antimeridian, gx:LatLonQuad, a picture
 warped into a tile the right way round and tinted, its deepest level, a
 KMZ's, the registry), screen overlay placement (units, size, aspect,
-rotation), the provider (tiles without points,
+rotation), times (stamps, spans, containers', boundaries and keys, the
+time bar's extent, a provider at a time), tracks (interpolation, the
+antimeridian, markers), Regions (size on the screen from near and far,
+out of sight, on the way to a feature), link addresses (view bounds,
+viewFormat, httpQuery, relative to a file or a web copy), deep layers,
+the provider (tiles without points,
 picking order), the registry, view poses and balloon HTML. `tests/ui`: a
 KML opened into the layer tree, a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
 is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,
 a stalk) drawn and hidden from the far side; ground overlays as imagery
-layers and a screen overlay drawn and switched off.
+layers and a screen overlay drawn and switched off; NetworkLinks to local
+files (one waiting for its Region, then hidden again), Refresh, a radio
+folder and a checkHideChildren folder (`links.kml`); a web link through a
+mock server (the view and client in its query, a failure); placemarks
+showing with the clock and a track's marker moving.

@@ -48,6 +48,12 @@ std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
                                                      QString* errorString);
 
 /**
+ * Records that the file at @p path is a copy of @p url (a NetworkLink's,
+ * fetched): sharedKmlDocument() sets the document's webBase from it.
+ */
+void setKmlWebBase(const QString& path, const QString& url);
+
+/**
  * Returns the container (Document or Folder) at @p containerPath in
  * @p document: child indices from the root separated by dots ("" for the
  * root, "0.2" for the root's first child's third); null if there is none.
@@ -58,9 +64,13 @@ const KmlFeature* kmlContainer(const KmlDocument& document,
 /**
  * Returns the source object of a layer showing the placemarks directly in
  * the container at @p containerPath of the KML file at @p path:
- * `{"kind": "kml", "path": …, "container": …}`.
+ * `{"kind": "kml", "path": …, "container": …}`; with @p deep
+ * (`"deep": true`) everything inside it (a ListStyle checkHideChildren
+ * container). The main window adds `"at"` (an ISO time, kmlTimeKey()) for
+ * the clock.
  */
-QJsonObject kmlLayerSource(const QString& path, const QString& containerPath);
+QJsonObject kmlLayerSource(const QString& path, const QString& containerPath,
+                           bool deep = false);
 
 /**
  * Returns @p placemark's geometry as vector features (a MultiGeometry
@@ -180,10 +190,14 @@ class KmlFeatureProvider : public FeatureProvider
 public:
   /**
    * Shows the placemarks of the container at @p containerPath of
-   * @p document (which it holds).
+   * @p document (which it holds): those directly in it, or with @p deep
+   * all inside it; with @p at, only those whose times (with their
+   * containers') show then (kmlShownAt()).
    */
   KmlFeatureProvider(std::shared_ptr<const KmlDocument> document,
-                     const QString& containerPath);
+                     const QString& containerPath,
+                     std::optional<QDateTime> at = std::nullopt,
+                     bool deep = false);
 
   /** Returns "kml:" and the path and container. */
   QString id() const override;
@@ -237,6 +251,16 @@ public:
     return m_screens;
   }
 
+  /**
+   * Returns a billboard for each of its gx:Tracks where the track is at
+   * @p clock (kmlTrackPosition()), in its placemark's icon and label;
+   * none for tracks not under way then.
+   */
+  std::vector<KmlBillboard> trackMarkersAt(const QDateTime& clock) const;
+
+  /** Returns true if it has gx:Tracks (they move with the clock). */
+  bool hasTracks() const { return !m_tracks.empty(); }
+
 private:
   struct Entry {
     /** Drawn over the view (a raised shape or a point), not in tiles. */
@@ -253,6 +277,10 @@ private:
   std::vector<KmlBillboard> m_billboards;
   std::vector<KmlRaisedShape> m_raised;
   std::vector<const KmlFeature*> m_screens;
+  std::optional<QDateTime> m_at;
+  bool m_deep = false;
+  /** Each track and its placemark's billboard. */
+  std::vector<std::pair<const KmlGeometry*, KmlBillboard>> m_tracks;
 };
 
 } // namespace ts

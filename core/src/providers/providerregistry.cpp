@@ -397,10 +397,17 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
     if (!document) {
       return nullptr;
     }
+    // The clock's moment for a document with times (kmlTimeKey()).
+    std::optional<QDateTime> at;
+    if (source.contains(QStringLiteral("at"))) {
+      at = QDateTime::fromString(source.value(QStringLiteral("at")).toString(),
+                                 Qt::ISODate);
+    }
     std::shared_ptr<KmlFeatureProvider> provider =
         std::make_shared<KmlFeatureProvider>(
             std::move(document),
-            source.value(QStringLiteral("container")).toString());
+            source.value(QStringLiteral("container")).toString(), at,
+            source.value(QStringLiteral("deep")).toBool());
     m_features[key] = provider;
     return provider;
   }

@@ -28,6 +28,7 @@
 
 #include <QStringList>
 
+#include "ts/kml/kmlactivity.h"
 #include "ts/kml/kmlreader.h"
 #include "ts/vector/featurepick.h"
 
@@ -219,6 +220,24 @@ bool overlaps(const GeoRect& a, const GeoRect& b)
 
 } // namespace
 
+namespace
+{
+
+/** Files that are copies of web documents: path → address. */
+std::map<QString, QString>& webBases()
+{
+  static std::map<QString, QString> bases;
+  return bases;
+}
+
+} // namespace
+
+void setKmlWebBase(const QString& path, const QString& url)
+{
+  const std::lock_guard<std::mutex> lock(documentsMutex());
+  webBases()[path] = url;
+}
+
 std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
                                                      QString* errorString)
 {
@@ -231,6 +250,10 @@ std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
   std::optional<KmlDocument> read = readKmlFile(path, errorString);
   if (!read) {
     return nullptr;
+  }
+  const std::map<QString, QString>::const_iterator web = webBases().find(path);
+  if (web != webBases().end()) {
+    read->webBase = web->second;
   }
   document = std::make_shared<const KmlDocument>(std::move(*read));
   slot = document;
@@ -255,11 +278,17 @@ const KmlFeature* kmlContainer(const KmlDocument& document,
   return feature;
 }
 
-QJsonObject kmlLayerSource(const QString& path, const QString& containerPath)
+QJsonObject kmlLayerSource(const QString& path, const QString& containerPath,
+                           bool deep)
 {
-  return QJsonObject{{QStringLiteral("kind"), QStringLiteral("kml")},
-                     {QStringLiteral("path"), path},
-                     {QStringLiteral("container"), containerPath}};
+  QJsonObject source;
+  source.insert(QStringLiteral("kind"), QStringLiteral("kml"));
+  source.insert(QStringLiteral("path"), path);
+  source.insert(QStringLiteral("container"), containerPath);
+  if (deep) {
+    source.insert(QStringLiteral("deep"), true);
+  }
+  return source;
 }
 
 namespace
@@ -419,9 +448,27 @@ std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
   return placemarkFeatures(placemark, style, nullptr);
 }
 
+namespace
+{
+
+void collectTracks(const KmlGeometry& geometry,
+                   std::vector<const KmlGeometry*>& tracks)
+{
+  if (geometry.kind == KmlGeometry::Kind::Track) {
+    tracks.push_back(&geometry);
+  }
+  for (const KmlGeometry& child : geometry.children) {
+    collectTracks(child, tracks);
+  }
+}
+
+} // namespace
+
 KmlFeatureProvider::KmlFeatureProvider(
-    std::shared_ptr<const KmlDocument> document, const QString& containerPath)
-    : m_document(std::move(document)), m_containerPath(containerPath)
+    std::shared_ptr<const KmlDocument> document, const QString& containerPath,
+    std::optional<QDateTime> at, bool deep)
+    : m_document(std::move(document)), m_containerPath(containerPath),
+      m_at(std::move(at)), m_deep(deep)
 {
   const KmlFeature* container =
       m_document ? kmlContainer(*m_document, containerPath) : nullptr;
@@ -430,6 +477,10 @@ KmlFeatureProvider::KmlFeatureProvider(
   }
   m_name = container->name;
   KmlStyleResolver resolver(*m_document);
+  const std::function<bool(const std::optional<KmlTime>&)> shown =
+      [this](const std::optional<KmlTime>& time) {
+        return !m_at || !time || kmlShownAt(*time, *m_at);
+      };
   const std::function<void(const KmlFeature&)> add =
       [&](const KmlFeature& placemark) {
         const KmlStyle style = resolver.resolve(placemark);
@@ -441,12 +492,55 @@ KmlFeatureProvider::KmlFeatureProvider(
           m_entries.push_back(
               Entry{overlay[i], std::move(features[i]), bounds, &placemark});
         }
-        std::vector<KmlRaisedShape> raised = kmlRaisedShapes(placemark, style);
-        m_raised.insert(m_raised.end(), raised.begin(), raised.end());
         std::vector<KmlBillboard> points =
             kmlBillboards(*m_document, placemark, style);
         m_billboards.insert(m_billboards.end(), points.begin(), points.end());
+        std::vector<KmlRaisedShape> raised = kmlRaisedShapes(placemark, style);
+        m_raised.insert(m_raised.end(), raised.begin(), raised.end());
+        if (placemark.geometry) {
+          std::vector<const KmlGeometry*> tracks;
+          collectTracks(*placemark.geometry, tracks);
+          if (!tracks.empty()) {
+            // The marker looks as a point of the placemark would.
+            KmlFeature asPoint = placemark;
+            KmlGeometry point;
+            point.kind = KmlGeometry::Kind::Point;
+            point.coordinates = {KmlCoordinate{}};
+            asPoint.geometry = point;
+            std::vector<KmlBillboard> look =
+                kmlBillboards(*m_document, asPoint, style);
+            for (const KmlGeometry* track : tracks) {
+              KmlBillboard marker = look.front();
+              marker.placemark = &placemark;
+              marker.altitudeMode = track->altitudeMode;
+              m_tracks.emplace_back(track, marker);
+            }
+          }
+        }
       };
+  const std::function<void(const KmlFeature&, const std::optional<KmlTime>&)>
+      visit = [&](const KmlFeature& parent,
+                  const std::optional<KmlTime>& time) {
+        for (const KmlFeature& child : parent.children) {
+          const std::optional<KmlTime> own = kmlNarrowTime(time, child.time);
+          if (!shown(own)) {
+            continue;
+          }
+          if (child.kind == KmlFeature::Kind::Placemark) {
+            add(child);
+          } else if (m_deep && child.kind == KmlFeature::Kind::ScreenOverlay) {
+            m_screens.push_back(&child);
+          } else if (m_deep && (child.kind == KmlFeature::Kind::Document ||
+                                child.kind == KmlFeature::Kind::Folder)) {
+            visit(child, own);
+          }
+        }
+      };
+  const std::optional<KmlTime> time =
+      kmlEffectiveTime(*m_document, containerPath);
+  if (!shown(time)) {
+    return;
+  }
   // A placemark or screen overlay named itself (a file of one placemark;
   // a screen overlay's own layer).
   if (container->kind == KmlFeature::Kind::Placemark) {
@@ -454,17 +548,34 @@ KmlFeatureProvider::KmlFeatureProvider(
   } else if (container->kind == KmlFeature::Kind::ScreenOverlay) {
     m_screens.push_back(container);
   }
-  for (const KmlFeature& child : container->children) {
-    if (child.kind == KmlFeature::Kind::Placemark) {
-      add(child);
+  visit(*container, time);
+}
+
+std::vector<KmlBillboard>
+KmlFeatureProvider::trackMarkersAt(const QDateTime& clock) const
+{
+  std::vector<KmlBillboard> markers;
+  for (const std::pair<const KmlGeometry*, KmlBillboard>& track : m_tracks) {
+    const std::optional<KmlCoordinate> at =
+        kmlTrackPosition(*track.first, clock);
+    if (!at) {
+      continue;
     }
+    KmlBillboard marker = track.second;
+    marker.lonDeg = at->lonDeg;
+    marker.latDeg = at->latDeg;
+    marker.altM = at->altM;
+    markers.push_back(marker);
   }
+  return markers;
 }
 
 QString KmlFeatureProvider::id() const
 {
-  return QStringLiteral("kml:%1|%2")
-      .arg(m_document ? m_document->path : QString(), m_containerPath);
+  return QStringLiteral("kml:%1|%2|%3|%4")
+      .arg(m_document ? m_document->path : QString(), m_containerPath,
+           m_at ? m_at->toString(Qt::ISODate) : QString(),
+           m_deep ? QStringLiteral("deep") : QString());
 }
 
 QString KmlFeatureProvider::name() const

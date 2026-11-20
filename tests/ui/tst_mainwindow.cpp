@@ -56,6 +56,7 @@
 #include <QStyleHints>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QTimeZone>
 #include <QTimer>
 #include <QTreeView>
 #include <QTreeWidget>
@@ -76,6 +77,7 @@
 #include "fixturepack.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "kmllinks.h"
 #include "layertreedock.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
@@ -2572,8 +2574,9 @@ private slots:
     QVERIFY(
         model->data(document, ts::LayerTreeModel::IsCollectionRole).toBool());
     // Shapes (its places), Times and places (its places), the document's
-    // own placemark, two ground overlays and a screen overlay.
-    QCOMPARE(model->rowCount(document), 6);
+    // own placemark, two ground overlays, a screen overlay and a network
+    // link.
+    QCOMPARE(model->rowCount(document), 7);
     const QModelIndex shapes = model->index(0, 0, document);
     QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
     QCOMPARE(model->rowCount(shapes), 1);
@@ -2703,6 +2706,179 @@ private slots:
     QMenu* menu = dock->contextMenu(picture);
     QVERIFY(menu != nullptr && menu->findChild<QAction*>(QStringLiteral(
                                    "flyThereAction")) != nullptr);
+  }
+
+  void kmlLinksAndLists()
+  {
+    // NetworkLinks to local files (one waiting for its Region), a radio
+    // folder, a folder listed as one entry.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    view->setPose(ts::CameraPose{51.5, -0.1, 2.0e6, 0.0, 0.0});
+    QString error;
+    QVERIFY2(window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/links.kml"),
+                             &error),
+             qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    QCOMPARE(model->rowCount(document), 4);
+    const QModelIndex local = model->index(0, 0, document);
+    const QModelIndex london = model->index(1, 0, document);
+    const QModelIndex radio = model->index(2, 0, document);
+    const QModelIndex hidden = model->index(3, 0, document);
+    // The local link: heights.kml inside it.
+    QTRY_COMPARE(model->rowCount(local), 1);
+    QCOMPARE(model->data(model->index(0, 0, local)).toString(),
+             QStringLiteral("Heights"));
+    // The Region-bound link: not until the view comes close.
+    const QString londonId =
+        model->data(london, ts::LayerTreeModel::NodeIdRole).toString();
+    QVERIFY(!window.kmlLinks()->isLoaded(londonId));
+    QCOMPARE(model->rowCount(london), 0);
+    view->setPose(ts::CameraPose{51.5, -0.1, 40000.0, 0.0, 0.0});
+    window.updateKmlRegions();
+    QTRY_COMPARE(model->rowCount(london), 1);
+    QCOMPARE(model->data(model->index(0, 0, london)).toString(),
+             QStringLiteral("In an archive"));
+    QVERIFY(window.kmlHiddenNodes().isEmpty());
+    // Away again: it (and what it brought) is left out.
+    view->setPose(ts::CameraPose{51.5, -0.1, 2.0e6, 0.0, 0.0});
+    window.updateKmlRegions();
+    QVERIFY(window.kmlHiddenNodes().contains(londonId));
+    // Refresh from the menu.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(local);
+    QAction* refresh =
+        menu != nullptr
+            ? menu->findChild<QAction*>(QStringLiteral("refreshLinkAction"))
+            : nullptr;
+    if (refresh == nullptr) {
+      QFAIL("no Refresh");
+    }
+    refresh->trigger();
+    QTRY_COMPARE(model->rowCount(local), 1);
+    // The radio folder: one on at a time.
+    const QModelIndex first = model->index(0, 0, radio);
+    const QModelIndex second = model->index(1, 0, radio);
+    QCOMPARE(model->data(first, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Checked));
+    QCOMPARE(model->data(second, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Unchecked));
+    model->setData(second, Qt::Checked, Qt::CheckStateRole);
+    QCOMPARE(model->data(first, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Unchecked));
+    // checkHideChildren: one layer with everything inside.
+    QCOMPARE(model->rowCount(hidden), 1);
+    QVERIFY(model->layerDefinition(model->index(0, 0, hidden))
+                .source.value(QStringLiteral("deep"))
+                .toBool());
+  }
+
+  void kmlWebLink()
+  {
+    // A link to the web: asked with the view and the client, its icons
+    // relative to its address.
+    ts::test::MockHttpServer server([](const ts::test::MockHttpRequest&) {
+      return ts::test::mockResponse(
+          200,
+          QByteArrayLiteral(
+              "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+              "<name>From the web</name><Placemark><name>Remote</name>"
+              "<Point><coordinates>3,4</coordinates></Point></Placemark>"
+              "</Document></kml>"),
+          QByteArrayLiteral("application/vnd.google-earth.kml+xml"));
+    });
+    QTemporaryDir folder;
+    QVERIFY(folder.isValid());
+    const QString path = folder.filePath(QStringLiteral("web.kml"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QStringLiteral(
+                   "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><NetworkLink>"
+                   "<name>Web</name><Link><href>%1</href>"
+                   "<viewRefreshMode>onRequest</viewRefreshMode>"
+                   "<httpQuery>client=[clientName]</httpQuery>"
+                   "</Link></NetworkLink></kml>")
+                   .arg(server.url(QStringLiteral("/data/live.kml"))
+                            .toString()
+                            .toHtmlEscaped())
+                   .toUtf8());
+    file.close();
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex link = model->index(0, 0);
+    QCOMPARE(model->data(link).toString(), QStringLiteral("Web"));
+    QTRY_COMPARE(model->rowCount(link), 1);
+    QCOMPARE(model->data(model->index(0, 0, link)).toString(),
+             QStringLiteral("From the web"));
+    QVERIFY(server.requestCount() >= 1);
+    const QString target =
+        QString::fromLatin1(server.requests().front().target);
+    QVERIFY2(target.contains(QLatin1String("BBOX=")), qPrintable(target));
+    QVERIFY(target.contains(QLatin1String("client=TerraSoar")));
+    // A failure: told in the status bar, what was there stays.
+    server.setHandler([](const ts::test::MockHttpRequest&) {
+      return ts::test::mockResponse(500, QByteArrayLiteral("no"));
+    });
+    const QString id =
+        model->data(link, ts::LayerTreeModel::NodeIdRole).toString();
+    window.kmlLinks()->load(id, ts::KmlViewParameters{});
+    QTRY_VERIFY(
+        window.statusBar()->currentMessage().contains(QLatin1String("500")));
+    QCOMPARE(model->rowCount(link), 1);
+  }
+
+  void kmlTime()
+  {
+    // Placemarks with times show at the clock's; a track's marker moves.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    const std::function<QStringList()> labels = [view]() {
+      QStringList found;
+      for (const ts::BillboardDraw& billboard : view->billboards()) {
+        found << billboard.label;
+      }
+      return found;
+    };
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::utc()));
+    QTRY_VERIFY(labels().contains(QStringLiteral("Spanned")));
+    QVERIFY(!labels().contains(QStringLiteral("Stamped")));
+    QVERIFY(!labels().contains(QStringLiteral("Track")));
+    // On the track's day, half way along it: its marker, the stamp not yet.
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 20), QTime(10, 30), QTimeZone::utc()));
+    QTRY_VERIFY(labels().contains(QStringLiteral("Track")));
+    QVERIFY(!labels().contains(QStringLiteral("Spanned")));
+    QVERIFY(!labels().contains(QStringLiteral("Stamped")));
+    double lon = 0.0;
+    for (const ts::BillboardDraw& billboard : view->billboards()) {
+      if (billboard.label == QLatin1String("Track")) {
+        lon = billboard.lonDeg;
+      }
+    }
+    QCOMPARE(lon, -0.75);
+    // Later: the stamp.
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 21), QTime(0, 0), QTimeZone::utc()));
+    QTRY_VERIFY(labels().contains(QStringLiteral("Stamped")));
+    QVERIFY(!labels().contains(QStringLiteral("Track")));
   }
 
   void wmsWhatIsHere()

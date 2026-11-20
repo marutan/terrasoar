@@ -429,6 +429,11 @@ struct KmlDocument {
   /** Where relative addresses start: a directory, or /vsizip/ and the archive's
    * path. */
   QString base;
+  /**
+   * The web address it was fetched from (a NetworkLink's), or empty; when
+   * set, relative addresses in a plain KML resolve against it.
+   */
+  QString webBase;
   /** NetworkLinkControl and other top-level elements kept as XML. */
   std::vector<QString> unknownTopLevel;
   /**

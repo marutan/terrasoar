@@ -942,6 +942,9 @@ QString resolveKmlHref(const KmlDocument& document, const QString& href)
   if (url.scheme() == QLatin1String("file")) {
     return url.toLocalFile();
   }
+  if (!document.webBase.isEmpty() && !document.kmz) {
+    return QUrl(document.webBase).resolved(QUrl(trimmed)).toString();
+  }
   if (QDir::isAbsolutePath(trimmed) || document.base.isEmpty()) {
     return trimmed;
   }

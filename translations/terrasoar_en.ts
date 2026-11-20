@@ -1006,6 +1006,17 @@
         </message>
     </context>
     <context>
+        <name>ts::KmlLinks</name>
+        <message>
+            <source>"%1" can't be read.</source>
+            <translation>"%1" can't be read.</translation>
+        </message>
+        <message>
+            <source>%1 couldn't be fetched (%2).</source>
+            <translation>%1 couldn't be fetched (%2).</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::KmlReader</name>
         <message>
             <source>%1 (line %2, column %3)</source>
@@ -1573,6 +1584,18 @@
         <message>
             <source>Screen overlay</source>
             <translation>Screen overlay</translation>
+        </message>
+        <message>
+            <source>Network link</source>
+            <translation>Network link</translation>
+        </message>
+        <message>
+            <source>%1: too many network links inside each other.</source>
+            <translation>%1: too many network links inside each other.</translation>
+        </message>
+        <message>
+            <source>Refresh</source>
+            <translation>Refresh</translation>
         </message>
     </context>
     <context>

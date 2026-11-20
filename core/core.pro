@@ -61,6 +61,7 @@ HEADERS += \
     include/ts/globe/vectorrenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
+    include/ts/kml/kmlactivity.h \
     include/ts/kml/kmldocument.h \
     include/ts/kml/kmlfeatureprovider.h \
     include/ts/kml/kmloverlays.h \
@@ -171,6 +172,7 @@ SOURCES += \
     src/globe/vectorrenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
+    src/kml/kmlactivity.cpp \
     src/kml/kmldocument.cpp \
     src/kml/kmlfeatureprovider.cpp \
     src/kml/kmloverlays.cpp \

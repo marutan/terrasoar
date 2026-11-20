@@ -27,9 +27,12 @@
 #include <QFile>
 #include <QImage>
 #include <QJsonObject>
+#include <QTimeZone>
+#include <QUrlQuery>
 #include <QtTest>
 
 #include "concurrency.h"
+#include "ts/kml/kmlactivity.h"
 #include "ts/kml/kmldocument.h"
 #include "ts/kml/kmlfeatureprovider.h"
 #include "ts/kml/kmloverlays.h"
@@ -44,6 +47,22 @@ namespace
 QString fixture(const QString& name)
 {
   return QStringLiteral(TS_TEST_DATA_DIR "/kml/") + name;
+}
+
+/** The names of the placemarks @p provider shows, in order, each once. */
+std::vector<QString> names(const ts::KmlFeatureProvider& provider)
+{
+  std::vector<QString> found;
+  const std::vector<ts::Feature> all =
+      provider.featuresAt(ts::GeoPoint{0.0, 0.0}, 1000.0);
+  for (const ts::Feature& feature : all) {
+    const QString name =
+        feature.attributes.value(QStringLiteral("name")).toString();
+    if (std::find(found.begin(), found.end(), name) == found.end()) {
+      found.push_back(name);
+    }
+  }
+  return found;
 }
 
 ts::KmlDocument read(const QString& name)
@@ -965,6 +984,262 @@ private slots:
     ts::KmlFeatureProvider provider(shared, path);
     QCOMPARE(provider.screenOverlays().size(), std::size_t{1});
     QCOMPARE(provider.featureCount(), std::size_t{0});
+  }
+
+  void times()
+  {
+    const QDateTime june(QDate(2026, 6, 1), QTime(0, 0), QTimeZone::utc());
+    const QDateTime july(QDate(2026, 7, 1), QTime(0, 0), QTimeZone::utc());
+    ts::KmlTime stamp;
+    stamp.begin = june;
+    stamp.end = june;
+    // A TimeStamp: from then on.
+    QVERIFY(!ts::kmlShownAt(stamp, june.addSecs(-1)));
+    QVERIFY(ts::kmlShownAt(stamp, june));
+    QVERIFY(ts::kmlShownAt(stamp, july));
+    // A TimeSpan: up to its end.
+    ts::KmlTime span;
+    span.begin = june;
+    span.end = july;
+    QVERIFY(ts::kmlShownAt(span, june));
+    QVERIFY(!ts::kmlShownAt(span, july));
+    QVERIFY(ts::kmlShownAt(ts::KmlTime{}, july));
+    // Narrowed by a container's.
+    ts::KmlTime later;
+    later.begin = june.addDays(10);
+    const ts::KmlTime narrowed =
+        ts::kmlNarrowTime(span, later).value_or(ts::KmlTime{});
+    QCOMPARE(narrowed.begin.value_or(QDateTime()), june.addDays(10));
+    QCOMPARE(narrowed.end.value_or(QDateTime()), july);
+    QVERIFY(!ts::kmlNarrowTime(std::nullopt, std::nullopt));
+
+    // everything.kml's "Times and places": a stamp and a span.
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
+                              &error);
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    const QString times = QStringLiteral("1");
+    QCOMPARE(ts::kmlContainer(*document, times)->name,
+             QStringLiteral("Times and places"));
+    const std::vector<QDateTime> boundaries =
+        ts::kmlTimeBoundaries(*document, times, false);
+    QCOMPARE(boundaries.size(), std::size_t{3});
+    QCOMPARE(boundaries.front(),
+             QDateTime(QDate(2026, 1, 1), QTime(0, 0), QTimeZone::utc()));
+    // The key stays put between boundaries.
+    QCOMPARE(ts::kmlTimeKey(boundaries, june), boundaries.front());
+    QCOMPARE(ts::kmlTimeKey(boundaries, june.addDays(3)), boundaries.front());
+    QCOMPARE(ts::kmlTimeKey(boundaries, july), boundaries.at(1));
+    QCOMPARE(ts::kmlTimeKey(boundaries, boundaries.front().addDays(-9)),
+             boundaries.front().addSecs(-1));
+    QVERIFY(ts::kmlTimeKey({}, july).isNull());
+    // The time bar: the boundaries and the track's hour in 36 s steps.
+    const QString extent = ts::kmlTimeExtent(*document, times, false);
+    QVERIFY2(extent.contains(QLatin1String(
+                 "2026-11-20T10:00:00Z/2026-11-20T11:00:00Z/PT36S")),
+             qPrintable(extent));
+    QVERIFY(extent.startsWith(QLatin1String("2026-01-01T00:00:00Z,")));
+    QVERIFY(ts::kmlTimeExtent(*document, QStringLiteral("0"), false).isEmpty());
+    // The provider at a time: in June the span shows, not the stamp.
+    const std::vector<QString> inJune = names(ts::KmlFeatureProvider(
+        document, times, ts::kmlTimeKey(boundaries, june)));
+    QCOMPARE(inJune, (std::vector<QString>{QStringLiteral("Spanned"),
+                                           QStringLiteral("Track")}));
+    const QDateTime evening(QDate(2026, 11, 20), QTime(18, 0),
+                            QTimeZone::utc());
+    const std::vector<QString> inNovember = names(ts::KmlFeatureProvider(
+        document, times, ts::kmlTimeKey(boundaries, evening)));
+    QCOMPARE(inNovember, (std::vector<QString>{QStringLiteral("Stamped"),
+                                               QStringLiteral("Track")}));
+    // Without a time, all.
+    QCOMPARE(names(ts::KmlFeatureProvider(document, times)).size(),
+             std::size_t{3});
+    QCOMPARE(ts::kmlEffectiveTime(*document, QStringLiteral("1.1"))
+                 .value_or(ts::KmlTime{})
+                 .end.value_or(QDateTime()),
+             QDateTime(QDate(2026, 6, 30), QTime(0, 0), QTimeZone::utc()));
+  }
+
+  void tracks()
+  {
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
+                              &error);
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    const ts::KmlFeature* track =
+        ts::kmlContainer(*document, QStringLiteral("1.2"));
+    QVERIFY(track != nullptr && track->geometry.has_value());
+    const ts::KmlGeometry& geometry =
+        track->geometry.value_or(ts::KmlGeometry{});
+    const QDateTime start(QDate(2026, 11, 20), QTime(10, 0), QTimeZone::utc());
+    // Half way: half way along, half way up.
+    const ts::KmlCoordinate half =
+        ts::kmlTrackPosition(geometry, start.addSecs(1800))
+            .value_or(ts::KmlCoordinate{});
+    QCOMPARE(half.lonDeg, -0.75);
+    QCOMPARE(half.latDeg, 51.1);
+    QCOMPARE(half.altM, 150.0);
+    QVERIFY(!ts::kmlTrackPosition(geometry, start.addSecs(-1)));
+    QVERIFY(!ts::kmlTrackPosition(geometry, start.addSecs(3601)));
+    // Across the antimeridian: the short way.
+    ts::KmlGeometry across;
+    across.kind = ts::KmlGeometry::Kind::Track;
+    across.when = {start, start.addSecs(100)};
+    across.coordinates = {ts::KmlCoordinate{179.0, 0.0, 0.0},
+                          ts::KmlCoordinate{-179.0, 0.0, 0.0}};
+    QCOMPARE(ts::kmlTrackPosition(across, start.addSecs(75))
+                 .value_or(ts::KmlCoordinate{})
+                 .lonDeg,
+             -179.5);
+    // A MultiGeometry's track.
+    ts::KmlGeometry multi;
+    multi.kind = ts::KmlGeometry::Kind::MultiGeometry;
+    multi.children = {geometry};
+    QVERIFY(ts::kmlTrackPosition(multi, start.addSecs(60)).has_value());
+    // The provider's marker: where the track is, as its placemark.
+    ts::KmlFeatureProvider provider(document, QStringLiteral("1"));
+    QVERIFY(provider.hasTracks());
+    const std::vector<ts::KmlBillboard> markers =
+        provider.trackMarkersAt(start.addSecs(1800));
+    QCOMPARE(markers.size(), std::size_t{1});
+    QCOMPARE(markers.front().label, QStringLiteral("Track"));
+    QCOMPARE(markers.front().lonDeg, -0.75);
+    QCOMPARE(markers.front().altitudeMode,
+             ts::KmlAltitudeMode::RelativeToSeaFloor);
+    QVERIFY(provider.trackMarkersAt(start.addDays(1)).empty());
+    QVERIFY(!ts::KmlFeatureProvider(document, QStringLiteral("0")).hasTracks());
+  }
+
+  void regions()
+  {
+    ts::Camera camera;
+    camera.setViewportSize(800.0, 600.0);
+    ts::KmlRegion region;
+    region.north = 51.6;
+    region.south = 51.4;
+    region.east = 0.1;
+    region.west = -0.3;
+    region.minLodPixels = 256.0;
+    // From far away it is small; close up large; from the other side of
+    // the Earth not in sight at all.
+    camera.setPose(ts::CameraPose{51.5, -0.1, 2.0e6, 0.0, 0.0});
+    const double far = ts::kmlRegionPixels(region, camera);
+    QVERIFY2(far > 0.0 && far < 256.0, qPrintable(QString::number(far)));
+    QVERIFY(!ts::kmlRegionActive(region, camera));
+    camera.setPose(ts::CameraPose{51.5, -0.1, 40000.0, 0.0, 0.0});
+    QVERIFY(ts::kmlRegionPixels(region, camera) > 256.0);
+    QVERIFY(ts::kmlRegionActive(region, camera));
+    region.maxLodPixels = 300.0;
+    QVERIFY(!ts::kmlRegionActive(region, camera));
+    camera.setPose(ts::CameraPose{-51.5, 179.0, 2.0e6, 0.0, 0.0});
+    QCOMPARE(ts::kmlRegionPixels(region, camera), -1.0);
+    // Off to the side of the view: not in sight.
+    camera.setPose(ts::CameraPose{51.5, 10.0, 40000.0, 0.0, 0.0});
+    QCOMPARE(ts::kmlRegionPixels(region, camera), -1.0);
+    // Regions on the way to a feature.
+    const ts::KmlDocument document = read(QStringLiteral("links.kml"));
+    QVERIFY(ts::kmlHasRegion(document, QStringLiteral("1")));
+    QVERIFY(!ts::kmlHasRegion(document, QStringLiteral("0")));
+    camera.setPose(ts::CameraPose{51.5, -0.1, 40000.0, 0.0, 0.0});
+    QVERIFY(ts::kmlRegionsActive(document, QStringLiteral("1"), camera));
+    camera.setPose(ts::CameraPose{51.5, -0.1, 2.0e6, 0.0, 0.0});
+    QVERIFY(!ts::kmlRegionsActive(document, QStringLiteral("1"), camera));
+    QVERIFY(ts::kmlRegionsActive(document, QStringLiteral("0"), camera));
+  }
+
+  void linkAddresses()
+  {
+    ts::Camera camera;
+    camera.setViewportSize(800.0, 600.0);
+    camera.setPose(ts::CameraPose{51.5, -0.1, 100000.0, 0.0, 0.0});
+    const ts::KmlViewParameters view = ts::kmlViewParameters(camera, false);
+    QVERIFY(view.bounds.westDeg < -0.1 && view.bounds.eastDeg > -0.1);
+    QVERIFY(view.bounds.southDeg < 51.5 && view.bounds.northDeg > 51.5);
+    QCOMPARE(view.widthPx, 800);
+    // The whole Earth in sight: all of it.
+    camera.setPose(ts::CameraPose{0.0, 0.0, 3.0e7, 0.0, 0.0});
+    QCOMPARE(ts::kmlViewParameters(camera, false).bounds.westDeg, -180.0);
+
+    ts::KmlDocument document;
+    document.base = QStringLiteral("/data");
+    ts::KmlLink link;
+    link.href = QStringLiteral("https://example.invalid/live.kml?key=1");
+    // No view refresh: as written.
+    QCOMPARE(ts::kmlLinkUrl(link, document, view).toString(),
+             QStringLiteral("https://example.invalid/live.kml?key=1"));
+    // onStop: the view's box by default, scaled.
+    link.viewRefreshMode = ts::KmlLink::ViewRefreshMode::OnStop;
+    link.viewBoundScale = 0.5;
+    const QUrl boxed = ts::kmlLinkUrl(link, document, view);
+    const QString query = boxed.query();
+    QVERIFY2(query.startsWith(QLatin1String("key=1&BBOX=")), qPrintable(query));
+    const QStringList box = QUrlQuery(boxed)
+                                .queryItemValue(QStringLiteral("BBOX"))
+                                .split(QLatin1Char(','));
+    QCOMPARE(box.size(), 4);
+    const double halfWidth = (view.bounds.eastDeg - view.bounds.westDeg) / 4.0;
+    QVERIFY(std::abs(box.at(0).toDouble() -
+                     ((view.bounds.westDeg + view.bounds.eastDeg) / 2.0 -
+                      halfWidth)) < 1e-6);
+    // viewFormat and httpQuery filled in.
+    link.viewFormat =
+        QStringLiteral("at=[lookatLat],[lookatLon]&w=[horizPixels]");
+    link.httpQuery = QStringLiteral("client=[clientName]&v=[kmlVersion]");
+    const QString filled = ts::kmlLinkUrl(link, document, view).query();
+    QVERIFY2(filled.contains(QLatin1String("w=800")), qPrintable(filled));
+    QVERIFY(filled.contains(QLatin1String("client=TerraSoar&v=2.2")));
+    QVERIFY(!filled.contains(QLatin1Char('[')));
+    // A relative address: a file next to the document, or on the web
+    // next to a document fetched from there.
+    link = ts::KmlLink{};
+    link.href = QStringLiteral("more.kml");
+    QCOMPARE(ts::kmlLinkUrl(link, document, view),
+             QUrl::fromLocalFile(QStringLiteral("/data/more.kml")));
+    document.webBase = QStringLiteral("https://example.invalid/kml/root.kml");
+    QCOMPARE(ts::kmlLinkUrl(link, document, view).toString(),
+             QStringLiteral("https://example.invalid/kml/more.kml"));
+    QCOMPARE(ts::resolveKmlHref(document, QStringLiteral("../icon.png")),
+             QStringLiteral("https://example.invalid/icon.png"));
+    // A fetched copy's base is remembered for it.
+    ts::setKmlWebBase(fixture(QStringLiteral("links.kml")),
+                      QStringLiteral("https://example.invalid/links.kml"));
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> copy =
+        ts::sharedKmlDocument(fixture(QStringLiteral("links.kml")), &error);
+    if (!copy) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(copy->webBase,
+             QStringLiteral("https://example.invalid/links.kml"));
+  }
+
+  void hiddenChildren()
+  {
+    // A checkHideChildren folder's layer: everything inside.
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::sharedKmlDocument(fixture(QStringLiteral("heights.kml")), &error);
+    const std::shared_ptr<const ts::KmlDocument> links = ts::sharedKmlDocument(
+        fixture(QStringLiteral("everything.kml")), &error);
+    if (!document || !links) {
+      QFAIL(qPrintable(error));
+    }
+    // everything.kml's root, deep: all placemarks of every folder.
+    ts::KmlFeatureProvider shallow(links, QString());
+    ts::KmlFeatureProvider deep(links, QString(), std::nullopt, true);
+    QVERIFY(deep.featureCount() > shallow.featureCount());
+    QCOMPARE(deep.screenOverlays().size(), std::size_t{1});
+    QVERIFY(deep.id() != shallow.id());
+    QCOMPARE(ts::kmlLayerSource(QStringLiteral("x.kml"), QString(), true)
+                 .value(QStringLiteral("deep"))
+                 .toBool(),
+             true);
   }
 
   void registryCreatesKml()

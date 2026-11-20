@@ -44,6 +44,29 @@ unticked. If the file has its own view, Terra Soar flies there.
 - Paths and areas crossing the 180° meridian are drawn the short way
   round, on the globe and on every map.
 
+## Time
+
+Places with dates show when the program's clock (the time bar, View →
+Time Bar) is at their time: a place with one date from then on, a place
+with a period during it. When a file has dates the time bar offers them,
+so stepping it goes from one change to the next. Tracks (a path with a
+time at each point, from GPS loggers and flight trackers) show a marker
+where they were at the clock's time; play the clock to watch it move.
+
+## Links, regions and lists
+
+- **Network links** bring in more KML, from a file or the web. Each is an
+  entry in the Layers panel holding what it brought. Some fetch again on
+  their own, every so often or when you stop moving the view (to show
+  what is in sight); right-click one and choose **Refresh** to fetch it
+  now.
+- **Regions**: some files show parts only when you are close enough
+  (large files of maps or photos, "superoverlays", load more detail as
+  you zoom in). Those parts come and go as you move.
+- **Folders that let you choose one** (radio folders): ticking one of
+  their entries unticks the others. Some folders are listed as one entry
+  without their contents, as the file asks.
+
 ## What a place is
 
 Click a place, path or area (without dragging) to see its **balloon**:
@@ -61,6 +84,8 @@ its view, or to see all of it.
   how many.
 - A file that isn't valid KML is refused with the line and column where
   it goes wrong.
-- More is coming in this phase:
-  pictures over the ground, links to online KML, time, and creating and
-  editing your own KML.
+- Creating and editing your own KML, and saving to KML and KMZ, come
+  later in this phase.
+- Not shown: photo overlays, 3D models, tours, and sounds.
+- Paths and areas in the air, and icons, are drawn over the view: a
+  hill in front of them doesn't hide them.

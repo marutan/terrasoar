@@ -32,6 +32,7 @@ HEADERS += \
     $$PWD/src/helpbrowser.h \
     $$PWD/src/helpwindow.h \
     $$PWD/src/iconcache.h \
+    $$PWD/src/kmllinks.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/projectionsettingsdialog.h \
     $$PWD/src/addwfsdialog.h \
@@ -61,6 +62,7 @@ SOURCES += \
     $$PWD/src/helpbrowser.cpp \
     $$PWD/src/helpwindow.cpp \
     $$PWD/src/iconcache.cpp \
+    $$PWD/src/kmllinks.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/projectionsettingsdialog.cpp \
     $$PWD/src/addwfsdialog.cpp \

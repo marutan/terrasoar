@@ -314,6 +314,9 @@ public:
   /** Returns how many raised shapes the last frame drew (for tests). */
   int32_t raisedShapesDrawn() const { return m_raisedDrawn; }
 
+  /** Returns the billboards set (for tests). */
+  const std::vector<BillboardDraw>& billboards() const { return m_billboards; }
+
   /** Returns how many billboards the last frame drew (for tests). */
   int32_t billboardsDrawn() const { return m_billboardsDrawn; }
 
