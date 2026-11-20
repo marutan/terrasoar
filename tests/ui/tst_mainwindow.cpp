@@ -27,6 +27,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QDir>
 #include <QDirIterator>
@@ -44,6 +45,7 @@
 #include <QMetaEnum>
 #include <QMouseEvent>
 #include <QNetworkProxy>
+#include <QPlainTextEdit>
 #include <QPointer>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -56,6 +58,8 @@
 #include <QStyleHints>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QTextBrowser>
+#include <QTimeZone>
 #include <QTimer>
 #include <QTreeView>
 #include <QTreeWidget>
@@ -70,11 +74,15 @@
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
 #include "appsettings.h"
+#include "balloonwindow.h"
 #include "elevationprofiledialog.h"
 #include "featureinfowindow.h"
 #include "fixturepack.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "kmlexport.h"
+#include "kmllinks.h"
+#include "kmlpropertiesdialog.h"
 #include "layertreedock.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
@@ -92,12 +100,16 @@
 #include "timemodebox.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
+#include "ts/kml/kmledit.h"
+#include "ts/kml/kmlreader.h"
+#include "ts/kml/kmlwriter.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
 #include "ts/network/regiontilesource.h"
 #include "ts/network/tilediskcache.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/regions/offlineregionstore.h"
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
@@ -438,6 +450,26 @@ bool helpKeyOpens(QDialog* dialog, const QString& target)
  * UI tests for the main window: opens and closes cleanly, and every string
  * is translatable and fits (checked with the pseudo-locale).
  */
+namespace
+{
+
+/** The feature named @p name in @p feature; null if none. */
+const ts::KmlFeature* find(const ts::KmlFeature& feature, const QString& name)
+{
+  if (feature.name == name) {
+    return &feature;
+  }
+  for (const ts::KmlFeature& child : feature.children) {
+    const ts::KmlFeature* found = find(child, name);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+} // namespace
+
 class TestMainWindow : public QObject
 {
   Q_OBJECT
@@ -2545,6 +2577,814 @@ private slots:
       dialog.grab().save(
           QDir(shots).filePath(QStringLiteral("add-wfs-dialog.png")));
     }
+  }
+
+  void openKml()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // A KML document in the layer tree: a collection per folder, the
+    // placemarks of each in a vector layer, visibility as written; a click
+    // on a placemark shows its balloon; a folder can be flown to.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    const int32_t before = window.layerModel()->rowCount();
+    QString error;
+    QVERIFY(!window.openFile(
+        QStringLiteral(TS_TEST_DATA_DIR "/kml/nothing.kml"), &error));
+    QVERIFY(!error.isEmpty());
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    QCOMPARE(model->rowCount(), before + 1);
+    const QModelIndex document = model->index(0, 0);
+    QCOMPARE(model->data(document).toString(), QStringLiteral("Everything"));
+    QVERIFY(
+        model->data(document, ts::LayerTreeModel::IsCollectionRole).toBool());
+    // Shapes (its places), Times and places (its places), the document's
+    // own placemark, two ground overlays, a screen overlay and a network
+    // link.
+    QCOMPARE(model->rowCount(document), 7);
+    const QModelIndex shapes = model->index(0, 0, document);
+    QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
+    QCOMPARE(model->rowCount(shapes), 1);
+    const QModelIndex places = model->index(0, 0, shapes);
+    QCOMPARE(model->data(places, ts::LayerTreeModel::LayerTypeRole).toInt(),
+             static_cast<int32_t>(ts::LayerType::Vector));
+    QCOMPARE(model->layerDefinition(places)
+                 .source.value(QStringLiteral("kind"))
+                 .toString(),
+             QStringLiteral("kml"));
+    // A click on the point: its balloon.
+    QCOMPARE(window.identifyAt(ts::LonLat{-1.8904, 52.4862}, 0.001), 1);
+    ts::BalloonWindow* balloon = window.balloonWindow();
+    if (balloon == nullptr) {
+      QFAIL("no balloon");
+    }
+    QVERIFY(balloon->isVisible());
+    QVERIFY2(balloon->text().contains(QStringLiteral("A point")),
+             qPrintable(balloon->text()));
+    QVERIFY(balloon->text().contains(QStringLiteral("Fly there")));
+    // Nowhere near a placemark: nothing.
+    QCOMPARE(window.identifyAt(ts::LonLat{100.0, -40.0}, 0.001), 0);
+    // Fly There on the Shapes folder.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(shapes);
+    if (menu == nullptr) {
+      QFAIL("no context menu");
+    }
+    QAction* fly = menu->findChild<QAction*>(QStringLiteral("flyThereAction"));
+    if (fly == nullptr) {
+      QFAIL("no Fly There");
+    }
+    fly->trigger();
+    // The point's icons and labels are drawn over the view where they
+    // are in sight.
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    // Double-clicking the folder flies there too (not renaming it).
+    view->setPose(ts::CameraPose{0.0, 100.0, 2.0e7, 0.0, 0.0});
+    dock->doubleClick(shapes);
+    QVERIFY(QTest::qWaitFor([&]() {
+      return std::abs(view->controller().camera().pose().targetLatDeg - 52.0) <
+             2.0;
+    }));
+    QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
+    view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() >= 1; }));
+    QVERIFY(view->labelsDrawn() >= 1);
+    // From the other side of the Earth they are hidden.
+    view->setPose(ts::CameraPose{-52.0, 178.0, 400000.0, 0.0, 0.0});
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() == 0; }));
+    QCOMPARE(view->billboardsDrawn(), 0);
+    // Switched off with their folder: none.
+    view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
+    model->setData(shapes, Qt::Unchecked, Qt::CheckStateRole);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() == 0; }));
+    QCOMPARE(view->billboardsDrawn(), 0);
+    model->setData(shapes, Qt::Checked, Qt::CheckStateRole);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() >= 1; }));
+    // A KMZ, through the same door.
+    QVERIFY2(window.openFile(
+                 QStringLiteral(TS_TEST_DATA_DIR "/kml/archive.kmz"), &error),
+             qPrintable(error));
+    QCOMPARE(model->data(model->index(0, 0)).toString(),
+             QStringLiteral("In an archive"));
+    const QJsonObject state = window.stateReport();
+    QVERIFY(state.value(QStringLiteral("layers"))
+                .toArray()
+                .contains(QStringLiteral("Places")));
+  }
+
+  void kmlHeights()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // Shapes above the ground, with walls, drawn over the globe; flat on
+    // the map.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(window.openFile(
+                 QStringLiteral(TS_TEST_DATA_DIR "/kml/heights.kml"), &error),
+             qPrintable(error));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    view->setPose(ts::CameraPose{51.5, 0.5, 600000.0, 0.0, 50.0});
+    QVERIFY(QTest::qWaitFor([&]() { return view->raisedShapesDrawn() == 2; }));
+    QCOMPARE(view->raisedShapesDrawn(), 2);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() >= 1; }));
+    view->setPose(ts::CameraPose{-51.5, 179.0, 600000.0, 0.0, 0.0});
+    QVERIFY(QTest::qWaitFor([&]() { return view->raisedShapesDrawn() == 0; }));
+    QCOMPARE(view->raisedShapesDrawn(), 0);
+  }
+
+  void kmlOverlays()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // Ground overlays as imagery layers; a screen overlay fixed to the view.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    QStringList names;
+    QModelIndex picture;
+    QModelIndex legend;
+    for (int32_t row = 0; row < model->rowCount(document); ++row) {
+      const QModelIndex child = model->index(row, 0, document);
+      names << model->data(child).toString();
+      if (model->data(child).toString() == QLatin1String("A picture")) {
+        picture = child;
+      } else if (model->data(child).toString() == QLatin1String("A legend")) {
+        legend = child;
+      }
+    }
+    QVERIFY2(picture.isValid() && legend.isValid(),
+             qPrintable(names.join(QStringLiteral(", "))));
+    QCOMPARE(model->data(picture, ts::LayerTreeModel::LayerTypeRole).toInt(),
+             static_cast<int32_t>(ts::LayerType::Imagery));
+    QCOMPARE(model->layerDefinition(picture)
+                 .source.value(QStringLiteral("kind"))
+                 .toString(),
+             QStringLiteral("kmloverlay"));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return view->screenOverlays().size() == std::size_t{1}; }));
+    QCOMPARE(view->screenOverlays().size(), std::size_t{1});
+    QCOMPARE(view->screenOverlays().front().image.size(), QSize(40, 20));
+    view->setPose(ts::CameraPose{51.5, 0.0, 600000.0, 0.0, 0.0});
+    // Off with its layer.
+    model->setData(legend, Qt::Unchecked, Qt::CheckStateRole);
+    QVERIFY(QTest::qWaitFor([&]() { return view->screenOverlays().empty(); }));
+    // Fly There on a ground overlay frames its box.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(picture);
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(QStringLiteral(
+                                   "flyThereAction")) != nullptr);
+  }
+
+  void kmlLinksAndLists()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // NetworkLinks to local files (one waiting for its Region), a radio
+    // folder, a folder listed as one entry.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    view->setPose(ts::CameraPose{51.5, -0.1, 2.0e6, 0.0, 0.0});
+    QString error;
+    QVERIFY2(window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/links.kml"),
+                             &error),
+             qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    QCOMPARE(model->rowCount(document), 4);
+    const QModelIndex local = model->index(0, 0, document);
+    const QModelIndex london = model->index(1, 0, document);
+    const QModelIndex radio = model->index(2, 0, document);
+    const QModelIndex hidden = model->index(3, 0, document);
+    // The local link: heights.kml inside it.
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(local) == 1; }));
+    QCOMPARE(model->rowCount(local), 1);
+    QCOMPARE(model->data(model->index(0, 0, local)).toString(),
+             QStringLiteral("Heights"));
+    // The Region-bound link: not until the view comes close.
+    const QString londonId =
+        model->data(london, ts::LayerTreeModel::NodeIdRole).toString();
+    QVERIFY(!window.kmlLinks()->isLoaded(londonId));
+    QCOMPARE(model->rowCount(london), 0);
+    view->setPose(ts::CameraPose{51.5, -0.1, 40000.0, 0.0, 0.0});
+    window.updateKmlRegions();
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(london) == 1; }));
+    QCOMPARE(model->rowCount(london), 1);
+    QCOMPARE(model->data(model->index(0, 0, london)).toString(),
+             QStringLiteral("In an archive"));
+    QVERIFY(window.kmlHiddenNodes().isEmpty());
+    // Away again: it (and what it brought) is left out.
+    view->setPose(ts::CameraPose{51.5, -0.1, 2.0e6, 0.0, 0.0});
+    window.updateKmlRegions();
+    QVERIFY(window.kmlHiddenNodes().contains(londonId));
+    // Refresh from the menu.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(local);
+    QAction* refresh =
+        menu != nullptr
+            ? menu->findChild<QAction*>(QStringLiteral("refreshLinkAction"))
+            : nullptr;
+    if (refresh == nullptr) {
+      QFAIL("no Refresh");
+    }
+    refresh->trigger();
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(local) == 1; }));
+    QCOMPARE(model->rowCount(local), 1);
+    // The radio folder: one on at a time.
+    const QModelIndex first = model->index(0, 0, radio);
+    const QModelIndex second = model->index(1, 0, radio);
+    QCOMPARE(model->data(first, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Checked));
+    QCOMPARE(model->data(second, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Unchecked));
+    model->setData(second, Qt::Checked, Qt::CheckStateRole);
+    QCOMPARE(model->data(first, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Unchecked));
+    // checkHideChildren: one layer with everything inside.
+    QCOMPARE(model->rowCount(hidden), 1);
+    QVERIFY(model->layerDefinition(model->index(0, 0, hidden))
+                .source.value(QStringLiteral("deep"))
+                .toBool());
+  }
+
+  void kmlWebLink()
+  {
+    // A link to the web: asked with the view and the client, its icons
+    // relative to its address.
+    ts::test::MockHttpServer server([](const ts::test::MockHttpRequest&) {
+      return ts::test::mockResponse(
+          200,
+          QByteArrayLiteral(
+              "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+              "<name>From the web</name><Placemark><name>Remote</name>"
+              "<Point><coordinates>3,4</coordinates></Point></Placemark>"
+              "</Document></kml>"),
+          QByteArrayLiteral("application/vnd.google-earth.kml+xml"));
+    });
+    QTemporaryDir folder;
+    QVERIFY(folder.isValid());
+    const QString path = folder.filePath(QStringLiteral("web.kml"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QStringLiteral(
+                   "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><NetworkLink>"
+                   "<name>Web</name><Link><href>%1</href>"
+                   "<viewRefreshMode>onRequest</viewRefreshMode>"
+                   "<httpQuery>client=[clientName]</httpQuery>"
+                   "</Link></NetworkLink></kml>")
+                   .arg(server.url(QStringLiteral("/data/live.kml"))
+                            .toString()
+                            .toHtmlEscaped())
+                   .toUtf8());
+    file.close();
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex link = model->index(0, 0);
+    QCOMPARE(model->data(link).toString(), QStringLiteral("Web"));
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(link) == 1; }));
+    QCOMPARE(model->rowCount(link), 1);
+    QCOMPARE(model->data(model->index(0, 0, link)).toString(),
+             QStringLiteral("From the web"));
+    QVERIFY(server.requestCount() >= 1);
+    const QString target =
+        QString::fromLatin1(server.requests().front().target);
+    QVERIFY2(target.contains(QLatin1String("BBOX=")), qPrintable(target));
+    QVERIFY(target.contains(QLatin1String("client=TerraSoar")));
+    // Offline (the server gone), a new window shows the copy from last
+    // time and says so.
+    {
+      ts::MainWindow offline;
+      offline.show();
+      QVERIFY(QTest::qWaitForWindowExposed(&offline));
+      server.setHandler([](const ts::test::MockHttpRequest&) {
+        return ts::test::mockResponse(503, QByteArrayLiteral("down"));
+      });
+      QVERIFY2(offline.openFile(path, &error), qPrintable(error));
+      const QModelIndex copied = offline.layerModel()->index(0, 0);
+      QVERIFY(QTest::qWaitFor(
+          [&]() { return offline.layerModel()->rowCount(copied) == 1; }));
+      QCOMPARE(offline.layerModel()->rowCount(copied), 1);
+      QCOMPARE(
+          offline.layerModel()->data(offline.layerModel()->index(0, 0, copied)),
+          QVariant(QStringLiteral("From the web")));
+      QVERIFY(QTest::qWaitFor([&]() {
+        return offline.statusBar()->currentMessage().contains(
+            QLatin1String("last time"));
+      }));
+    }
+    // A failure: told in the status bar, what was there stays.
+    server.setHandler([](const ts::test::MockHttpRequest&) {
+      return ts::test::mockResponse(500, QByteArrayLiteral("no"));
+    });
+    const QString id =
+        model->data(link, ts::LayerTreeModel::NodeIdRole).toString();
+    window.kmlLinks()->load(id, ts::KmlViewParameters{});
+    QVERIFY(QTest::qWaitFor([&]() {
+      return window.statusBar()->currentMessage().contains(
+          QLatin1String("500"));
+    }));
+    QCOMPARE(model->rowCount(link), 1);
+  }
+
+  void kmlTime()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // Placemarks with times show at the clock's; a track's marker moves.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    const std::function<QStringList()> labels = [view]() {
+      QStringList found;
+      for (const ts::BillboardDraw& billboard : view->billboards()) {
+        found << billboard.label;
+      }
+      return found;
+    };
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::utc()));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return labels().contains(QStringLiteral("Spanned")); }));
+    QVERIFY(!labels().contains(QStringLiteral("Stamped")));
+    QVERIFY(!labels().contains(QStringLiteral("Track")));
+    // On the track's day, half way along it: its marker, the stamp not yet.
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 20), QTime(10, 30), QTimeZone::utc()));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return labels().contains(QStringLiteral("Track")); }));
+    QVERIFY(!labels().contains(QStringLiteral("Spanned")));
+    QVERIFY(!labels().contains(QStringLiteral("Stamped")));
+    double lon = 0.0;
+    for (const ts::BillboardDraw& billboard : view->billboards()) {
+      if (billboard.label == QLatin1String("Track")) {
+        lon = billboard.lonDeg;
+      }
+    }
+    QCOMPARE(lon, -0.75);
+    // Later: the stamp.
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 21), QTime(0, 0), QTimeZone::utc()));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return labels().contains(QStringLiteral("Stamped")); }));
+    QVERIFY(!labels().contains(QStringLiteral("Track")));
+  }
+
+  void kmlSaving()
+  {
+    // A KML entry saved as it was read; a folder alone; a profile line and
+    // a region as KML.
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    const QString documentId =
+        model->data(document, ts::LayerTreeModel::NodeIdRole).toString();
+    const std::optional<ts::KmlDocument> whole =
+        window.kmlNodeDocument(documentId, &error);
+    if (!whole) {
+      QFAIL(qPrintable(error));
+    }
+    QFile file(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QVERIFY(QString::fromUtf8(ts::writeKml(*whole))
+                .endsWith(QString::fromUtf8(file.readAll())
+                              .section(QLatin1String("?>"), 1)));
+    const QString shapesId =
+        model
+            ->data(model->index(0, 0, document), ts::LayerTreeModel::NodeIdRole)
+            .toString();
+    const std::optional<ts::KmlDocument> folder =
+        window.kmlNodeDocument(shapesId, &error);
+    QVERIFY(folder.has_value());
+    QCOMPARE(folder.value_or(ts::KmlDocument{}).root.children.size(),
+             std::size_t{1});
+    QVERIFY(!window.kmlNodeDocument(QStringLiteral("nothing"), &error));
+    // Saved to a file and read back.
+    QTemporaryDir out;
+    const QString path = out.filePath(QStringLiteral("shapes.kmz"));
+    QVERIFY(ts::writeKmlFile(folder.value_or(ts::KmlDocument{}), path, &error));
+    const std::optional<ts::KmlDocument> again = ts::readKmlFile(path, &error);
+    QVERIFY2(again.has_value(), qPrintable(error));
+    // The entry's menu offers it.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(model->index(0, 0, document));
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(
+                                   QStringLiteral("saveKmlAction")) != nullptr);
+    // A profile line and a region.
+    ts::ElevationProfile profile;
+    for (int32_t i = 0; i < 3; ++i) {
+      ts::ProfilePoint point;
+      point.position = ts::GeoPoint{51.0 + i, 179.0 + i};
+      profile.points.push_back(point);
+    }
+    const ts::KmlDocument line = ts::ElevationProfileDialog::toKml(profile);
+    const ts::KmlGeometry path3 =
+        line.root.children.front().geometry.value_or(ts::KmlGeometry{});
+    QCOMPARE(path3.coordinates.size(), std::size_t{3});
+    QCOMPARE(path3.coordinates.back().lonDeg, -179.0);
+    QVERIFY(path3.tessellate);
+    ts::OfflineRegion region;
+    region.name = QStringLiteral("Wales");
+    region.geometry = ts::RegionGeometry::rectangle(-5.0, 51.0, -3.0, 53.0);
+    const ts::KmlDocument area = ts::OfflineRegionsDialog::regionKml(region);
+    QCOMPARE(area.root.name, QStringLiteral("Wales"));
+    const ts::KmlGeometry polygon =
+        area.root.children.front().geometry.value_or(ts::KmlGeometry{});
+    QCOMPARE(polygon.kind, ts::KmlGeometry::Kind::Polygon);
+    QCOMPARE(polygon.coordinates.size(), std::size_t{5});
+    QCOMPARE(polygon.coordinates.front(), polygon.coordinates.back());
+    // Saved without a word when nothing is missing.
+    const QString regionPath = out.filePath(QStringLiteral("wales.kml"));
+    QVERIFY(ts::saveKmlTo(&window, area, regionPath, QStringLiteral("test")));
+    QVERIFY(QFileInfo::exists(regionPath));
+  }
+
+  void kmlLargeFile()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // A large file is read off the GUI thread: the window keeps going
+    // (timers fire) while it opens, and its placemarks show.
+    QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("large.kml"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+               "<name>Large</name>");
+    for (int32_t i = 0; i < 100000; ++i) {
+      const int32_t column = i % 3600;
+      const int32_t row = i / 3600;
+      file.write(QStringLiteral("<Placemark><name>P%1</name><Point>"
+                                "<coordinates>%2,%3</coordinates></Point>"
+                                "</Placemark>")
+                     .arg(i)
+                     .arg(-180.0 + 0.1 * column, 0, 'f', 1)
+                     .arg(-60.0 + 0.1 * row, 0, 'f', 1)
+                     .toUtf8());
+    }
+    file.write("</Document></kml>");
+    file.close();
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    int32_t ticks = 0;
+    QTimer ticker;
+    ticker.setInterval(10);
+    QObject::connect(&ticker, &QTimer::timeout, [&ticks]() { ++ticks; });
+    ticker.start();
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ticker.stop();
+    QVERIFY2(ticks >= 5, qPrintable(QString::number(ticks)));
+    QCOMPARE(window.layerModel()->data(window.layerModel()->index(0, 0)),
+             QVariant(QStringLiteral("Large")));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return view->billboards().size() == std::size_t{100000}; }));
+    QCOMPARE(view->billboards().size(), std::size_t{100000});
+  }
+
+  void kmlEditing()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // A document of one's own: drawn elements, dragged points, undo and
+    // redo, properties, the clipboard, saving and projects.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    ts::LayerTreeModel* model = window.layerModel();
+    const QString key = window.newKmlDocument();
+    QVERIFY(!key.isEmpty());
+    QCOMPARE(model->data(model->index(0, 0)).toString(),
+             QStringLiteral("Untitled"));
+    ts::KmlEditDocument* document = window.kmlEditDocument(key);
+    QVERIFY(document != nullptr);
+    // A placemark: selected, its handle shown, drawn.
+    QVERIFY(window.addKmlPlacemark(ts::LonLat{1.0, 2.0}));
+    QCOMPARE(window.selectedKmlFeature().value_or(QString()),
+             QStringLiteral("0"));
+    QCOMPARE(view->editHandles().size(), std::size_t{1});
+    QVERIFY(QTest::qWaitFor([&]() { return !view->billboards().empty(); }));
+    // Dragging its handle moves it.
+    view->dragHandle(0, ts::LonLat{3.0, 4.0});
+    QCOMPARE(document->document()
+                 .root.children.front()
+                 .geometry.value_or(ts::KmlGeometry{})
+                 .coordinates.front()
+                 .lonDeg,
+             3.0);
+    // A path: dragging the middle of an edge adds a point; undo, redo.
+    QVERIFY(window.addKmlPath({ts::LonLat{0.0, 0.0}, ts::LonLat{2.0, 0.0}}));
+    QCOMPARE(view->editHandles().size(), std::size_t{3});
+    const std::function<std::size_t()> pathPoints = [document]() {
+      return document->document()
+          .root.children.at(1)
+          .geometry.value_or(ts::KmlGeometry{})
+          .coordinates.size();
+    };
+    view->dragHandle(2, ts::LonLat{1.0, 1.0});
+    QCOMPARE(pathPoints(), std::size_t{3});
+    QVERIFY(window.undoKml());
+    QCOMPARE(pathPoints(), std::size_t{2});
+    QVERIFY(window.redoKml());
+    QCOMPARE(pathPoints(), std::size_t{3});
+    // Right-clicking a point deletes it; a path keeps two.
+    emit view->handleDeleteRequested(1);
+    QCOMPARE(pathPoints(), std::size_t{2});
+    emit view->handleDeleteRequested(1);
+    QCOMPARE(pathPoints(), std::size_t{2});
+    // A polygon with a hole.
+    QVERIFY(
+        window.addKmlPolygon({ts::LonLat{10.0, 10.0}, ts::LonLat{14.0, 10.0},
+                              ts::LonLat{14.0, 14.0}}));
+    QVERIFY(window.addKmlHole({ts::LonLat{12.5, 10.5}, ts::LonLat{13.5, 10.5},
+                               ts::LonLat{13.5, 11.5}}));
+    QCOMPARE(document->document()
+                 .root.children.at(2)
+                 .geometry.value_or(ts::KmlGeometry{})
+                 .inner.size(),
+             std::size_t{1});
+
+    // A folder; with it selected in the tree, new elements go in it.
+    QVERIFY(window.addKmlFolder());
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    const QModelIndex root = model->index(0, 0);
+    QModelIndex folder;
+    for (int32_t i = 0; i < model->rowCount(root); ++i) {
+      if (model->data(model->index(i, 0, root)).toString() ==
+          QLatin1String("Folder")) {
+        folder = model->index(i, 0, root);
+      }
+    }
+    QVERIFY(folder.isValid());
+    dock->setCurrentIndex(folder);
+    QVERIFY(window.addKmlPlacemark(ts::LonLat{5.0, 5.0}));
+    QCOMPARE(window.selectedKmlFeature().value_or(QString()),
+             QStringLiteral("3.0"));
+    // A ground overlay over a rectangle.
+    QVERIFY(window.addKmlGroundOverlay(
+        QStringLiteral(TS_TEST_DATA_DIR "/kml/images/overlay.png"),
+        ts::RegionGeometry::rectangle(20.0, 0.0, 30.0, 5.0)));
+    // Properties: a name, a time, data.
+    ts::KmlFeature changed = document->document().root.children.front();
+    changed.name = QStringLiteral("Home");
+    changed.extendedData = {{QStringLiteral("rooms"), QStringLiteral("5")}};
+    QVERIFY(
+        window.setKmlFeature(key, QStringLiteral("0"), changed, std::nullopt));
+    QCOMPARE(document->document().root.children.front().name,
+             QStringLiteral("Home"));
+    QAction* undo = window.findChild<QAction*>(QStringLiteral("kmlUndoAction"));
+    QVERIFY(undo != nullptr);
+    QVERIFY(window.kmlMenu()->actions().contains(undo));
+    QCOMPARE(undo->text(), QStringLiteral("&Undo Change Properties"));
+    // Copy and paste: a second Home; cut takes it away again.
+    window.selectKmlFeature(key, QStringLiteral("0"));
+    dock->setCurrentIndex(root);
+    QVERIFY(window.copyKml());
+    QVERIFY(window.pasteKml());
+    std::size_t homes = 0;
+    for (const ts::KmlFeature& feature : document->document().root.children) {
+      homes += feature.name == QLatin1String("Home") ? 1U : 0U;
+    }
+    QCOMPARE(homes, std::size_t{2});
+    QVERIFY(window.cutKml());
+    QVERIFY(window.deleteKml() == false); // nothing selected now
+    QVERIFY(QApplication::clipboard()->text().contains(QLatin1String("Home")));
+    // Saved: the file has it all; nothing unsaved.
+    QTemporaryDir folderOnDisk;
+    const QString saved = folderOnDisk.filePath(QStringLiteral("mine.kmz"));
+    QVERIFY(window.saveKmlDocument(key, saved));
+    QVERIFY(!document->isModified());
+    QString error;
+    const std::optional<ts::KmlDocument> read = ts::readKmlFile(saved, &error);
+    QVERIFY2(read.has_value(), qPrintable(error));
+    const ts::KmlDocument& back = read.value_or(ts::KmlDocument{});
+    QVERIFY(find(back.root, QStringLiteral("Home")) != nullptr);
+    QVERIFY(
+        ts::readKmlResource(back, QStringLiteral("files/overlay.png"), &error)
+            .size() > 0);
+    // A project keeps it (with a change not yet saved: in the project).
+    QVERIFY(window.addKmlFolder());
+    const QString project =
+        folderOnDisk.filePath(QStringLiteral("p.terrasoar"));
+    // Asked whether to save the file first: no, the project keeps it.
+    bool asked = false;
+    QTimer::singleShot(0, &window, [&asked]() {
+      for (QWidget* widget : QApplication::topLevelWidgets()) {
+        if (QMessageBox* box = qobject_cast<QMessageBox*>(widget)) {
+          asked = true;
+          box->button(QMessageBox::No)->click();
+        }
+      }
+    });
+    QVERIFY2(window.saveProject(project, &error), qPrintable(error));
+    QVERIFY(asked);
+    ts::MainWindow again;
+    QVERIFY2(again.openProject(project, &error), qPrintable(error));
+    const QModelIndex reopened = again.layerModel()->index(0, 0);
+    QCOMPARE(again.layerModel()->data(reopened).toString(),
+             QStringLiteral("Untitled"));
+    QVERIFY(again.layerModel()->rowCount(reopened) >= 4);
+    const QString reopenedKey = again.activeKmlDocument();
+    QVERIFY(!reopenedKey.isEmpty());
+    ts::KmlEditDocument* restored = again.kmlEditDocument(reopenedKey);
+    QVERIFY(restored != nullptr);
+    QCOMPARE(restored->filePath(), saved);
+    QVERIFY(restored->isModified());
+    QCOMPARE(restored->document().root.children.back().name,
+             QStringLiteral("Folder"));
+  }
+
+  void kmlPropertiesDialog()
+  {
+    // The dialog's fields become the element's properties; a shared style
+    // is edited for all that use it.
+    QString error;
+    const std::optional<ts::KmlDocument> document = ts::readKmlFile(
+        QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"), &error);
+    QVERIFY2(document.has_value(), qPrintable(error));
+    const ts::KmlDocument& kml = document.value_or(ts::KmlDocument{});
+    const ts::KmlFeature* line = find(kml.root, QStringLiteral("A line"));
+    QVERIFY(line != nullptr);
+    ts::KmlView here;
+    here.latDeg = 12.0;
+    ts::KmlPropertiesDialog dialog(
+        *line, kml, [here]() { return here; }, nullptr);
+    dialog.findChild<QLineEdit*>(QStringLiteral("kmlName"))
+        ->setText(QStringLiteral("Renamed"));
+    dialog.findChild<QPlainTextEdit*>(QStringLiteral("kmlDescription"))
+        ->setPlainText(QStringLiteral("<b>bold</b>"));
+    QVERIFY(dialog.findChild<QTextBrowser*>(QStringLiteral("kmlPreview"))
+                ->toHtml()
+                .contains(QLatin1String("bold")));
+    dialog.findChild<QPushButton*>(QStringLiteral("kmlSetView"))->click();
+    dialog.findChild<QComboBox*>(QStringLiteral("kmlAltitudeMode"))
+        ->setCurrentIndex(2);
+    dialog.findChild<QDoubleSpinBox*>(QStringLiteral("kmlAltitude"))
+        ->setValue(500.0);
+    dialog.findChild<QCheckBox*>(QStringLiteral("kmlExtrude"))
+        ->setChecked(true);
+    dialog.findChild<QComboBox*>(QStringLiteral("kmlTimeKind"))
+        ->setCurrentIndex(1);
+    dialog.findChild<QPushButton*>(QStringLiteral("kmlAddField"))->click();
+    // Its own style: a wider line.
+    dialog.findChild<QDoubleSpinBox*>(QStringLiteral("kmlLineWidth"))
+        ->setValue(7.0);
+    const ts::KmlFeature edited = dialog.feature();
+    QCOMPARE(edited.name, QStringLiteral("Renamed"));
+    QCOMPARE(edited.description, QStringLiteral("<b>bold</b>"));
+    QCOMPARE(edited.view.value_or(ts::KmlView{}).latDeg, 12.0);
+    const ts::KmlGeometry geometry =
+        edited.geometry.value_or(ts::KmlGeometry{});
+    QCOMPARE(geometry.altitudeMode, ts::KmlAltitudeMode::Absolute);
+    QVERIFY(geometry.extrude);
+    QCOMPARE(geometry.coordinates.back().altM, 500.0);
+    QVERIFY(edited.time.has_value());
+    QCOMPARE(edited.extendedData.size(), std::size_t{1});
+    QCOMPARE(edited.style.value_or(ts::KmlStyle{})
+                 .line.value_or(ts::KmlLineStyle{})
+                 .width,
+             7.0);
+    QVERIFY(edited.styleUrl.isEmpty());
+    QVERIFY(!dialog.sharedStyle());
+    // A shared style instead: the element points at it; the style changes.
+    QComboBox* style =
+        dialog.findChild<QComboBox*>(QStringLiteral("kmlStyleChoice"));
+    const int32_t red = style->findData(QStringLiteral("red"));
+    QVERIFY(red > 0);
+    style->setCurrentIndex(red);
+    dialog.findChild<QDoubleSpinBox*>(QStringLiteral("kmlLineWidth"))
+        ->setValue(9.0);
+    QCOMPARE(dialog.feature().styleUrl, QStringLiteral("#red"));
+    QVERIFY(!dialog.feature().style.has_value());
+    const ts::KmlStyle shared = dialog.sharedStyle().value_or(ts::KmlStyle{});
+    QCOMPARE(shared.id, QStringLiteral("red"));
+    QCOMPARE(shared.line.value_or(ts::KmlLineStyle{}).width, 9.0);
+    // Its icon is kept.
+    QCOMPARE(shared.icon.value_or(ts::KmlIconStyle{}).href,
+             QStringLiteral("icons/pin.png"));
+  }
+
+  void kmlEditingFiles()
+  {
+    // A file made editable: an edit changes only what it touches; a folder
+    // dragged into another moves in the document.
+    QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("everything.kml"));
+    QVERIFY(QFile::copy(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        path));
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QString rootId =
+        model->data(model->index(0, 0), ts::LayerTreeModel::NodeIdRole)
+            .toString();
+    // Its menu offers editing; then it is editable.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(model->index(0, 0));
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(QStringLiteral(
+                                   "editKmlNodeAction")) != nullptr);
+    const QString key = window.editKmlDocument(rootId);
+    QVERIFY(!key.isEmpty());
+    ts::KmlEditDocument* document = window.kmlEditDocument(key);
+    QCOMPARE(document->filePath(), path);
+    QCOMPARE(window.editKmlDocument(
+                 model->data(model->index(0, 0), ts::LayerTreeModel::NodeIdRole)
+                     .toString()),
+             key);
+    ts::KmlFeature point =
+        document->document().root.children.front().children.front();
+    point.name = QStringLiteral("Renamed");
+    QVERIFY(
+        window.setKmlFeature(key, QStringLiteral("0.0"), point, std::nullopt));
+    QVERIFY(window.saveKmlDocument(key, path));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString written = QString::fromUtf8(file.readAll());
+    QVERIFY(written.contains(QLatin1String("<name>Renamed</name>")));
+    QVERIFY(written.contains(QLatin1String("atom:author")));
+    QVERIFY(written.contains(QLatin1String("<PhotoOverlay>")));
+    // Shapes dragged into Times and places.
+    const QModelIndex root = model->index(0, 0);
+    QModelIndex shapes;
+    QModelIndex times;
+    for (int32_t i = 0; i < model->rowCount(root); ++i) {
+      const QString name = model->data(model->index(i, 0, root)).toString();
+      if (name == QLatin1String("Shapes")) {
+        shapes = model->index(i, 0, root);
+      } else if (name == QLatin1String("Times and places")) {
+        times = model->index(i, 0, root);
+      }
+    }
+    QVERIFY(shapes.isValid() && times.isValid());
+    QVERIFY(model->moveNode(shapes, times, 0));
+    QVERIFY(QTest::qWaitFor([&]() {
+      return document->document().root.children.front().name ==
+             QStringLiteral("Times and places");
+    }));
+    QCOMPARE(document->document().root.children.front().name,
+             QStringLiteral("Times and places"));
+    const ts::KmlFeature& moved =
+        document->document().root.children.front().children.back();
+    QCOMPARE(moved.name, QStringLiteral("Shapes"));
+    QVERIFY(window.undoKml());
+    QCOMPARE(document->document().root.children.front().name,
+             QStringLiteral("Shapes"));
   }
 
   void wmsWhatIsHere()

@@ -84,6 +84,9 @@ The middle button does what the region needs:
   says are out of date are fetched again; the rest stays as it is. Do this
   before a trip.
 
+**Export as KML…** saves a region's area as KML, to share it or open it in
+other programs ([KML and KMZ](kml.md)).
+
 **Delete** removes a region. Its tiles stay in the cache as ordinary saved
 tiles for now, and go when space is needed.
 

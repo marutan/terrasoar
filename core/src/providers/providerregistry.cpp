@@ -36,6 +36,8 @@
 #include "ts/elevation/geoidmodel.h"
 #include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/elevation/webterrainprovider.h"
+#include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmloverlays.h"
 #include "ts/network/networkclient.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
@@ -376,10 +378,49 @@ ProviderRegistry::basePackTime(const QJsonObject& source) const
   return time;
 }
 
+namespace
+{
+
+/** A KML layer's placemarks ("kind": "kml"). */
+std::shared_ptr<FeatureProvider> createKmlFeatures(const QJsonObject& source,
+                                                   QString* errorString)
+{
+  std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+      source.value(QStringLiteral("path")).toString(), errorString);
+  if (!document) {
+    return nullptr;
+  }
+  // The clock's moment for a document with times (kmlTimeKey()).
+  std::optional<QDateTime> at;
+  if (source.contains(QStringLiteral("at"))) {
+    at = QDateTime::fromString(source.value(QStringLiteral("at")).toString(),
+                               Qt::ISODate);
+  }
+  return std::make_shared<KmlFeatureProvider>(
+      std::move(document), source.value(QStringLiteral("container")).toString(),
+      at, source.value(QStringLiteral("deep")).toBool());
+}
+
+} // namespace
+
 std::shared_ptr<FeatureProvider>
 ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
+  if (source.value(QStringLiteral("kind")).toString() == QLatin1String("kml")) {
+    const QString key = canonical(source);
+    const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
+        found = m_features.find(key);
+    std::shared_ptr<FeatureProvider> provider =
+        found != m_features.end() ? found->second.lock() : nullptr;
+    if (!provider) {
+      provider = createKmlFeatures(source, errorString);
+    }
+    if (provider) {
+      m_features[key] = provider;
+    }
+    return provider;
+  }
   if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wfs")) {
     const QString key = canonical(source);
     const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
@@ -786,6 +827,31 @@ std::shared_ptr<ImageryProvider> createFileImagery(const QJsonObject& source,
 } // namespace
 
 std::shared_ptr<ImageryProvider>
+ProviderRegistry::createKmlOverlayLocked(const QJsonObject& source,
+                                         QString* errorString)
+{
+  const std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+      source.value(QStringLiteral("path")).toString(), errorString);
+  if (!document) {
+    return nullptr;
+  }
+  std::shared_ptr<KmlGroundOverlayProvider> provider =
+      std::make_shared<KmlGroundOverlayProvider>(
+          document, source.value(QStringLiteral("feature")).toString(),
+          networkLocked());
+  if (!provider->isValid()) {
+    if (errorString != nullptr) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Unknown or invalid imagery source: %1")
+              .arg(canonical(source));
+    }
+    return nullptr;
+  }
+  return provider;
+}
+
+std::shared_ptr<ImageryProvider>
 ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
@@ -817,6 +883,9 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("file")) {
     provider = createFileImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("kmloverlay")) {
+    provider = createKmlOverlayLocked(source, errorString);
   } else {
     provider = createImageryProvider(source, errorString);
   }

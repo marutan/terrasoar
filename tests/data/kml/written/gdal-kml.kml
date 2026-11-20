@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document id="root_doc">
+<Schema name="Everything" id="Everything">
+	<SimpleField name="timestamp" type="string"></SimpleField>
+	<SimpleField name="begin" type="string"></SimpleField>
+	<SimpleField name="end" type="string"></SimpleField>
+	<SimpleField name="altitudeMode" type="string"></SimpleField>
+	<SimpleField name="tessellate" type="int"></SimpleField>
+	<SimpleField name="extrude" type="int"></SimpleField>
+	<SimpleField name="visibility" type="int"></SimpleField>
+	<SimpleField name="drawOrder" type="int"></SimpleField>
+	<SimpleField name="icon" type="string"></SimpleField>
+</Schema>
+<Folder><name>Everything</name>
+  <Placemark>
+	<name>A picture</name>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Everything">
+		<SimpleData name="visibility">-1</SimpleData>
+		<SimpleData name="drawOrder">2</SimpleData>
+		<SimpleData name="icon">images/overlay.png</SimpleData>
+	</SchemaData></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>1,52,0 1,51,0 -1,51,0 -1,52,0 1,52,0</coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark>
+	<name>A quad</name>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Everything">
+		<SimpleData name="visibility">-1</SimpleData>
+		<SimpleData name="icon">images/overlay.png</SimpleData>
+	</SchemaData></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>0,40 2,40 2.5,42.0 -0.5,42.0 0,40</coordinates></LinearRing></outerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark>
+	<name>External style</name>
+	<ExtendedData><SchemaData schemaUrl="#Everything">
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>5,45</coordinates></Point>
+  </Placemark>
+</Folder>
+<Folder><name>Shapes</name>
+  <Placemark>
+	<name>A point</name>
+	<description>&lt;p&gt;A &lt;i&gt;point&lt;/i&gt; in Birmingham.&lt;/p&gt;</description>
+	<ExtendedData><SchemaData schemaUrl="#Shapes">
+		<SimpleData name="altitudeMode">absolute</SimpleData>
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">1</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>-1.8904,52.4862,140</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<name>A line</name>
+	<Style><LineStyle><color>FF00A5FF</color><width>5</width></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Shapes">
+		<SimpleData name="tessellate">1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-3,53.4,0 -2.24,53.48,0 -1.55,53.8,0</coordinates></LineString>
+  </Placemark>
+  <Placemark>
+	<name>A ring</name>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Shapes">
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <LinearRing><coordinates>0,51 1,51 1,52 0,51</coordinates></LinearRing>
+  </Placemark>
+  <Placemark>
+	<name>A polygon with a hole</name>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Shapes">
+		<SimpleData name="altitudeMode">relativeToGround</SimpleData>
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">1</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing><coordinates>-2,52,100 -1,52,100 -1,53,100 -2,53,100 -2,52,100</coordinates></LinearRing></outerBoundaryIs><innerBoundaryIs><LinearRing><coordinates>-1.6,52.4,100 -1.4,52.4,100 -1.4,52.6,100 -1.6,52.4,100</coordinates></LinearRing></innerBoundaryIs></Polygon>
+  </Placemark>
+  <Placemark>
+	<name>Two points and a line</name>
+	<ExtendedData><SchemaData schemaUrl="#Shapes">
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <MultiGeometry><Point><coordinates>-4,50</coordinates></Point><Point><coordinates>-4.1,50.1</coordinates></Point><LineString><coordinates>-4,50 -4.1,50.1</coordinates></LineString></MultiGeometry>
+  </Placemark>
+</Folder>
+<Folder><name>Times_and_places</name>
+  <Placemark>
+	<name>Stamped</name>
+	<ExtendedData><SchemaData schemaUrl="#Times_and_places">
+		<SimpleData name="timestamp">2026/11/20 12:00:00+00</SimpleData>
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>0.1,51.5</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<name>Spanned</name>
+	<ExtendedData><SchemaData schemaUrl="#Times_and_places">
+		<SimpleData name="begin">2026/01/01 00:00:00</SimpleData>
+		<SimpleData name="end">2026/06/30 00:00:00</SimpleData>
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <Point><coordinates>0.2,51.5</coordinates></Point>
+  </Placemark>
+  <Placemark>
+	<name>Track</name>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#Times_and_places">
+		<SimpleData name="begin">2026/11/20 10:00:00+00</SimpleData>
+		<SimpleData name="end">2026/11/20 11:00:00+00</SimpleData>
+		<SimpleData name="tessellate">-1</SimpleData>
+		<SimpleData name="extrude">0</SimpleData>
+		<SimpleData name="visibility">-1</SimpleData>
+	</SchemaData></ExtendedData>
+      <LineString><coordinates>-1,51,100 -0.5,51.2,200</coordinates></LineString>
+  </Placemark>
+</Folder>
+<Schema name="Shapes" id="Shapes">
+	<SimpleField name="timestamp" type="string"></SimpleField>
+	<SimpleField name="begin" type="string"></SimpleField>
+	<SimpleField name="end" type="string"></SimpleField>
+	<SimpleField name="altitudeMode" type="string"></SimpleField>
+	<SimpleField name="tessellate" type="int"></SimpleField>
+	<SimpleField name="extrude" type="int"></SimpleField>
+	<SimpleField name="visibility" type="int"></SimpleField>
+	<SimpleField name="drawOrder" type="int"></SimpleField>
+	<SimpleField name="icon" type="string"></SimpleField>
+</Schema>
+<Schema name="Times_and_places" id="Times_and_places">
+	<SimpleField name="timestamp" type="string"></SimpleField>
+	<SimpleField name="begin" type="string"></SimpleField>
+	<SimpleField name="end" type="string"></SimpleField>
+	<SimpleField name="altitudeMode" type="string"></SimpleField>
+	<SimpleField name="tessellate" type="int"></SimpleField>
+	<SimpleField name="extrude" type="int"></SimpleField>
+	<SimpleField name="visibility" type="int"></SimpleField>
+	<SimpleField name="drawOrder" type="int"></SimpleField>
+	<SimpleField name="icon" type="string"></SimpleField>
+</Schema>
+</Document></kml>

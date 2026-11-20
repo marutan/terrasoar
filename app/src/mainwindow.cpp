@@ -21,9 +21,11 @@
 #include "mainwindow.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -34,6 +36,9 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QElapsedTimer>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -46,6 +51,8 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMimeData>
+#include <QProgressDialog>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
@@ -60,10 +67,14 @@
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
+#include "balloonwindow.h"
 #include "elevationprofiledialog.h"
 #include "featureinfowindow.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "iconcache.h"
+#include "kmlexport.h"
+#include "kmllinks.h"
 #include "layertreedock.h"
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
@@ -79,6 +90,13 @@
 #include "ts/geo/geodetic.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/layerstackdraws.h"
+#include "ts/kml/kmlactivity.h"
+#include "ts/kml/kmldocument.h"
+#include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmloverlays.h"
+#include "ts/kml/kmlpresentation.h"
+#include "ts/kml/kmlreader.h"
+#include "ts/kml/kmlwriter.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/layers/projectfile.h"
 #include "ts/packs/basepack.h"
@@ -90,11 +108,23 @@
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
+#include "ts/vector/vectorstyle.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 
 namespace ts
 {
+
+namespace
+{
+
+/** How long the view must stay still before KML Regions are checked. */
+constexpr int32_t kmlViewSettleMs = 300;
+
+/** How many NetworkLinks may sit inside each other. */
+constexpr int32_t kmlMostLinkDepth = 8;
+
+} // namespace
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), m_statusLabel(new QLabel(this)),
@@ -154,6 +184,8 @@ MainWindow::MainWindow(QWidget* parent)
             &MainWindow::showPointerPosition);
     connect(m_globeView, &GlobeView::cameraChanged, this,
             &MainWindow::showEyeHeight);
+    connect(m_globeView, &GlobeView::cameraChanged, this,
+            &MainWindow::kmlCameraMoved);
     connect(m_globeView, &GlobeView::pointClicked, this,
             [this](LonLat point, double degreesPerPixel) {
               identifyAt(point, degreesPerPixel);
@@ -215,6 +247,38 @@ MainWindow::MainWindow(QWidget* parent)
   m_layerDock->setTimeLookup([this](const QJsonObject& source) {
     return m_registry->basePackTime(source);
   });
+  m_layerDock->setNodeActions([this](const QModelIndex& index, QObject* owner) {
+    return nodeActions(index, owner);
+  });
+  // Double-clicking a KML entry flies there, as in Google Earth.
+  m_layerDock->setDoubleClickAction([this](const QModelIndex& index) {
+    const std::optional<CameraPose> pose = kmlNodePose(
+        m_layers->data(index, LayerTreeModel::NodeIdRole).toString());
+    if (!pose || m_globeView == nullptr) {
+      return false;
+    }
+    m_globeView->flyTo(*pose, 0.0);
+    return true;
+  });
+  setAcceptDrops(true);
+  m_icons = new IconCache(m_registry->network(), this);
+  m_kmlLinks = new KmlLinks(m_registry->network(), this);
+  connect(m_kmlLinks, &KmlLinks::loaded, this, &MainWindow::kmlLinkLoaded);
+  connect(m_kmlLinks, &KmlLinks::failed, this,
+          [this](const QString&, const QString& error) {
+            statusBar()->showMessage(error, 10000);
+          });
+  m_kmlViewTimer = new QTimer(this);
+  m_kmlViewTimer->setSingleShot(true);
+  m_kmlViewTimer->setInterval(kmlViewSettleMs);
+  connect(m_kmlViewTimer, &QTimer::timeout, this,
+          &MainWindow::updateKmlRegions);
+  connect(m_layers, &QAbstractItemModel::dataChanged, this,
+          [this](const QModelIndex& topLeft) { kmlCheckChanged(topLeft); });
+  connect(m_icons, &IconCache::iconsChanged, this, [this]() {
+    m_tintedIcons.clear();
+    refreshBillboards(m_layers->layerStack());
+  });
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
@@ -260,6 +324,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   createActions();
   createMenus();
+  createKmlEditing();
   retranslateUi();
 
   resize(1024, 768);
@@ -562,6 +627,10 @@ void MainWindow::createActions()
   m_featureInfoAction->setObjectName(QStringLiteral("featureInfoAction"));
   m_featureInfoAction->setCheckable(true);
   m_featureInfoAction->setChecked(true);
+  m_openKmlAction = new QAction(this);
+  m_openKmlAction->setObjectName(QStringLiteral("openKmlAction"));
+  connect(m_openKmlAction, &QAction::triggered, this,
+          &MainWindow::openKmlDialog);
   m_addWfsAction = new QAction(this);
   m_addWfsAction->setObjectName(QStringLiteral("addWfsAction"));
   connect(m_addWfsAction, &QAction::triggered, this,
@@ -846,6 +915,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addWmtsAction);
   m_fileMenu->addAction(m_addXyzAction);
+  m_fileMenu->addAction(m_openKmlAction);
   m_fileMenu->addAction(m_addWfsAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
@@ -894,6 +964,9 @@ void MainWindow::retranslateUi()
 {
   setWindowTitle(programName());
   m_fileMenu->setTitle(tr("&File"));
+  if (m_kmlMenu != nullptr) {
+    retranslateKmlEditing();
+  }
   m_viewMenu->setTitle(tr("&View"));
   m_helpMenu->setTitle(tr("&Help"));
   m_quitAction->setText(tr("&Quit"));
@@ -965,6 +1038,10 @@ void MainWindow::retranslateUi()
   m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
   m_addWmtsAction->setStatusTip(
       tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
+  m_openKmlAction->setText(tr("Open &KML or KMZ…"));
+  m_openKmlAction->setStatusTip(
+      tr("Add a KML or KMZ file (from Google Earth and other programs) to "
+         "the layer tree"));
   m_addWfsAction->setText(tr("Add W&FS Layer…"));
   m_addWfsAction->setStatusTip(
       tr("Add features (points, lines and areas) from a web feature service "
@@ -1107,6 +1184,11 @@ void MainWindow::refreshLayers()
       projectionWith(projection->id(), projection->parameterValues()));
   QStringList errors;
   applyImageryDraws(stack, &errors);
+  refreshBillboards(stack);
+  m_drawnVectors = QJsonArray();
+  for (const VectorStackEntry& entry : stack.vectors) {
+    m_drawnVectors.append(entry.definition.source);
+  }
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setElevationDraw(
       elevationDrawForStack(stack, *m_registry, &errors));
@@ -1139,12 +1221,49 @@ void MainWindow::clockMoved()
   for (const ImageryStackEntry& entry : stack.imagery) {
     sources.append(entry.definition.source);
   }
+  QJsonArray vectors;
+  for (const VectorStackEntry& entry : stack.vectors) {
+    vectors.append(entry.definition.source);
+  }
+  if (vectors != m_drawnVectors) {
+    // KML whose times show something else now.
+    refreshLayers();
+    return;
+  }
+  // Markers moving along tracks.
+  refreshBillboards(stack);
   if (sources == m_drawnImagery) {
     return;
   }
   QStringList errors;
   applyImageryDraws(stack, &errors);
   watchLayerStatus(stack);
+}
+
+const std::vector<QDateTime>&
+MainWindow::kmlBoundaries(const QJsonObject& source) const
+{
+  const QString key =
+      source.value(QStringLiteral("path")).toString() + QLatin1Char('|') +
+      source.value(QStringLiteral("container")).toString() + QLatin1Char('|') +
+      (source.value(QStringLiteral("deep")).toBool() ? QStringLiteral("deep")
+                                                     : QString()) +
+      QLatin1Char('|') +
+      QString::number(source.value(QStringLiteral("rev")).toDouble());
+  const std::map<QString, std::vector<QDateTime>>::const_iterator found =
+      m_kmlBoundaries.find(key);
+  if (found != m_kmlBoundaries.end()) {
+    return found->second;
+  }
+  std::vector<QDateTime> boundaries;
+  const std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+      source.value(QStringLiteral("path")).toString(), nullptr);
+  if (document) {
+    boundaries = kmlTimeBoundaries(
+        *document, source.value(QStringLiteral("container")).toString(),
+        source.value(QStringLiteral("deep")).toBool());
+  }
+  return m_kmlBoundaries[key] = std::move(boundaries);
 }
 
 LayerStack MainWindow::timedStack() const
@@ -1159,13 +1278,809 @@ LayerStack MainWindow::timedStack() const
       entry.definition.source.insert(QStringLiteral("time"), time->toJson());
     }
   }
+  // KML layers whose Regions are out of sight are left out; those with
+  // times show the clock's.
+  // A Region hides what is inside its feature too (a link's document).
+  const std::function<bool(const QString&)> hidden =
+      [this](const QString& nodeId) {
+        if (m_kmlInactive.empty()) {
+          return false;
+        }
+        for (QModelIndex up = m_layers->indexOfId(nodeId); up.isValid();
+             up = up.parent()) {
+          if (m_kmlInactive.count(
+                  m_layers->data(up, LayerTreeModel::NodeIdRole).toString()) !=
+              0) {
+            return true;
+          }
+        }
+        return false;
+      };
+  stack.imagery.erase(std::remove_if(stack.imagery.begin(), stack.imagery.end(),
+                                     [&](const ImageryStackEntry& entry) {
+                                       return hidden(entry.nodeId);
+                                     }),
+                      stack.imagery.end());
+  stack.vectors.erase(std::remove_if(stack.vectors.begin(), stack.vectors.end(),
+                                     [&](const VectorStackEntry& entry) {
+                                       return hidden(entry.nodeId);
+                                     }),
+                      stack.vectors.end());
+  for (VectorStackEntry& entry : stack.vectors) {
+    const QJsonObject& source = entry.definition.source;
+    if (source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const std::vector<QDateTime>& boundaries = kmlBoundaries(source);
+    if (!boundaries.empty()) {
+      entry.definition.source.insert(
+          QStringLiteral("at"),
+          kmlTimeKey(boundaries, m_clock->time()).toString(Qt::ISODate));
+    }
+  }
   return stack;
+}
+
+bool MainWindow::openFile(const QString& path, QString* errorString)
+{
+  if (path.endsWith(QLatin1String(".kml"), Qt::CaseInsensitive) ||
+      path.endsWith(QLatin1String(".kmz"), Qt::CaseInsensitive)) {
+    return openKml(path, errorString);
+  }
+  return openProject(path, errorString);
+}
+
+void MainWindow::openKmlDialog()
+{
+  const QString path = QFileDialog::getOpenFileName(
+      this, tr("Open KML or KMZ"), QString(),
+      tr("KML and KMZ files (*.kml *.kmz);;All files (*)"));
+  if (path.isEmpty()) {
+    return;
+  }
+  QString error;
+  if (!openKml(path, &error)) {
+    QMessageBox::warning(this, tr("Open KML or KMZ"), error);
+  }
+}
+
+bool MainWindow::openKml(const QString& path, QString* errorString)
+{
+  const QString absolute = QFileInfo(path).absoluteFilePath();
+  const std::shared_ptr<const KmlDocument> document =
+      readKmlInBackground(absolute, errorString);
+  if (!document) {
+    return false;
+  }
+  addKmlFeature(*document, document->root, QString(), QModelIndex(), 0);
+  m_kmlRoots[m_layers->data(m_layers->index(0, 0), LayerTreeModel::NodeIdRole)
+                 .toString()] = absolute;
+  updateKmlActions();
+  if (!document->skipped.isEmpty()) {
+    statusBar()->showMessage(
+        tr("%1: %n element(s) Terra Soar doesn't show were skipped.", nullptr,
+           static_cast<int32_t>(document->skipped.size()))
+            .arg(QFileInfo(path).fileName()),
+        10000);
+  }
+  if (m_globeView != nullptr && document->root.view) {
+    m_globeView->flyTo(kmlViewPose(document->root.view.value_or(KmlView{})),
+                       0.0);
+  }
+  return true;
+}
+
+std::shared_ptr<const KmlDocument>
+MainWindow::readKmlInBackground(const QString& path, QString* errorString)
+{
+  // Large files take seconds to read: off the GUI thread, which keeps
+  // drawing, with a busy dialog if it takes a while.
+  constexpr int32_t pollMs = 20;
+  constexpr int32_t dialogAfterMs = 500;
+  std::future<std::pair<std::shared_ptr<const KmlDocument>, QString>> reading =
+      std::async(std::launch::async, [path]() {
+        QString error;
+        std::shared_ptr<const KmlDocument> document =
+            sharedKmlDocument(path, &error);
+        return std::make_pair(document, error);
+      });
+  QElapsedTimer waited;
+  waited.start();
+  std::unique_ptr<QProgressDialog> busy;
+  while (reading.wait_for(std::chrono::milliseconds(pollMs)) !=
+         std::future_status::ready) {
+    if (!busy && waited.elapsed() > dialogAfterMs) {
+      busy = std::make_unique<QProgressDialog>(
+          tr("Reading %1…").arg(QFileInfo(path).fileName()), QString(), 0, 0,
+          this);
+      busy->setWindowModality(Qt::WindowModal);
+      busy->setMinimumDuration(0);
+      busy->show();
+    }
+    QCoreApplication::processEvents(QEventLoop::AllEvents, pollMs);
+  }
+  std::pair<std::shared_ptr<const KmlDocument>, QString> read = reading.get();
+  if (!read.first && errorString != nullptr) {
+    *errorString = read.second;
+  }
+  return read.first;
+}
+
+void MainWindow::addKmlFeature(const KmlDocument& document,
+                               const KmlFeature& container,
+                               const QString& featurePath,
+                               const QModelIndex& parent, int32_t row)
+{
+  // A file whose feature is a link or an overlay: that alone.
+  if (container.kind == KmlFeature::Kind::NetworkLink) {
+    addKmlLink(document, container, featurePath, parent, row);
+    return;
+  }
+  if (container.kind == KmlFeature::Kind::GroundOverlay ||
+      container.kind == KmlFeature::Kind::ScreenOverlay) {
+    addKmlOverlay(document, container, featurePath, parent, row);
+    return;
+  }
+  QString name = container.name;
+  if (name.isEmpty() && featurePath.isEmpty()) {
+    name = QFileInfo(document.path).completeBaseName();
+  }
+  const QModelIndex collection = m_layers->addCollection(
+      name.isEmpty() ? tr("Folder") : name, parent, row);
+  const QString collectionId =
+      m_layers->data(collection, LayerTreeModel::NodeIdRole).toString();
+  m_kmlNodes[collectionId] = {document.path, featurePath};
+  const KmlListStyle list =
+      KmlStyleResolver(document).resolve(container).list.value_or(
+          KmlListStyle{});
+  if (container.kind == KmlFeature::Kind::Placemark) {
+    // A file of one placemark.
+    addKmlPlaces(document, featurePath, collection, 0, false);
+  } else if (list.itemType == KmlListStyle::ItemType::CheckHideChildren) {
+    // Listed as one entry: everything inside in one layer.
+    addKmlPlaces(document, featurePath, collection, 0, true);
+  } else {
+    addKmlChildren(document, container, featurePath, collection);
+  }
+  if (list.itemType == KmlListStyle::ItemType::RadioFolder) {
+    // At most one child on: the first the file shows.
+    m_kmlRadio.insert(collectionId);
+    bool on = false;
+    for (int32_t i = 0; i < m_layers->rowCount(collection); ++i) {
+      const QModelIndex child = m_layers->index(i, 0, collection);
+      if (m_layers->data(child, Qt::CheckStateRole).toInt() == Qt::Checked) {
+        if (on) {
+          m_layers->setData(child, Qt::Unchecked, Qt::CheckStateRole);
+        }
+        on = true;
+      }
+    }
+  }
+  if (!container.visibility) {
+    m_layers->setData(collection, Qt::Unchecked, Qt::CheckStateRole);
+  }
+}
+
+void MainWindow::addKmlChildren(const KmlDocument& document,
+                                const KmlFeature& container,
+                                const QString& featurePath,
+                                const QModelIndex& collection)
+{
+  int32_t next = 0;
+  bool placemarks = false;
+  for (std::size_t i = 0; i < container.children.size(); ++i) {
+    const KmlFeature& child = container.children[i];
+    const QString childPath =
+        featurePath.isEmpty()
+            ? QString::number(i)
+            : featurePath + QLatin1Char('.') + QString::number(i);
+    switch (child.kind) {
+    case KmlFeature::Kind::Document:
+    case KmlFeature::Kind::Folder:
+      addKmlFeature(document, child, childPath, collection, next++);
+      break;
+    case KmlFeature::Kind::GroundOverlay:
+    case KmlFeature::Kind::ScreenOverlay:
+      addKmlOverlay(document, child, childPath, collection, next++);
+      break;
+    case KmlFeature::Kind::NetworkLink:
+      addKmlLink(document, child, childPath, collection, next++);
+      break;
+    case KmlFeature::Kind::Placemark:
+      // The container's placemarks, in one layer where the first is.
+      if (!placemarks) {
+        placemarks = true;
+        addKmlPlaces(document, featurePath, collection, next++, false);
+      }
+      break;
+    }
+  }
+}
+
+void MainWindow::addKmlPlaces(const KmlDocument& document,
+                              const QString& featurePath,
+                              const QModelIndex& collection, int32_t row,
+                              bool deep)
+{
+  LayerDefinition definition;
+  definition.id = QStringLiteral("kml:") +
+                  QUuid::createUuid().toString(QUuid::WithoutBraces);
+  definition.origin = LayerOrigin::User;
+  definition.type = LayerType::Vector;
+  definition.name = tr("Places");
+  definition.source =
+      withKmlRevision(kmlLayerSource(document.path, featurePath, deep));
+  VectorStyle style;
+  style.fill = QColor(255, 255, 255);
+  style.outline = QColor(255, 255, 255);
+  definition.style = style.toJson();
+  const QModelIndex layer = m_layers->addLayer(definition, collection, row);
+  m_kmlNodes[m_layers->data(layer, LayerTreeModel::NodeIdRole).toString()] = {
+      document.path, featurePath};
+}
+
+void MainWindow::addKmlLink(const KmlDocument& document, const KmlFeature& link,
+                            const QString& featurePath,
+                            const QModelIndex& parent, int32_t row)
+{
+  const QModelIndex collection = m_layers->addCollection(
+      link.name.isEmpty() ? tr("Network link") : link.name, parent, row);
+  const QString id =
+      m_layers->data(collection, LayerTreeModel::NodeIdRole).toString();
+  m_kmlNodes[id] = {document.path, featurePath};
+  m_kmlLinks->add(id, sharedKmlDocument(document.path, nullptr), featurePath);
+  // Fetched now, unless a Region waits for the view to come near.
+  if (!kmlHasRegion(document, featurePath)) {
+    m_kmlLinks->load(id, currentViewParameters());
+  }
+  if (!link.visibility) {
+    m_layers->setData(collection, Qt::Unchecked, Qt::CheckStateRole);
+  }
+}
+
+KmlViewParameters MainWindow::currentViewParameters() const
+{
+  if (m_globeView == nullptr) {
+    return KmlViewParameters{};
+  }
+  return kmlViewParameters(m_globeView->controller().camera(),
+                           m_globeView->terrainShown());
+}
+
+// The link's node, then the file it brought.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void MainWindow::kmlLinkLoaded(const QString& nodeId, const QString& path,
+                               bool flyToView)
+{
+  const QModelIndex node = m_layers->indexOfId(nodeId);
+  if (!node.isValid()) {
+    m_kmlLinks->remove(nodeId);
+    return;
+  }
+  QString error;
+  const std::shared_ptr<const KmlDocument> document =
+      sharedKmlDocument(path, &error);
+  if (!document) {
+    statusBar()->showMessage(error, 10000);
+    return;
+  }
+  // Links inside links (a superoverlay's levels): not without end.
+  int32_t depth = 0;
+  for (QModelIndex up = node; up.isValid(); up = up.parent()) {
+    depth += m_kmlLinks->contains(
+                 m_layers->data(up, LayerTreeModel::NodeIdRole).toString())
+                 ? 1
+                 : 0;
+  }
+  if (depth > kmlMostLinkDepth) {
+    statusBar()->showMessage(tr("%1: too many network links inside each other.")
+                                 .arg(m_layers->data(node).toString()),
+                             10000);
+    return;
+  }
+  // What it linked to before goes; what it links to now comes in its place.
+  const bool wasRefreshing = m_refreshingKml;
+  m_refreshingKml = true;
+  while (m_layers->rowCount(node) > 0) {
+    m_layers->removeNode(
+        m_layers->index(m_layers->rowCount(node) - 1, 0, node));
+  }
+  forgetRemovedKmlNodes();
+  addKmlFeature(*document, document->root, QString(), node, 0);
+  m_refreshingKml = wasRefreshing;
+  if (flyToView && m_globeView != nullptr && document->root.view) {
+    m_globeView->flyTo(kmlViewPose(document->root.view.value_or(KmlView{})),
+                       0.0);
+  }
+}
+
+void MainWindow::forgetRemovedKmlNodes()
+{
+  for (std::map<QString, std::pair<QString, QString>>::iterator it =
+           m_kmlNodes.begin();
+       it != m_kmlNodes.end();) {
+    if (m_layers->indexOfId(it->first).isValid()) {
+      ++it;
+    } else {
+      m_kmlRadio.erase(it->first);
+      m_kmlLinks->remove(it->first);
+      it = m_kmlNodes.erase(it);
+    }
+  }
+}
+
+void MainWindow::kmlCameraMoved()
+{
+  if (m_globeView == nullptr) {
+    return;
+  }
+  const CameraPose& pose = m_globeView->controller().camera().pose();
+  const bool moved = !m_lastKmlPose ||
+                     m_lastKmlPose->targetLatDeg != pose.targetLatDeg ||
+                     m_lastKmlPose->targetLonDeg != pose.targetLonDeg ||
+                     m_lastKmlPose->rangeM != pose.rangeM ||
+                     m_lastKmlPose->headingDeg != pose.headingDeg ||
+                     m_lastKmlPose->tiltDeg != pose.tiltDeg;
+  if (moved && !m_kmlNodes.empty()) {
+    m_lastKmlPose = pose;
+    m_kmlViewTimer->start();
+  }
+}
+
+void MainWindow::updateKmlRegions()
+{
+  if (m_globeView == nullptr) {
+    return;
+  }
+  forgetRemovedKmlNodes();
+  const Camera& camera = m_globeView->controller().camera();
+  const KmlViewParameters view = currentViewParameters();
+  std::set<QString> inactive;
+  for (const std::pair<const QString, std::pair<QString, QString>>& node :
+       m_kmlNodes) {
+    const std::shared_ptr<const KmlDocument> document =
+        sharedKmlDocument(node.second.first, nullptr);
+    if (!document || !kmlHasRegion(*document, node.second.second)) {
+      continue;
+    }
+    if (!kmlRegionsActive(*document, node.second.second, camera)) {
+      inactive.insert(node.first);
+    } else if (m_kmlLinks->contains(node.first) &&
+               !m_kmlLinks->isLoaded(node.first)) {
+      // A link waiting for its Region: now.
+      m_kmlLinks->load(node.first, view);
+    }
+  }
+  m_kmlLinks->viewStopped(view);
+  if (inactive != m_kmlInactive) {
+    m_kmlInactive = inactive;
+    refreshLayers();
+  }
+}
+
+void MainWindow::kmlCheckChanged(const QModelIndex& topLeft)
+{
+  syncKmlEntry(topLeft);
+  // A radio folder's child switched on: its siblings off.
+  if (m_refreshingKml || !topLeft.isValid() ||
+      m_layers->data(topLeft, Qt::CheckStateRole).toInt() != Qt::Checked) {
+    return;
+  }
+  const QModelIndex parent = topLeft.parent();
+  if (m_kmlRadio.count(
+          m_layers->data(parent, LayerTreeModel::NodeIdRole).toString()) == 0) {
+    return;
+  }
+  m_refreshingKml = true;
+  for (int32_t i = 0; i < m_layers->rowCount(parent); ++i) {
+    const QModelIndex sibling = m_layers->index(i, 0, parent);
+    if (sibling != topLeft &&
+        m_layers->data(sibling, Qt::CheckStateRole).toInt() != Qt::Unchecked) {
+      m_layers->setData(sibling, Qt::Unchecked, Qt::CheckStateRole);
+    }
+  }
+  m_refreshingKml = false;
+}
+
+void MainWindow::addKmlOverlay(const KmlDocument& document,
+                               const KmlFeature& overlay,
+                               const QString& featurePath,
+                               const QModelIndex& parent, int32_t row)
+{
+  LayerDefinition definition;
+  definition.id = QStringLiteral("kml:") +
+                  QUuid::createUuid().toString(QUuid::WithoutBraces);
+  definition.origin = LayerOrigin::User;
+  if (overlay.kind == KmlFeature::Kind::GroundOverlay) {
+    // A picture on the ground: imagery, in the file's draw order.
+    definition.type = LayerType::Imagery;
+    definition.name =
+        overlay.name.isEmpty() ? tr("Ground overlay") : overlay.name;
+    definition.source =
+        withKmlRevision(kmlOverlaySource(document.path, featurePath));
+  } else {
+    // A picture on the screen: drawn by the view, from its own layer.
+    definition.type = LayerType::Vector;
+    definition.name =
+        overlay.name.isEmpty() ? tr("Screen overlay") : overlay.name;
+    definition.source =
+        withKmlRevision(kmlLayerSource(document.path, featurePath));
+    VectorStyle style;
+    definition.style = style.toJson();
+  }
+  const QModelIndex layer = m_layers->addLayer(definition, parent, row);
+  m_kmlNodes[m_layers->data(layer, LayerTreeModel::NodeIdRole).toString()] = {
+      document.path, featurePath};
+  if (!overlay.visibility) {
+    m_layers->setData(layer, Qt::Unchecked, Qt::CheckStateRole);
+  }
+}
+
+std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
+                                              QObject* parent)
+{
+  const QString id =
+      m_layers->data(index, LayerTreeModel::NodeIdRole).toString();
+  std::vector<QAction*> actions;
+  if (m_kmlLinks->contains(id)) {
+    QAction* refresh = new QAction(tr("Refresh"), parent);
+    refresh->setObjectName(QStringLiteral("refreshLinkAction"));
+    connect(refresh, &QAction::triggered, this,
+            [this, id]() { m_kmlLinks->load(id, currentViewParameters()); });
+    actions.push_back(refresh);
+  }
+  const std::vector<QAction*> fly = flyThereActions(id, parent);
+  actions.insert(actions.end(), fly.begin(), fly.end());
+  if (m_kmlNodes.count(id) != 0 && kmlKeyOf(id).isEmpty()) {
+    QAction* edit = new QAction(tr("Edit This Document"), parent);
+    edit->setObjectName(QStringLiteral("editKmlNodeAction"));
+    connect(edit, &QAction::triggered, this,
+            [this, id]() { editKmlDocument(id); });
+    actions.push_back(edit);
+  }
+  if (m_kmlNodes.count(id) != 0) {
+    QAction* save = new QAction(tr("Save As KML or KMZ…"), parent);
+    save->setObjectName(QStringLiteral("saveKmlAction"));
+    connect(save, &QAction::triggered, this, [this, id]() {
+      QString error;
+      const std::optional<KmlDocument> document = kmlNodeDocument(id, &error);
+      if (!document) {
+        QMessageBox::warning(this, tr("Save As KML or KMZ"), error);
+        return;
+      }
+      const QString name =
+          document->root.children.size() == 1 &&
+                  !document->root.children.front().name.isEmpty()
+              ? document->root.children.front().name
+              : QFileInfo(document->path).completeBaseName();
+      saveKmlAs(this, *document, tr("Save As KML or KMZ"),
+                name + QStringLiteral(".kml"));
+    });
+    actions.push_back(save);
+  }
+  return actions;
+}
+
+std::optional<KmlDocument>
+MainWindow::kmlNodeDocument(const QString& nodeId, QString* errorString) const
+{
+  const std::map<QString, std::pair<QString, QString>>::const_iterator found =
+      m_kmlNodes.find(nodeId);
+  if (found == m_kmlNodes.end()) {
+    return std::nullopt;
+  }
+  // Read again keeping the text, so what is saved is the file as it was.
+  KmlReadOptions options;
+  options.keepSource = true;
+  std::optional<KmlDocument> document =
+      readKmlFile(found->second.first, errorString, options);
+  if (!document) {
+    return std::nullopt;
+  }
+  const std::shared_ptr<const KmlDocument> shown =
+      sharedKmlDocument(found->second.first, nullptr);
+  document->webBase = shown ? shown->webBase : QString();
+  if (found->second.second.isEmpty()) {
+    return document;
+  }
+  return kmlExtract(*document, found->second.second);
+}
+
+std::optional<CameraPose> MainWindow::kmlNodePose(const QString& id) const
+{
+  const std::map<QString, std::pair<QString, QString>>::const_iterator found =
+      m_kmlNodes.find(id);
+  if (found == m_kmlNodes.end()) {
+    return std::nullopt;
+  }
+  const std::shared_ptr<const KmlDocument> document =
+      sharedKmlDocument(found->second.first, nullptr);
+  const KmlFeature* feature =
+      document ? kmlContainer(*document, found->second.second) : nullptr;
+  if (feature == nullptr) {
+    return std::nullopt;
+  }
+  // Its own view, else one framing its first placemark with a geometry.
+  std::optional<CameraPose> pose = kmlFeaturePose(*feature);
+  for (std::size_t i = 0; !pose && i < feature->children.size(); ++i) {
+    pose = kmlFeaturePose(feature->children[i]);
+  }
+  return pose;
+}
+
+std::vector<QAction*> MainWindow::flyThereActions(const QString& id,
+                                                  QObject* parent)
+{
+  const std::optional<CameraPose> pose = kmlNodePose(id);
+  if (!pose || m_globeView == nullptr) {
+    return {};
+  }
+  QAction* fly = new QAction(tr("Fly There"), parent);
+  fly->setObjectName(QStringLiteral("flyThereAction"));
+  const CameraPose target = *pose;
+  connect(fly, &QAction::triggered, this,
+          [this, target]() { m_globeView->flyTo(target, 0.0); });
+  return {fly};
+}
+
+namespace
+{
+
+/** A hot spot's coordinate as a fraction of the icon's @p extent. */
+double hotSpotFraction(double value, KmlVec2::Units units, double extent)
+{
+  switch (units) {
+  case KmlVec2::Units::Fraction:
+    return value;
+  case KmlVec2::Units::Pixels:
+    return value / std::max(extent, 1.0);
+  case KmlVec2::Units::InsetPixels:
+    break;
+  }
+  return 1.0 - value / std::max(extent, 1.0);
+}
+
+/** A raised KML shape as the view draws it. */
+RaisedShapeDraw raisedShapeDraw(const KmlRaisedShape& shape)
+{
+  RaisedShapeDraw draw;
+  draw.height =
+      shape.relative ? OverlayHeight::Relative : OverlayHeight::Absolute;
+  draw.closed = shape.closed;
+  draw.surface = shape.surface;
+  draw.walls = shape.extrude;
+  draw.line = shape.line;
+  draw.widthPx = shape.widthPx;
+  draw.fill = shape.fill;
+  for (const std::vector<KmlCoordinate>& ring : shape.rings) {
+    std::vector<Geodetic> points;
+    points.reserve(ring.size());
+    for (const KmlCoordinate& c : ring) {
+      points.push_back(Geodetic{c.latDeg, c.lonDeg, c.altM});
+    }
+    draw.rings.push_back(std::move(points));
+  }
+  return draw;
+}
+
+OverlayHeight overlayHeight(KmlAltitudeMode mode)
+{
+  switch (mode) {
+  case KmlAltitudeMode::ClampToGround:
+  case KmlAltitudeMode::ClampToSeaFloor:
+    return OverlayHeight::Ground;
+  case KmlAltitudeMode::RelativeToGround:
+  case KmlAltitudeMode::RelativeToSeaFloor:
+    return OverlayHeight::Relative;
+  case KmlAltitudeMode::Absolute:
+    break;
+  }
+  return OverlayHeight::Absolute;
+}
+
+} // namespace
+
+QImage MainWindow::tintedIcon(const QString& where, const QColor& tint,
+                              bool pushpin)
+{
+  const std::pair<QString, QRgb> key{where, tint.rgba()};
+  const std::map<std::pair<QString, QRgb>, QImage>::const_iterator known =
+      m_tintedIcons.find(key);
+  if (known != m_tintedIcons.end()) {
+    return known->second;
+  }
+  // A missing picture is nothing; a missing icon the pushpin.
+  QImage icon = pushpin ? m_icons->icon(where) : m_icons->image(where);
+  if (icon.isNull()) {
+    return icon;
+  }
+  icon = icon.convertToFormat(QImage::Format_ARGB32);
+  if (tint != QColor(255, 255, 255)) {
+    // KML multiplies the icon's colours (and opacity) by the tint.
+    for (int32_t y = 0; y < icon.height(); ++y) {
+      QRgb* row = reinterpret_cast<QRgb*>(icon.scanLine(y));
+      for (int32_t x = 0; x < icon.width(); ++x) {
+        const QRgb p = row[x];
+        row[x] =
+            qRgba(qRed(p) * tint.red() / 255, qGreen(p) * tint.green() / 255,
+                  qBlue(p) * tint.blue() / 255, qAlpha(p) * tint.alpha() / 255);
+      }
+    }
+  }
+  m_tintedIcons[key] = icon;
+  return icon;
+}
+
+void MainWindow::refreshBillboards(const LayerStack& stack)
+{
+  if (m_globeView == nullptr || m_icons == nullptr) {
+    return;
+  }
+  std::vector<BillboardDraw> draws;
+  std::vector<RaisedShapeDraw> raised;
+  std::vector<ScreenOverlayDraw> screens;
+  for (const VectorStackEntry& entry : stack.vectors) {
+    if (entry.definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const std::shared_ptr<KmlFeatureProvider> provider =
+        std::dynamic_pointer_cast<KmlFeatureProvider>(
+            m_registry->features(entry.definition.source, nullptr));
+    if (!provider) {
+      continue;
+    }
+    std::vector<KmlBillboard> points = provider->billboards();
+    if (provider->hasTracks()) {
+      const std::vector<KmlBillboard> markers =
+          provider->trackMarkersAt(m_clock->time());
+      points.insert(points.end(), markers.begin(), markers.end());
+    }
+    for (const KmlBillboard& billboard : points) {
+      draws.push_back(billboardDraw(billboard));
+    }
+    for (const KmlFeature* screen : provider->screenOverlays()) {
+      ScreenOverlayDraw draw;
+      draw.image =
+          tintedIcon(resolveKmlHref(*provider->document(), screen->iconHref),
+                     screen->color, false);
+      draw.placement = screen->screen.value_or(KmlScreenPlacement{});
+      draw.drawOrder = screen->drawOrder;
+      if (!draw.image.isNull()) {
+        screens.push_back(std::move(draw));
+      }
+    }
+    for (const KmlRaisedShape& shape : provider->raisedShapes()) {
+      raised.push_back(raisedShapeDraw(shape));
+    }
+  }
+  m_globeView->setBillboards(std::move(draws));
+  m_globeView->setRaisedShapes(std::move(raised));
+  std::stable_sort(screens.begin(), screens.end(),
+                   [](const ScreenOverlayDraw& a, const ScreenOverlayDraw& b) {
+                     return a.drawOrder < b.drawOrder;
+                   });
+  m_globeView->setScreenOverlays(std::move(screens));
+}
+
+BillboardDraw MainWindow::billboardDraw(const KmlBillboard& billboard)
+{
+  constexpr double iconPx = 32.0;
+  BillboardDraw draw;
+  draw.latDeg = billboard.latDeg;
+  draw.lonDeg = billboard.lonDeg;
+  draw.height = overlayHeight(billboard.altitudeMode);
+  draw.heightM = billboard.altM;
+  draw.stalk = billboard.extrude;
+  draw.stalkColor = billboard.stalkColor;
+  draw.icon = tintedIcon(billboard.icon, billboard.tint);
+  draw.sizePx = iconPx * billboard.scale;
+  draw.headingDeg = billboard.headingDeg;
+  // KML's hot spot counts y from the bottom; the default pushpin's needle
+  // is at its bottom centre.
+  if (billboard.icon.isEmpty()) {
+    draw.hotSpot = QPointF(0.5, 1.0);
+  } else {
+    const QSizeF size(draw.icon.size());
+    const KmlVec2& h = billboard.hotSpot;
+    draw.hotSpot = QPointF(hotSpotFraction(h.x, h.xUnits, size.width()),
+                           1.0 - hotSpotFraction(h.y, h.yUnits, size.height()));
+  }
+  draw.label = billboard.label;
+  draw.labelColor = billboard.labelColor;
+  draw.labelScale = billboard.labelScale;
+  return draw;
+}
+
+bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)
+{
+  const LayerStack stack = m_layers->layerStack();
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const std::shared_ptr<KmlFeatureProvider> provider =
+        std::dynamic_pointer_cast<KmlFeatureProvider>(
+            m_registry->features(definition.source, nullptr));
+    if (!provider) {
+      continue;
+    }
+    const std::vector<const KmlFeature*> found = provider->placemarksAt(
+        GeoPoint{point.latDeg, point.lonDeg}, 4.0 * degreesPerPixel);
+    if (found.empty()) {
+      continue;
+    }
+    const KmlFeature& placemark = *found.front();
+    KmlStyleResolver resolver(*provider->document());
+    const KmlStyle style = resolver.resolve(placemark);
+    if (style.balloon && !style.balloon->display) {
+      return true; // hidden on purpose
+    }
+    if (m_balloon == nullptr) {
+      m_balloon = new BalloonWindow(this);
+      connect(m_balloon, &BalloonWindow::flyToRequested, this,
+              [this](const CameraPose& pose) {
+                if (m_globeView != nullptr) {
+                  m_globeView->flyTo(pose, 0.0);
+                }
+              });
+    }
+    const QString base =
+        provider->document()->kmz ? QString() : provider->document()->base;
+    m_balloon->showBalloon(placemark.name, kmlBalloonHtml(placemark, style),
+                           style.balloon ? style.balloon->backgroundColor
+                                         : QColor(Qt::white),
+                           kmlFeaturePose(placemark), base);
+    return true;
+  }
+  return false;
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+  const QList<QUrl> urls = event->mimeData()->urls();
+  const bool any = std::any_of(urls.begin(), urls.end(), [](const QUrl& url) {
+    const QString path = url.toLocalFile().toLower();
+    return path.endsWith(QLatin1String(".kml")) ||
+           path.endsWith(QLatin1String(".kmz")) ||
+           path.endsWith(QLatin1String(".terrasoar"));
+  });
+  if (any) {
+    event->acceptProposedAction();
+  }
+}
+
+void MainWindow::dropEvent(QDropEvent* event)
+{
+  const QList<QUrl> urls = event->mimeData()->urls();
+  for (const QUrl& url : urls) {
+    const QString path = url.toLocalFile();
+    if (path.isEmpty()) {
+      continue;
+    }
+    QString error;
+    if (!openFile(path, &error)) {
+      QMessageBox::warning(this, tr("Open"), error);
+    }
+  }
+  event->acceptProposedAction();
 }
 
 int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
 {
+  // KML being drawn or edited takes the click first.
+  if (kmlClicked(point, degreesPerPixel)) {
+    return 1;
+  }
   if (!m_featureInfoAction->isChecked()) {
     return 0;
+  }
+  // A KML placemark there: its balloon.
+  if (showBalloonAt(point, degreesPerPixel)) {
+    return 1;
   }
   // The visible WMS layers that can be asked, topmost first, as drawn now;
   // then the WFS layers, whose features are here already.
@@ -1245,6 +2160,24 @@ void MainWindow::updateTimeBar(const LayerStack& stack)
       extents.append(QStringLiteral("%1-01-01/%1-12-01/P1M").arg(year));
     } else {
       extents.append(time->extent);
+    }
+  }
+  for (const VectorStackEntry& entry : stack.vectors) {
+    const QJsonObject& source = entry.definition.source;
+    if (source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+        source.value(QStringLiteral("path")).toString(), nullptr);
+    const QString extent =
+        document ? kmlTimeExtent(
+                       *document,
+                       source.value(QStringLiteral("container")).toString(),
+                       source.value(QStringLiteral("deep")).toBool())
+                 : QString();
+    if (!extent.isEmpty()) {
+      extents.append(extent);
     }
   }
   m_timeBar->setExtent(TimeExtent::parse(extents));
@@ -1409,6 +2342,9 @@ ElevationProfileDialog* MainWindow::showElevationProfile()
 
 void MainWindow::profileLine(const std::vector<LonLat>& points)
 {
+  if (m_kmlDrawing != 0) {
+    return; // a KML path, not a profile
+  }
   if (m_globeView == nullptr || points.size() < 2) {
     return;
   }
@@ -1566,9 +2502,20 @@ NewRegionDialog* MainWindow::newOfflineRegion()
 bool MainWindow::openProject(const QString& path, QString* errorString)
 {
   const std::optional<Project> project = loadProject(path, errorString);
-  if (!project || !m_layers->fromJson(project->layers, errorString)) {
+  if (!project) {
     return false;
   }
+  // The KML of the project before is gone with its entries.
+  m_kmlEdits.clear();
+  m_kmlRoots.clear();
+  m_kmlNodes.clear();
+  m_kmlRadio.clear();
+  m_kmlSelection.reset();
+  showKmlHandles();
+  if (!m_layers->fromJson(project->layers, errorString)) {
+    return false;
+  }
+  openKmlProjectEntries(project->kml);
   if (m_globeView) {
     // An unknown projection (a newer program's) keeps the current one.
     m_globeView->setMapProjection(
@@ -1596,7 +2543,17 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
         m_globeView->mapProjection()->parameterValues();
   }
   project.time = m_clock->time();
-  project.layers = m_layers->toJson();
+  // KML documents: their files (or text); their entries are made again
+  // from them when the project opens.
+  bool cancelled = false;
+  project.kml = kmlProjectEntries(&cancelled);
+  if (cancelled) {
+    if (errorString != nullptr) {
+      *errorString = tr("The project wasn't saved.");
+    }
+    return false;
+  }
+  project.layers = kmlProjectLayers(project.kml);
   if (!ts::saveProject(path, project, errorString)) {
     return false;
   }

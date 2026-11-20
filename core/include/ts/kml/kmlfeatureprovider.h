@@ -1,0 +1,302 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+  Terra Soar - A virtual globe
+
+  Copyright (C) 2026 Peter Howkins
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, see <https://www.gnu.org/licenses/>.
+ */
+/**
+ * @file
+ * A folder of a KML document as a source of vector features.
+ */
+#ifndef TS_KML_KMLFEATUREPROVIDER_H
+#define TS_KML_KMLFEATUREPROVIDER_H
+
+#include <memory>
+#include <optional>
+#include <vector>
+
+#include <QJsonObject>
+#include <QString>
+
+#include "ts/kml/kmldocument.h"
+#include "ts/providers/tileprovider.h"
+
+namespace ts
+{
+
+class KmlStyleResolver;
+
+/**
+ * Returns the document at @p path, read once and shared while anything
+ * holds it (every layer of one file shares one copy); null, with
+ * @p errorString set, if it can't be read.
+ *
+ * @threadsafe
+ */
+std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
+                                                     QString* errorString);
+
+/**
+ * Records that the file at @p path is a copy of @p url (a NetworkLink's,
+ * fetched): sharedKmlDocument() sets the document's webBase from it.
+ */
+void setKmlWebBase(const QString& path, const QString& url);
+
+/**
+ * Makes sharedKmlDocument(@p path) give @p document while anything holds
+ * it (a document being edited, by its key).
+ */
+void registerKmlDocument(const QString& path,
+                         const std::shared_ptr<const KmlDocument>& document);
+
+/**
+ * Returns the container (Document or Folder) at @p containerPath in
+ * @p document: child indices from the root separated by dots ("" for the
+ * root, "0.2" for the root's first child's third); null if there is none.
+ */
+const KmlFeature* kmlContainer(const KmlDocument& document,
+                               const QString& containerPath);
+
+/**
+ * Returns the source object of a layer showing the placemarks directly in
+ * the container at @p containerPath of the KML file at @p path:
+ * `{"kind": "kml", "path": …, "container": …}`; with @p deep
+ * (`"deep": true`) everything inside it (a ListStyle checkHideChildren
+ * container). The main window adds `"at"` (an ISO time, kmlTimeKey()) for
+ * the clock.
+ */
+QJsonObject kmlLayerSource(const QString& path, const QString& containerPath,
+                           bool deep = false);
+
+/**
+ * Returns @p placemark's geometry as vector features (a MultiGeometry
+ * gives one per member) with its name, description and extended data as
+ * attributes and its KML style as their own (@p style, resolved): line
+ * colour and width, polygon fill and outline, the icon's colour and size
+ * for points (a yellow dot for the default icon). Longitudes are made
+ * continuous across the antimeridian; a feature reaching past ±180° also
+ * comes shifted by 360°, so the tiles on each side clip their part.
+ */
+std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
+                                          const KmlStyle& style);
+
+/**
+ * An icon and label at a placemark's point: drawn on the screen over the
+ * view, upright, whatever the projection.
+ *
+ * @reentrant
+ */
+struct KmlBillboard {
+  /** Where: longitude and latitude, degrees. */
+  double lonDeg = 0.0;
+  /** As lonDeg. */
+  double latDeg = 0.0;
+  /** Height as the placemark gives it, metres (see altitudeMode). */
+  double altM = 0.0;
+  /** How altM is measured. */
+  KmlAltitudeMode altitudeMode = KmlAltitudeMode::ClampToGround;
+  /**
+   * The icon: a local path (or KMZ member) or web address
+   * (resolveKmlHref()); empty for the default pushpin.
+   */
+  QString icon;
+  /** Tint (IconStyle color: white leaves the icon as it is). */
+  QColor tint = QColor(255, 255, 255);
+  /** Icon size as a factor of 32 pixels; 0 hides the icon. */
+  double scale = 1.0;
+  /** Degrees clockwise from north. */
+  double headingDeg = 0.0;
+  /** The point of the icon on the position. */
+  KmlVec2 hotSpot;
+  /** The label (the placemark's name); empty for none. */
+  QString label;
+  /** The label's colour. */
+  QColor labelColor = QColor(255, 255, 255);
+  /** The label's size as a factor; 0 hides it. */
+  double labelScale = 1.0;
+  /** A stalk from the ground up to it (extrude, not clamped). */
+  bool extrude = false;
+  /** The stalk's colour (LineStyle's). */
+  QColor stalkColor = QColor(255, 255, 255);
+  /** The placemark (in the provider's document). */
+  const KmlFeature* placemark = nullptr;
+};
+
+/**
+ * A line or polygon above the ground (altitude mode other than clamped):
+ * drawn in 3D over the view, with walls down to the ground if extruded.
+ *
+ * @reentrant
+ */
+struct KmlRaisedShape {
+  /**
+   * The line, or the polygon's outer boundary then its holes: longitudes
+   * made continuous, edges longer than a degree divided so they follow the
+   * curve of the Earth, heights interpolated.
+   */
+  std::vector<std::vector<KmlCoordinate>> rings;
+  /** True for a polygon or ring (closed), false for a line. */
+  bool closed = false;
+  /** True for a polygon: its top is filled. */
+  bool surface = false;
+  /** Heights from the ground (relativeToGround) rather than sea level. */
+  bool relative = false;
+  /** Walls down to the ground. */
+  bool extrude = false;
+  /** The line's (or outline's) colour; transparent for none. */
+  QColor line = QColor(255, 255, 255);
+  /** The line's width, pixels. */
+  double widthPx = 1.0;
+  /**
+   * The fill of a polygon's top and of walls (PolyStyle's colour);
+   * transparent for none.
+   */
+  QColor fill = QColor(255, 255, 255);
+  /** The placemark (in the provider's document). */
+  const KmlFeature* placemark = nullptr;
+};
+
+/**
+ * Returns @p placemark's lines and polygons that are above the ground
+ * (absolute or relativeToGround, and the gx sea-floor modes), with
+ * @p style. Clamped ones are drawn on the ground (kmlPlacemarkFeatures()).
+ */
+std::vector<KmlRaisedShape> kmlRaisedShapes(const KmlFeature& placemark,
+                                            const KmlStyle& style);
+
+/**
+ * Returns @p placemark's billboards with @p style: one per point of its
+ * geometry (a MultiGeometry's points too), the label on the first.
+ * Icons resolve against @p document.
+ */
+std::vector<KmlBillboard> kmlBillboards(const KmlDocument& document,
+                                        const KmlFeature& placemark,
+                                        const KmlStyle& style);
+
+/**
+ * The placemarks directly in one container of a KML document, as vector
+ * features: their styles from the document (KmlStyleResolver), served by
+ * tile from memory (a tile gets the features whose extent meets it), and
+ * the placemarks under a point for balloons and What Is Here.
+ *
+ * @threadsafe
+ */
+class KmlFeatureProvider : public FeatureProvider
+{
+public:
+  /**
+   * Shows the placemarks of the container at @p containerPath of
+   * @p document (which it holds): those directly in it, or with @p deep
+   * all inside it; with @p at, only those whose times (with their
+   * containers') show then (kmlShownAt()).
+   */
+  KmlFeatureProvider(std::shared_ptr<const KmlDocument> document,
+                     const QString& containerPath,
+                     std::optional<QDateTime> at = std::nullopt,
+                     bool deep = false);
+
+  /** Returns "kml:" and the path and container. */
+  QString id() const override;
+  /** Returns the container's name. */
+  QString name() const override;
+  /** Returns TileKey's deepest level (the features are all in memory). */
+  int32_t maximumLevel() const override;
+
+  /** Returns the features meeting @p key's stored tile. */
+  std::optional<FeatureTile>
+  loadFeatures(TileKey key, const std::atomic<bool>& cancelled) override;
+
+  /** Returns @p key's ancestor at level 6 at most (features are whole). */
+  TileKey storedKey(TileKey key) const override;
+
+  /** Returns the features under @p point (see FeatureProvider). */
+  std::vector<Feature> featuresAt(GeoPoint point,
+                                  double toleranceDeg) const override;
+
+  /** Returns the placemarks under @p point, topmost (last drawn) first. */
+  std::vector<const KmlFeature*> placemarksAt(GeoPoint point,
+                                              double toleranceDeg) const;
+
+  /** Returns the document. */
+  const std::shared_ptr<const KmlDocument>& document() const
+  {
+    return m_document;
+  }
+
+  /** Returns how many features it has. */
+  std::size_t featureCount() const { return m_entries.size(); }
+
+  /**
+   * Returns the icons and labels of its points, drawn over the view
+   * (their features are kept for picking, not drawn as dots).
+   */
+  const std::vector<KmlBillboard>& billboards() const { return m_billboards; }
+
+  /**
+   * Returns its lines and polygons above the ground, drawn over the view
+   * (their features are kept for picking, not drawn on the ground).
+   */
+  const std::vector<KmlRaisedShape>& raisedShapes() const { return m_raised; }
+
+  /**
+   * Returns its ScreenOverlays: the feature itself when its path names a
+   * ScreenOverlay (each has its own layer).
+   */
+  const std::vector<const KmlFeature*>& screenOverlays() const
+  {
+    return m_screens;
+  }
+
+  /**
+   * Returns a billboard for each of its gx:Tracks where the track is at
+   * @p clock (kmlTrackPosition()), in its placemark's icon and label;
+   * none for tracks not under way then.
+   */
+  std::vector<KmlBillboard> trackMarkersAt(const QDateTime& clock) const;
+
+  /** Returns true if it has gx:Tracks (they move with the clock). */
+  bool hasTracks() const { return !m_tracks.empty(); }
+
+private:
+  bool shownAt(const std::optional<KmlTime>& time) const;
+  void addChildren(const KmlFeature& parent, const std::optional<KmlTime>& time,
+                   KmlStyleResolver& resolver);
+  void addPlacemark(const KmlFeature& placemark, KmlStyleResolver& resolver);
+
+  struct Entry {
+    /** Drawn over the view (a raised shape or a point), not in tiles. */
+    bool overlay = false;
+    Feature feature;
+    GeoRect bounds;
+    const KmlFeature* placemark = nullptr;
+  };
+
+  const std::shared_ptr<const KmlDocument> m_document;
+  const QString m_containerPath;
+  QString m_name;
+  std::vector<Entry> m_entries;
+  std::vector<KmlBillboard> m_billboards;
+  std::vector<KmlRaisedShape> m_raised;
+  std::vector<const KmlFeature*> m_screens;
+  std::optional<QDateTime> m_at;
+  bool m_deep = false;
+  /** Each track and its placemark's billboard. */
+  std::vector<std::pair<const KmlGeometry*, KmlBillboard>> m_tracks;
+};
+
+} // namespace ts
+
+#endif // TS_KML_KMLFEATUREPROVIDER_H

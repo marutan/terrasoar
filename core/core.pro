@@ -61,6 +61,14 @@ HEADERS += \
     include/ts/globe/vectorrenderer.h \
     include/ts/i18n/pseudotranslator.h \
     include/ts/i18n/translationloader.h \
+    include/ts/kml/kmlactivity.h \
+    include/ts/kml/kmldocument.h \
+    include/ts/kml/kmledit.h \
+    include/ts/kml/kmlfeatureprovider.h \
+    include/ts/kml/kmloverlays.h \
+    include/ts/kml/kmlpresentation.h \
+    include/ts/kml/kmlreader.h \
+    include/ts/kml/kmlwriter.h \
     include/ts/layers/layerdefinition.h \
     include/ts/layers/layertreemodel.h \
     include/ts/layers/projectfile.h \
@@ -112,6 +120,7 @@ HEADERS += \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
     include/ts/tiling/tileselector.h \
+    include/ts/vector/featurepick.h \
     include/ts/vector/stylerules.h \
     include/ts/vector/vectormesh.h \
     include/ts/vector/vectorstyle.h \
@@ -165,6 +174,14 @@ SOURCES += \
     src/globe/vectorrenderer.cpp \
     src/i18n/pseudotranslator.cpp \
     src/i18n/translationloader.cpp \
+    src/kml/kmlactivity.cpp \
+    src/kml/kmldocument.cpp \
+    src/kml/kmledit.cpp \
+    src/kml/kmlfeatureprovider.cpp \
+    src/kml/kmloverlays.cpp \
+    src/kml/kmlpresentation.cpp \
+    src/kml/kmlreader.cpp \
+    src/kml/kmlwriter.cpp \
     src/layers/layerdefinition.cpp \
     src/layers/layertreemodel.cpp \
     src/layers/projectfile.cpp \
@@ -211,6 +228,7 @@ SOURCES += \
     src/tiling/tileloader.cpp \
     src/tiling/tilemesh.cpp \
     src/tiling/tileselector.cpp \
+    src/vector/featurepick.cpp \
     src/vector/stylerules.cpp \
     src/vector/vectormesh.cpp \
     src/vector/vectorstyle.cpp \

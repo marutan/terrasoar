@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- KML 2.2 with the gx: elements Terra Soar writes (for xmllint). -->
+<schema xmlns="http://www.w3.org/2001/XMLSchema">
+  <import namespace="http://www.opengis.net/kml/2.2"
+    schemaLocation="ogckml22.xsd"/>
+  <import namespace="http://www.google.com/kml/ext/2.2"
+    schemaLocation="terrasoar-gx.xsd"/>
+</schema>

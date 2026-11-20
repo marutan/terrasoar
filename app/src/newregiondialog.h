@@ -209,6 +209,8 @@ private:
   std::optional<RegionEstimate> m_estimateResult;
   std::optional<RegionEstimate> m_estimate;
   bool m_estimating = false;
+  /** Waiting for an area this dialog asked the view to draw. */
+  bool m_awaitingArea = false;
 };
 
 } // namespace ts

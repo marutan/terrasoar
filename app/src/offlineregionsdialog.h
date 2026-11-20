@@ -30,6 +30,8 @@
 #include <QDialog>
 #include <QPointer>
 
+#include "ts/kml/kmldocument.h"
+
 class QEvent;
 class QLabel;
 class QPushButton;
@@ -40,6 +42,7 @@ namespace ts
 
 class GlobeView;
 class OfflineRegionManager;
+struct OfflineRegion;
 
 /**
  * Lists the offline regions with their layer, levels, tiles, size and
@@ -57,6 +60,9 @@ class OfflineRegionsDialog : public QDialog
   Q_DISABLE_COPY_MOVE(OfflineRegionsDialog)
 
 public:
+  /** Returns @p region as a KML document (an area on the ground). */
+  static KmlDocument regionKml(const OfflineRegion& region);
+
   /**
    * The user guide's section on this window
    * (`offline-use.md#managing-regions`), opened by F1.
@@ -103,6 +109,7 @@ private:
   void showOutline();
   void pauseOrResume();
   void deleteRegion();
+  void exportRegion();
 
   OfflineRegionManager& m_manager;
   QPointer<GlobeView> m_view;
@@ -111,6 +118,7 @@ private:
   QPushButton* m_newButton = nullptr;
   QPushButton* m_pauseButton = nullptr;
   QPushButton* m_deleteButton = nullptr;
+  QPushButton* m_exportButton = nullptr;
   QPushButton* m_closeButton = nullptr;
 };
 

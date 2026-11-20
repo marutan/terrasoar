@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Heights</name>
+    <Style id="block">
+      <LineStyle><color>ff000000</color><width>2</width></LineStyle>
+      <PolyStyle><color>c0ff8000</color></PolyStyle>
+    </Style>
+    <Style id="wall">
+      <LineStyle><color>ff0000ff</color><width>3</width></LineStyle>
+      <PolyStyle><color>800000ff</color></PolyStyle>
+    </Style>
+    <Placemark>
+      <name>A block</name>
+      <styleUrl>#block</styleUrl>
+      <Polygon>
+        <extrude>1</extrude>
+        <altitudeMode>absolute</altitudeMode>
+        <outerBoundaryIs><LinearRing><coordinates>
+          -0.13,51.50,40000 -0.03,51.50,40000 -0.03,51.56,40000
+          -0.13,51.56,40000 -0.13,51.50,40000
+        </coordinates></LinearRing></outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+    <Placemark>
+      <name>A wall</name>
+      <styleUrl>#wall</styleUrl>
+      <LineString>
+        <extrude>1</extrude>
+        <altitudeMode>relativeToGround</altitudeMode>
+        <coordinates>-0.40,51.40,20000 0.30,51.40,30000 2.70,51.60,30000</coordinates>
+      </LineString>
+    </Placemark>
+    <Placemark>
+      <name>On a stalk</name>
+      <styleUrl>#wall</styleUrl>
+      <Point>
+        <extrude>1</extrude>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>-0.30,51.70,30000</coordinates>
+      </Point>
+    </Placemark>
+    <Placemark>
+      <name>Draped</name>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>-0.5,51.2 0.5,51.2</coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>

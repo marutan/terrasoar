@@ -29,12 +29,14 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <vector>
 
 #include <QDockWidget>
 #include <QJsonObject>
 
 #include "ts/time/layertime.h"
 
+class QAction;
 class QCheckBox;
 class QEvent;
 class QLabel;
@@ -94,6 +96,36 @@ public:
   QMenu* timeMenu(const QModelIndex& index);
 
   /**
+   * Sets what a double click on an entry does first: @p action returns
+   * true if it did something (the entry isn't then renamed; F2 still
+   * renames it).
+   */
+  void setDoubleClickAction(std::function<bool(const QModelIndex&)> action);
+
+  /** Returns the entry selected, or an invalid index. */
+  QModelIndex currentIndex() const;
+
+  /** Selects @p index. */
+  void setCurrentIndex(const QModelIndex& index);
+
+  /** Double-clicks @p index as the user would (for tests). */
+  void doubleClick(const QModelIndex& index);
+
+  /**
+   * Sets what adds actions for a node to its context menu (the window's
+   * Fly There for KML), made with the given parent; first in the menu.
+   */
+  void setNodeActions(
+      std::function<std::vector<QAction*>(const QModelIndex&, QObject*)>
+          actions);
+
+  /**
+   * Returns the context menu for @p index: the node's actions, then its
+   * Time menu; null if it has none.
+   */
+  QMenu* contextMenu(const QModelIndex& index);
+
+  /**
    * Tells the dock whether composite groups are drawn as such; when not
    * (software rendering), the option explains that opacity multiplies.
    */
@@ -129,6 +161,9 @@ signals:
   void addWebTerrainRequested();
 
 protected:
+  /** Takes double clicks on entries with a double-click action. */
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;
 
@@ -146,6 +181,11 @@ private:
   QTreeView* m_view = nullptr;
   std::function<std::optional<LayerTime>(const QJsonObject&)> m_timeLookup;
   QMenu* m_timeMenu = nullptr;
+  QMenu* m_contextMenu = nullptr;
+  std::vector<QAction*> m_contextActions;
+  std::function<std::vector<QAction*>(const QModelIndex&, QObject*)>
+      m_nodeActions;
+  std::function<bool(const QModelIndex&)> m_doubleClick;
   QToolButton* m_addLayerButton = nullptr;
   QMenu* m_addLayerMenu = nullptr;
   QPushButton* m_addCollectionButton = nullptr;

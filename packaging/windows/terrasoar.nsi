@@ -54,6 +54,7 @@ RequestExecutionLevel admin
 !define HOMEPAGE "https://github.com/marutan/terrasoar"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\TerraSoar"
 !define PROGID "TerraSoar.Project"
+!define KMLPROGID "TerraSoar.Kml"
 
 Name "${NAME} ${VERSION}"
 OutFile "${OUTFILE}"
@@ -131,6 +132,13 @@ Section "${NAME}" SecMain
   WriteRegStr HKLM "Software\Classes\${PROGID}" "" "Terra Soar project"
   WriteRegStr HKLM "Software\Classes\${PROGID}\DefaultIcon" "" "$INSTDIR\terrasoar.exe,0"
   WriteRegStr HKLM "Software\Classes\${PROGID}\shell\open\command" "" '"$INSTDIR\terrasoar.exe" "%1"'
+  ; KML and KMZ: offered in Open With, without taking them from the
+  ; program that already opens them (Google Earth).
+  WriteRegStr HKLM "Software\Classes\${KMLPROGID}" "" "KML or KMZ (Terra Soar)"
+  WriteRegStr HKLM "Software\Classes\${KMLPROGID}\DefaultIcon" "" "$INSTDIR\terrasoar.exe,0"
+  WriteRegStr HKLM "Software\Classes\${KMLPROGID}\shell\open\command" "" '"$INSTDIR\terrasoar.exe" "%1"'
+  WriteRegStr HKLM "Software\Classes\.kml\OpenWithProgids" "${KMLPROGID}" ""
+  WriteRegStr HKLM "Software\Classes\.kmz\OpenWithProgids" "${KMLPROGID}" ""
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
   ; Settings > Apps.
@@ -171,6 +179,9 @@ Section "Uninstall"
     DeleteRegKey HKLM "Software\Classes\.terrasoar"
   ${EndIf}
   DeleteRegKey HKLM "Software\Classes\${PROGID}"
+  DeleteRegValue HKLM "Software\Classes\.kml\OpenWithProgids" "${KMLPROGID}"
+  DeleteRegValue HKLM "Software\Classes\.kmz\OpenWithProgids" "${KMLPROGID}"
+  DeleteRegKey HKLM "Software\Classes\${KMLPROGID}"
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 
   DeleteRegKey HKLM "${UNINSTALL_KEY}"

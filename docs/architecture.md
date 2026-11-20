@@ -58,6 +58,7 @@ Subsections so far:
 | `gl` | OpenGL capability probe, software-renderer detection |
 | `globe` | The globe and map renderer: ray-cast WGS 84 ellipsoid, the graticule, imagery tiles, vector layers (fills and outlines), markers relative to the eye, all blended between globe and flat map in the vertex shaders; layer stack to draws (`docs/design/vector-rendering.md`, `docs/design/morph.md`) |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
+| `kml` | KML 2.2 and KMZ: the element model, the reader (gx: extensions, unknown elements kept), style resolution, placemarks as vector features, views and balloons (`docs/design/kml.md`) |
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `packs` | Data pack manifests (files with checksums, datasets with sources, licences and attribution), verification, finding the base pack (`docs/data/base-pack.md`) |

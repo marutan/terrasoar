@@ -116,6 +116,9 @@ QByteArray projectToJson(const Project& project)
   }
   document.insert(QStringLiteral("view"), view);
   document.insert(QStringLiteral("layers"), project.layers);
+  if (!project.kml.isEmpty()) {
+    document.insert(QStringLiteral("kml"), project.kml);
+  }
   return QJsonDocument(document).toJson(QJsonDocument::Indented);
 }
 
@@ -177,6 +180,7 @@ std::optional<Project> projectFromJson(const QByteArray& json,
     project.time = *time;
   }
   project.layers = object.value(QStringLiteral("layers")).toArray();
+  project.kml = object.value(QStringLiteral("kml")).toArray();
   return project;
 }
 

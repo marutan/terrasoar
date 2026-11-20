@@ -89,6 +89,8 @@ project.
    globe.
 4. **Save as CSV…** writes every point (distance, latitude, longitude,
    height above sea level and above the ellipsoid) for a spreadsheet.
+   **Save as KML…** saves the line itself, for Google Earth and other
+   programs ([KML and KMZ](kml.md)).
 
 **Draw Another Line** starts again. The heights come from the visible
 elevation layers (your own files first), at a detail suited to the line's

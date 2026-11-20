@@ -25,10 +25,10 @@ The first roadmap's rules still apply to every phase here:
 | 10 | WMTS | WMTS layers added, browsed, cached and taken offline like WMS layers |
 | 11 | More projections | Transverse Mercator/UTM, UK National Grid, Cassini, Lambert Conformal, Polyconic, Azimuthal Equidistant, Gnomonic, Equidistant Cylindrical, Rotated Mercator, Gall (Stereographic, Peters/Orthographic), RPF native, polar and world projections |
 | 12 | More web services | XYZ/TMS, WFS; WMS TIME and GetFeatureInfo |
+| 16 | KML | 16a: import KML/KMZ and draw it on the globe and map; 16b: create KML, add elements, export |
 | 13 | Terrain analysis | Slope/aspect, contours, line of sight, viewshed |
 | 14 | Realism | Atmosphere, sun lighting, glTF models |
 | 15 | Satellite orbits | Satellites from TLEs, with past and future tracks over chosen time spans |
-| 16 | KML | 16a: import KML/KMZ and draw it on the globe and map; 16b: create KML, add elements, export |
 | 17 | Aircraft from ADS-B | Recorded, live-receiver and airplanes.live ADS-B data as aircraft in 3D above the globe, with trails: off, a time span, or all |
 | 18 | Ships from AIS | Recorded, live-receiver and open online AIS data as vessels on the map and globe, with trails like Phase 17's |
 | 19 | Vector layer colours | Change the colours (and line width) of the graticule and shoreline layers |
@@ -39,7 +39,7 @@ The first roadmap's rules still apply to every phase here:
 | 24 | Rendering backend | Qt 6 RHI (Vulkan, Direct3D 11) |
 | 25 | Road to 1.0 | Code signing, Flathub, translations, accessibility, 1.0 release |
 
-The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 25 (road to 1.0) comes last: 1.0 is released when the phases before it are done. Phases 12 (WFS), 16 (KML) and 22 (local data files) share a vector feature pipeline: per-feature styles, attributes, picking and draping. Phase 12 now comes first, so it builds the pipeline, and Phases 16 and 22 extend it. Phase 14's lighting is built on OpenGL first, and Phase 24's backend (which comes later) carries it over with every other shader. Phase 15 needs a program-wide clock, which Phase 12's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. KML's time elements use the same clock. Phase 10 (WMTS) reuses the WMS machinery and needs nothing else, so it comes early. Phase 12's XYZ tiles then reuse its Web Mercator reprojection. Phase 17 (aircraft) plays recordings on the program-wide clock and shares Phase 15's way of drawing moving objects and their tracks, so it is easiest after Phase 15. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 18 (ships) is Phase 17 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 19 (vector layer colours) is small and depends on nothing, so it can be done at any time. WFS layers, KML without its own styles, and Phase 22's vector files reuse its style dialog. Phase 20 (navigation controls) depends on nothing either. It makes the flat map turn and tilt in every projection, including Phase 11's. Phase 21 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 16, 17 and 18 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
+The phases are mostly independent. Phase 9 (the user guide in the program) depends on nothing else and comes first. Phase 25 (road to 1.0) comes last: 1.0 is released when the phases before it are done. Phases 12 (WFS), 16 (KML) and 22 (local data files) share a vector feature pipeline: per-feature styles, attributes, picking and draping. Phase 12 now comes first, so it builds the pipeline, and Phases 16 and 22 extend it. Phase 16 (KML) comes straight after Phase 12, ahead of Phases 13 to 15 (the table lists the phases in that order; their numbers stay as they were, so references between phases still hold): it extends Phase 12's vector feature pipeline and follows the program clock Phase 12 built for its time elements. Phase 14's lighting is built on OpenGL first, and Phase 24's backend (which comes later) carries it over with every other shader. Phase 15 needs a program-wide clock, which Phase 12's WMS time slider and Phase 14's sun position also need. Whichever of those phases comes first should build the clock for all three. KML's time elements use the same clock. Phase 10 (WMTS) reuses the WMS machinery and needs nothing else, so it comes early. Phase 12's XYZ tiles then reuse its Web Mercator reprojection. Phase 17 (aircraft) plays recordings on the program-wide clock and shares Phase 15's way of drawing moving objects and their tracks, so it is easiest after Phase 15. It can use Phase 14's 3D models if they exist, and falls back to simple shapes if not. Phase 18 (ships) is Phase 17 at sea level: it shares the track store, trails, playback and live connections. Whichever comes first builds them as a shared `ts/tracks` subsection for satellites, aircraft and ships. Phase 19 (vector layer colours) is small and depends on nothing, so it can be done at any time. WFS layers, KML without its own styles, and Phase 22's vector files reuse its style dialog. Phase 20 (navigation controls) depends on nothing either. It makes the flat map turn and tilt in every projection, including Phase 11's. Phase 21 (VMAP0) uses the existing packager and pack manager. Its place names need text labels on the globe, which Phases 16, 17 and 18 need too. Whichever comes first builds label drawing for all of them, and until then the VMAP0 packs can ship without names.
 
 ## Phase 9 – User guide in the program
 
@@ -231,6 +231,8 @@ Projections, grouped by kind. Each is in View → Map Projection, with its param
 
 ## Phase 12 – More web services
 
+**Status (2026-11-20):** delivered (PR #51): XYZ/TMS tiles (12a), the program clock with WMS and WMTS TIME and Blue Marble month by month as a data pack (12b), What Is Here with WMS GetFeatureInfo (12c), and WFS with per-feature styles in the vector pipeline (12d). See `docs/design/xyz.md`, `wms.md#time`, `wms.md#getfeatureinfo` and `wfs.md`.
+
 Goal: the common web map services beyond WMS.
 
 **Deliverables**
@@ -256,6 +258,121 @@ Goal: the common web map services beyond WMS.
 - Offline regions work for XYZ layers.
 
 **Exit criteria**: each service type adds, draws, caches and goes offline like WMS.
+
+## Phase 16 – KML
+
+**Status (2026-11-20):** delivered (16a-1 to 16b-2 on one branch, one pull request). Design: `docs/design/kml.md`; for users: `docs/user/kml.md`. Differences from the plan below:
+- Shapes above the ground, icons and labels are drawn over the frame, so terrain in front of them doesn't hide them; a Region on a single placemark inside a Places layer is not used (containers', overlays' and links' are).
+- The reading fixtures are Google's KML Samples, GDAL's test files and files written by GDAL's KML and LIBKML drivers (which QGIS uses); the OGC specification's own examples are not included.
+- Display is tested by what is drawn (counts, placement, hiding) and checked by eye, not by golden images.
+
+Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make them in, and can create, edit and export KML of its own. Phase 16a (import and display) is useful alone. Phase 16b (authoring and export) builds on it.
+
+**Approach (proposed)**: our own KML 2.2 reader and writer on `QXmlStreamReader`/`QXmlStreamWriter`, in a `core` subsection (`ts/kml`) with its own unit test project (`tests/kml`).
+- GDAL's KML drivers flatten documents into layers and lose most styling and structure, which both display and round-tripping need.
+- KMZ archives are read and written through GDAL's zip support (`/vsizip/`, `CPLCreateZip`), which is already linked.
+- The `gx:` extensions that Google Earth writes are read where they matter (`gx:Track`, `gx:altitudeMode`).
+
+### Phase 16a – Import and display
+
+**Deliverables**
+
+- **Opening:**
+  - File → Open KML/KMZ… and drag and drop.
+  - `.kml` and `.kmz` registered with the desktop (Linux MIME type, Windows file association) to open in Terra Soar.
+- **Document structure:** the document's `Document`/`Folder` tree becomes a collection in the layer tree.
+  - Folders keep their names, order and visibility (`visibility`, `open`), and can be switched on and off like layers.
+  - `ListStyle` is honoured (check, radio and hidden folders).
+- **Placemarks:**
+  - Geometry: `Point`, `LineString`, `LinearRing`, `Polygon` (with holes) and `MultiGeometry`.
+  - Each has its name as a label, and its description (HTML) shown in a balloon on click.
+  - `ExtendedData` is shown as a table in the balloon.
+- **Styles:** `Style` and `StyleMap` (normal and highlight), shared by `styleUrl` within the document or in another file.
+  - `IconStyle` (icon, scale, colour, heading, hotspot)
+  - `LabelStyle`
+  - `LineStyle` (colour and width)
+  - `PolyStyle` (fill, outline)
+  - `BalloonStyle`
+  - Icons come from the KMZ, local files or the web (through the disk cache).
+- **Heights:**
+  - Altitude modes `clampToGround`, `relativeToGround` and `absolute`, plus `clampToSeaFloor`/`relativeToSeaFloor`, against the terrain when it is on.
+  - `extrude` (walls and stalks to the ground)
+  - `tessellate` (lines following the curve of the Earth)
+- **Overlays:**
+  - `GroundOverlay`: an image draped over a `LatLonBox` (with rotation) or `gx:LatLonQuad`, as an imagery layer with opacity.
+  - `ScreenOverlay`: a legend or logo fixed to the view.
+- **Views:**
+  - `LookAt` and `Camera`: double-clicking a placemark or folder flies there.
+  - The document's own view is used when it opens.
+- **Network and time:**
+  - `NetworkLink`: online KML loaded and refreshed on its interval or view change, through the disk cache, and offline from the last copy.
+  - `Region` and `Lod`: content shown only when its area is big enough on screen.
+  - `TimeStamp`, `TimeSpan` and `gx:Track` follow the program's clock: features appear and disappear with time, and tracks animate.
+- **Robustness:**
+  - Unknown or unsupported elements are skipped and listed (not an error).
+  - Malformed files report the line and column.
+  - Large files (100,000 placemarks) load off the GUI thread within the memory budget.
+- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through the vector feature pipeline built in Phase 12.
+
+### Phase 16b – Create, edit and export
+
+**Deliverables**
+
+- **New documents:** File → New KML Document creates an editable KML layer, and an imported document can be made editable.
+- **Adding elements, drawn on the globe or map (reusing the region and profile drawing tools):**
+  - placemarks
+  - paths
+  - polygons (with holes)
+  - ground overlays (an image file placed and stretched by its corners)
+  - folders to group them
+- **Editing:**
+  - Move a placemark, drag a path's or polygon's vertices, and insert and delete vertices.
+  - Cut, copy, paste and delete.
+  - Drag elements between folders.
+  - Full undo and redo.
+- **Properties dialog per element:**
+  - name, description (with a preview)
+  - style: icon, colours, line width, fill, label scale
+  - altitude, altitude mode and extrude
+  - time stamp or span
+  - extended data fields
+  - its view (set from the current camera)
+- **Shared styles:** edit a style once for all the elements that use it.
+- **Export:**
+  - Save as KML or KMZ (a KMZ includes the icons and overlay images it uses).
+  - Export a single folder.
+  - Export a drawn region or an elevation profile line as KML.
+- **Round trip:** a file opened, edited and saved keeps what Terra Soar doesn't edit, including unknown elements, `gx:` extensions and comments where possible, so editing in Terra Soar doesn't lose another program's data.
+- **Projects:** editable KML layers are saved with the project, or linked to their file with a prompt to save changes.
+
+**Technical documentation**
+
+- `docs/design/kml.md`: the reader and writer, the element model, how styles resolve, altitude modes against terrain, network links and caching, and round-trip preservation.
+- `docs/user/kml.md`: opening KML and KMZ, drawing and editing, and exporting.
+
+**Regression tests**
+
+- **Reading:**
+  - every supported element from fixture files, checking geometry, structure, styles and resolved `styleUrl`s, including shared and external styles
+  - the OGC KML 2.2 specification's examples
+  - files written by Google Earth, QGIS and GDAL (stored, with their licences noted)
+- **KMZ:** reading and writing archives with icons and overlay images, and paths relative to the archive.
+- **Errors:** malformed XML, unknown elements, missing icons and broken links are each reported without crashing.
+- **Display:** golden images of styled placemarks, lines, polygons, extruded and clamped geometry on terrain, and ground and screen overlays, on the globe and the map.
+- **Network links:** refresh by interval and view, against a mock server, and offline reuse.
+- **Time:** features appear and disappear as the clock passes their time stamps and spans, and `gx:Track` positions interpolate.
+- **Editing (16b):**
+  - each edit, and its undo and redo, leaves the document as expected
+  - vertex dragging changes only that vertex
+- **Writing (16b):**
+  - Exported files validate against the OGC KML 2.2 schema (`xmllint`, schema stored in the tests).
+  - GDAL reads every exported file with the same geometry.
+  - A round trip of each fixture through Terra Soar keeps every element it doesn't edit.
+- **Performance:** the large-file fixture loads within the time and memory budgets and draws within the frame budget.
+
+**Exit criteria**:
+- **16a:** the fixture KML from Google Earth, QGIS and the OGC examples displays correctly on the globe and the map.
+- **16b:** documents made in Terra Soar export to valid KML and KMZ that other programs open, and round trips lose nothing.
 
 ## Phase 13 – Terrain analysis
 
@@ -367,116 +484,6 @@ Goal: satellites shown where they are, where they have been and where they are g
 - **Performance**: the frame budget holds with a fixture of several thousand satellites shown.
 
 **Exit criteria**: satellites from a file or CelesTrak show at positions matching the reference propagator, with correct past and future tracks for any chosen spans and clock time, within the frame budget.
-
-## Phase 16 – KML
-
-Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make them in, and can create, edit and export KML of its own. Phase 16a (import and display) is useful alone. Phase 16b (authoring and export) builds on it.
-
-**Approach (proposed)**: our own KML 2.2 reader and writer on `QXmlStreamReader`/`QXmlStreamWriter`, in a `core` subsection (`ts/kml`) with its own unit test project (`tests/kml`).
-- GDAL's KML drivers flatten documents into layers and lose most styling and structure, which both display and round-tripping need.
-- KMZ archives are read and written through GDAL's zip support (`/vsizip/`, `CPLCreateZip`), which is already linked.
-- The `gx:` extensions that Google Earth writes are read where they matter (`gx:Track`, `gx:altitudeMode`).
-
-### Phase 16a – Import and display
-
-**Deliverables**
-
-- **Opening:**
-  - File → Open KML/KMZ… and drag and drop.
-  - `.kml` and `.kmz` registered with the desktop (Linux MIME type, Windows file association) to open in Terra Soar.
-- **Document structure:** the document's `Document`/`Folder` tree becomes a collection in the layer tree.
-  - Folders keep their names, order and visibility (`visibility`, `open`), and can be switched on and off like layers.
-  - `ListStyle` is honoured (check, radio and hidden folders).
-- **Placemarks:**
-  - Geometry: `Point`, `LineString`, `LinearRing`, `Polygon` (with holes) and `MultiGeometry`.
-  - Each has its name as a label, and its description (HTML) shown in a balloon on click.
-  - `ExtendedData` is shown as a table in the balloon.
-- **Styles:** `Style` and `StyleMap` (normal and highlight), shared by `styleUrl` within the document or in another file.
-  - `IconStyle` (icon, scale, colour, heading, hotspot)
-  - `LabelStyle`
-  - `LineStyle` (colour and width)
-  - `PolyStyle` (fill, outline)
-  - `BalloonStyle`
-  - Icons come from the KMZ, local files or the web (through the disk cache).
-- **Heights:**
-  - Altitude modes `clampToGround`, `relativeToGround` and `absolute`, plus `clampToSeaFloor`/`relativeToSeaFloor`, against the terrain when it is on.
-  - `extrude` (walls and stalks to the ground)
-  - `tessellate` (lines following the curve of the Earth)
-- **Overlays:**
-  - `GroundOverlay`: an image draped over a `LatLonBox` (with rotation) or `gx:LatLonQuad`, as an imagery layer with opacity.
-  - `ScreenOverlay`: a legend or logo fixed to the view.
-- **Views:**
-  - `LookAt` and `Camera`: double-clicking a placemark or folder flies there.
-  - The document's own view is used when it opens.
-- **Network and time:**
-  - `NetworkLink`: online KML loaded and refreshed on its interval or view change, through the disk cache, and offline from the last copy.
-  - `Region` and `Lod`: content shown only when its area is big enough on screen.
-  - `TimeStamp`, `TimeSpan` and `gx:Track` follow the program's clock: features appear and disappear with time, and tracks animate.
-- **Robustness:**
-  - Unknown or unsupported elements are skipped and listed (not an error).
-  - Malformed files report the line and column.
-  - Large files (100,000 placemarks) load off the GUI thread within the memory budget.
-- **On the map:** everything draws on the flat map as on the globe, including split at the antimeridian, through the vector feature pipeline built in Phase 12.
-
-### Phase 16b – Create, edit and export
-
-**Deliverables**
-
-- **New documents:** File → New KML Document creates an editable KML layer, and an imported document can be made editable.
-- **Adding elements, drawn on the globe or map (reusing the region and profile drawing tools):**
-  - placemarks
-  - paths
-  - polygons (with holes)
-  - ground overlays (an image file placed and stretched by its corners)
-  - folders to group them
-- **Editing:**
-  - Move a placemark, drag a path's or polygon's vertices, and insert and delete vertices.
-  - Cut, copy, paste and delete.
-  - Drag elements between folders.
-  - Full undo and redo.
-- **Properties dialog per element:**
-  - name, description (with a preview)
-  - style: icon, colours, line width, fill, label scale
-  - altitude, altitude mode and extrude
-  - time stamp or span
-  - extended data fields
-  - its view (set from the current camera)
-- **Shared styles:** edit a style once for all the elements that use it.
-- **Export:**
-  - Save as KML or KMZ (a KMZ includes the icons and overlay images it uses).
-  - Export a single folder.
-  - Export a drawn region or an elevation profile line as KML.
-- **Round trip:** a file opened, edited and saved keeps what Terra Soar doesn't edit, including unknown elements, `gx:` extensions and comments where possible, so editing in Terra Soar doesn't lose another program's data.
-- **Projects:** editable KML layers are saved with the project, or linked to their file with a prompt to save changes.
-
-**Technical documentation**
-
-- `docs/design/kml.md`: the reader and writer, the element model, how styles resolve, altitude modes against terrain, network links and caching, and round-trip preservation.
-- `docs/user/kml.md`: opening KML and KMZ, drawing and editing, and exporting.
-
-**Regression tests**
-
-- **Reading:**
-  - every supported element from fixture files, checking geometry, structure, styles and resolved `styleUrl`s, including shared and external styles
-  - the OGC KML 2.2 specification's examples
-  - files written by Google Earth, QGIS and GDAL (stored, with their licences noted)
-- **KMZ:** reading and writing archives with icons and overlay images, and paths relative to the archive.
-- **Errors:** malformed XML, unknown elements, missing icons and broken links are each reported without crashing.
-- **Display:** golden images of styled placemarks, lines, polygons, extruded and clamped geometry on terrain, and ground and screen overlays, on the globe and the map.
-- **Network links:** refresh by interval and view, against a mock server, and offline reuse.
-- **Time:** features appear and disappear as the clock passes their time stamps and spans, and `gx:Track` positions interpolate.
-- **Editing (16b):**
-  - each edit, and its undo and redo, leaves the document as expected
-  - vertex dragging changes only that vertex
-- **Writing (16b):**
-  - Exported files validate against the OGC KML 2.2 schema (`xmllint`, schema stored in the tests).
-  - GDAL reads every exported file with the same geometry.
-  - A round trip of each fixture through Terra Soar keeps every element it doesn't edit.
-- **Performance:** the large-file fixture loads within the time and memory budgets and draws within the frame budget.
-
-**Exit criteria**:
-- **16a:** the fixture KML from Google Earth, QGIS and the OGC examples displays correctly on the globe and the map.
-- **16b:** documents made in Terra Soar export to valid KML and KMZ that other programs open, and round trips lose nothing.
 
 ## Phase 17 – Aircraft from ADS-B
 

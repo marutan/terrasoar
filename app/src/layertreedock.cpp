@@ -39,6 +39,7 @@
 #include <QLabel>
 #include <QLocale>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPersistentModelIndex>
 #include <QPushButton>
 #include <QSlider>
@@ -72,11 +73,12 @@ LayerTreeDock::LayerTreeDock(LayerTreeModel* model, QWidget* parent)
   m_view->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_view, &QTreeView::customContextMenuRequested, this,
           [this](QPoint position) {
-            QMenu* menu = timeMenu(m_view->indexAt(position));
+            QMenu* menu = contextMenu(m_view->indexAt(position));
             if (menu != nullptr) {
               menu->popup(m_view->viewport()->mapToGlobal(position));
             }
           });
+  m_view->viewport()->installEventFilter(this);
   layout->addWidget(m_view, 1);
 
   // The drawing rule the tree order can't show: vectors over imagery.
@@ -340,6 +342,77 @@ void LayerTreeDock::setTimeLookup(
     std::function<std::optional<LayerTime>(const QJsonObject&)> lookup)
 {
   m_timeLookup = std::move(lookup);
+}
+
+void LayerTreeDock::setNodeActions(
+    std::function<std::vector<QAction*>(const QModelIndex&, QObject*)> actions)
+{
+  m_nodeActions = std::move(actions);
+}
+
+void LayerTreeDock::setDoubleClickAction(
+    std::function<bool(const QModelIndex&)> action)
+{
+  m_doubleClick = std::move(action);
+}
+
+QModelIndex LayerTreeDock::currentIndex() const
+{
+  return m_view->currentIndex();
+}
+
+void LayerTreeDock::setCurrentIndex(const QModelIndex& index)
+{
+  m_view->setCurrentIndex(index);
+}
+
+void LayerTreeDock::doubleClick(const QModelIndex& index)
+{
+  if (!m_doubleClick || !m_doubleClick(index)) {
+    m_view->edit(index);
+  }
+}
+
+bool LayerTreeDock::eventFilter(QObject* watched, QEvent* event)
+{
+  if (watched == m_view->viewport() &&
+      event->type() == QEvent::MouseButtonDblClick && m_doubleClick) {
+    const QMouseEvent* mouse = dynamic_cast<QMouseEvent*>(event);
+    const QModelIndex index =
+        mouse != nullptr ? m_view->indexAt(mouse->pos()) : QModelIndex();
+    if (index.isValid() && m_doubleClick(index)) {
+      return true; // done: not renamed
+    }
+  }
+  return QDockWidget::eventFilter(watched, event);
+}
+
+QMenu* LayerTreeDock::contextMenu(const QModelIndex& index)
+{
+  if (!index.isValid()) {
+    return nullptr;
+  }
+  if (m_contextMenu == nullptr) {
+    m_contextMenu = new QMenu(this);
+    m_contextMenu->setObjectName(QStringLiteral("layerContextMenu"));
+  }
+  m_contextMenu->clear();
+  // Actions made for the last menu go with it.
+  for (QAction* old : m_contextActions) {
+    old->deleteLater();
+  }
+  m_contextActions.clear();
+  if (m_nodeActions) {
+    m_contextActions = m_nodeActions(index, m_contextMenu);
+    for (QAction* action : m_contextActions) {
+      m_contextMenu->addAction(action);
+    }
+  }
+  QMenu* time = timeMenu(index);
+  if (time != nullptr) {
+    m_contextMenu->addMenu(time);
+  }
+  return m_contextMenu->isEmpty() ? nullptr : m_contextMenu;
 }
 
 QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)

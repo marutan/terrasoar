@@ -206,9 +206,20 @@ NewRegionDialog::NewRegionDialog(OfflineRegionManager& manager,
   connect(m_estimatePoll, &QTimer::timeout, this,
           &NewRegionDialog::pollEstimate);
   if (m_view) {
-    connect(m_view, &GlobeView::regionDrawn, this, &NewRegionDialog::areaDrawn);
-    connect(m_view, &GlobeView::regionDrawingCancelled, this,
-            [this]() { show(); });
+    // Only drawings this dialog asked for (not a KML polygon's).
+    connect(m_view, &GlobeView::regionDrawn, this,
+            [this](const RegionGeometry& area) {
+              if (m_awaitingArea) {
+                m_awaitingArea = false;
+                areaDrawn(area);
+              }
+            });
+    connect(m_view, &GlobeView::regionDrawingCancelled, this, [this]() {
+      if (m_awaitingArea) {
+        m_awaitingArea = false;
+        show();
+      }
+    });
   } else {
     m_viewButton->setEnabled(false);
     m_rectangleButton->setEnabled(false);
@@ -382,6 +393,7 @@ void NewRegionDialog::draw(bool polygon)
     return;
   }
   hide();
+  m_awaitingArea = true;
   m_view->startRegionDrawing(polygon ? GlobeView::RegionDrawing::Polygon
                                      : GlobeView::RegionDrawing::Rectangle);
 }

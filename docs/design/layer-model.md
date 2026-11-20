@@ -136,6 +136,14 @@ A project (`*.terrasoar`) is an indented JSON document:
   "tileSize": …, "maximumLevel": …, "bounds": […], "title": …,
   "attribution": …}` ([wmts.md](wmts.md)). The tile matrices are kept in
   the project, so it too asks the server for nothing but tiles.
+- KML documents in the tree are listed in `kml` (only when there are
+  any): `[{"node": <id of the document's entry in layers>, "path": <its
+  file>, "editable": true|false}, …]`, or `"text"` (the KML itself)
+  instead of `path` for a document made in Terra Soar and never saved.
+  Their entries in `layers` keep the document's name, visibility and
+  place; what is inside is made again from the file or text when the
+  project opens ([kml.md](kml.md#projects)). Layer sources of KML are
+  `kml` and `kmloverlay` ([kml.md](kml.md)).
 - `view.mode` is `"globe"` or `"map"`; `view.projection` is the flat
   map's projection by its identifier ([projections.md](projections.md)),
   kept also while the globe is shown. A projection this build doesn't

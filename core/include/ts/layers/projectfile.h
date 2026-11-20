@@ -62,6 +62,13 @@ struct Project {
   QDateTime time;
   /** The layer tree (LayerTreeModel::toJson()). */
   QJsonArray layers;
+  /**
+   * The KML documents in the layer tree (key `kml`), each an object with
+   * `node` (the id of its entry in layers), and `path` (its file) or
+   * `text` (the KML of one never saved); `editable` if it is being
+   * edited. Empty, and left out, if there are none.
+   */
+  QJsonArray kml;
 };
 
 /** Format name in every project file. */

@@ -30,7 +30,9 @@
 #include <optional>
 #include <vector>
 
+#include <QColor>
 #include <QElapsedTimer>
+#include <QImage>
 #include <QMetaType>
 #include <QOpenGLWidget>
 #include <QPointF>
@@ -40,8 +42,10 @@
 #include <QTimer>
 
 #include "ts/camera/cameracontroller.h"
+#include "ts/geo/geodetic.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/globe/tilerenderer.h"
+#include "ts/kml/kmldocument.h"
 #include "ts/perf/frametimestats.h"
 #include "ts/regions/regiongeometry.h"
 #include "ts/render/framepacer.h"
@@ -59,6 +63,96 @@ namespace ts
 class GlRenderDevice;
 class GlobeRenderer;
 class Projection;
+
+/** How the heights of shapes drawn over the view are measured. */
+enum class OverlayHeight : uint8_t {
+  /** On the ground (the terrain where shown); heights ignored. */
+  Ground,
+  /** Above the ground (the terrain where shown). */
+  Relative,
+  /** Above sea level (the ellipsoid). */
+  Absolute
+};
+
+/**
+ * An icon with its label drawn on the screen at a place (KML placemarks):
+ * upright on the globe, the maps and through the morph.
+ */
+struct BillboardDraw {
+  /** Its height, metres (see height). */
+  double heightM = 0.0;
+  /** How heightM is measured. */
+  OverlayHeight height = OverlayHeight::Ground;
+  /** A stalk from the ground up to it, in stalkColor. */
+  bool stalk = false;
+  /** The stalk's colour. */
+  QColor stalkColor = QColor(255, 255, 255);
+  /** Its latitude, degrees. */
+  double latDeg = 0.0;
+  /** Its longitude, degrees. */
+  double lonDeg = 0.0;
+  /** The icon, already tinted; null for none. */
+  QImage icon;
+  /** Its size on the screen, logical pixels (the larger side). */
+  double sizePx = 32.0;
+  /** The point of the icon on the place, as fractions from the top left. */
+  QPointF hotSpot{0.5, 1.0};
+  /** Degrees clockwise from north (the icon turns, not the label). */
+  double headingDeg = 0.0;
+  /** The label; empty for none. */
+  QString label;
+  /** Its colour. */
+  QColor labelColor = QColor(255, 255, 255);
+  /** Its size as a factor of the normal; 0 hides it. */
+  double labelScale = 1.0;
+};
+
+/**
+ * A line or polygon above the ground drawn over the view (KML), with walls
+ * down to the ground if extruded. Not hidden by terrain in front of it.
+ */
+struct RaisedShapeDraw {
+  /**
+   * The line, or the polygon's outer boundary then its holes: longitude,
+   * latitude (degrees) and height (metres, see height) per point.
+   */
+  std::vector<std::vector<Geodetic>> rings;
+  /** How the heights are measured (Relative or Absolute). */
+  OverlayHeight height = OverlayHeight::Absolute;
+  /** Closed (a polygon or ring). */
+  bool closed = false;
+  /** A polygon: its top is filled with fill. */
+  bool surface = false;
+  /** Walls down to the ground, filled with fill. */
+  bool walls = false;
+  /** The line's colour; transparent for none. */
+  QColor line;
+  /** The line's width, pixels. */
+  double widthPx = 1.0;
+  /** The fill of the top and walls; transparent for none. */
+  QColor fill;
+};
+
+/**
+ * A point of a shape being edited (KML): a vertex to drag, or the middle
+ * of an edge, which becomes a vertex when dragged.
+ */
+struct EditHandleDraw {
+  /** Where it is. */
+  LonLat at;
+  /** True for the middle of an edge. */
+  bool middle = false;
+};
+
+/** A picture fixed to the screen over the view (a KML ScreenOverlay). */
+struct ScreenOverlayDraw {
+  /** The picture, already tinted. */
+  QImage image;
+  /** Where it goes (kmlScreenRect()). */
+  KmlScreenPlacement placement;
+  /** Higher ones are drawn over lower ones. */
+  int32_t drawOrder = 0;
+};
 
 /**
  * Shows the globe and turns mouse and keyboard input into camera motion.
@@ -206,6 +300,56 @@ public:
    */
   const QString& scaleBarText() const { return m_scaleBarText; }
 
+  /**
+   * Sets the icons and labels drawn over the view (KML placemarks). They
+   * are hidden behind the globe, and thinned where they crowd: one icon
+   * per few pixels, labels that don't overlap, at most a few hundred.
+   */
+  void setBillboards(std::vector<BillboardDraw> billboards);
+
+  /**
+   * Sets the lines and polygons above the ground drawn over the view (KML),
+   * nearest last; flat on the maps.
+   */
+  void setRaisedShapes(std::vector<RaisedShapeDraw> shapes);
+
+  /**
+   * Sets the handles of the shape being edited (none to stop): drawn on
+   * the ground; left-dragging one moves it (handleMoved() when let go),
+   * right-clicking a vertex asks for it to go (handleDeleteRequested()).
+   */
+  void setEditHandles(std::vector<EditHandleDraw> handles);
+
+  /** Returns the handles set. */
+  const std::vector<EditHandleDraw>& editHandles() const
+  {
+    return m_editHandles;
+  }
+
+  /** Drags handle @p index to @p to as the user would (for tests). */
+  void dragHandle(int32_t index, LonLat to);
+
+  /** Sets the pictures fixed to the screen, drawn in order (KML). */
+  void setScreenOverlays(std::vector<ScreenOverlayDraw> overlays);
+
+  /** Returns the screen overlays set (for tests). */
+  const std::vector<ScreenOverlayDraw>& screenOverlays() const
+  {
+    return m_screens;
+  }
+
+  /** Returns how many raised shapes the last frame drew (for tests). */
+  int32_t raisedShapesDrawn() const { return m_raisedDrawn; }
+
+  /** Returns the billboards set (for tests). */
+  const std::vector<BillboardDraw>& billboards() const { return m_billboards; }
+
+  /** Returns how many billboards the last frame drew (for tests). */
+  int32_t billboardsDrawn() const { return m_billboardsDrawn; }
+
+  /** Returns how many labels the last frame drew (for tests). */
+  int32_t labelsDrawn() const { return m_labelsDrawn; }
+
   /** Moves the camera to @p pose at once, stopping any motion. */
   void setPose(const CameraPose& pose);
 
@@ -313,6 +457,12 @@ signals:
    */
   void pointClicked(ts::LonLat point, double degreesPerPixel);
 
+  /** The user dragged edit handle @p index to @p to (setEditHandles()). */
+  void handleMoved(int32_t index, ts::LonLat to);
+
+  /** The user right-clicked vertex handle @p index: to delete it. */
+  void handleDeleteRequested(int32_t index);
+
   /** The user cancelled drawing a region, or it was cancelled. */
   void regionDrawingCancelled();
 
@@ -349,6 +499,20 @@ private:
   void onFrameTimer();
   void releaseGl();
   void updatePointerReadout();
+  void drawBillboards();
+  void drawRaisedShapes();
+  void projectRing(const RaisedShapeDraw& shape,
+                   const std::vector<Geodetic>& ring,
+                   std::vector<std::optional<ScreenPoint>>& tops,
+                   std::vector<std::optional<ScreenPoint>>& feet);
+  std::optional<QPointF> billboardOnScreen(const BillboardDraw& billboard);
+  void drawScreenOverlays();
+  void drawEditHandles();
+  int32_t handleAt(QPointF positionPx);
+  std::optional<QPointF> groundOnScreen(LonLat point);
+  double groundHeightM(double latDeg, double lonDeg);
+  Vec3 overlayEcef(double latDeg, double lonDeg, double heightM,
+                   OverlayHeight height);
   void reportClick();
   void drawOverlay();
   void drawAttributions();
@@ -404,6 +568,15 @@ private:
   std::vector<LonLat> m_drawnPoints;
   /** True while dragging out a rectangle. */
   bool m_drawingDrag = false;
+  std::vector<BillboardDraw> m_billboards;
+  std::vector<RaisedShapeDraw> m_raised;
+  std::vector<ScreenOverlayDraw> m_screens;
+  std::vector<EditHandleDraw> m_editHandles;
+  /** The handle being dragged, -1 for none. */
+  int32_t m_dragHandle = -1;
+  int32_t m_raisedDrawn = 0;
+  int32_t m_billboardsDrawn = 0;
+  int32_t m_labelsDrawn = 0;
   /** Where a left press that may become a click was. */
   std::optional<QPointF> m_clickPressPx;
   /** Waits out a double click before reporting a click. */

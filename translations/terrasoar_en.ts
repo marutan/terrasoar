@@ -54,12 +54,12 @@
 </translation>
         </message>
         <message>
-            <source>Project file to open.</source>
-            <translation>Project file to open.</translation>
+            <source>Project, KML or KMZ file to open.</source>
+            <translation>Project, KML or KMZ file to open.</translation>
         </message>
         <message>
-            <source>[project]</source>
-            <translation>[project]</translation>
+            <source>[file…]</source>
+            <translation>[file…]</translation>
         </message>
     </context>
     <context>
@@ -574,6 +574,17 @@
         </message>
     </context>
     <context>
+        <name>ts::BalloonWindow</name>
+        <message>
+            <source>Placemark</source>
+            <translation>Placemark</translation>
+        </message>
+        <message>
+            <source>Fly there</source>
+            <translation>Fly there</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BuiltinLayers</name>
         <message>
             <source>Checkerboard</source>
@@ -702,6 +713,22 @@
         <message>
             <source>Point at the chart to see where a height is on the globe.</source>
             <translation>Point at the chart to see where a height is on the globe.</translation>
+        </message>
+        <message>
+            <source>Elevation profile</source>
+            <translation>Elevation profile</translation>
+        </message>
+        <message>
+            <source>Profile line</source>
+            <translation>Profile line</translation>
+        </message>
+        <message>
+            <source>profile.kml</source>
+            <translation>profile.kml</translation>
+        </message>
+        <message>
+            <source>Save as &amp;KML…</source>
+            <translation>Save as &amp;KML…</translation>
         </message>
     </context>
     <context>
@@ -992,6 +1019,298 @@
         <message>
             <source>No pages match</source>
             <translation>No pages match</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::KmlExport</name>
+        <message>
+            <source>KML (*.kml);;KMZ with its pictures (*.kmz)</source>
+            <translation>KML (*.kml);;KMZ with its pictures (*.kmz)</translation>
+        </message>
+        <message>
+            <source>Saved "%1", but these files it uses couldn't be read and aren't in it:
+%2</source>
+            <translation>Saved "%1", but these files it uses couldn't be read and aren't in it:
+%2</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::KmlLinks</name>
+        <message>
+            <source>"%1" can't be read.</source>
+            <translation>"%1" can't be read.</translation>
+        </message>
+        <message>
+            <source>%1 couldn't be fetched (%2).</source>
+            <translation>%1 couldn't be fetched (%2).</translation>
+        </message>
+        <message>
+            <source>%1 couldn't be fetched (%2): showing the copy from last time.</source>
+            <translation>%1 couldn't be fetched (%2): showing the copy from last time.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::KmlPropertiesDialog</name>
+        <message>
+            <source>Properties of %1</source>
+            <translation>Properties of %1</translation>
+        </message>
+        <message>
+            <source>the element</source>
+            <translation>the element</translation>
+        </message>
+        <message>
+            <source>General</source>
+            <translation>General</translation>
+        </message>
+        <message>
+            <source>Style</source>
+            <translation>Style</translation>
+        </message>
+        <message>
+            <source>Height</source>
+            <translation>Height</translation>
+        </message>
+        <message>
+            <source>Time</source>
+            <translation>Time</translation>
+        </message>
+        <message>
+            <source>Data</source>
+            <translation>Data</translation>
+        </message>
+        <message>
+            <source>Set from the &amp;View</source>
+            <translation>Set from the &amp;View</translation>
+        </message>
+        <message>
+            <source>C&amp;lear</source>
+            <translation>C&amp;lear</translation>
+        </message>
+        <message>
+            <source>&amp;Name:</source>
+            <translation>&amp;Name:</translation>
+        </message>
+        <message>
+            <source>&amp;Description (HTML):</source>
+            <translation>&amp;Description (HTML):</translation>
+        </message>
+        <message>
+            <source>Balloon:</source>
+            <translation>Balloon:</translation>
+        </message>
+        <message>
+            <source>View:</source>
+            <translation>View:</translation>
+        </message>
+        <message>
+            <source>This element's own</source>
+            <translation>This element's own</translation>
+        </message>
+        <message numerus="yes">
+            <source>Shared: %1 (used by %n element(s))</source>
+            <translation>
+                <numerusform>Shared: %1 (used by %n element)</numerusform>
+                <numerusform>Shared: %1 (used by %n elements)</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>The standard pushpin</source>
+            <translation>The standard pushpin</translation>
+        </message>
+        <message>
+            <source>C&amp;hoose…</source>
+            <translation>C&amp;hoose…</translation>
+        </message>
+        <message>
+            <source>Choose an Icon</source>
+            <translation>Choose an Icon</translation>
+        </message>
+        <message>
+            <source>Pictures (*.png *.jpg *.jpeg *.gif *.svg);;All files (*)</source>
+            <translation>Pictures (*.png *.jpg *.jpeg *.gif *.svg);;All files (*)</translation>
+        </message>
+        <message>
+            <source>&amp;Fill</source>
+            <translation>&amp;Fill</translation>
+        </message>
+        <message>
+            <source>&amp;Outline</source>
+            <translation>&amp;Outline</translation>
+        </message>
+        <message>
+            <source>&amp;Style:</source>
+            <translation>&amp;Style:</translation>
+        </message>
+        <message>
+            <source>&amp;Icon:</source>
+            <translation>&amp;Icon:</translation>
+        </message>
+        <message>
+            <source>Icon colour:</source>
+            <translation>Icon colour:</translation>
+        </message>
+        <message>
+            <source>Icon si&amp;ze:</source>
+            <translation>Icon si&amp;ze:</translation>
+        </message>
+        <message>
+            <source>Label colour:</source>
+            <translation>Label colour:</translation>
+        </message>
+        <message>
+            <source>&amp;Label size:</source>
+            <translation>&amp;Label size:</translation>
+        </message>
+        <message>
+            <source>Line colour:</source>
+            <translation>Line colour:</translation>
+        </message>
+        <message>
+            <source>Line &amp;width (pixels):</source>
+            <translation>Line &amp;width (pixels):</translation>
+        </message>
+        <message>
+            <source>Area:</source>
+            <translation>Area:</translation>
+        </message>
+        <message>
+            <source> m</source>
+            <translation> m</translation>
+        </message>
+        <message>
+            <source>On the ground</source>
+            <translation>On the ground</translation>
+        </message>
+        <message>
+            <source>Above the ground</source>
+            <translation>Above the ground</translation>
+        </message>
+        <message>
+            <source>Above sea level</source>
+            <translation>Above sea level</translation>
+        </message>
+        <message>
+            <source>On the sea floor</source>
+            <translation>On the sea floor</translation>
+        </message>
+        <message>
+            <source>Above the sea floor</source>
+            <translation>Above the sea floor</translation>
+        </message>
+        <message>
+            <source>&amp;Walls down to the ground (extrude)</source>
+            <translation>&amp;Walls down to the ground (extrude)</translation>
+        </message>
+        <message>
+            <source>&amp;Measured:</source>
+            <translation>&amp;Measured:</translation>
+        </message>
+        <message>
+            <source>&amp;Height:</source>
+            <translation>&amp;Height:</translation>
+        </message>
+        <message>
+            <source>Always</source>
+            <translation>Always</translation>
+        </message>
+        <message>
+            <source>From a moment on (time stamp)</source>
+            <translation>From a moment on (time stamp)</translation>
+        </message>
+        <message>
+            <source>During a period (time span)</source>
+            <translation>During a period (time span)</translation>
+        </message>
+        <message>
+            <source>&amp;Shown:</source>
+            <translation>&amp;Shown:</translation>
+        </message>
+        <message>
+            <source>&amp;From:</source>
+            <translation>&amp;From:</translation>
+        </message>
+        <message>
+            <source>&amp;Until:</source>
+            <translation>&amp;Until:</translation>
+        </message>
+        <message>
+            <source>Field</source>
+            <translation>Field</translation>
+        </message>
+        <message>
+            <source>Value</source>
+            <translation>Value</translation>
+        </message>
+        <message>
+            <source>&amp;Add Field</source>
+            <translation>&amp;Add Field</translation>
+        </message>
+        <message>
+            <source>&amp;Remove Field</source>
+            <translation>&amp;Remove Field</translation>
+        </message>
+        <message>
+            <source>field</source>
+            <translation>field</translation>
+        </message>
+        <message>
+            <source>Colour</source>
+            <translation>Colour</translation>
+        </message>
+        <message>
+            <source>None: flying there shows all of it</source>
+            <translation>None: flying there shows all of it</translation>
+        </message>
+        <message>
+            <source>%1, %2, %3 m away</source>
+            <translation>%1, %2, %3 m away</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::KmlReader</name>
+        <message>
+            <source>%1 (line %2, column %3)</source>
+            <translation>%1 (line %2, column %3)</translation>
+        </message>
+        <message>
+            <source>The file is not KML: %1 (line %2, column %3).</source>
+            <translation>The file is not KML: %1 (line %2, column %3).</translation>
+        </message>
+        <message>
+            <source>The file is not KML: it starts with &lt;%1&gt;.</source>
+            <translation>The file is not KML: it starts with &lt;%1&gt;.</translation>
+        </message>
+        <message>
+            <source>The KML is damaged: %1 (line %2, column %3).</source>
+            <translation>The KML is damaged: %1 (line %2, column %3).</translation>
+        </message>
+        <message>
+            <source>Cannot open "%1": %2</source>
+            <translation>Cannot open "%1": %2</translation>
+        </message>
+        <message>
+            <source>"%1" is a KMZ archive without a KML file in it.</source>
+            <translation>"%1" is a KMZ archive without a KML file in it.</translation>
+        </message>
+        <message>
+            <source>"%1" is not a local file.</source>
+            <translation>"%1" is not a local file.</translation>
+        </message>
+        <message>
+            <source>Cannot read "%1".</source>
+            <translation>Cannot read "%1".</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::KmlWriter</name>
+        <message>
+            <source>Cannot write "%1": %2</source>
+            <translation>Cannot write "%1": %2</translation>
+        </message>
+        <message>
+            <source>it can't be replaced.</source>
+            <translation>it can't be replaced.</translation>
         </message>
     </context>
     <context>
@@ -1481,6 +1800,305 @@
             <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</source>
             <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</translation>
         </message>
+        <message>
+            <source>Open &amp;KML or KMZ…</source>
+            <translation>Open &amp;KML or KMZ…</translation>
+        </message>
+        <message>
+            <source>Add a KML or KMZ file (from Google Earth and other programs) to the layer tree</source>
+            <translation>Add a KML or KMZ file (from Google Earth and other programs) to the layer tree</translation>
+        </message>
+        <message>
+            <source>Open KML or KMZ</source>
+            <translation>Open KML or KMZ</translation>
+        </message>
+        <message>
+            <source>KML and KMZ files (*.kml *.kmz);;All files (*)</source>
+            <translation>KML and KMZ files (*.kml *.kmz);;All files (*)</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n element(s) Terra Soar doesn't show were skipped.</source>
+            <translation>
+                <numerusform>%1: %n element Terra Soar doesn't show were skipped.</numerusform>
+                <numerusform>%1: %n elements Terra Soar doesn't show were skipped.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Folder</source>
+            <translation>Folder</translation>
+        </message>
+        <message>
+            <source>Places</source>
+            <translation>Places</translation>
+        </message>
+        <message>
+            <source>Fly There</source>
+            <translation>Fly There</translation>
+        </message>
+        <message>
+            <source>Open</source>
+            <translation>Open</translation>
+        </message>
+        <message>
+            <source>Ground overlay</source>
+            <translation>Ground overlay</translation>
+        </message>
+        <message>
+            <source>Screen overlay</source>
+            <translation>Screen overlay</translation>
+        </message>
+        <message>
+            <source>Network link</source>
+            <translation>Network link</translation>
+        </message>
+        <message>
+            <source>%1: too many network links inside each other.</source>
+            <translation>%1: too many network links inside each other.</translation>
+        </message>
+        <message>
+            <source>Refresh</source>
+            <translation>Refresh</translation>
+        </message>
+        <message>
+            <source>Save As KML or KMZ…</source>
+            <translation>Save As KML or KMZ…</translation>
+        </message>
+        <message>
+            <source>Save As KML or KMZ</source>
+            <translation>Save As KML or KMZ</translation>
+        </message>
+        <message>
+            <source>Reading %1…</source>
+            <translation>Reading %1…</translation>
+        </message>
+        <message>
+            <source>Edit This Document</source>
+            <translation>Edit This Document</translation>
+        </message>
+        <message>
+            <source>The project wasn't saved.</source>
+            <translation>The project wasn't saved.</translation>
+        </message>
+        <message>
+            <source>Select a KML entry to edit its file.</source>
+            <translation>Select a KML entry to edit its file.</translation>
+        </message>
+        <message>
+            <source>&amp;KML</source>
+            <translation>&amp;KML</translation>
+        </message>
+        <message>
+            <source>&amp;New KML Document</source>
+            <translation>&amp;New KML Document</translation>
+        </message>
+        <message>
+            <source>Start a KML document of your own to draw places, paths and areas</source>
+            <translation>Start a KML document of your own to draw places, paths and areas</translation>
+        </message>
+        <message>
+            <source>&amp;Edit This Document</source>
+            <translation>&amp;Edit This Document</translation>
+        </message>
+        <message>
+            <source>Make the KML document of the selected entry editable</source>
+            <translation>Make the KML document of the selected entry editable</translation>
+        </message>
+        <message>
+            <source>Add &amp;Placemark</source>
+            <translation>Add &amp;Placemark</translation>
+        </message>
+        <message>
+            <source>Click where the placemark goes</source>
+            <translation>Click where the placemark goes</translation>
+        </message>
+        <message>
+            <source>Add Pa&amp;th</source>
+            <translation>Add Pa&amp;th</translation>
+        </message>
+        <message>
+            <source>Click each point of the path; double-click or Enter to finish</source>
+            <translation>Click each point of the path; double-click or Enter to finish</translation>
+        </message>
+        <message>
+            <source>Add Pol&amp;ygon</source>
+            <translation>Add Pol&amp;ygon</translation>
+        </message>
+        <message>
+            <source>Click each corner; double-click or Enter to finish</source>
+            <translation>Click each corner; double-click or Enter to finish</translation>
+        </message>
+        <message>
+            <source>Add &amp;Hole to Polygon</source>
+            <translation>Add &amp;Hole to Polygon</translation>
+        </message>
+        <message>
+            <source>Draw a hole in the selected polygon, corner by corner</source>
+            <translation>Draw a hole in the selected polygon, corner by corner</translation>
+        </message>
+        <message>
+            <source>Add &amp;Ground Overlay…</source>
+            <translation>Add &amp;Ground Overlay…</translation>
+        </message>
+        <message>
+            <source>Choose a picture, then drag the rectangle it covers</source>
+            <translation>Choose a picture, then drag the rectangle it covers</translation>
+        </message>
+        <message>
+            <source>Add &amp;Folder</source>
+            <translation>Add &amp;Folder</translation>
+        </message>
+        <message>
+            <source>P&amp;roperties…</source>
+            <translation>P&amp;roperties…</translation>
+        </message>
+        <message>
+            <source>Cu&amp;t</source>
+            <translation>Cu&amp;t</translation>
+        </message>
+        <message>
+            <source>&amp;Copy</source>
+            <translation>&amp;Copy</translation>
+        </message>
+        <message>
+            <source>Pa&amp;ste</source>
+            <translation>Pa&amp;ste</translation>
+        </message>
+        <message>
+            <source>&amp;Delete</source>
+            <translation>&amp;Delete</translation>
+        </message>
+        <message>
+            <source>Sa&amp;ve KML Document</source>
+            <translation>Sa&amp;ve KML Document</translation>
+        </message>
+        <message>
+            <source>Save KML Document &amp;As…</source>
+            <translation>Save KML Document &amp;As…</translation>
+        </message>
+        <message>
+            <source>&amp;Undo %1</source>
+            <translation>&amp;Undo %1</translation>
+        </message>
+        <message>
+            <source>&amp;Undo</source>
+            <translation>&amp;Undo</translation>
+        </message>
+        <message>
+            <source>&amp;Redo %1</source>
+            <translation>&amp;Redo %1</translation>
+        </message>
+        <message>
+            <source>&amp;Redo</source>
+            <translation>&amp;Redo</translation>
+        </message>
+        <message>
+            <source>Untitled</source>
+            <translation>Untitled</translation>
+        </message>
+        <message>
+            <source>Edit KML</source>
+            <translation>Edit KML</translation>
+        </message>
+        <message>
+            <source>Placemark</source>
+            <translation>Placemark</translation>
+        </message>
+        <message>
+            <source>Add Placemark</source>
+            <translation>Add Placemark</translation>
+        </message>
+        <message>
+            <source>Path</source>
+            <translation>Path</translation>
+        </message>
+        <message>
+            <source>Add Path</source>
+            <translation>Add Path</translation>
+        </message>
+        <message>
+            <source>Polygon</source>
+            <translation>Polygon</translation>
+        </message>
+        <message>
+            <source>Add Polygon</source>
+            <translation>Add Polygon</translation>
+        </message>
+        <message>
+            <source>Add Hole</source>
+            <translation>Add Hole</translation>
+        </message>
+        <message>
+            <source>Add Ground Overlay</source>
+            <translation>Add Ground Overlay</translation>
+        </message>
+        <message>
+            <source>Add Folder</source>
+            <translation>Add Folder</translation>
+        </message>
+        <message>
+            <source>Change Properties</source>
+            <translation>Change Properties</translation>
+        </message>
+        <message>
+            <source>Delete</source>
+            <translation>Delete</translation>
+        </message>
+        <message>
+            <source>Paste</source>
+            <translation>Paste</translation>
+        </message>
+        <message>
+            <source>Save KML Document</source>
+            <translation>Save KML Document</translation>
+        </message>
+        <message>
+            <source>KML (*.kml);;KMZ with its pictures (*.kmz)</source>
+            <translation>KML (*.kml);;KMZ with its pictures (*.kmz)</translation>
+        </message>
+        <message>
+            <source>Click where the placemark goes.</source>
+            <translation>Click where the placemark goes.</translation>
+        </message>
+        <message>
+            <source>Choose the Picture</source>
+            <translation>Choose the Picture</translation>
+        </message>
+        <message>
+            <source>Pictures (*.png *.jpg *.jpeg *.gif *.tif *.tiff);;All files (*)</source>
+            <translation>Pictures (*.png *.jpg *.jpeg *.gif *.tif *.tiff);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Add Point</source>
+            <translation>Add Point</translation>
+        </message>
+        <message>
+            <source>Move Point</source>
+            <translation>Move Point</translation>
+        </message>
+        <message>
+            <source>Delete Point</source>
+            <translation>Delete Point</translation>
+        </message>
+        <message>
+            <source>That point can't go: a path keeps two, an area three.</source>
+            <translation>That point can't go: a path keeps two, an area three.</translation>
+        </message>
+        <message>
+            <source>Move</source>
+            <translation>Move</translation>
+        </message>
+        <message>
+            <source>Save the changes to %1 before saving the project? If not, the project keeps them, and the file stays as it was.</source>
+            <translation>Save the changes to %1 before saving the project? If not, the project keeps them, and the file stays as it was.</translation>
+        </message>
+        <message>
+            <source>Rename</source>
+            <translation>Rename</translation>
+        </message>
+        <message>
+            <source>%1.kml</source>
+            <translation>%1.kml</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -1745,6 +2363,14 @@
         <message>
             <source>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</source>
             <translation>Delete the region “%1”? Its tiles stay in the cache for now but may be removed to make room.</translation>
+        </message>
+        <message>
+            <source>&amp;Export as KML…</source>
+            <translation>&amp;Export as KML…</translation>
+        </message>
+        <message>
+            <source>Export Region</source>
+            <translation>Export Region</translation>
         </message>
     </context>
     <context>

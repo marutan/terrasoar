@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Links</name>
+    <Style id="radio"><ListStyle><listItemType>radioFolder</listItemType></ListStyle></Style>
+    <Style id="hide"><ListStyle><listItemType>checkHideChildren</listItemType></ListStyle></Style>
+    <NetworkLink>
+      <name>Local</name>
+      <Link><href>heights.kml</href></Link>
+    </NetworkLink>
+    <NetworkLink>
+      <name>Near London</name>
+      <Region>
+        <LatLonAltBox><north>51.6</north><south>51.4</south><east>0.1</east><west>-0.3</west></LatLonAltBox>
+        <Lod><minLodPixels>256</minLodPixels></Lod>
+      </Region>
+      <Link><href>archive.kmz</href></Link>
+    </NetworkLink>
+    <Folder>
+      <name>Choose one</name>
+      <styleUrl>#radio</styleUrl>
+      <Folder><name>First</name><Placemark><name>One</name><Point><coordinates>1,1</coordinates></Point></Placemark></Folder>
+      <Folder><name>Second</name><Placemark><name>Two</name><Point><coordinates>2,2</coordinates></Point></Placemark></Folder>
+    </Folder>
+    <Folder>
+      <name>Hidden inside</name>
+      <styleUrl>#hide</styleUrl>
+      <Folder><name>A</name><Placemark><name>In A</name><Point><coordinates>3,3</coordinates></Point></Placemark></Folder>
+      <Placemark><name>Direct</name><Point><coordinates>4,4</coordinates></Point></Placemark>
+    </Folder>
+  </Document>
+</kml>

@@ -31,12 +31,17 @@ HEADERS += \
     $$PWD/src/appsettings.h \
     $$PWD/src/helpbrowser.h \
     $$PWD/src/helpwindow.h \
+    $$PWD/src/iconcache.h \
+    $$PWD/src/kmlexport.h \
+    $$PWD/src/kmllinks.h \
+    $$PWD/src/kmlpropertiesdialog.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/projectionsettingsdialog.h \
     $$PWD/src/addwfsdialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
     $$PWD/src/addxyzdialog.h \
+    $$PWD/src/balloonwindow.h \
     $$PWD/src/elevationprofiledialog.h \
     $$PWD/src/featureinfowindow.h \
     $$PWD/src/globeview.h \
@@ -58,17 +63,23 @@ SOURCES += \
     $$PWD/src/appsettings.cpp \
     $$PWD/src/helpbrowser.cpp \
     $$PWD/src/helpwindow.cpp \
+    $$PWD/src/iconcache.cpp \
+    $$PWD/src/kmlexport.cpp \
+    $$PWD/src/kmllinks.cpp \
+    $$PWD/src/kmlpropertiesdialog.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/projectionsettingsdialog.cpp \
     $$PWD/src/addwfsdialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
     $$PWD/src/addxyzdialog.cpp \
+    $$PWD/src/balloonwindow.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
     $$PWD/src/featureinfowindow.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \
+    $$PWD/src/mainwindowkml.cpp \
     $$PWD/src/newregiondialog.cpp \
     $$PWD/src/offlineregionmanager.cpp \
     $$PWD/src/packmanager.cpp \

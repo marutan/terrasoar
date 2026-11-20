@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document id="root_doc">
+    <Style id="red">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>1.5</scale>
+        <heading>45</heading>
+        <Icon>
+          <href>icons/pin.png</href>
+        </Icon>
+        <hotSpot x="0.5" y="0"/>
+      </IconStyle>
+      <LabelStyle>
+        <color>ff00ffff</color>
+        <scale>0.8</scale>
+      </LabelStyle>
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>3</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>7f00ff00</color>
+      </PolyStyle>
+    </Style>
+    <Style id="blue">
+      <LineStyle>
+        <color>ffff0000</color>
+        <width>2</width>
+      </LineStyle>
+    </Style>
+    <Style id="redOrBlue">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>1.5</scale>
+        <heading>45</heading>
+        <Icon>
+          <href>icons/pin.png</href>
+        </Icon>
+        <hotSpot x="0.5" y="0"/>
+      </IconStyle>
+      <LabelStyle>
+        <color>ff00ffff</color>
+        <scale>0.8</scale>
+      </LabelStyle>
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>3</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>7f00ff00</color>
+      </PolyStyle>
+    </Style>
+    <Document id="Everything">
+      <name>Everything</name>
+      <Style id="red">
+        <IconStyle>
+          <color>ff0000ff</color>
+          <scale>1.5</scale>
+          <heading>45</heading>
+          <Icon>
+            <href>icons/pin.png</href>
+          </Icon>
+          <hotSpot x="0.5" y="0"/>
+        </IconStyle>
+        <LabelStyle>
+          <color>ff00ffff</color>
+          <scale>0.8</scale>
+        </LabelStyle>
+        <LineStyle>
+          <color>ff0000ff</color>
+          <width>3</width>
+        </LineStyle>
+        <PolyStyle>
+          <color>7f00ff00</color>
+        </PolyStyle>
+      </Style>
+      <Style id="blue">
+        <LineStyle>
+          <color>ffff0000</color>
+          <width>2</width>
+        </LineStyle>
+      </Style>
+      <Style id="redOrBlue">
+        <IconStyle>
+          <color>ff0000ff</color>
+          <scale>1.5</scale>
+          <heading>45</heading>
+          <Icon>
+            <href>icons/pin.png</href>
+          </Icon>
+          <hotSpot x="0.5" y="0"/>
+        </IconStyle>
+        <LabelStyle>
+          <color>ff00ffff</color>
+          <scale>0.8</scale>
+        </LabelStyle>
+        <LineStyle>
+          <color>ff0000ff</color>
+          <width>3</width>
+        </LineStyle>
+        <PolyStyle>
+          <color>7f00ff00</color>
+        </PolyStyle>
+      </Style>
+      <Placemark id="Everything.1">
+        <name>A picture</name>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>
+                1,52,0
+                1,51,0
+                -1,51,0
+                -1,52,0
+                1,52,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark id="Everything.2">
+        <name>A quad</name>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>
+                0,40,0
+                2,40,0
+                2.5,42,0
+                -0.5,42,0
+                0,40,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark id="Everything.3">
+        <name>External style</name>
+        <styleUrl>#tyles.kml#shared</styleUrl>
+        <Point>
+          <extrude>0</extrude>
+          <coordinates>
+            5,45,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Document>
+    <Document id="Shapes">
+      <name>Shapes</name>
+      <Placemark id="Shapes.1">
+        <name>A point</name>
+        <description><![CDATA[<p>A <i>point</i> in Birmingham.</p>]]></description>
+        <styleUrl>#redOrBlue</styleUrl>
+        <Point>
+          <extrude>1</extrude>
+          <altitudeMode>absolute</altitudeMode>
+          <coordinates>
+            -1.8904,52.4862,140
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark id="Shapes.2">
+        <name>A line</name>
+        <Style>
+          <LineStyle>
+            <color>ff00a5ff</color>
+            <width>5</width>
+          </LineStyle>
+        </Style>
+        <LineString>
+          <extrude>0</extrude>
+          <tessellate>1</tessellate>
+          <altitudeMode>clampToGround</altitudeMode>
+          <coordinates>
+            -3,53.4,0
+            -2.24,53.48,0
+            -1.55,53.8,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark id="Shapes.3">
+        <name>A ring</name>
+        <LineString>
+          <extrude>0</extrude>
+          <coordinates>
+            0,51,0
+            1,51,0
+            1,52,0
+            0,51,0
+          </coordinates>
+        </LineString>
+      </Placemark>
+      <Placemark id="Shapes.4">
+        <name>A polygon with a hole</name>
+        <styleUrl>#red</styleUrl>
+        <Polygon>
+          <extrude>1</extrude>
+          <altitudeMode>relativeToGround</altitudeMode>
+          <outerBoundaryIs>
+            <LinearRing>
+              <coordinates>
+                -2,52,100
+                -1,52,100
+                -1,53,100
+                -2,53,100
+                -2,52,100
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+          <innerBoundaryIs>
+            <LinearRing>
+              <coordinates>
+                -1.6,52.4,100
+                -1.4,52.4,100
+                -1.4,52.6,100
+                -1.6,52.4,100
+              </coordinates>
+            </LinearRing>
+          </innerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark id="Shapes.5">
+        <name>Two points and a line</name>
+        <MultiGeometry>
+          <Point>
+            <extrude>0</extrude>
+            <coordinates>
+              -4,50,0
+            </coordinates>
+          </Point>
+          <Point>
+            <extrude>0</extrude>
+            <coordinates>
+              -4.1,50.1,0
+            </coordinates>
+          </Point>
+          <LineString>
+            <extrude>0</extrude>
+            <coordinates>
+              -4,50,0
+              -4.1,50.1,0
+            </coordinates>
+          </LineString>
+        </MultiGeometry>
+      </Placemark>
+    </Document>
+    <Document id="Times_and_places">
+      <name>Times and places</name>
+      <Placemark id="Times_and_places.1">
+        <name>Stamped</name>
+        <TimeStamp>
+          <when>2026-11-20T12:00:00Z</when>
+        </TimeStamp>
+        <Point>
+          <extrude>0</extrude>
+          <coordinates>
+            0.1,51.5,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark id="Times_and_places.2">
+        <name>Spanned</name>
+        <TimeSpan>
+          <begin>2026-01-01T00:00:00</begin>
+          <end>2026-06-30T00:00:00</end>
+        </TimeSpan>
+        <Point>
+          <extrude>0</extrude>
+          <coordinates>
+            0.2,51.5,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark id="Times_and_places.3">
+        <name>Track</name>
+        <TimeSpan>
+          <begin>2026-11-20T10:00:00Z</begin>
+          <end>2026-11-20T11:00:00Z</end>
+        </TimeSpan>
+        <LineString>
+          <extrude>0</extrude>
+          <coordinates>
+            -1,51,100
+            -0.5,51.2,200
+          </coordinates>
+        </LineString>
+      </Placemark>
+    </Document>
+  </Document>
+</kml>
