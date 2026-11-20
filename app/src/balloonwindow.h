@@ -63,7 +63,8 @@ public:
    * @p pose if given; local images resolve against @p baseDirectory.
    */
   void showBalloon(const QString& title, const QString& html,
-                   const QColor& background, std::optional<CameraPose> pose,
+                   const QColor& background,
+                   const std::optional<CameraPose>& pose,
                    const QString& baseDirectory);
 
   /** Returns the text shown (for tests). */

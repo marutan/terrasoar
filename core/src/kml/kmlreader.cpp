@@ -19,7 +19,9 @@
  */
 #include "ts/kml/kmlreader.h"
 
+#include <array>
 #include <cstdint>
+#include <map>
 #include <utility>
 
 #include <QCoreApplication>
@@ -73,15 +75,37 @@ KmlAltitudeMode altitudeMode(const QString& text)
   return KmlAltitudeMode::ClampToGround;
 }
 
+KmlLink::RefreshMode refreshMode(const QString& t)
+{
+  if (t == QLatin1String("onInterval")) {
+    return KmlLink::RefreshMode::OnInterval;
+  }
+  if (t == QLatin1String("onExpire")) {
+    return KmlLink::RefreshMode::OnExpire;
+  }
+  return KmlLink::RefreshMode::OnChange;
+}
+
+KmlLink::ViewRefreshMode viewRefreshMode(const QString& t)
+{
+  static const std::map<QString, KmlLink::ViewRefreshMode> modes{
+      {QStringLiteral("onStop"), KmlLink::ViewRefreshMode::OnStop},
+      {QStringLiteral("onRequest"), KmlLink::ViewRefreshMode::OnRequest},
+      {QStringLiteral("onRegion"), KmlLink::ViewRefreshMode::OnRegion}};
+  const std::map<QString, KmlLink::ViewRefreshMode>::const_iterator found =
+      modes.find(t);
+  return found != modes.end() ? found->second : KmlLink::ViewRefreshMode::Never;
+}
+
 /** Reads a coordinates element's tuples ("lon,lat[,alt]" by whitespace). */
 std::vector<KmlCoordinate> coordinates(QString text)
 {
   // Some writers put spaces after the commas.
-  text.replace(QRegularExpression(QStringLiteral("\\s*,\\s*")),
-               QStringLiteral(","));
+  static const QRegularExpression commas(QStringLiteral("\\s*,\\s*"));
+  static const QRegularExpression spaces(QStringLiteral("\\s+"));
+  text.replace(commas, QStringLiteral(","));
   std::vector<KmlCoordinate> list;
-  const QStringList tuples = text.split(
-      QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+  const QStringList tuples = text.split(spaces, Qt::SkipEmptyParts);
   for (const QString& tuple : tuples) {
     const QStringList values = tuple.split(QLatin1Char(','));
     bool okLon = false;
@@ -118,7 +142,7 @@ class Reader
 {
 public:
   Reader(QXmlStreamReader& xml, KmlDocument& document)
-      : m_xml(xml), m_document(document)
+      : m_xml(&xml), m_document(&document)
   {
   }
 
@@ -127,10 +151,10 @@ public:
   {
     KmlFeature f;
     f.kind = kind;
-    f.id = m_xml.attributes().value(QLatin1String("id")).toString();
+    f.id = m_xml->attributes().value(QLatin1String("id")).toString();
     QString last;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (common(f, n) || (isContainer(kind) && container(f, n)) ||
           (kind == KmlFeature::Kind::Placemark && placemark(f, n)) ||
           (isOverlay(kind) && overlay(f, n)) ||
@@ -150,17 +174,18 @@ public:
     QString captured;
     QXmlStreamWriter writer(&captured);
     int32_t depth = 0;
-    do {
-      if (m_xml.isStartElement()) {
+    for (;;) {
+      if (m_xml->isStartElement()) {
         ++depth;
-      } else if (m_xml.isEndElement()) {
+      } else if (m_xml->isEndElement()) {
         --depth;
       }
-      writer.writeCurrentToken(m_xml);
-      if (depth == 0) {
+      writer.writeCurrentToken(*m_xml);
+      if (depth == 0 || m_xml->atEnd()) {
         break;
       }
-    } while (!m_xml.atEnd() && (m_xml.readNext(), true));
+      m_xml->readNext();
+    }
     return captured;
   }
 
@@ -179,16 +204,16 @@ private:
 
   void note(const QString& n)
   {
-    m_document.skipped.append(
+    m_document->skipped.append(
         QCoreApplication::translate("ts::KmlReader", "%1 (line %2, column %3)")
             .arg(n)
-            .arg(m_xml.lineNumber())
-            .arg(m_xml.columnNumber()));
+            .arg(m_xml->lineNumber())
+            .arg(m_xml->columnNumber()));
   }
 
   QString text()
   {
-    return m_xml.readElementText(QXmlStreamReader::IncludeChildElements);
+    return m_xml->readElementText(QXmlStreamReader::IncludeChildElements);
   }
 
   bool common(KmlFeature& f, const QString& n)
@@ -279,11 +304,11 @@ private:
       f.latLonBox = latLonBox(f.latLonBox.value_or(KmlLatLonBox{}));
     } else if (n == QLatin1String("LatLonQuad")) {
       KmlLatLonBox box = f.latLonBox.value_or(KmlLatLonBox{});
-      while (m_xml.readNextStartElement()) {
-        if (m_xml.name() == QLatin1String("coordinates")) {
+      while (m_xml->readNextStartElement()) {
+        if (m_xml->name() == QLatin1String("coordinates")) {
           box.quad = coordinates(text());
         } else {
-          m_xml.skipCurrentElement();
+          m_xml->skipCurrentElement();
         }
       }
       f.latLonBox = box;
@@ -346,8 +371,8 @@ private:
     } else {
       return std::nullopt;
     }
-    while (m_xml.readNextStartElement()) {
-      geometryPart(g, m_xml.name().toString());
+    while (m_xml->readNextStartElement()) {
+      geometryPart(g, m_xml->name().toString());
     }
     return g;
   }
@@ -365,13 +390,13 @@ private:
     } else if (n == QLatin1String("outerBoundaryIs") ||
                n == QLatin1String("innerBoundaryIs")) {
       std::vector<KmlCoordinate> ring;
-      while (m_xml.readNextStartElement()) {
+      while (m_xml->readNextStartElement()) {
         const std::optional<KmlGeometry> part =
-            geometry(m_xml.name().toString());
+            geometry(m_xml->name().toString());
         if (part) {
           ring = part->coordinates;
         } else {
-          m_xml.skipCurrentElement();
+          m_xml->skipCurrentElement();
         }
       }
       if (n == QLatin1String("outerBoundaryIs")) {
@@ -382,8 +407,8 @@ private:
     } else if (n == QLatin1String("when")) {
       g.when.push_back(time(text()).value_or(QDateTime()));
     } else if (n == QLatin1String("coord")) {
-      const QStringList values = text().split(
-          QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+      static const QRegularExpression spaces(QStringLiteral("\\s+"));
+      const QStringList values = text().split(spaces, Qt::SkipEmptyParts);
       g.coordinates.push_back(KmlCoordinate{number(values.value(0), 0.0),
                                             number(values.value(1), 0.0),
                                             number(values.value(2), 0.0)});
@@ -394,35 +419,35 @@ private:
         g.children.push_back(std::move(*member));
       } else {
         note(n);
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     } else {
       note(n);
-      m_xml.skipCurrentElement();
+      m_xml->skipCurrentElement();
     }
   }
 
   KmlStyle style()
   {
     KmlStyle s;
-    s.id = m_xml.attributes().value(QLatin1String("id")).toString();
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    s.id = m_xml->attributes().value(QLatin1String("id")).toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n == QLatin1String("IconStyle")) {
         s.icon = iconStyle();
       } else if (n == QLatin1String("LabelStyle")) {
         KmlLabelStyle label;
-        while (m_xml.readNextStartElement()) {
-          colourOrScale(m_xml.name(), &label.color, &label.scale);
+        while (m_xml->readNextStartElement()) {
+          colourOrScale(m_xml->name(), &label.color, &label.scale);
         }
         s.label = label;
       } else if (n == QLatin1String("LineStyle")) {
         KmlLineStyle line;
-        while (m_xml.readNextStartElement()) {
-          if (m_xml.name() == QLatin1String("width")) {
+        while (m_xml->readNextStartElement()) {
+          if (m_xml->name() == QLatin1String("width")) {
             line.width = number(text(), 1.0);
           } else {
-            colourOrScale(m_xml.name(), &line.color, nullptr);
+            colourOrScale(m_xml->name(), &line.color, nullptr);
           }
         }
         s.line = line;
@@ -434,7 +459,7 @@ private:
         s.list = listStyle();
       } else {
         note(n);
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
     return s;
@@ -451,15 +476,15 @@ private:
     } else if (name == QLatin1String("scale") && scale != nullptr) {
       *scale = number(text(), 1.0);
     } else {
-      m_xml.skipCurrentElement();
+      m_xml->skipCurrentElement();
     }
   }
 
   KmlIconStyle iconStyle()
   {
     KmlIconStyle icon;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n == QLatin1String("Icon")) {
         icon.href = link().href;
       } else if (n == QLatin1String("heading")) {
@@ -467,7 +492,7 @@ private:
       } else if (n == QLatin1String("hotSpot")) {
         icon.hotSpot = vec2();
       } else {
-        colourOrScale(m_xml.name(), &icon.color, &icon.scale);
+        colourOrScale(m_xml->name(), &icon.color, &icon.scale);
       }
     }
     return icon;
@@ -476,14 +501,14 @@ private:
   KmlPolyStyle polyStyle()
   {
     KmlPolyStyle poly;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n == QLatin1String("fill")) {
         poly.fill = isBool(text().trimmed());
       } else if (n == QLatin1String("outline")) {
         poly.outline = isBool(text().trimmed());
       } else {
-        colourOrScale(m_xml.name(), &poly.color, nullptr);
+        colourOrScale(m_xml->name(), &poly.color, nullptr);
       }
     }
     return poly;
@@ -492,8 +517,8 @@ private:
   KmlBalloonStyle balloonStyle()
   {
     KmlBalloonStyle balloon;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n == QLatin1String("bgColor") || n == QLatin1String("color")) {
         balloon.backgroundColor = kmlColor(text());
       } else if (n == QLatin1String("textColor")) {
@@ -503,7 +528,7 @@ private:
       } else if (n == QLatin1String("displayMode")) {
         balloon.display = text().trimmed() != QLatin1String("hide");
       } else {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
     return balloon;
@@ -512,8 +537,8 @@ private:
   KmlListStyle listStyle()
   {
     KmlListStyle list;
-    while (m_xml.readNextStartElement()) {
-      if (m_xml.name() == QLatin1String("listItemType")) {
+    while (m_xml->readNextStartElement()) {
+      if (m_xml->name() == QLatin1String("listItemType")) {
         const QString t = text().trimmed();
         if (t == QLatin1String("radioFolder")) {
           list.itemType = KmlListStyle::ItemType::RadioFolder;
@@ -523,7 +548,7 @@ private:
           list.itemType = KmlListStyle::ItemType::CheckHideChildren;
         }
       } else {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
     return list;
@@ -532,17 +557,17 @@ private:
   KmlStyleMap styleMap()
   {
     KmlStyleMap map;
-    map.id = m_xml.attributes().value(QLatin1String("id")).toString();
-    while (m_xml.readNextStartElement()) {
-      if (m_xml.name() != QLatin1String("Pair")) {
-        m_xml.skipCurrentElement();
+    map.id = m_xml->attributes().value(QLatin1String("id")).toString();
+    while (m_xml->readNextStartElement()) {
+      if (m_xml->name() != QLatin1String("Pair")) {
+        m_xml->skipCurrentElement();
         continue;
       }
       QString key;
       QString url;
       std::optional<KmlStyle> inline_;
-      while (m_xml.readNextStartElement()) {
-        const QString n = m_xml.name().toString();
+      while (m_xml->readNextStartElement()) {
+        const QString n = m_xml->name().toString();
         if (n == QLatin1String("key")) {
           key = text().trimmed();
         } else if (n == QLatin1String("styleUrl")) {
@@ -550,7 +575,7 @@ private:
         } else if (n == QLatin1String("Style")) {
           inline_ = style();
         } else {
-          m_xml.skipCurrentElement();
+          m_xml->skipCurrentElement();
         }
       }
       if (key == QLatin1String("highlight")) {
@@ -568,8 +593,8 @@ private:
   {
     KmlView v;
     v.kind = kind;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n == QLatin1String("longitude")) {
         v.lonDeg = number(text(), 0.0);
       } else if (n == QLatin1String("latitude")) {
@@ -587,7 +612,7 @@ private:
       } else if (n == QLatin1String("altitudeMode")) {
         v.altitudeMode = altitudeMode(text());
       } else {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
     return v;
@@ -596,14 +621,14 @@ private:
   KmlRegion region()
   {
     KmlRegion r;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n != QLatin1String("LatLonAltBox") && n != QLatin1String("Lod")) {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
         continue;
       }
-      while (m_xml.readNextStartElement()) {
-        const QString p = m_xml.name().toString();
+      while (m_xml->readNextStartElement()) {
+        const QString p = m_xml->name().toString();
         const double value = number(text(), 0.0);
         if (p == QLatin1String("north")) {
           r.north = value;
@@ -629,8 +654,8 @@ private:
 
   KmlLatLonBox latLonBox(KmlLatLonBox box)
   {
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       const double value = number(text(), 0.0);
       if (n == QLatin1String("north")) {
         box.north = value;
@@ -650,12 +675,12 @@ private:
   KmlTime timeStamp()
   {
     KmlTime t;
-    while (m_xml.readNextStartElement()) {
-      if (m_xml.name() == QLatin1String("when")) {
+    while (m_xml->readNextStartElement()) {
+      if (m_xml->name() == QLatin1String("when")) {
         t.begin = time(text());
         t.end = t.begin;
       } else {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
     return t;
@@ -664,13 +689,13 @@ private:
   KmlTime timeSpan()
   {
     KmlTime t;
-    while (m_xml.readNextStartElement()) {
-      if (m_xml.name() == QLatin1String("begin")) {
+    while (m_xml->readNextStartElement()) {
+      if (m_xml->name() == QLatin1String("begin")) {
         t.begin = time(text());
-      } else if (m_xml.name() == QLatin1String("end")) {
+      } else if (m_xml->name() == QLatin1String("end")) {
         t.end = time(text());
       } else {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
     return t;
@@ -678,35 +703,35 @@ private:
 
   void extendedData(KmlFeature& f)
   {
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       if (n == QLatin1String("Data")) {
         const QString name =
-            m_xml.attributes().value(QLatin1String("name")).toString();
+            m_xml->attributes().value(QLatin1String("name")).toString();
         QString value;
         QString display;
-        while (m_xml.readNextStartElement()) {
-          if (m_xml.name() == QLatin1String("value")) {
+        while (m_xml->readNextStartElement()) {
+          if (m_xml->name() == QLatin1String("value")) {
             value = text().trimmed();
-          } else if (m_xml.name() == QLatin1String("displayName")) {
+          } else if (m_xml->name() == QLatin1String("displayName")) {
             display = text().trimmed();
           } else {
-            m_xml.skipCurrentElement();
+            m_xml->skipCurrentElement();
           }
         }
         f.extendedData.emplace_back(display.isEmpty() ? name : display, value);
       } else if (n == QLatin1String("SchemaData")) {
-        while (m_xml.readNextStartElement()) {
-          if (m_xml.name() == QLatin1String("SimpleData")) {
+        while (m_xml->readNextStartElement()) {
+          if (m_xml->name() == QLatin1String("SimpleData")) {
             const QString name =
-                m_xml.attributes().value(QLatin1String("name")).toString();
+                m_xml->attributes().value(QLatin1String("name")).toString();
             f.extendedData.emplace_back(name, text().trimmed());
           } else {
-            m_xml.skipCurrentElement();
+            m_xml->skipCurrentElement();
           }
         }
       } else {
-        m_xml.skipCurrentElement();
+        m_xml->skipCurrentElement();
       }
     }
   }
@@ -714,26 +739,17 @@ private:
   KmlLink link()
   {
     KmlLink l;
-    while (m_xml.readNextStartElement()) {
-      const QString n = m_xml.name().toString();
+    while (m_xml->readNextStartElement()) {
+      const QString n = m_xml->name().toString();
       const QString t = text().trimmed();
       if (n == QLatin1String("href")) {
         l.href = t;
       } else if (n == QLatin1String("refreshMode")) {
-        l.refreshMode =
-            t == QLatin1String("onInterval") ? KmlLink::RefreshMode::OnInterval
-            : t == QLatin1String("onExpire") ? KmlLink::RefreshMode::OnExpire
-                                             : KmlLink::RefreshMode::OnChange;
+        l.refreshMode = refreshMode(t);
       } else if (n == QLatin1String("refreshInterval")) {
         l.refreshIntervalS = number(t, 4.0);
       } else if (n == QLatin1String("viewRefreshMode")) {
-        l.viewRefreshMode = t == QLatin1String("onStop")
-                                ? KmlLink::ViewRefreshMode::OnStop
-                            : t == QLatin1String("onRequest")
-                                ? KmlLink::ViewRefreshMode::OnRequest
-                            : t == QLatin1String("onRegion")
-                                ? KmlLink::ViewRefreshMode::OnRegion
-                                : KmlLink::ViewRefreshMode::Never;
+        l.viewRefreshMode = viewRefreshMode(t);
       } else if (n == QLatin1String("viewRefreshTime")) {
         l.viewRefreshTimeS = number(t, 4.0);
       } else if (n == QLatin1String("viewBoundScale")) {
@@ -750,17 +766,17 @@ private:
   KmlVec2 vec2()
   {
     KmlVec2 v;
-    const QXmlStreamAttributes a = m_xml.attributes();
+    const QXmlStreamAttributes a = m_xml->attributes();
     v.x = number(a.value(QLatin1String("x")).toString(), 0.5);
     v.y = number(a.value(QLatin1String("y")).toString(), 0.5);
     v.xUnits = units(a.value(QLatin1String("xunits")).toString());
     v.yUnits = units(a.value(QLatin1String("yunits")).toString());
-    m_xml.skipCurrentElement();
+    m_xml->skipCurrentElement();
     return v;
   }
 
-  QXmlStreamReader& m_xml;
-  KmlDocument& m_document;
+  QXmlStreamReader* m_xml;
+  KmlDocument* m_document;
 };
 
 std::optional<KmlFeature::Kind> featureKind(const QString& n)
@@ -803,10 +819,10 @@ QByteArray readVsi(const QString& path)
     return QByteArray();
   }
   QByteArray data;
-  char buffer[65536];
+  std::array<char, 65536> buffer{};
   size_t read = 0;
-  while ((read = VSIFReadL(buffer, 1, sizeof(buffer), file)) > 0) {
-    data.append(buffer, static_cast<qsizetype>(read));
+  while ((read = VSIFReadL(buffer.data(), 1, buffer.size(), file)) > 0) {
+    data.append(buffer.data(), static_cast<qsizetype>(read));
   }
   VSIFCloseL(file);
   return data;
@@ -930,7 +946,7 @@ std::optional<KmlDocument> readKmlFile(const QString& path,
 
 QString resolveKmlHref(const KmlDocument& document, const QString& href)
 {
-  const QString trimmed = href.trimmed();
+  QString trimmed = href.trimmed();
   if (trimmed.isEmpty()) {
     return QString();
   }
@@ -979,7 +995,7 @@ QByteArray readKmlLocalFile(const QString& where)
 }
 
 KmlStyleResolver::KmlStyleResolver(const KmlDocument& document)
-    : m_document(document)
+    : m_document(&document)
 {
 }
 
@@ -992,11 +1008,11 @@ std::optional<KmlStyle> KmlStyleResolver::styleAt(const QString& url,
   }
   const QString file = url.left(hash);
   const QString id = url.mid(hash + 1);
-  const KmlDocument* document = &m_document;
+  const KmlDocument* document = m_document;
   if (!file.isEmpty()) {
     std::shared_ptr<const KmlDocument>& external = m_external[file];
     if (!external) {
-      const QString where = resolveKmlHref(m_document, file);
+      const QString where = resolveKmlHref(*m_document, file);
       QString error;
       std::optional<KmlDocument> read =
           where.startsWith(QLatin1String("/vsizip/"))

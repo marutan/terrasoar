@@ -182,7 +182,8 @@ void KmlLinks::load(const QString& nodeId, const KmlViewParameters& view)
   if (link.ticket) {
     return; // already on its way
   }
-  link.url = kmlLinkUrl(*link.feature->link, *link.document, view);
+  link.url =
+      kmlLinkUrl(link.feature->link.value_or(KmlLink{}), *link.document, view);
   if (link.url.isLocalFile()) {
     const QString where = link.url.toLocalFile();
     if (QFileInfo::exists(where)) {
@@ -198,9 +199,10 @@ void KmlLinks::load(const QString& nodeId, const KmlViewParameters& view)
       // Inside a KMZ: copied out.
       const QByteArray body = readKmlLocalFile(where);
       if (body.isEmpty()) {
-        emit failed(nodeId, QCoreApplication::translate("ts::KmlLinks",
-                                                        "\"%1\" can't be read.")
-                                .arg(link.feature->link->href));
+        emit failed(
+            nodeId,
+            QCoreApplication::translate("ts::KmlLinks", "\"%1\" can't be read.")
+                .arg(link.feature->link.value_or(KmlLink{}).href));
       } else {
         deliver(nodeId, link, body);
       }

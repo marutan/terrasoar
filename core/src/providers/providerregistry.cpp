@@ -378,6 +378,31 @@ ProviderRegistry::basePackTime(const QJsonObject& source) const
   return time;
 }
 
+namespace
+{
+
+/** A KML layer's placemarks ("kind": "kml"). */
+std::shared_ptr<FeatureProvider> createKmlFeatures(const QJsonObject& source,
+                                                   QString* errorString)
+{
+  std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+      source.value(QStringLiteral("path")).toString(), errorString);
+  if (!document) {
+    return nullptr;
+  }
+  // The clock's moment for a document with times (kmlTimeKey()).
+  std::optional<QDateTime> at;
+  if (source.contains(QStringLiteral("at"))) {
+    at = QDateTime::fromString(source.value(QStringLiteral("at")).toString(),
+                               Qt::ISODate);
+  }
+  return std::make_shared<KmlFeatureProvider>(
+      std::move(document), source.value(QStringLiteral("container")).toString(),
+      at, source.value(QStringLiteral("deep")).toBool());
+}
+
+} // namespace
+
 std::shared_ptr<FeatureProvider>
 ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 {
@@ -386,29 +411,14 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
     const QString key = canonical(source);
     const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
         found = m_features.find(key);
-    if (found != m_features.end()) {
-      std::shared_ptr<FeatureProvider> live = found->second.lock();
-      if (live) {
-        return live;
-      }
+    std::shared_ptr<FeatureProvider> provider =
+        found != m_features.end() ? found->second.lock() : nullptr;
+    if (!provider) {
+      provider = createKmlFeatures(source, errorString);
     }
-    std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
-        source.value(QStringLiteral("path")).toString(), errorString);
-    if (!document) {
-      return nullptr;
+    if (provider) {
+      m_features[key] = provider;
     }
-    // The clock's moment for a document with times (kmlTimeKey()).
-    std::optional<QDateTime> at;
-    if (source.contains(QStringLiteral("at"))) {
-      at = QDateTime::fromString(source.value(QStringLiteral("at")).toString(),
-                                 Qt::ISODate);
-    }
-    std::shared_ptr<KmlFeatureProvider> provider =
-        std::make_shared<KmlFeatureProvider>(
-            std::move(document),
-            source.value(QStringLiteral("container")).toString(), at,
-            source.value(QStringLiteral("deep")).toBool());
-    m_features[key] = provider;
     return provider;
   }
   if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wfs")) {

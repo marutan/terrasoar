@@ -103,7 +103,7 @@ public:
   std::optional<KmlStyle> styleAt(const QString& url, bool highlight);
 
 private:
-  const KmlDocument& m_document;
+  const KmlDocument* m_document;
   std::map<QString, std::shared_ptr<const KmlDocument>> m_external;
 };
 

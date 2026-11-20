@@ -37,6 +37,8 @@
 namespace ts
 {
 
+class KmlStyleResolver;
+
 /**
  * Returns the document at @p path, read once and shared while anything
  * holds it (every layer of one file shares one copy); null, with
@@ -262,6 +264,11 @@ public:
   bool hasTracks() const { return !m_tracks.empty(); }
 
 private:
+  bool shownAt(const std::optional<KmlTime>& time) const;
+  void addChildren(const KmlFeature& parent, const std::optional<KmlTime>& time,
+                   KmlStyleResolver& resolver);
+  void addPlacemark(const KmlFeature& placemark, KmlStyleResolver& resolver);
+
   struct Entry {
     /** Drawn over the view (a raised shape or a point), not in tiles. */
     bool overlay = false;

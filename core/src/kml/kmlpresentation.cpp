@@ -36,24 +36,75 @@ constexpr double pi = 3.14159265358979323846;
 constexpr double metresPerDegree = 111320.0;
 constexpr double largestTiltDeg = 85.0;
 
-void extend(const std::vector<KmlCoordinate>& coordinates, double* west,
-            double* south, double* east, double* north)
+/** A latitude/longitude box being grown; empty to start with. */
+struct Bounds {
+  double west = 1e9;
+  double south = 1e9;
+  double east = -1e9;
+  double north = -1e9;
+};
+
+void extend(const std::vector<KmlCoordinate>& coordinates, Bounds& bounds)
 {
   for (const KmlCoordinate& c : coordinates) {
-    *west = std::min(*west, c.lonDeg);
-    *east = std::max(*east, c.lonDeg);
-    *south = std::min(*south, c.latDeg);
-    *north = std::max(*north, c.latDeg);
+    bounds.west = std::min(bounds.west, c.lonDeg);
+    bounds.east = std::max(bounds.east, c.lonDeg);
+    bounds.south = std::min(bounds.south, c.latDeg);
+    bounds.north = std::max(bounds.north, c.latDeg);
   }
 }
 
-void extendGeometry(const KmlGeometry& geometry, double* west, double* south,
-                    double* east, double* north)
+void extendGeometry(const KmlGeometry& geometry, Bounds& bounds)
 {
-  extend(geometry.coordinates, west, south, east, north);
+  extend(geometry.coordinates, bounds);
   for (const KmlGeometry& child : geometry.children) {
-    extendGeometry(child, west, south, east, north);
+    extendGeometry(child, bounds);
   }
+}
+
+/** The value of $[key] (or $[key/displayName]) in a balloon's template. */
+QString balloonValue(const KmlFeature& placemark, const QString& key,
+                     bool displayName)
+{
+  if (key == QLatin1String("name")) {
+    return placemark.name.toHtmlEscaped();
+  }
+  if (key == QLatin1String("description")) {
+    return placemark.description;
+  }
+  if (key == QLatin1String("Snippet")) {
+    return placemark.snippet.toHtmlEscaped();
+  }
+  if (key == QLatin1String("id")) {
+    return placemark.id.toHtmlEscaped();
+  }
+  QString value;
+  for (const std::pair<QString, QString>& data : placemark.extendedData) {
+    if (data.first == key) {
+      value = displayName ? data.first.toHtmlEscaped()
+                          : data.second.toHtmlEscaped();
+    }
+  }
+  return value;
+}
+
+/** A BalloonStyle's text with its $[…] filled in. */
+QString filledBalloon(const KmlFeature& placemark, const QString& text)
+{
+  static const QRegularExpression entity(
+      QStringLiteral("\\$\\[([^\\]/]+)(/displayName)?\\]"));
+  QString filled;
+  int32_t from = 0;
+  QRegularExpressionMatchIterator matches = entity.globalMatch(text);
+  while (matches.hasNext()) {
+    const QRegularExpressionMatch match = matches.next();
+    filled +=
+        text.mid(from, static_cast<int32_t>(match.capturedStart()) - from);
+    filled += balloonValue(placemark, match.captured(1),
+                           !match.captured(2).isEmpty());
+    from = static_cast<int32_t>(match.capturedEnd());
+  }
+  return filled + text.mid(from);
 }
 
 } // namespace
@@ -89,19 +140,19 @@ std::optional<CameraPose> kmlFeaturePose(const KmlFeature& feature)
   if (feature.view) {
     return kmlViewPose(*feature.view);
   }
-  double west = 1e9;
-  double south = 1e9;
-  double east = -1e9;
-  double north = -1e9;
+  Bounds bounds;
   if (feature.geometry) {
-    extendGeometry(*feature.geometry, &west, &south, &east, &north);
+    extendGeometry(*feature.geometry, bounds);
+  } else if (feature.latLonBox && !feature.latLonBox->quad.empty()) {
+    extend(feature.latLonBox->quad, bounds);
   } else if (feature.latLonBox) {
-    west = feature.latLonBox->west;
-    east = feature.latLonBox->east;
-    south = feature.latLonBox->south;
-    north = feature.latLonBox->north;
-    extend(feature.latLonBox->quad, &west, &south, &east, &north);
+    bounds = Bounds{feature.latLonBox->west, feature.latLonBox->south,
+                    feature.latLonBox->east, feature.latLonBox->north};
   }
+  const double west = bounds.west;
+  const double south = bounds.south;
+  const double east = bounds.east;
+  const double north = bounds.north;
   if (west > east) {
     return std::nullopt;
   }
@@ -121,41 +172,7 @@ QString kmlBalloonHtml(const KmlFeature& placemark, const KmlStyle& style)
   const KmlBalloonStyle balloon = style.balloon.value_or(KmlBalloonStyle{});
   QString html;
   if (!balloon.text.isEmpty()) {
-    static const QRegularExpression entity(
-        QStringLiteral("\\$\\[([^\\]/]+)(/displayName)?\\]"));
-    html = balloon.text;
-    QString filled;
-    int32_t from = 0;
-    QRegularExpressionMatchIterator matches = entity.globalMatch(html);
-    while (matches.hasNext()) {
-      const QRegularExpressionMatch match = matches.next();
-      const QString key = match.captured(1);
-      QString value;
-      if (key == QLatin1String("name")) {
-        value = placemark.name.toHtmlEscaped();
-      } else if (key == QLatin1String("description")) {
-        value = placemark.description;
-      } else if (key == QLatin1String("Snippet")) {
-        value = placemark.snippet.toHtmlEscaped();
-      } else if (key == QLatin1String("id")) {
-        value = placemark.id.toHtmlEscaped();
-      } else if (key == QLatin1String("geDirections")) {
-        value = QString();
-      } else {
-        for (const std::pair<QString, QString>& data : placemark.extendedData) {
-          if (data.first == key) {
-            value = match.captured(2).isEmpty() ? data.second.toHtmlEscaped()
-                                                : data.first.toHtmlEscaped();
-          }
-        }
-      }
-      filled +=
-          html.mid(from, static_cast<int32_t>(match.capturedStart()) - from);
-      filled += value;
-      from = static_cast<int32_t>(match.capturedEnd());
-    }
-    filled += html.mid(from);
-    return filled;
+    return filledBalloon(placemark, balloon.text);
   }
   if (!placemark.name.isEmpty()) {
     html += QStringLiteral("<h3>%1</h3>").arg(placemark.name.toHtmlEscaped());

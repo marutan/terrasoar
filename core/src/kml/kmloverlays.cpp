@@ -159,6 +159,8 @@ QRgb sample(const QImage& image, QPointF uv)
 
 } // namespace
 
+// The file, then the feature in it, as kmlLayerSource().
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 QJsonObject kmlOverlaySource(const QString& path, const QString& featurePath)
 {
   QJsonObject source;
@@ -371,7 +373,7 @@ KmlGroundOverlayProvider::loadTileImage(TileKey key,
   QImage image(tilePx, tilePx, QImage::Format_ARGB32);
   image.fill(Qt::transparent);
   bool any = false;
-  const KmlLatLonBox& box = *m_overlay->latLonBox;
+  const KmlLatLonBox box = m_overlay->latLonBox.value_or(KmlLatLonBox{});
   for (int32_t j = 0; j < tilePx; ++j) {
     if (cancelled.load()) {
       result.outcome = ImageLoadResult::Outcome::Cancelled;

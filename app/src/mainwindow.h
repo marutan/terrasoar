@@ -66,11 +66,13 @@ class BalloonWindow;
 class IconCache;
 class KmlLinks;
 struct KmlViewParameters;
+struct KmlBillboard;
 class ElevationProfileDialog;
 class FeatureInfoWindow;
 struct AboutDataRow;
 
 class CountryAreas;
+struct BillboardDraw;
 class GlobeView;
 struct KmlDocument;
 struct KmlFeature;
@@ -352,6 +354,7 @@ private:
   std::vector<QAction*> nodeActions(const QModelIndex& index, QObject* parent);
   bool showBalloonAt(LonLat point, double degreesPerPixel);
   void refreshBillboards(const LayerStack& stack);
+  BillboardDraw billboardDraw(const KmlBillboard& billboard);
   QImage tintedIcon(const QString& where, const QColor& tint,
                     bool pushpin = true);
   void addKmlChildren(const KmlDocument& document, const KmlFeature& container,

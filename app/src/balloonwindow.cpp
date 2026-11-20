@@ -55,7 +55,7 @@ void BalloonWindow::changeEvent(QEvent* event)
 
 void BalloonWindow::showBalloon(const QString& title, const QString& html,
                                 const QColor& background,
-                                std::optional<CameraPose> pose,
+                                const std::optional<CameraPose>& pose,
                                 const QString& baseDirectory)
 {
   m_title = title;

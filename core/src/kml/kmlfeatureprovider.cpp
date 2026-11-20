@@ -278,8 +278,11 @@ const KmlFeature* kmlContainer(const KmlDocument& document,
   return feature;
 }
 
+// The file, then the container in it.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 QJsonObject kmlLayerSource(const QString& path, const QString& containerPath,
                            bool deep)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   QJsonObject source;
   source.insert(QStringLiteral("kind"), QStringLiteral("kml"));
@@ -373,14 +376,9 @@ std::vector<KmlRaisedShape> kmlRaisedShapes(const KmlFeature& placemark,
 namespace
 {
 
-std::vector<Feature> placemarkFeatures(const KmlFeature& placemark,
-                                       const KmlStyle& style,
-                                       std::vector<bool>* overlay)
+/** A feature with the placemark's id and attributes, no geometry yet. */
+Feature placemarkBase(const KmlFeature& placemark)
 {
-  std::vector<Feature> features;
-  if (!placemark.geometry) {
-    return features;
-  }
   Feature base;
   base.id = placemark.id;
   base.attributes.insert(QStringLiteral("name"), placemark.name);
@@ -391,36 +389,44 @@ std::vector<Feature> placemarkFeatures(const KmlFeature& placemark,
   for (const std::pair<QString, QString>& data : placemark.extendedData) {
     base.attributes.insert(data.first, data.second);
   }
+  return base;
+}
+
+/** How a part of type @p type looks with @p style. */
+FeatureStyle partStyle(const KmlStyle& style, Feature::Type type)
+{
   const KmlLineStyle line = style.line.value_or(KmlLineStyle{});
   const KmlPolyStyle poly = style.poly.value_or(KmlPolyStyle{});
+  const bool tinted = style.icon && style.icon->color != QColor(255, 255, 255);
   FeatureStyle look;
   look.outline = line.color;
   look.outlineWidthPx = line.width;
   look.fill = poly.fill ? poly.color : QColor(0, 0, 0, 0);
-  if (style.icon) {
-    const bool tinted = style.icon->color != QColor(255, 255, 255);
-    look.pointSizePx = pointSizePx * style.icon->scale;
-    if (tinted) {
-      look.outline = style.icon->color;
-    }
+  if (type == Feature::Type::Points) {
+    // Dots in the icon's colour, yellow for the default pushpin.
+    look.outline = tinted ? style.icon->color : defaultIconColour;
+    look.pointSizePx = pointSizePx * (style.icon ? style.icon->scale : 1.0);
+  } else if (type == Feature::Type::Polygon && !poly.outline) {
+    look.outline = QColor(0, 0, 0, 0);
+  }
+  return look;
+}
+
+std::vector<Feature> placemarkFeatures(const KmlFeature& placemark,
+                                       const KmlStyle& style,
+                                       std::vector<bool>* overlay)
+{
+  std::vector<Feature> features;
+  if (!placemark.geometry) {
+    return features;
   }
   std::vector<Feature> parts;
   std::vector<bool> raised;
-  addGeometry(*placemark.geometry, base, parts, &raised);
+  addGeometry(*placemark.geometry, placemarkBase(placemark), parts, &raised);
   for (std::size_t i = 0; i < parts.size(); ++i) {
     Feature& feature = parts[i];
     const std::size_t before = features.size();
-    FeatureStyle own = look;
-    if (feature.type == Feature::Type::Points) {
-      // Dots in the icon's colour, yellow for the default pushpin.
-      own.outline = style.icon && style.icon->color != QColor(255, 255, 255)
-                        ? style.icon->color
-                        : defaultIconColour;
-      own.pointSizePx = pointSizePx * (style.icon ? style.icon->scale : 1.0);
-    } else if (feature.type == Feature::Type::Polygon && !poly.outline) {
-      own.outline = QColor(0, 0, 0, 0);
-    }
-    feature.style = own;
+    feature.style = partStyle(style, feature.type);
     const GeoRect bounds = boundsOf(feature);
     if (bounds.eastDeg > 180.0) {
       features.push_back(shifted(feature, -360.0));
@@ -477,78 +483,84 @@ KmlFeatureProvider::KmlFeatureProvider(
   }
   m_name = container->name;
   KmlStyleResolver resolver(*m_document);
-  const std::function<bool(const std::optional<KmlTime>&)> shown =
-      [this](const std::optional<KmlTime>& time) {
-        return !m_at || !time || kmlShownAt(*time, *m_at);
-      };
-  const std::function<void(const KmlFeature&)> add =
-      [&](const KmlFeature& placemark) {
-        const KmlStyle style = resolver.resolve(placemark);
-        std::vector<bool> overlay;
-        std::vector<Feature> features =
-            placemarkFeatures(placemark, style, &overlay);
-        for (std::size_t i = 0; i < features.size(); ++i) {
-          const GeoRect bounds = boundsOf(features[i]);
-          m_entries.push_back(
-              Entry{overlay[i], std::move(features[i]), bounds, &placemark});
-        }
-        std::vector<KmlBillboard> points =
-            kmlBillboards(*m_document, placemark, style);
-        m_billboards.insert(m_billboards.end(), points.begin(), points.end());
-        std::vector<KmlRaisedShape> raised = kmlRaisedShapes(placemark, style);
-        m_raised.insert(m_raised.end(), raised.begin(), raised.end());
-        if (placemark.geometry) {
-          std::vector<const KmlGeometry*> tracks;
-          collectTracks(*placemark.geometry, tracks);
-          if (!tracks.empty()) {
-            // The marker looks as a point of the placemark would.
-            KmlFeature asPoint = placemark;
-            KmlGeometry point;
-            point.kind = KmlGeometry::Kind::Point;
-            point.coordinates = {KmlCoordinate{}};
-            asPoint.geometry = point;
-            std::vector<KmlBillboard> look =
-                kmlBillboards(*m_document, asPoint, style);
-            for (const KmlGeometry* track : tracks) {
-              KmlBillboard marker = look.front();
-              marker.placemark = &placemark;
-              marker.altitudeMode = track->altitudeMode;
-              m_tracks.emplace_back(track, marker);
-            }
-          }
-        }
-      };
-  const std::function<void(const KmlFeature&, const std::optional<KmlTime>&)>
-      visit = [&](const KmlFeature& parent,
-                  const std::optional<KmlTime>& time) {
-        for (const KmlFeature& child : parent.children) {
-          const std::optional<KmlTime> own = kmlNarrowTime(time, child.time);
-          if (!shown(own)) {
-            continue;
-          }
-          if (child.kind == KmlFeature::Kind::Placemark) {
-            add(child);
-          } else if (m_deep && child.kind == KmlFeature::Kind::ScreenOverlay) {
-            m_screens.push_back(&child);
-          } else if (m_deep && (child.kind == KmlFeature::Kind::Document ||
-                                child.kind == KmlFeature::Kind::Folder)) {
-            visit(child, own);
-          }
-        }
-      };
   const std::optional<KmlTime> time =
       kmlEffectiveTime(*m_document, containerPath);
-  if (!shown(time)) {
+  if (!shownAt(time)) {
     return;
   }
   // A placemark or screen overlay named itself (a file of one placemark;
   // a screen overlay's own layer).
   if (container->kind == KmlFeature::Kind::Placemark) {
-    add(*container);
+    addPlacemark(*container, resolver);
   } else if (container->kind == KmlFeature::Kind::ScreenOverlay) {
     m_screens.push_back(container);
   }
-  visit(*container, time);
+  addChildren(*container, time, resolver);
+}
+
+bool KmlFeatureProvider::shownAt(const std::optional<KmlTime>& time) const
+{
+  return !m_at || !time || kmlShownAt(*time, *m_at);
+}
+
+void KmlFeatureProvider::addChildren(const KmlFeature& parent,
+                                     const std::optional<KmlTime>& time,
+                                     KmlStyleResolver& resolver)
+{
+  for (const KmlFeature& child : parent.children) {
+    const std::optional<KmlTime> own = kmlNarrowTime(time, child.time);
+    if (!shownAt(own)) {
+      continue;
+    }
+    if (child.kind == KmlFeature::Kind::Placemark) {
+      addPlacemark(child, resolver);
+    } else if (m_deep && child.kind == KmlFeature::Kind::ScreenOverlay) {
+      m_screens.push_back(&child);
+    } else if (m_deep && (child.kind == KmlFeature::Kind::Document ||
+                          child.kind == KmlFeature::Kind::Folder)) {
+      addChildren(child, own, resolver);
+    }
+  }
+}
+
+void KmlFeatureProvider::addPlacemark(const KmlFeature& placemark,
+                                      KmlStyleResolver& resolver)
+{
+  const KmlStyle style = resolver.resolve(placemark);
+  std::vector<bool> overlay;
+  std::vector<Feature> features = placemarkFeatures(placemark, style, &overlay);
+  for (std::size_t i = 0; i < features.size(); ++i) {
+    const GeoRect bounds = boundsOf(features[i]);
+    m_entries.push_back(
+        Entry{overlay[i], std::move(features[i]), bounds, &placemark});
+  }
+  std::vector<KmlBillboard> points =
+      kmlBillboards(*m_document, placemark, style);
+  m_billboards.insert(m_billboards.end(), points.begin(), points.end());
+  std::vector<KmlRaisedShape> raised = kmlRaisedShapes(placemark, style);
+  m_raised.insert(m_raised.end(), raised.begin(), raised.end());
+  if (!placemark.geometry) {
+    return;
+  }
+  std::vector<const KmlGeometry*> tracks;
+  collectTracks(*placemark.geometry, tracks);
+  if (tracks.empty()) {
+    return;
+  }
+  // The marker looks as a point of the placemark would.
+  KmlFeature asPoint = placemark;
+  KmlGeometry point;
+  point.kind = KmlGeometry::Kind::Point;
+  point.coordinates = {KmlCoordinate{}};
+  asPoint.geometry = point;
+  const std::vector<KmlBillboard> look =
+      kmlBillboards(*m_document, asPoint, style);
+  for (const KmlGeometry* track : tracks) {
+    KmlBillboard marker = look.front();
+    marker.placemark = &placemark;
+    marker.altitudeMode = track->altitudeMode;
+    m_tracks.emplace_back(track, marker);
+  }
 }
 
 std::vector<KmlBillboard>
@@ -633,6 +645,25 @@ std::vector<Feature> KmlFeatureProvider::featuresAt(GeoPoint point,
   return found;
 }
 
+namespace
+{
+
+/** Points are picked before lines, lines before areas. */
+int32_t pickRank(Feature::Type type)
+{
+  switch (type) {
+  case Feature::Type::Points:
+    return 0;
+  case Feature::Type::LineStrings:
+    return 1;
+  case Feature::Type::Polygon:
+    break;
+  }
+  return 2;
+}
+
+} // namespace
+
 std::vector<const KmlFeature*>
 KmlFeatureProvider::placemarksAt(GeoPoint point, double toleranceDeg) const
 {
@@ -647,14 +678,11 @@ KmlFeatureProvider::placemarksAt(GeoPoint point, double toleranceDeg) const
     if (!near || !featureUnder(entry.feature, point, toleranceDeg)) {
       continue;
     }
-    const int32_t rank = entry.feature.type == Feature::Type::Points        ? 0
-                         : entry.feature.type == Feature::Type::LineStrings ? 1
-                                                                            : 2;
-    hits.emplace_back(rank, entry.placemark);
+    hits.emplace_back(pickRank(entry.feature.type), entry.placemark);
   }
   std::stable_sort(hits.begin(), hits.end(),
-                   [](const std::pair<int32_t, const KmlFeature*>& a,
-                      const std::pair<int32_t, const KmlFeature*>& b) {
+                   [](std::pair<int32_t, const KmlFeature*> a,
+                      std::pair<int32_t, const KmlFeature*> b) {
                      return a.first < b.first;
                    });
   std::vector<const KmlFeature*> found;

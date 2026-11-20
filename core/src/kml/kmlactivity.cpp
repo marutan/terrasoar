@@ -261,8 +261,9 @@ std::optional<KmlCoordinate> kmlTrackPosition(const KmlGeometry& track,
       continue;
     }
     const int64_t span = from.msecsTo(to);
-    const double t =
-        span > 0 ? static_cast<double>(from.msecsTo(clock)) / span : 0.0;
+    const double t = span > 0 ? static_cast<double>(from.msecsTo(clock)) /
+                                    static_cast<double>(span)
+                              : 0.0;
     const KmlCoordinate& a = track.coordinates.at(i);
     const KmlCoordinate& b = track.coordinates.at(i + 1);
     double toLon = b.lonDeg;
@@ -342,12 +343,11 @@ bool kmlRegionActive(const KmlRegion& region, const Camera& camera)
 bool kmlRegionsActive(const KmlDocument& document, const QString& featurePath,
                       const Camera& camera)
 {
-  for (const KmlFeature* feature : chainTo(document, featurePath)) {
-    if (feature->region && !kmlRegionActive(*feature->region, camera)) {
-      return false;
-    }
-  }
-  return true;
+  const std::vector<const KmlFeature*> chain = chainTo(document, featurePath);
+  return std::all_of(
+      chain.begin(), chain.end(), [&camera](const KmlFeature* feature) {
+        return !feature->region || kmlRegionActive(*feature->region, camera);
+      });
 }
 
 bool kmlHasRegion(const KmlDocument& document, const QString& featurePath)

@@ -49,6 +49,21 @@ QString fixture(const QString& name)
   return QStringLiteral(TS_TEST_DATA_DIR "/kml/") + name;
 }
 
+/**
+ * The fixture @p name, shared as the display reads it; ends the run if it
+ * can't be read.
+ */
+std::shared_ptr<const ts::KmlDocument> shared(const QString& name)
+{
+  QString error;
+  std::shared_ptr<const ts::KmlDocument> document =
+      ts::sharedKmlDocument(fixture(name), &error);
+  if (!document) {
+    qFatal("%s: %s", qPrintable(name), qPrintable(error));
+  }
+  return document;
+}
+
 /** The names of the placemarks @p provider shows, in order, each once. */
 std::vector<QString> names(const ts::KmlFeatureProvider& provider)
 {
@@ -599,11 +614,7 @@ private slots:
   {
     QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
-        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
-                              &error);
-    if (!document) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("everything.kml"));
     // One copy while anything holds it.
     QCOMPARE(ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
                                    &error),
@@ -662,11 +673,7 @@ private slots:
     // A point's icon, tint, scale, heading, hot spot and label.
     QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
-        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
-                              &error);
-    if (!document) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("everything.kml"));
     ts::KmlFeatureProvider shapes(document, QStringLiteral("0"));
     // The point and the two of the MultiGeometry; only the first of a
     // placemark's points is labelled.
@@ -701,10 +708,7 @@ private slots:
     QVERIFY(!shapes.placemarksAt(ts::GeoPoint{52.4862, -1.8904}, 0.01).empty());
     // A KMZ's icon is inside the archive, and can be read.
     const std::shared_ptr<const ts::KmlDocument> kmz =
-        ts::sharedKmlDocument(fixture(QStringLiteral("archive.kmz")), &error);
-    if (!kmz) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("archive.kmz"));
     ts::KmlFeatureProvider pinned(kmz, QString());
     QCOMPARE(pinned.billboards().size(), std::size_t{1});
     const QString icon = pinned.billboards().front().icon;
@@ -734,10 +738,7 @@ private slots:
     // Shapes above the ground: drawn over the view, not in the tiles.
     QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
-        ts::sharedKmlDocument(fixture(QStringLiteral("heights.kml")), &error);
-    if (!document) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("heights.kml"));
     ts::KmlFeatureProvider provider(document, QString());
     const std::vector<ts::KmlRaisedShape>& raised = provider.raisedShapes();
     QCOMPARE(raised.size(), std::size_t{2});
@@ -908,21 +909,14 @@ private slots:
     QCOMPARE(provider.maximumLevel(), 3);
     // A missing picture: nothing anywhere.
     const std::shared_ptr<const ts::KmlDocument> everything =
-        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
-                              &error);
-    if (!everything) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("everything.kml"));
     // A placemark isn't a ground overlay.
     QVERIFY(!ts::KmlGroundOverlayProvider(everything, QStringLiteral("0.0"),
                                           nullptr)
                  .isValid());
     // The KMZ's square, read from the archive.
     const std::shared_ptr<const ts::KmlDocument> kmz =
-        ts::sharedKmlDocument(fixture(QStringLiteral("archive.kmz")), &error);
-    if (!kmz) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("archive.kmz"));
     ts::KmlGroundOverlayProvider square(kmz, QStringLiteral("1"), nullptr);
     QVERIFY(square.isValid());
     const ts::ImageLoadResult inside = square.loadTileImage(
@@ -968,20 +962,16 @@ private slots:
     QCOMPARE(ts::kmlScreenRect(plain, QSizeF(40, 20), QSizeF(800, 600)).rect,
              QRectF(200, 200, 400, 200));
     // A ScreenOverlay's layer: the provider has it.
-    QString error;
-    const std::shared_ptr<const ts::KmlDocument> shared = ts::sharedKmlDocument(
-        fixture(QStringLiteral("everything.kml")), &error);
-    if (!shared) {
-      QFAIL(qPrintable(error));
-    }
+    const std::shared_ptr<const ts::KmlDocument> everything =
+        shared(QStringLiteral("everything.kml"));
     QString path;
-    for (std::size_t i = 0; i < shared->root.children.size(); ++i) {
-      if (shared->root.children.at(i).kind ==
+    for (std::size_t i = 0; i < everything->root.children.size(); ++i) {
+      if (everything->root.children.at(i).kind ==
           ts::KmlFeature::Kind::ScreenOverlay) {
         path = QString::number(i);
       }
     }
-    ts::KmlFeatureProvider provider(shared, path);
+    ts::KmlFeatureProvider provider(everything, path);
     QCOMPARE(provider.screenOverlays().size(), std::size_t{1});
     QCOMPARE(provider.featureCount(), std::size_t{0});
   }
@@ -1016,11 +1006,7 @@ private slots:
     // everything.kml's "Times and places": a stamp and a span.
     QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
-        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
-                              &error);
-    if (!document) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("everything.kml"));
     const QString times = QStringLiteral("1");
     QCOMPARE(ts::kmlContainer(*document, times)->name,
              QStringLiteral("Times and places"));
@@ -1067,11 +1053,7 @@ private slots:
   {
     QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
-        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
-                              &error);
-    if (!document) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("everything.kml"));
     const ts::KmlFeature* track =
         ts::kmlContainer(*document, QStringLiteral("1.2"));
     QVERIFY(track != nullptr && track->geometry.has_value());
@@ -1211,10 +1193,7 @@ private slots:
                       QStringLiteral("https://example.invalid/links.kml"));
     QString error;
     const std::shared_ptr<const ts::KmlDocument> copy =
-        ts::sharedKmlDocument(fixture(QStringLiteral("links.kml")), &error);
-    if (!copy) {
-      QFAIL(qPrintable(error));
-    }
+        shared(QStringLiteral("links.kml"));
     QCOMPARE(copy->webBase,
              QStringLiteral("https://example.invalid/links.kml"));
   }
@@ -1223,13 +1202,8 @@ private slots:
   {
     // A checkHideChildren folder's layer: everything inside.
     QString error;
-    const std::shared_ptr<const ts::KmlDocument> document =
-        ts::sharedKmlDocument(fixture(QStringLiteral("heights.kml")), &error);
-    const std::shared_ptr<const ts::KmlDocument> links = ts::sharedKmlDocument(
-        fixture(QStringLiteral("everything.kml")), &error);
-    if (!document || !links) {
-      QFAIL(qPrintable(error));
-    }
+    const std::shared_ptr<const ts::KmlDocument> links =
+        shared(QStringLiteral("everything.kml"));
     // everything.kml's root, deep: all placemarks of every folder.
     ts::KmlFeatureProvider shallow(links, QString());
     ts::KmlFeatureProvider deep(links, QString(), std::nullopt, true);

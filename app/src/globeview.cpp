@@ -956,6 +956,8 @@ double GlobeView::groundHeightM(double latDeg, double lonDeg)
   return m_globe->terrainHeightM(latDeg, lonDeg).value_or(0.0);
 }
 
+// Latitude, then longitude, as everywhere in the program.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Vec3 GlobeView::overlayEcef(double latDeg, double lonDeg, double heightM,
                             OverlayHeight height)
 {
@@ -1010,7 +1012,186 @@ struct OverlayPiece {
   QPen pen;
 };
 
+using Projected = std::vector<std::optional<ScreenPoint>>;
+
+/** A polygon's top as it builds up from its rings. */
+struct ShapeTop {
+  QPainterPath path;
+  double depthM = 0.0;
+  int32_t count = 0;
+  bool whole = true;
+};
+
+/** The walls of a ring: one quad per edge, from its top to its foot. */
+bool addWalls(const RaisedShapeDraw& shape, const Projected& tops,
+              const Projected& feet, const QRectF& visible,
+              std::vector<OverlayPiece>& pieces)
+{
+  const std::size_t n = tops.size();
+  const std::size_t edges = shape.closed ? n : n - 1;
+  bool any = false;
+  for (std::size_t i = 0; i < edges; ++i) {
+    const std::size_t j = (i + 1) % n;
+    if (!tops[i] || !tops[j] || !feet[i] || !feet[j]) {
+      continue;
+    }
+    QPainterPath quad;
+    quad.moveTo(tops[i]->xPx, tops[i]->yPx);
+    quad.lineTo(tops[j]->xPx, tops[j]->yPx);
+    quad.lineTo(feet[j]->xPx, feet[j]->yPx);
+    quad.lineTo(feet[i]->xPx, feet[i]->yPx);
+    quad.closeSubpath();
+    if (!visible.intersects(quad.boundingRect())) {
+      continue;
+    }
+    const double depth = (tops[i]->depthM + tops[j]->depthM + feet[i]->depthM +
+                          feet[j]->depthM) /
+                         4.0;
+    pieces.push_back(
+        OverlayPiece{depth, quad, QBrush(shape.fill), QPen(Qt::NoPen)});
+    any = true;
+  }
+  return any;
+}
+
+/** A ring's line: unbroken runs of the points in sight. */
+bool addLine(const RaisedShapeDraw& shape, const Projected& tops,
+             const QRectF& visible, std::vector<OverlayPiece>& pieces)
+{
+  const std::size_t n = tops.size();
+  const std::size_t edges = shape.closed ? n : n - 1;
+  QPainterPath run;
+  double depth = 0.0;
+  int32_t count = 0;
+  bool open = false;
+  for (std::size_t k = 0; k <= edges; ++k) {
+    const std::optional<ScreenPoint>& p = tops[k % n];
+    if (!p) {
+      open = false;
+      continue;
+    }
+    if (open) {
+      run.lineTo(p->xPx, p->yPx);
+    } else {
+      run.moveTo(p->xPx, p->yPx);
+      open = true;
+    }
+    depth += p->depthM;
+    ++count;
+  }
+  if (count < 2 || !visible.intersects(run.boundingRect())) {
+    return false;
+  }
+  QPen pen(shape.line, shape.widthPx);
+  pen.setCapStyle(Qt::RoundCap);
+  pen.setJoinStyle(Qt::RoundJoin);
+  // Lines over the walls they top.
+  pieces.push_back(
+      OverlayPiece{depth / count - 1.0, run, QBrush(Qt::NoBrush), pen});
+  return true;
+}
+
+/** Adds a ring to a polygon's top (whole only if all of it is in sight). */
+void addToTop(ShapeTop& top, const Projected& tops)
+{
+  QPolygonF polygon;
+  for (const std::optional<ScreenPoint>& p : tops) {
+    if (!p) {
+      top.whole = false;
+      return;
+    }
+    polygon << QPointF(p->xPx, p->yPx);
+    top.depthM += p->depthM;
+    ++top.count;
+  }
+  top.path.addPolygon(polygon);
+}
+
+/** Draws an icon turned and placed by its hot spot; returns where. */
+QRectF drawBillboardIcon(QPainter& painter, const BillboardDraw& billboard,
+                         QPointF at)
+{
+  if (billboard.icon.isNull() || billboard.sizePx <= 0.0) {
+    return QRectF();
+  }
+  const QSizeF size =
+      QSizeF(billboard.icon.size())
+          .scaled(billboard.sizePx, billboard.sizePx, Qt::KeepAspectRatio);
+  QRectF iconRect(QPointF(-billboard.hotSpot.x() * size.width(),
+                          -billboard.hotSpot.y() * size.height()),
+                  size);
+  painter.save();
+  painter.translate(at);
+  painter.rotate(billboard.headingDeg);
+  painter.drawImage(iconRect, billboard.icon);
+  painter.restore();
+  iconRect.translate(at);
+  return iconRect;
+}
+
+/**
+ * Draws a billboard's label beside its icon, with a halo, unless it would
+ * cover one of @p labels; returns true if drawn.
+ */
+bool drawBillboardLabel(QPainter& painter, QFont font,
+                        const BillboardDraw& billboard, QPointF at,
+                        const QRectF& iconRect, std::vector<QRectF>& labels)
+{
+  const QFontMetricsF metrics(font);
+  const QPointF origin =
+      iconRect.isNull()
+          ? at + QPointF(4.0, metrics.ascent() / 2.0)
+          : QPointF(iconRect.right() + 2.0,
+                    iconRect.center().y() + metrics.ascent() / 2.0 - 1.0);
+  const QRectF labelRect(origin.x(), origin.y() - metrics.ascent(),
+                         metrics.horizontalAdvance(billboard.label),
+                         metrics.height());
+  const bool crowded =
+      std::any_of(labels.begin(), labels.end(), [&](const QRectF& other) {
+        return other.intersects(labelRect);
+      });
+  if (crowded) {
+    return false;
+  }
+  labels.push_back(labelRect);
+  // A dark halo keeps the label legible on any imagery.
+  QPainterPath path;
+  path.addText(origin, font, billboard.label);
+  painter.setPen(QPen(QColor(0, 0, 0, 170), 2.5));
+  painter.setBrush(Qt::NoBrush);
+  painter.drawPath(path);
+  painter.fillPath(path, billboard.labelColor);
+  return true;
+}
+
 } // namespace
+
+void GlobeView::projectRing(const RaisedShapeDraw& shape,
+                            const std::vector<Geodetic>& ring,
+                            std::vector<std::optional<ScreenPoint>>& tops,
+                            std::vector<std::optional<ScreenPoint>>& feet)
+{
+  // Each point on the screen: its top and, for walls, its foot.
+  const Camera& camera = m_controller.camera();
+  const bool onMap = camera.morph() > 0.0;
+  for (const Geodetic& point : ring) {
+    if (onMap) {
+      tops.push_back(camera.projectGeodetic(point.latDeg, point.lonDeg));
+      feet.emplace_back();
+      continue;
+    }
+    const Vec3 upper =
+        overlayEcef(point.latDeg, point.lonDeg, point.heightM, shape.height);
+    const Vec3 normal = surfaceNormalEcef(point.latDeg, point.lonDeg);
+    const bool facing = dot(normal, camera.eyeEcef() - upper) > 0.0;
+    tops.push_back(facing ? camera.project(upper)
+                          : std::optional<ScreenPoint>());
+    feet.push_back(shape.walls && facing
+                       ? camera.project(overlayEcef(point.latDeg, point.lonDeg,
+                                                    0.0, OverlayHeight::Ground))
+                       : std::optional<ScreenPoint>());
+  }
+}
 
 void GlobeView::drawRaisedShapes()
 {
@@ -1018,121 +1199,36 @@ void GlobeView::drawRaisedShapes()
   if (m_raised.empty()) {
     return;
   }
-  const Camera& camera = m_controller.camera();
-  const bool onMap = camera.morph() > 0.0;
-  const Vec3& eye = camera.eyeEcef();
+  const bool onMap = m_controller.camera().morph() > 0.0;
   const QRectF visible =
       QRectF(rect()).adjusted(-width(), -height(), width(), height());
   std::vector<OverlayPiece> pieces;
   for (const RaisedShapeDraw& shape : m_raised) {
+    const bool filled = shape.fill.alpha() > 0;
     bool any = false;
-    QPainterPath top;
-    top.setFillRule(Qt::OddEvenFill);
-    double topDepth = 0.0;
-    int32_t topCount = 0;
-    bool topWhole = true;
+    ShapeTop top;
+    top.path.setFillRule(Qt::OddEvenFill);
     for (const std::vector<Geodetic>& ring : shape.rings) {
-      // Each point on the screen: its top and, for walls, its foot.
-      std::vector<std::optional<ScreenPoint>> tops;
-      std::vector<std::optional<ScreenPoint>> feet;
-      for (const Geodetic& point : ring) {
-        if (onMap) {
-          tops.push_back(camera.projectGeodetic(point.latDeg, point.lonDeg));
-          feet.emplace_back();
-          continue;
-        }
-        const Vec3 upper = overlayEcef(point.latDeg, point.lonDeg,
-                                       point.heightM, shape.height);
-        const Vec3 normal = surfaceNormalEcef(point.latDeg, point.lonDeg);
-        const bool facing = dot(normal, eye - upper) > 0.0;
-        tops.push_back(facing ? camera.project(upper)
-                              : std::optional<ScreenPoint>());
-        feet.push_back(shape.walls && facing ? camera.project(overlayEcef(
-                                                   point.latDeg, point.lonDeg,
-                                                   0.0, OverlayHeight::Ground))
-                                             : std::optional<ScreenPoint>());
+      Projected tops;
+      Projected feet;
+      projectRing(shape, ring, tops, feet);
+      if (shape.walls && !onMap && filled) {
+        any = addWalls(shape, tops, feet, visible, pieces) || any;
       }
-      const std::size_t n = ring.size();
-      const std::size_t edges = shape.closed ? n : n - 1;
-      // Walls: one quad per edge.
-      if (shape.walls && !onMap && shape.fill.alpha() > 0) {
-        for (std::size_t i = 0; i < edges; ++i) {
-          const std::size_t j = (i + 1) % n;
-          if (!tops[i] || !tops[j] || !feet[i] || !feet[j]) {
-            continue;
-          }
-          QPainterPath quad;
-          quad.moveTo(tops[i]->xPx, tops[i]->yPx);
-          quad.lineTo(tops[j]->xPx, tops[j]->yPx);
-          quad.lineTo(feet[j]->xPx, feet[j]->yPx);
-          quad.lineTo(feet[i]->xPx, feet[i]->yPx);
-          quad.closeSubpath();
-          if (!visible.intersects(quad.boundingRect())) {
-            continue;
-          }
-          const double depth = (tops[i]->depthM + tops[j]->depthM +
-                                feet[i]->depthM + feet[j]->depthM) /
-                               4.0;
-          pieces.push_back(
-              OverlayPiece{depth, quad, QBrush(shape.fill), QPen(Qt::NoPen)});
-          any = true;
-        }
-      }
-      // The line: unbroken runs of visible points.
       if (shape.line.alpha() > 0) {
-        QPainterPath run;
-        double depth = 0.0;
-        int32_t count = 0;
-        bool open = false;
-        for (std::size_t k = 0; k <= edges; ++k) {
-          const std::optional<ScreenPoint>& p = tops[k % n];
-          if (!p) {
-            open = false;
-            continue;
-          }
-          if (open) {
-            run.lineTo(p->xPx, p->yPx);
-          } else {
-            run.moveTo(p->xPx, p->yPx);
-            open = true;
-          }
-          depth += p->depthM;
-          ++count;
-        }
-        if (count > 1 && visible.intersects(run.boundingRect())) {
-          QPen pen(shape.line, shape.widthPx);
-          pen.setCapStyle(Qt::RoundCap);
-          pen.setJoinStyle(Qt::RoundJoin);
-          // Lines over the walls they top.
-          pieces.push_back(
-              OverlayPiece{depth / count - 1.0, run, QBrush(Qt::NoBrush), pen});
-          any = true;
-        }
+        any = addLine(shape, tops, visible, pieces) || any;
       }
-      // The top of a polygon, if all of it is in sight.
-      if (shape.surface && shape.fill.alpha() > 0) {
-        QPolygonF polygon;
-        for (const std::optional<ScreenPoint>& p : tops) {
-          if (!p) {
-            topWhole = false;
-            break;
-          }
-          polygon << QPointF(p->xPx, p->yPx);
-          topDepth += p->depthM;
-          ++topCount;
-        }
-        top.addPolygon(polygon);
+      if (shape.surface && filled) {
+        addToTop(top, tops);
       }
     }
-    if (shape.surface && shape.fill.alpha() > 0 && topWhole && topCount > 0 &&
-        visible.intersects(top.boundingRect())) {
-      pieces.push_back(OverlayPiece{topDepth / topCount, top,
+    if (shape.surface && filled && top.whole && top.count > 0 &&
+        visible.intersects(top.path.boundingRect())) {
+      pieces.push_back(OverlayPiece{top.depthM / top.count, top.path,
                                     QBrush(shape.fill), QPen(Qt::NoPen)});
       any = true;
     }
-    if (any) {
-      ++m_raisedDrawn;
-    }
+    m_raisedDrawn += any ? 1 : 0;
   }
   std::stable_sort(pieces.begin(), pieces.end(),
                    [](const OverlayPiece& a, const OverlayPiece& b) {
@@ -1147,6 +1243,28 @@ void GlobeView::drawRaisedShapes()
   }
 }
 
+std::optional<QPointF>
+GlobeView::billboardOnScreen(const BillboardDraw& billboard)
+{
+  const Camera& camera = m_controller.camera();
+  if (camera.morph() > 0.0) {
+    const std::optional<ScreenPoint> screen =
+        camera.projectGeodetic(billboard.latDeg, billboard.lonDeg);
+    return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
+                  : std::nullopt;
+  }
+  const Vec3 ecef = overlayEcef(billboard.latDeg, billboard.lonDeg,
+                                billboard.heightM, billboard.height);
+  // Behind the globe: the ellipsoid faces away from the eye there.
+  const Vec3 normal = surfaceNormalEcef(billboard.latDeg, billboard.lonDeg);
+  if (dot(normal, camera.eyeEcef() - ecef) <= 0.0) {
+    return std::nullopt;
+  }
+  const std::optional<ScreenPoint> screen = camera.project(ecef);
+  return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
+                : std::nullopt;
+}
+
 void GlobeView::drawBillboards()
 {
   m_billboardsDrawn = 0;
@@ -1159,7 +1277,6 @@ void GlobeView::drawBillboards()
   constexpr double marginPx = 64.0;
   const Camera& camera = m_controller.camera();
   const bool onMap = camera.morph() > 0.0;
-  const Vec3& eye = camera.eyeEcef();
   QPainter painter(this);
   painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
   painter.setRenderHint(QPainter::Antialiasing, true);
@@ -1170,24 +1287,8 @@ void GlobeView::drawBillboards()
   const QRectF visible =
       QRectF(rect()).adjusted(-marginPx, -marginPx, marginPx, marginPx);
   for (const BillboardDraw& billboard : m_billboards) {
-    const Vec3 ecef = onMap ? Vec3{}
-                            : overlayEcef(billboard.latDeg, billboard.lonDeg,
-                                          billboard.heightM, billboard.height);
-    if (!onMap) {
-      // Behind the globe: the ellipsoid faces away from the eye there.
-      const Vec3 normal = surfaceNormalEcef(billboard.latDeg, billboard.lonDeg);
-      if (dot(normal, eye - ecef) <= 0.0) {
-        continue;
-      }
-    }
-    const std::optional<ScreenPoint> screen =
-        onMap ? camera.projectGeodetic(billboard.latDeg, billboard.lonDeg)
-              : camera.project(ecef);
-    if (!screen) {
-      continue;
-    }
-    const QPointF at(screen->xPx, screen->yPx);
-    if (!visible.contains(at)) {
+    const std::optional<QPointF> at = billboardOnScreen(billboard);
+    if (!at || !visible.contains(*at)) {
       continue;
     }
     if (billboard.stalk && !onMap) {
@@ -1195,63 +1296,26 @@ void GlobeView::drawBillboards()
           billboard.latDeg, billboard.lonDeg, 0.0, OverlayHeight::Ground));
       if (foot) {
         painter.setPen(QPen(billboard.stalkColor, 1.5));
-        painter.drawLine(QPointF(foot->xPx, foot->yPx), at);
+        painter.drawLine(QPointF(foot->xPx, foot->yPx), *at);
       }
     }
     // One icon per cell where they crowd.
     const int64_t cell =
-        (static_cast<int64_t>(std::floor(at.x() / cellPx)) << 32) ^
-        static_cast<int64_t>(std::floor(at.y() / cellPx));
+        (static_cast<int64_t>(std::floor(at->x() / cellPx)) << 32) ^
+        static_cast<int64_t>(std::floor(at->y() / cellPx));
     if (!cells.insert(cell).second) {
       continue;
     }
     ++m_billboardsDrawn;
-    QRectF iconRect;
-    if (!billboard.icon.isNull() && billboard.sizePx > 0.0) {
-      const QSizeF size =
-          QSizeF(billboard.icon.size())
-              .scaled(billboard.sizePx, billboard.sizePx, Qt::KeepAspectRatio);
-      iconRect = QRectF(QPointF(-billboard.hotSpot.x() * size.width(),
-                                -billboard.hotSpot.y() * size.height()),
-                        size);
-      painter.save();
-      painter.translate(at);
-      painter.rotate(billboard.headingDeg);
-      painter.drawImage(iconRect, billboard.icon);
-      painter.restore();
-      iconRect.translate(at);
-    }
+    const QRectF iconRect = drawBillboardIcon(painter, billboard, *at);
     if (billboard.label.isEmpty() || billboard.labelScale <= 0.0 ||
         m_labelsDrawn >= mostLabels) {
       continue;
     }
     font.setPointSizeF(basePt * billboard.labelScale);
-    painter.setFont(font);
-    const QFontMetricsF metrics(font);
-    const QPointF origin =
-        iconRect.isNull()
-            ? at + QPointF(4.0, metrics.ascent() / 2.0)
-            : QPointF(iconRect.right() + 2.0,
-                      iconRect.center().y() + metrics.ascent() / 2.0 - 1.0);
-    const QRectF labelRect(origin.x(), origin.y() - metrics.ascent(),
-                           metrics.horizontalAdvance(billboard.label),
-                           metrics.height());
-    const bool crowded =
-        std::any_of(labels.begin(), labels.end(), [&](const QRectF& other) {
-          return other.intersects(labelRect);
-        });
-    if (crowded) {
-      continue;
+    if (drawBillboardLabel(painter, font, billboard, *at, iconRect, labels)) {
+      ++m_labelsDrawn;
     }
-    labels.push_back(labelRect);
-    ++m_labelsDrawn;
-    // A dark halo keeps the label legible on any imagery.
-    QPainterPath path;
-    path.addText(origin, font, billboard.label);
-    painter.setPen(QPen(QColor(0, 0, 0, 170), 2.5));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawPath(path);
-    painter.fillPath(path, billboard.labelColor);
   }
 }
 

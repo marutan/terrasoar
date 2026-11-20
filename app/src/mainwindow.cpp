@@ -1341,7 +1341,8 @@ bool MainWindow::openKml(const QString& path, QString* errorString)
         10000);
   }
   if (m_globeView != nullptr && document->root.view) {
-    m_globeView->flyTo(kmlViewPose(*document->root.view), 0.0);
+    m_globeView->flyTo(kmlViewPose(document->root.view.value_or(KmlView{})),
+                       0.0);
   }
   return true;
 }
@@ -1486,6 +1487,8 @@ KmlViewParameters MainWindow::currentViewParameters() const
                            m_globeView->terrainShown());
 }
 
+// The link's node, then the file it brought.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void MainWindow::kmlLinkLoaded(const QString& nodeId, const QString& path,
                                bool flyToView)
 {
@@ -1526,7 +1529,8 @@ void MainWindow::kmlLinkLoaded(const QString& nodeId, const QString& path,
   addKmlFeature(*document, document->root, QString(), node, 0);
   m_refreshingKml = wasRefreshing;
   if (flyToView && m_globeView != nullptr && document->root.view) {
-    m_globeView->flyTo(kmlViewPose(*document->root.view), 0.0);
+    m_globeView->flyTo(kmlViewPose(document->root.view.value_or(KmlView{})),
+                       0.0);
   }
 }
 
@@ -1701,6 +1705,43 @@ std::vector<QAction*> MainWindow::flyThereActions(const QString& id,
 namespace
 {
 
+/** A hot spot's coordinate as a fraction of the icon's @p extent. */
+double hotSpotFraction(double value, KmlVec2::Units units, double extent)
+{
+  switch (units) {
+  case KmlVec2::Units::Fraction:
+    return value;
+  case KmlVec2::Units::Pixels:
+    return value / std::max(extent, 1.0);
+  case KmlVec2::Units::InsetPixels:
+    break;
+  }
+  return 1.0 - value / std::max(extent, 1.0);
+}
+
+/** A raised KML shape as the view draws it. */
+RaisedShapeDraw raisedShapeDraw(const KmlRaisedShape& shape)
+{
+  RaisedShapeDraw draw;
+  draw.height =
+      shape.relative ? OverlayHeight::Relative : OverlayHeight::Absolute;
+  draw.closed = shape.closed;
+  draw.surface = shape.surface;
+  draw.walls = shape.extrude;
+  draw.line = shape.line;
+  draw.widthPx = shape.widthPx;
+  draw.fill = shape.fill;
+  for (const std::vector<KmlCoordinate>& ring : shape.rings) {
+    std::vector<Geodetic> points;
+    points.reserve(ring.size());
+    for (const KmlCoordinate& c : ring) {
+      points.push_back(Geodetic{c.latDeg, c.lonDeg, c.altM});
+    }
+    draw.rings.push_back(std::move(points));
+  }
+  return draw;
+}
+
 OverlayHeight overlayHeight(KmlAltitudeMode mode)
 {
   switch (mode) {
@@ -1754,7 +1795,6 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
   if (m_globeView == nullptr || m_icons == nullptr) {
     return;
   }
-  constexpr double iconPx = 32.0;
   std::vector<BillboardDraw> draws;
   std::vector<RaisedShapeDraw> raised;
   std::vector<ScreenOverlayDraw> screens;
@@ -1776,37 +1816,7 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
       points.insert(points.end(), markers.begin(), markers.end());
     }
     for (const KmlBillboard& billboard : points) {
-      BillboardDraw draw;
-      draw.latDeg = billboard.latDeg;
-      draw.lonDeg = billboard.lonDeg;
-      draw.height = overlayHeight(billboard.altitudeMode);
-      draw.heightM = billboard.altM;
-      draw.stalk = billboard.extrude;
-      draw.stalkColor = billboard.stalkColor;
-      draw.icon = tintedIcon(billboard.icon, billboard.tint);
-      draw.sizePx = iconPx * billboard.scale;
-      draw.headingDeg = billboard.headingDeg;
-      // KML's hot spot counts y from the bottom; the default pushpin's
-      // needle is at its bottom centre.
-      if (billboard.icon.isEmpty()) {
-        draw.hotSpot = QPointF(0.5, 1.0);
-      } else {
-        const QSizeF size(draw.icon.size());
-        const KmlVec2& h = billboard.hotSpot;
-        const double x = h.xUnits == KmlVec2::Units::Fraction ? h.x
-                         : h.xUnits == KmlVec2::Units::Pixels
-                             ? h.x / std::max(size.width(), 1.0)
-                             : 1.0 - h.x / std::max(size.width(), 1.0);
-        const double y = h.yUnits == KmlVec2::Units::Fraction ? h.y
-                         : h.yUnits == KmlVec2::Units::Pixels
-                             ? h.y / std::max(size.height(), 1.0)
-                             : 1.0 - h.y / std::max(size.height(), 1.0);
-        draw.hotSpot = QPointF(x, 1.0 - y);
-      }
-      draw.label = billboard.label;
-      draw.labelColor = billboard.labelColor;
-      draw.labelScale = billboard.labelScale;
-      draws.push_back(std::move(draw));
+      draws.push_back(billboardDraw(billboard));
     }
     for (const KmlFeature* screen : provider->screenOverlays()) {
       ScreenOverlayDraw draw;
@@ -1820,24 +1830,7 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
       }
     }
     for (const KmlRaisedShape& shape : provider->raisedShapes()) {
-      RaisedShapeDraw draw;
-      draw.height =
-          shape.relative ? OverlayHeight::Relative : OverlayHeight::Absolute;
-      draw.closed = shape.closed;
-      draw.surface = shape.surface;
-      draw.walls = shape.extrude;
-      draw.line = shape.line;
-      draw.widthPx = shape.widthPx;
-      draw.fill = shape.fill;
-      for (const std::vector<KmlCoordinate>& ring : shape.rings) {
-        std::vector<Geodetic> points;
-        points.reserve(ring.size());
-        for (const KmlCoordinate& c : ring) {
-          points.push_back(Geodetic{c.latDeg, c.lonDeg, c.altM});
-        }
-        draw.rings.push_back(std::move(points));
-      }
-      raised.push_back(std::move(draw));
+      raised.push_back(raisedShapeDraw(shape));
     }
   }
   m_globeView->setBillboards(std::move(draws));
@@ -1847,6 +1840,35 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
                      return a.drawOrder < b.drawOrder;
                    });
   m_globeView->setScreenOverlays(std::move(screens));
+}
+
+BillboardDraw MainWindow::billboardDraw(const KmlBillboard& billboard)
+{
+  constexpr double iconPx = 32.0;
+  BillboardDraw draw;
+  draw.latDeg = billboard.latDeg;
+  draw.lonDeg = billboard.lonDeg;
+  draw.height = overlayHeight(billboard.altitudeMode);
+  draw.heightM = billboard.altM;
+  draw.stalk = billboard.extrude;
+  draw.stalkColor = billboard.stalkColor;
+  draw.icon = tintedIcon(billboard.icon, billboard.tint);
+  draw.sizePx = iconPx * billboard.scale;
+  draw.headingDeg = billboard.headingDeg;
+  // KML's hot spot counts y from the bottom; the default pushpin's needle
+  // is at its bottom centre.
+  if (billboard.icon.isEmpty()) {
+    draw.hotSpot = QPointF(0.5, 1.0);
+  } else {
+    const QSizeF size(draw.icon.size());
+    const KmlVec2& h = billboard.hotSpot;
+    draw.hotSpot = QPointF(hotSpotFraction(h.x, h.xUnits, size.width()),
+                           1.0 - hotSpotFraction(h.y, h.yUnits, size.height()));
+  }
+  draw.label = billboard.label;
+  draw.labelColor = billboard.labelColor;
+  draw.labelScale = billboard.labelScale;
+  return draw;
 }
 
 bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)

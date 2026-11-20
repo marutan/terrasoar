@@ -468,6 +468,11 @@ private:
   void updatePointerReadout();
   void drawBillboards();
   void drawRaisedShapes();
+  void projectRing(const RaisedShapeDraw& shape,
+                   const std::vector<Geodetic>& ring,
+                   std::vector<std::optional<ScreenPoint>>& tops,
+                   std::vector<std::optional<ScreenPoint>>& feet);
+  std::optional<QPointF> billboardOnScreen(const BillboardDraw& billboard);
   void drawScreenOverlays();
   double groundHeightM(double latDeg, double lonDeg);
   Vec3 overlayEcef(double latDeg, double lonDeg, double heightM,
