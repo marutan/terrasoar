@@ -324,18 +324,21 @@ private slots:
     // A WMTS source's Time dimension is replaced, not added.
     QJsonObject source;
     source.insert(QStringLiteral("kind"), QStringLiteral("wmts"));
-    source.insert(QStringLiteral("dimensions"),
-                  QJsonArray{QJsonArray{QStringLiteral("Time"),
-                                        QStringLiteral("2026-01-01")}});
+    // Appended, not braced: QJsonArray{QJsonArray{…}} copies the inner
+    // array in Qt 6.8.
+    QJsonArray dimensions;
+    dimensions.append(
+        QJsonArray{QStringLiteral("Time"), QStringLiteral("2026-01-01")});
+    source.insert(QStringLiteral("dimensions"), dimensions);
     ts::LayerTime time;
     time.dimension = QStringLiteral("Time");
     time.extent = QStringLiteral("2026-01-01,2026-02-01");
     source.insert(QStringLiteral("time"), time.toJson());
     const QJsonObject drawn = ts::sourceAtTime(source, utc("2026-02-10"));
-    const QJsonArray dimensions =
+    const QJsonArray drawnDimensions =
         drawn.value(QStringLiteral("dimensions")).toArray();
-    QCOMPARE(dimensions.size(), 1);
-    QCOMPARE(dimensions.at(0).toArray().at(1).toString(),
+    QCOMPARE(drawnDimensions.size(), 1);
+    QCOMPARE(drawnDimensions.at(0).toArray().at(1).toString(),
              QStringLiteral("2026-02-01"));
     // A source without time is left alone.
     QJsonObject plain{{QStringLiteral("kind"), QStringLiteral("solid")}};

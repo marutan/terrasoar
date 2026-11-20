@@ -520,8 +520,18 @@ private slots:
              QStringLiteral("2026-11-05"));
     QCOMPARE(query.queryItemValue(QStringLiteral("WIDTH")),
              QStringLiteral("256"));
-    QCOMPARE(query.queryItemValue(QStringLiteral("BBOX"), QUrl::FullyDecoded),
-             bbox);
+    // To about a micrometre: the last digits of the Web Mercator
+    // northings differ between platforms' maths libraries.
+    const QStringList asked =
+        query.queryItemValue(QStringLiteral("BBOX"), QUrl::FullyDecoded)
+            .split(QLatin1Char(','));
+    const QStringList expected = bbox.split(QLatin1Char(','));
+    QCOMPARE(asked.size(), expected.size());
+    for (int32_t k = 0; k < asked.size(); ++k) {
+      QVERIFY2(std::abs(asked.at(k).toDouble() - expected.at(k).toDouble()) <
+                   1e-6,
+               qPrintable(asked.join(QLatin1Char(','))));
+    }
     QCOMPARE(query.queryItemValue(iName).toInt(), i);
     QCOMPARE(query
                  .queryItemValue(iName == QLatin1String("I")

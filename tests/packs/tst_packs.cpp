@@ -961,9 +961,10 @@ private slots:
              QStringLiteral("Month 2004-07"));
     // A month the pack hasn't got: the base pack's picture.
     QJsonObject march = plain;
-    march.insert(QStringLiteral("dimensions"),
-                 QJsonArray{QJsonArray{QStringLiteral("month"),
-                                       QStringLiteral("2004-03")}});
+    QJsonArray marchDimensions;
+    marchDimensions.append(
+        QJsonArray{QStringLiteral("month"), QStringLiteral("2004-03")});
+    march.insert(QStringLiteral("dimensions"), marchDimensions);
     QCOMPARE(colourOf(march), QColor(10, 20, 30));
     // A layer with time settings of its own keeps them.
     QVERIFY(!registry.basePackTime(timed).has_value());

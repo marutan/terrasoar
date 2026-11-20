@@ -20,6 +20,7 @@
 #include "ts/vector/stylerules.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 
 #include <QColor>
@@ -65,7 +66,9 @@ std::optional<QColor> cssColour(const QVariant& value, const QVariant& opacity)
   bool ok = false;
   const double alpha = opacity.toDouble(&ok);
   if (opacity.isValid() && ok) {
-    colour.setAlphaF(static_cast<float>(std::clamp(alpha, 0.0, 1.0)));
+    // Whole steps: setAlphaF() takes a float in Qt 6, a double in Qt 5.
+    colour.setAlpha(
+        static_cast<int32_t>(std::lround(std::clamp(alpha, 0.0, 1.0) * 255.0)));
   }
   return colour;
 }

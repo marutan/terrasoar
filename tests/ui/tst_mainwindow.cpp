@@ -2672,7 +2672,7 @@ private slots:
     // A drag is not a click.
     QTest::mousePress(globe, Qt::LeftButton, Qt::NoModifier, middle);
     QMouseEvent move(QEvent::MouseMove, QPointF(middle + QPoint(40, 0)),
-                     globe->mapToGlobal(QPointF(middle + QPoint(40, 0))),
+                     QPointF(globe->mapToGlobal(middle + QPoint(40, 0))),
                      Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
     QApplication::sendEvent(globe, &move);
     QTest::mouseRelease(globe, Qt::LeftButton, Qt::NoModifier,
