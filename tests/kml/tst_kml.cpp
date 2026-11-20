@@ -24,6 +24,7 @@
 #include <functional>
 #include <optional>
 
+#include <QElapsedTimer>
 #include <QFile>
 #include <QImage>
 #include <QJsonObject>
@@ -1312,7 +1313,9 @@ private slots:
         QStringLiteral("gdal/placemark_with_kml_prefix.kml"),
         QStringLiteral("gdal/kml_with_space_content_in_coordinates.kml"),
         QStringLiteral("gdal/tab_separated_coord_triplet.kml"),
-        QStringLiteral("gdal/point_with_external_style.kml")};
+        QStringLiteral("gdal/point_with_external_style.kml"),
+        QStringLiteral("written/gdal-kml.kml"),
+        QStringLiteral("written/gdal-libkml.kml")};
     for (const QString& name : files) {
       QFile file(fixture(name));
       QVERIFY(file.open(QIODevice::ReadOnly));
@@ -1683,6 +1686,76 @@ private slots:
           return true;
         });
     QCOMPARE(failures, 0);
+  }
+
+  void writtenByGdal()
+  {
+    // everything.kml as GDAL's KML and LIBKML drivers (and so QGIS) write
+    // it: every placemark, with its name, geometry and style.
+    for (const QString& name : {QStringLiteral("written/gdal-kml.kml"),
+                                QStringLiteral("written/gdal-libkml.kml")}) {
+      const ts::KmlDocument document = read(name);
+      QCOMPARE(countPlacemarks(document.root), 11);
+      const ts::KmlFeature* polygon =
+          find(document.root, QStringLiteral("A polygon with a hole"));
+      QVERIFY2(polygon != nullptr, qPrintable(name));
+      const ts::KmlGeometry geometry =
+          polygon->geometry.value_or(ts::KmlGeometry{});
+      QCOMPARE(geometry.kind, ts::KmlGeometry::Kind::Polygon);
+      QCOMPARE(geometry.inner.size(), std::size_t{1});
+      ts::KmlStyleResolver resolver(document);
+      QVERIFY2(resolver.resolve(*polygon).poly.has_value() ||
+                   resolver.resolve(*polygon).line.has_value(),
+               qPrintable(name));
+    }
+  }
+
+  void largeFile()
+  {
+    // 100,000 placemarks with styles and data: read, and made into
+    // features and billboards, within budgets (generous, for slow CI).
+    constexpr int32_t placemarks = 100000;
+    QByteArray xml = QByteArrayLiteral(
+        "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+        "<Style id=\"s\"><IconStyle><color>ff00ff00</color></IconStyle>"
+        "<LineStyle><width>2</width></LineStyle></Style>");
+    xml.reserve(placemarks * 230);
+    for (int32_t i = 0; i < placemarks; ++i) {
+      const double lon = -180.0 + (i % 3600) * 0.1;
+      const double lat = -60.0 + (i / 3600) * 0.1;
+      xml += QStringLiteral(
+                 "<Placemark><name>Place %1</name><styleUrl>#s</styleUrl>"
+                 "<ExtendedData><Data name=\"n\"><value>%1</value></Data>"
+                 "</ExtendedData><Point><coordinates>%2,%3</coordinates>"
+                 "</Point></Placemark>")
+                 .arg(i)
+                 .arg(lon, 0, 'f', 1)
+                 .arg(lat, 0, 'f', 1)
+                 .toUtf8();
+    }
+    xml += QByteArrayLiteral("</Document></kml>");
+    QElapsedTimer timer;
+    timer.start();
+    QString error;
+    std::optional<ts::KmlDocument> parsed =
+        ts::parseKml(xml, QString(), &error);
+    if (!parsed) {
+      QFAIL(qPrintable(error));
+    }
+    const int64_t readMs = timer.restart();
+    QCOMPARE(parsed->root.children.size(), std::size_t{placemarks});
+    const std::shared_ptr<const ts::KmlDocument> document =
+        std::make_shared<const ts::KmlDocument>(std::move(*parsed));
+    ts::KmlFeatureProvider provider(document, QString());
+    const int64_t buildMs = timer.elapsed();
+    QCOMPARE(provider.billboards().size(), std::size_t{placemarks});
+    qInfo("%s",
+          qPrintable(QStringLiteral(
+                         "100,000 placemarks: read in %1 ms, features in %2 ms")
+                         .arg(readMs)
+                         .arg(buildMs)));
+    QVERIFY2(readMs < 10000, qPrintable(QString::number(readMs)));
+    QVERIFY2(buildMs < 10000, qPrintable(QString::number(buildMs)));
   }
 
   void benchmarkRead()

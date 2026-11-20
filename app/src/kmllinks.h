@@ -50,7 +50,9 @@ class NetworkTicket;
  * if any, is active): a local file at once, a web address in the
  * background. What arrives is written to a file of its own (web documents
  * in a temporary folder for the session, their relative addresses kept
- * pointing at the web) and loaded() gives its path. Afterwards each link
+ * pointing at the web) and loaded() gives its path; a copy of each web
+ * link's last document is kept in the cache folder and shown when it
+ * can't be fetched (offline). Afterwards each link
  * is fetched again every refreshInterval (onInterval), viewRefreshTime
  * after the view stops moving (viewRefreshMode onStop), or when asked
  * (Refresh).
@@ -137,6 +139,9 @@ private:
   };
 
   void poll();
+  static QString copyPath(const Link& link);
+  static void keepCopy(const Link& link, const QByteArray& body);
+  static QByteArray copyOf(const Link& link);
   void deliver(const QString& nodeId, Link& link, const QByteArray& body);
 
   std::shared_ptr<NetworkClient> m_network;

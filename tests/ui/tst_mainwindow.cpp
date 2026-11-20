@@ -2619,6 +2619,12 @@ private slots:
     // are in sight.
     ts::GlobeView* view = window.findChild<ts::GlobeView*>();
     QVERIFY(view != nullptr);
+    // Double-clicking the folder flies there too (not renaming it).
+    view->setPose(ts::CameraPose{0.0, 100.0, 2.0e7, 0.0, 0.0});
+    dock->doubleClick(shapes);
+    QTRY_VERIFY(
+        std::abs(view->controller().camera().pose().targetLatDeg - 52.0) < 2.0);
+    QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
     view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
     QTRY_VERIFY(view->billboardsDrawn() >= 1);
     QVERIFY(view->labelsDrawn() >= 1);
@@ -2828,6 +2834,24 @@ private slots:
         QString::fromLatin1(server.requests().front().target);
     QVERIFY2(target.contains(QLatin1String("BBOX=")), qPrintable(target));
     QVERIFY(target.contains(QLatin1String("client=TerraSoar")));
+    // Offline (the server gone), a new window shows the copy from last
+    // time and says so.
+    {
+      ts::MainWindow offline;
+      offline.show();
+      QVERIFY(QTest::qWaitForWindowExposed(&offline));
+      server.setHandler([](const ts::test::MockHttpRequest&) {
+        return ts::test::mockResponse(503, QByteArrayLiteral("down"));
+      });
+      QVERIFY2(offline.openFile(path, &error), qPrintable(error));
+      const QModelIndex copied = offline.layerModel()->index(0, 0);
+      QTRY_COMPARE(offline.layerModel()->rowCount(copied), 1);
+      QCOMPARE(
+          offline.layerModel()->data(offline.layerModel()->index(0, 0, copied)),
+          QVariant(QStringLiteral("From the web")));
+      QTRY_VERIFY(offline.statusBar()->currentMessage().contains(
+          QLatin1String("last time")));
+    }
     // A failure: told in the status bar, what was there stays.
     server.setHandler([](const ts::test::MockHttpRequest&) {
       return ts::test::mockResponse(500, QByteArrayLiteral("no"));
@@ -2958,6 +2982,46 @@ private slots:
     const QString regionPath = out.filePath(QStringLiteral("wales.kml"));
     QVERIFY(ts::saveKmlTo(&window, area, regionPath, QStringLiteral("test")));
     QVERIFY(QFileInfo::exists(regionPath));
+  }
+
+  void kmlLargeFile()
+  {
+    // A large file is read off the GUI thread: the window keeps going
+    // (timers fire) while it opens, and its placemarks show.
+    QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("large.kml"));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+               "<name>Large</name>");
+    for (int32_t i = 0; i < 100000; ++i) {
+      file.write(QStringLiteral("<Placemark><name>P%1</name><Point>"
+                                "<coordinates>%2,%3</coordinates></Point>"
+                                "</Placemark>")
+                     .arg(i)
+                     .arg(-180.0 + (i % 3600) * 0.1, 0, 'f', 1)
+                     .arg(-60.0 + (i / 3600) * 0.1, 0, 'f', 1)
+                     .toUtf8());
+    }
+    file.write("</Document></kml>");
+    file.close();
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    int32_t ticks = 0;
+    QTimer ticker;
+    ticker.setInterval(10);
+    QObject::connect(&ticker, &QTimer::timeout, [&ticks]() { ++ticks; });
+    ticker.start();
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ticker.stop();
+    QVERIFY2(ticks >= 5, qPrintable(QString::number(ticks)));
+    QCOMPARE(window.layerModel()->data(window.layerModel()->index(0, 0)),
+             QVariant(QStringLiteral("Large")));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    QTRY_COMPARE(view->billboards().size(), std::size_t{100000});
   }
 
   void wmsWhatIsHere()

@@ -241,21 +241,33 @@ void setKmlWebBase(const QString& path, const QString& url)
 std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
                                                      QString* errorString)
 {
-  const std::lock_guard<std::mutex> lock(documentsMutex());
-  std::weak_ptr<const KmlDocument>& slot = documents()[path];
-  std::shared_ptr<const KmlDocument> document = slot.lock();
-  if (document) {
-    return document;
+  QString webBase;
+  {
+    const std::lock_guard<std::mutex> lock(documentsMutex());
+    std::shared_ptr<const KmlDocument> known = documents()[path].lock();
+    if (known) {
+      return known;
+    }
+    const std::map<QString, QString>::const_iterator web =
+        webBases().find(path);
+    webBase = web != webBases().end() ? web->second : QString();
   }
+  // Read without the lock: a large file takes seconds, and others may want
+  // other documents meanwhile.
   std::optional<KmlDocument> read = readKmlFile(path, errorString);
   if (!read) {
     return nullptr;
   }
-  const std::map<QString, QString>::const_iterator web = webBases().find(path);
-  if (web != webBases().end()) {
-    read->webBase = web->second;
+  read->webBase = webBase;
+  std::shared_ptr<const KmlDocument> document =
+      std::make_shared<const KmlDocument>(std::move(*read));
+  const std::lock_guard<std::mutex> lock(documentsMutex());
+  std::weak_ptr<const KmlDocument>& slot = documents()[path];
+  // Read twice at once: one copy for all.
+  std::shared_ptr<const KmlDocument> first = slot.lock();
+  if (first) {
+    return first;
   }
-  document = std::make_shared<const KmlDocument>(std::move(*read));
   slot = document;
   return document;
 }

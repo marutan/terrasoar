@@ -96,6 +96,16 @@ public:
   QMenu* timeMenu(const QModelIndex& index);
 
   /**
+   * Sets what a double click on an entry does first: @p action returns
+   * true if it did something (the entry isn't then renamed; F2 still
+   * renames it).
+   */
+  void setDoubleClickAction(std::function<bool(const QModelIndex&)> action);
+
+  /** Double-clicks @p index as the user would (for tests). */
+  void doubleClick(const QModelIndex& index);
+
+  /**
    * Sets what adds actions for a node to its context menu (the window's
    * Fly There for KML), made with the given parent; first in the menu.
    */
@@ -145,6 +155,9 @@ signals:
   void addWebTerrainRequested();
 
 protected:
+  /** Takes double clicks on entries with a double-click action. */
+  bool eventFilter(QObject* watched, QEvent* event) override;
+
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;
 
@@ -166,6 +179,7 @@ private:
   std::vector<QAction*> m_contextActions;
   std::function<std::vector<QAction*>(const QModelIndex&, QObject*)>
       m_nodeActions;
+  std::function<bool(const QModelIndex&)> m_doubleClick;
   QToolButton* m_addLayerButton = nullptr;
   QMenu* m_addLayerMenu = nullptr;
   QPushButton* m_addCollectionButton = nullptr;

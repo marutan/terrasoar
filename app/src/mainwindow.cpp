@@ -21,9 +21,11 @@
 #include "mainwindow.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <future>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -36,6 +38,7 @@
 #include <QDir>
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QElapsedTimer>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -49,6 +52,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QProgressDialog>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
@@ -247,6 +251,16 @@ MainWindow::MainWindow(QWidget* parent)
       [this](const QModelIndex& index, QObject* parent) {
         return nodeActions(index, parent);
       });
+  // Double-clicking a KML entry flies there, as in Google Earth.
+  m_layerDock->setDoubleClickAction([this](const QModelIndex& index) {
+    const std::optional<CameraPose> pose = kmlNodePose(
+        m_layers->data(index, LayerTreeModel::NodeIdRole).toString());
+    if (!pose || m_globeView == nullptr) {
+      return false;
+    }
+    m_globeView->flyTo(*pose, 0.0);
+    return true;
+  });
   setAcceptDrops(true);
   m_icons = new IconCache(m_registry->network(), this);
   m_kmlLinks = new KmlLinks(m_registry->network(), this);
@@ -1330,7 +1344,7 @@ bool MainWindow::openKml(const QString& path, QString* errorString)
 {
   const QString absolute = QFileInfo(path).absoluteFilePath();
   const std::shared_ptr<const KmlDocument> document =
-      sharedKmlDocument(absolute, errorString);
+      readKmlInBackground(absolute, errorString);
   if (!document) {
     return false;
   }
@@ -1347,6 +1361,42 @@ bool MainWindow::openKml(const QString& path, QString* errorString)
                        0.0);
   }
   return true;
+}
+
+std::shared_ptr<const KmlDocument>
+MainWindow::readKmlInBackground(const QString& path, QString* errorString)
+{
+  // Large files take seconds to read: off the GUI thread, which keeps
+  // drawing, with a busy dialog if it takes a while.
+  constexpr int32_t pollMs = 20;
+  constexpr int32_t dialogAfterMs = 500;
+  std::future<std::pair<std::shared_ptr<const KmlDocument>, QString>> reading =
+      std::async(std::launch::async, [path]() {
+        QString error;
+        std::shared_ptr<const KmlDocument> document =
+            sharedKmlDocument(path, &error);
+        return std::make_pair(document, error);
+      });
+  QElapsedTimer waited;
+  waited.start();
+  std::unique_ptr<QProgressDialog> busy;
+  while (reading.wait_for(std::chrono::milliseconds(pollMs)) !=
+         std::future_status::ready) {
+    if (!busy && waited.elapsed() > dialogAfterMs) {
+      busy = std::make_unique<QProgressDialog>(
+          tr("Reading %1…").arg(QFileInfo(path).fileName()), QString(), 0, 0,
+          this);
+      busy->setWindowModality(Qt::WindowModal);
+      busy->setMinimumDuration(0);
+      busy->show();
+    }
+    QCoreApplication::processEvents(QEventLoop::AllEvents, pollMs);
+  }
+  std::pair<std::shared_ptr<const KmlDocument>, QString> read = reading.get();
+  if (!read.first && errorString != nullptr) {
+    *errorString = read.second;
+  }
+  return read.first;
 }
 
 void MainWindow::addKmlFeature(const KmlDocument& document,
@@ -1718,27 +1768,33 @@ MainWindow::kmlNodeDocument(const QString& nodeId, QString* errorString) const
   return kmlExtract(*document, found->second.second);
 }
 
-std::vector<QAction*> MainWindow::flyThereActions(const QString& id,
-                                                  QObject* parent)
+std::optional<CameraPose> MainWindow::kmlNodePose(const QString& id) const
 {
   const std::map<QString, std::pair<QString, QString>>::const_iterator found =
       m_kmlNodes.find(id);
-  if (found == m_kmlNodes.end() || m_globeView == nullptr) {
-    return {};
+  if (found == m_kmlNodes.end()) {
+    return std::nullopt;
   }
   const std::shared_ptr<const KmlDocument> document =
       sharedKmlDocument(found->second.first, nullptr);
   const KmlFeature* feature =
       document ? kmlContainer(*document, found->second.second) : nullptr;
   if (feature == nullptr) {
-    return {};
+    return std::nullopt;
   }
   // Its own view, else one framing its first placemark with a geometry.
   std::optional<CameraPose> pose = kmlFeaturePose(*feature);
   for (std::size_t i = 0; !pose && i < feature->children.size(); ++i) {
     pose = kmlFeaturePose(feature->children[i]);
   }
-  if (!pose) {
+  return pose;
+}
+
+std::vector<QAction*> MainWindow::flyThereActions(const QString& id,
+                                                  QObject* parent)
+{
+  const std::optional<CameraPose> pose = kmlNodePose(id);
+  if (!pose || m_globeView == nullptr) {
     return {};
   }
   QAction* fly = new QAction(tr("Fly There"), parent);

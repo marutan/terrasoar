@@ -39,6 +39,7 @@
 #include <QLabel>
 #include <QLocale>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPersistentModelIndex>
 #include <QPushButton>
 #include <QSlider>
@@ -77,6 +78,7 @@ LayerTreeDock::LayerTreeDock(LayerTreeModel* model, QWidget* parent)
               menu->popup(m_view->viewport()->mapToGlobal(position));
             }
           });
+  m_view->viewport()->installEventFilter(this);
   layout->addWidget(m_view, 1);
 
   // The drawing rule the tree order can't show: vectors over imagery.
@@ -346,6 +348,32 @@ void LayerTreeDock::setNodeActions(
     std::function<std::vector<QAction*>(const QModelIndex&, QObject*)> actions)
 {
   m_nodeActions = std::move(actions);
+}
+
+void LayerTreeDock::setDoubleClickAction(
+    std::function<bool(const QModelIndex&)> action)
+{
+  m_doubleClick = std::move(action);
+}
+
+void LayerTreeDock::doubleClick(const QModelIndex& index)
+{
+  if (!m_doubleClick || !m_doubleClick(index)) {
+    m_view->edit(index);
+  }
+}
+
+bool LayerTreeDock::eventFilter(QObject* watched, QEvent* event)
+{
+  if (watched == m_view->viewport() &&
+      event->type() == QEvent::MouseButtonDblClick && m_doubleClick) {
+    const QMouseEvent* mouse = static_cast<QMouseEvent*>(event);
+    const QModelIndex index = m_view->indexAt(mouse->pos());
+    if (index.isValid() && m_doubleClick(index)) {
+      return true; // done: not renamed
+    }
+  }
+  return QDockWidget::eventFilter(watched, event);
 }
 
 QMenu* LayerTreeDock::contextMenu(const QModelIndex& index)

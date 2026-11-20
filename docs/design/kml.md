@@ -242,6 +242,10 @@ collection, replacing what was there:
   onExpire is treated as onChange (once);
 - flyToView flies to the new document's view; a failure is shown in the
   status bar and what was there stays;
+- each web link's last document is also kept in the cache folder
+  (`kml-links/`, by the SHA-1 of its address without the view's
+  parameters), and shown, with a message, when it can't be fetched and
+  nothing is shown yet (offline);
 - links inside links are followed eight deep at most.
 
 ## Lists (ListStyle)
@@ -262,7 +266,11 @@ Windows, without taking them from another program) all go through
 it (or its file), each Folder and Document inside a collection in order,
 and each container's placemarks one vector layer (Places) where its first
 placemark is; `visibility` 0 leaves an entry switched off. The document's
-own view, if any, is flown to. Ground and screen overlays are layers of
+own view, if any, is flown to. The file is read on a worker thread
+(`readKmlInBackground()`): the window keeps drawing, with a busy dialog
+after half a second (100,000 placemarks take about 1.5 s to read and
+0.15 s to make into features). `sharedKmlDocument()` reads without
+holding its lock, so other documents can be had meanwhile. Ground and screen overlays are layers of
 their own where they are in the file. Elements skipped are counted in the status
 bar.
 
@@ -282,8 +290,9 @@ web (local images next to a `.kml` show); web links open in the browser.
 is, and a Camera into the ground point it looks at (straight down when
 not tilted) at the matching range; tilts are kept below 85°. Without a
 view, `kmlFeaturePose()` frames the geometry or the overlay's box. A
-folder's or layer's context menu has Fly There, and a balloon has a Fly
-there link.
+folder's or layer's context menu has Fly There, double-clicking a KML
+entry flies there (it isn't renamed; F2 still renames it), and a balloon
+has a Fly there link.
 
 ## Writing
 

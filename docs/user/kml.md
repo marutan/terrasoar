@@ -17,6 +17,9 @@ same order, and the places of each folder are a layer called **Places**.
 Tick and untick them as any layer; folders the file hides start
 unticked. If the file has its own view, Terra Soar flies there.
 
+Large files (tens of thousands of places) take a moment to read; Terra
+Soar keeps going meanwhile.
+
 ## What is drawn
 
 - **Paths and areas** in the colours and widths the file gives them.
@@ -59,7 +62,7 @@ where they were at the clock's time; play the clock to watch it move.
   entry in the Layers panel holding what it brought. Some fetch again on
   their own, every so often or when you stop moving the view (to show
   what is in sight); right-click one and choose **Refresh** to fetch it
-  now.
+  now. Without a connection, the copy from last time is shown.
 - **Regions**: some files show parts only when you are close enough
   (large files of maps or photos, "superoverlays", load more detail as
   you zoom in). Those parts come and go as you move.
@@ -75,8 +78,9 @@ own layout when it has one. Links in it open in your web browser;
 pictures from the web are not loaded. **Fly there** at the bottom takes
 you to it.
 
-Right-click a folder or a Places layer and choose **Fly There** to go to
-its view, or to see all of it.
+Double-click a folder, a Places layer or a picture in the Layers panel
+(or right-click it and choose **Fly There**) to go to its view, or to see
+all of it. To rename it, select it and press F2.
 
 ## Saving
 

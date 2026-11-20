@@ -16,6 +16,13 @@ the network.
 | `images/legend.png` | The screen overlay's picture: orange, 40 × 20 |
 | `archive.kmz` | A KMZ: doc.kml with an icon and a ground overlay image inside the archive |
 
+## Written by other programs (`written/`)
+
+`everything.kml` translated by GDAL 3.8.4 (`GDALVectorTranslate`, as
+`ogr2ogr` and QGIS's export do) with its two KML writers: `gdal-kml.kml`
+(the KML driver) and `gdal-libkml.kml` (LIBKML). Made from our own
+fixture, so Terra Soar's to use.
+
 ## From GDAL's tests (`gdal/`)
 
 From GDAL's `autotest/ogr/data/kml` (https://github.com/OSGeo/gdal),

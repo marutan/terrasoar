@@ -25,9 +25,11 @@
 
 #include <QCoreApplication>
 #include <QCryptographicHash>
+#include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QSaveFile>
+#include <QStandardPaths>
 #include <QTimer>
 
 #include "ts/kml/kmlfeatureprovider.h"
@@ -254,6 +256,34 @@ void KmlLinks::deliver(const QString& nodeId, Link& link,
   emit loaded(nodeId, path, link.feature->flyToView);
 }
 
+QString KmlLinks::copyPath(const Link& link)
+{
+  // By the link's address without the view's parameters.
+  const QString address = resolveKmlHref(
+      *link.document, link.feature->link.value_or(KmlLink{}).href);
+  const QByteArray hash =
+      QCryptographicHash::hash(address.toUtf8(), QCryptographicHash::Sha1)
+          .toHex();
+  return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+      .filePath(QStringLiteral("kml-links/") + QString::fromLatin1(hash));
+}
+
+void KmlLinks::keepCopy(const Link& link, const QByteArray& body)
+{
+  const QString path = copyPath(link);
+  QDir().mkpath(QFileInfo(path).absolutePath());
+  QSaveFile file(path);
+  if (file.open(QIODevice::WriteOnly) && file.write(body) == body.size()) {
+    file.commit();
+  }
+}
+
+QByteArray KmlLinks::copyOf(const Link& link)
+{
+  QFile file(copyPath(link));
+  return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
+
 void KmlLinks::poll()
 {
   std::vector<QString> finished;
@@ -271,7 +301,18 @@ void KmlLinks::poll()
     const HttpResponse response = link.ticket->response();
     link.ticket.reset();
     if (response.isSuccess()) {
+      keepCopy(link, response.body);
       deliver(nodeId, link, response.body);
+    } else if (!link.loaded && !copyOf(link).isEmpty()) {
+      // Offline: the copy from last time, saying so.
+      deliver(nodeId, link, copyOf(link));
+      emit failed(nodeId,
+                  QCoreApplication::translate(
+                      "ts::KmlLinks",
+                      "%1 couldn't be fetched (%2): showing the copy from "
+                      "last time.")
+                      .arg(link.url.toDisplayString(),
+                           QString::number(response.status)));
     } else {
       emit failed(nodeId, QCoreApplication::translate(
                               "ts::KmlLinks", "%1 couldn't be fetched (%2).")

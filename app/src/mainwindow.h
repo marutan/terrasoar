@@ -366,6 +366,8 @@ private:
   BillboardDraw billboardDraw(const KmlBillboard& billboard);
   QImage tintedIcon(const QString& where, const QColor& tint,
                     bool pushpin = true);
+  std::shared_ptr<const KmlDocument> readKmlInBackground(const QString& path,
+                                                         QString* errorString);
   void addKmlChildren(const KmlDocument& document, const KmlFeature& container,
                       const QString& featurePath,
                       const QModelIndex& collection);
@@ -382,6 +384,7 @@ private:
   void kmlCheckChanged(const QModelIndex& topLeft);
   const std::vector<QDateTime>& kmlBoundaries(const QJsonObject& source) const;
   std::vector<QAction*> flyThereActions(const QString& id, QObject* parent);
+  std::optional<CameraPose> kmlNodePose(const QString& id) const;
   void addKmlOverlay(const KmlDocument& document, const KmlFeature& overlay,
                      const QString& featurePath, const QModelIndex& parent,
                      int32_t row);

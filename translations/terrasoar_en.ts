@@ -1044,6 +1044,10 @@
             <source>%1 couldn't be fetched (%2).</source>
             <translation>%1 couldn't be fetched (%2).</translation>
         </message>
+        <message>
+            <source>%1 couldn't be fetched (%2): showing the copy from last time.</source>
+            <translation>%1 couldn't be fetched (%2): showing the copy from last time.</translation>
+        </message>
     </context>
     <context>
         <name>ts::KmlReader</name>
@@ -1644,6 +1648,10 @@
         <message>
             <source>Save As KML or KMZ</source>
             <translation>Save As KML or KMZ</translation>
+        </message>
+        <message>
+            <source>Reading %1…</source>
+            <translation>Reading %1…</translation>
         </message>
     </context>
     <context>
