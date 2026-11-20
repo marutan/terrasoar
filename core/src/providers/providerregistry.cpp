@@ -37,6 +37,7 @@
 #include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/elevation/webterrainprovider.h"
 #include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmloverlays.h"
 #include "ts/network/networkclient.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
@@ -809,6 +810,31 @@ std::shared_ptr<ImageryProvider> createFileImagery(const QJsonObject& source,
 } // namespace
 
 std::shared_ptr<ImageryProvider>
+ProviderRegistry::createKmlOverlayLocked(const QJsonObject& source,
+                                         QString* errorString)
+{
+  const std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+      source.value(QStringLiteral("path")).toString(), errorString);
+  if (!document) {
+    return nullptr;
+  }
+  std::shared_ptr<KmlGroundOverlayProvider> provider =
+      std::make_shared<KmlGroundOverlayProvider>(
+          document, source.value(QStringLiteral("feature")).toString(),
+          networkLocked());
+  if (!provider->isValid()) {
+    if (errorString != nullptr) {
+      *errorString =
+          QCoreApplication::translate("ts::ProviderRegistry",
+                                      "Unknown or invalid imagery source: %1")
+              .arg(canonical(source));
+    }
+    return nullptr;
+  }
+  return provider;
+}
+
+std::shared_ptr<ImageryProvider>
 ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
@@ -840,6 +866,9 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("file")) {
     provider = createFileImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("kmloverlay")) {
+    provider = createKmlOverlayLocked(source, errorString);
   } else {
     provider = createImageryProvider(source, errorString);
   }

@@ -92,12 +92,18 @@ QString IconCache::diskPath(const QString& url)
 
 QImage IconCache::icon(const QString& where)
 {
+  const QImage found = image(where);
+  return found.isNull() ? pushpin() : found;
+}
+
+QImage IconCache::image(const QString& where)
+{
   if (where.isEmpty()) {
-    return pushpin();
+    return QImage();
   }
   const std::map<QString, QImage>::const_iterator known = m_icons.find(where);
   if (known != m_icons.end()) {
-    return known->second.isNull() ? pushpin() : known->second;
+    return known->second;
   }
   const bool web = where.startsWith(QLatin1String("http://")) ||
                    where.startsWith(QLatin1String("https://"));
@@ -105,7 +111,7 @@ QImage IconCache::icon(const QString& where)
   if (!web) {
     image = QImage::fromData(readKmlLocalFile(where));
     m_icons[where] = image;
-    return image.isNull() ? pushpin() : image;
+    return image;
   }
   // From an earlier fetch, else ask for it.
   QFile saved(diskPath(where));
@@ -120,7 +126,7 @@ QImage IconCache::icon(const QString& where)
     m_tickets[where] = m_network->start(HttpRequest{QUrl(where), {}});
     m_poll->start();
   }
-  return pushpin();
+  return QImage();
 }
 
 void IconCache::poll()

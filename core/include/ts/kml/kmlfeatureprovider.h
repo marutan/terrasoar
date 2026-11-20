@@ -228,6 +228,15 @@ public:
    */
   const std::vector<KmlRaisedShape>& raisedShapes() const { return m_raised; }
 
+  /**
+   * Returns its ScreenOverlays: the feature itself when its path names a
+   * ScreenOverlay (each has its own layer).
+   */
+  const std::vector<const KmlFeature*>& screenOverlays() const
+  {
+    return m_screens;
+  }
+
 private:
   struct Entry {
     /** Drawn over the view (a raised shape or a point), not in tiles. */
@@ -243,6 +252,7 @@ private:
   std::vector<Entry> m_entries;
   std::vector<KmlBillboard> m_billboards;
   std::vector<KmlRaisedShape> m_raised;
+  std::vector<const KmlFeature*> m_screens;
 };
 
 } // namespace ts

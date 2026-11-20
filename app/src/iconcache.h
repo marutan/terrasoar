@@ -64,6 +64,12 @@ public:
   /** Returns the icon at @p where (the pushpin for empty or missing). */
   QImage icon(const QString& where);
 
+  /**
+   * Returns the picture at @p where, as icon() but null while it is
+   * fetched or if it can't be had (for screen overlays).
+   */
+  QImage image(const QString& where);
+
   /** Returns the default icon: a yellow pushpin, 32 pixels. */
   static const QImage& pushpin();
 

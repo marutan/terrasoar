@@ -143,6 +143,40 @@ Terrain in front of a shape doesn't hide it: they are drawn over the
 frame, like the billboards. On the maps they are drawn flat, without
 walls.
 
+## Overlays
+
+**GroundOverlay.** Each is an imagery layer (source `{"kind":
+"kmloverlay", "path": …, "feature": "0.3"}`), so it is draped on the
+terrain, blended and ordered like any imagery, and can be faded with the
+layer's opacity. `ts::KmlGroundOverlayProvider` reads the picture once
+(from the KMZ or next to the file; from the web through the network
+client, asked again after a failure), multiplies it by the overlay's
+colour, and fills each tile it touches by finding, for each tile pixel,
+where it falls in the picture (`kmlOverlayImagePoint()`, bilinear):
+
+- a LatLonBox: x from west to east, y from north to south, the picture
+  turned `rotation` degrees anticlockwise about the box's centre (in
+  degrees of latitude and longitude, as Google Earth does);
+- a gx:LatLonQuad: the inverse of the bilinear stretch between its four
+  corners (lower left, lower right, upper right, upper left);
+- boxes across the antimeridian (east < west), longitudes taken on the
+  box's side.
+
+Its deepest level is one past where the tiles' pixels match the
+picture's. `altitude` is not used: the picture is always draped
+(clampToGround); drawOrder is the order in the layer tree.
+
+**ScreenOverlay.** Each is a layer of its own (a `kml` source naming the
+overlay), so it can be switched off. The main window hands the visible
+ones to `GlobeView` (`ScreenOverlayDraw`: the picture through
+`IconCache`, tinted, sorted by drawOrder), which places each with
+`kmlScreenRect()` on every frame: size (−1 the picture's own, 0 keeping
+its aspect, else a fraction of the view or pixels), overlayXY on the
+picture put on screenXY on the view (fractions and pixels from the
+bottom left, insetPixels from the top right), turned `rotation` degrees
+anticlockwise about rotationXY on the view. They are drawn over
+everything but the attributions and scale bar.
+
 ## In the window
 
 **Opening.** File → Open KML or KMZ…, files dropped on the window, and
@@ -153,7 +187,8 @@ Windows, without taking them from another program) all go through
 it (or its file), each Folder and Document inside a collection in order,
 and each container's placemarks one vector layer (Places) where its first
 placemark is; `visibility` 0 leaves an entry switched off. The document's
-own view, if any, is flown to. Elements skipped are counted in the status
+own view, if any, is flown to. Ground and screen overlays are layers of
+their own where they are in the file. Elements skipped are counted in the status
 bar.
 
 **Balloons.** A click (What Is Here, [wms.md](wms.md#getfeatureinfo))
@@ -187,9 +222,13 @@ features of placemarks (styles, default icon, MultiGeometry, the
 antimeridian), billboards (icon, tint, scale, heading, hot spot, label, a
 KMZ's icon read from the archive), raised shapes (modes, walls, fill
 and outline rules, long edges divided, left out of tiles but picked),
-the provider (tiles without points,
+ground overlays (box, rotation, antimeridian, gx:LatLonQuad, a picture
+warped into a tile the right way round and tinted, its deepest level, a
+KMZ's, the registry), screen overlay placement (units, size, aspect,
+rotation), the provider (tiles without points,
 picking order), the registry, view poses and balloon HTML. `tests/ui`: a
 KML opened into the layer tree, a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
 is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,
-a stalk) drawn and hidden from the far side.
+a stalk) drawn and hidden from the far side; ground overlays as imagery
+layers and a screen overlay drawn and switched off.

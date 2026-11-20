@@ -49,6 +49,7 @@
 #include "ts/geo/geoformat.h"
 #include "ts/globe/globerenderer.h"
 #include "ts/globe/tilerenderer.h"
+#include "ts/kml/kmloverlays.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/render/glrenderdevice.h"
@@ -468,6 +469,7 @@ void GlobeView::paintGL()
 
   drawRaisedShapes();
   drawBillboards();
+  drawScreenOverlays();
   drawAttributions();
   drawScaleBar();
   drawRegions();
@@ -964,6 +966,31 @@ Vec3 GlobeView::overlayEcef(double latDeg, double lonDeg, double heightM,
     h += groundHeightM(latDeg, lonDeg);
   }
   return geodeticToEcef(Geodetic{latDeg, lonDeg, h});
+}
+
+void GlobeView::setScreenOverlays(std::vector<ScreenOverlayDraw> overlays)
+{
+  m_screens = std::move(overlays);
+  update();
+}
+
+void GlobeView::drawScreenOverlays()
+{
+  if (m_screens.empty()) {
+    return;
+  }
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+  for (const ScreenOverlayDraw& overlay : m_screens) {
+    const KmlScreenRect placed = kmlScreenRect(
+        overlay.placement, QSizeF(overlay.image.size()), QSizeF(size()));
+    painter.save();
+    painter.translate(placed.pivot);
+    painter.rotate(placed.rotationDeg);
+    painter.translate(-placed.pivot);
+    painter.drawImage(placed.rect, overlay.image);
+    painter.restore();
+  }
 }
 
 void GlobeView::setRaisedShapes(std::vector<RaisedShapeDraw> shapes)

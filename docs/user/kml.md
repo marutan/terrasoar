@@ -34,6 +34,13 @@ unticked. If the file has its own view, Terra Soar flies there.
   so buildings, flight paths and fences stand up. Places in the air can
   stand on a line down to the ground. On the flat maps they lie flat.
   Hills and mountains in front of them don't hide them.
+- **Pictures on the ground** (ground overlays: old maps, weather,
+  plans) are laid over the globe and the maps, turned and stretched as
+  the file says. Each is its own entry in the Layers panel, so you can
+  untick it, change its opacity or drag it above or below other imagery.
+- **Pictures on the screen** (screen overlays: legends, logos) stay at
+  their place on the screen whatever you look at. Each is its own entry
+  too.
 - Paths and areas crossing the 180° meridian are drawn the short way
   round, on the globe and on every map.
 

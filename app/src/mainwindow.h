@@ -331,7 +331,11 @@ private:
   std::vector<QAction*> nodeActions(const QModelIndex& index, QObject* parent);
   bool showBalloonAt(LonLat point, double degreesPerPixel);
   void refreshBillboards(const LayerStack& stack);
-  QImage tintedIcon(const QString& where, const QColor& tint);
+  QImage tintedIcon(const QString& where, const QColor& tint,
+                    bool pushpin = true);
+  void addKmlOverlay(const KmlDocument& document, const KmlFeature& overlay,
+                     const QString& featurePath, const QModelIndex& parent,
+                     int32_t row);
   LayerStack timedStack() const;
   void updateTimeBar(const LayerStack& stack);
   void applyImageryDraws(const LayerStack& stack, QStringList* errors);

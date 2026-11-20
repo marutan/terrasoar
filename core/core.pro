@@ -63,6 +63,7 @@ HEADERS += \
     include/ts/i18n/translationloader.h \
     include/ts/kml/kmldocument.h \
     include/ts/kml/kmlfeatureprovider.h \
+    include/ts/kml/kmloverlays.h \
     include/ts/kml/kmlpresentation.h \
     include/ts/kml/kmlreader.h \
     include/ts/layers/layerdefinition.h \
@@ -172,6 +173,7 @@ SOURCES += \
     src/i18n/translationloader.cpp \
     src/kml/kmldocument.cpp \
     src/kml/kmlfeatureprovider.cpp \
+    src/kml/kmloverlays.cpp \
     src/kml/kmlpresentation.cpp \
     src/kml/kmlreader.cpp \
     src/layers/layerdefinition.cpp \

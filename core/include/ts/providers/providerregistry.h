@@ -222,6 +222,8 @@ private:
   std::shared_ptr<ImageryProvider> createXyzImagery(const QJsonObject& source,
                                                     QString* errorString);
   std::shared_ptr<NetworkClient> networkLocked();
+  std::shared_ptr<ImageryProvider>
+  createKmlOverlayLocked(const QJsonObject& source, QString* errorString);
   struct Replacement;
   /** The variant a base pack source's dimensions pick; null if none. */
   const Replacement* basePackVariant(const QJsonObject& source) const;

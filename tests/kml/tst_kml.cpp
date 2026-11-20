@@ -32,6 +32,7 @@
 #include "concurrency.h"
 #include "ts/kml/kmldocument.h"
 #include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmloverlays.h"
 #include "ts/kml/kmlpresentation.h"
 #include "ts/kml/kmlreader.h"
 #include "ts/providers/providerregistry.h"
@@ -781,6 +782,189 @@ private slots:
     geometry.altitudeMode = ts::KmlAltitudeMode::ClampToGround;
     line.geometry = geometry;
     QVERIFY(ts::kmlRaisedShapes(line, ts::KmlStyle{}).empty());
+  }
+
+  void overlayPlacement()
+  {
+    ts::KmlLatLonBox box;
+    box.north = 10.0;
+    box.south = 0.0;
+    box.east = 20.0;
+    box.west = 0.0;
+    const QPointF centre =
+        ts::kmlOverlayImagePoint(box, 10.0, 5.0).value_or(QPointF(-1, -1));
+    QCOMPARE(centre, QPointF(0.5, 0.5));
+    // y from the top of the picture.
+    const QPointF upperLeft =
+        ts::kmlOverlayImagePoint(box, 5.0, 7.5).value_or(QPointF(-1, -1));
+    QCOMPARE(upperLeft, QPointF(0.25, 0.25));
+    QVERIFY(!ts::kmlOverlayImagePoint(box, 21.0, 5.0));
+    QVERIFY(!ts::kmlOverlayImagePoint(box, 10.0, -1.0));
+    // Turned 90° anticlockwise: the picture's right edge faces north.
+    box.rotationDeg = 90.0;
+    const QPointF north =
+        ts::kmlOverlayImagePoint(box, 10.0, 9.0).value_or(QPointF(-1, -1));
+    QVERIFY(std::abs(north.x() - 0.7) < 1e-9);
+    QVERIFY(std::abs(north.y() - 0.5) < 1e-9);
+    const ts::GeoRect turned = ts::kmlOverlayBounds(box);
+    QVERIFY(std::abs(turned.northDeg - 15.0) < 1e-9);
+    QVERIFY(std::abs(turned.westDeg - 5.0) < 1e-9);
+    // Across the antimeridian.
+    box.rotationDeg = 0.0;
+    box.west = 170.0;
+    box.east = -170.0;
+    const QPointF across =
+        ts::kmlOverlayImagePoint(box, -175.0, 5.0).value_or(QPointF(-1, -1));
+    QCOMPARE(across, QPointF(0.75, 0.5));
+    QCOMPARE(ts::kmlOverlayBounds(box).eastDeg, 190.0);
+    // A gx:LatLonQuad: its corners are the picture's.
+    ts::KmlLatLonBox quad;
+    quad.quad = {
+        ts::KmlCoordinate{0.0, 40.0, 0.0}, ts::KmlCoordinate{2.0, 40.0, 0.0},
+        ts::KmlCoordinate{2.5, 42.0, 0.0}, ts::KmlCoordinate{-0.5, 42.0, 0.0}};
+    const QPointF lowerLeft = ts::kmlOverlayImagePoint(quad, 0.0001, 40.0001)
+                                  .value_or(QPointF(-1, -1));
+    QVERIFY(lowerLeft.x() < 0.01 && lowerLeft.y() > 0.99);
+    const QPointF middle =
+        ts::kmlOverlayImagePoint(quad, 1.0, 41.0).value_or(QPointF(-1, -1));
+    QVERIFY(std::abs(middle.x() - 0.5) < 1e-9);
+    QVERIFY(std::abs(middle.y() - 0.5) < 1e-9);
+    QVERIFY(!ts::kmlOverlayImagePoint(quad, 2.2, 40.5));
+    QCOMPARE(ts::kmlOverlayBounds(quad).westDeg, -0.5);
+  }
+
+  void groundOverlays()
+  {
+    // A picture warped into tiles, the right way up, tinted.
+    QString error;
+    const QString xml = QStringLiteral(
+        "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><GroundOverlay>"
+        "<name>Quarters</name><color>80ffffff</color>"
+        "<Icon><href>images/overlay.png</href></Icon>"
+        "<LatLonBox><north>10</north><south>0</south><east>20</east>"
+        "<west>0</west></LatLonBox></GroundOverlay></kml>");
+    std::optional<ts::KmlDocument> parsed =
+        ts::parseKml(xml.toUtf8(), fixture(QString()), &error);
+    if (!parsed) {
+      QFAIL(qPrintable(error));
+    }
+    const std::shared_ptr<const ts::KmlDocument> document =
+        std::make_shared<const ts::KmlDocument>(std::move(*parsed));
+    ts::KmlGroundOverlayProvider provider(document, QString(), nullptr);
+    QVERIFY(provider.isValid());
+    QCOMPARE(provider.name(), QStringLiteral("Quarters"));
+    const std::atomic<bool> cancelled{false};
+    // Level 4 tiles are 11.25° across; this one holds the picture's lower
+    // right.
+    const ts::TileKey key =
+        ts::TileKey::containing(4, ts::Geodetic{5.0, 15.0, 0.0});
+    const ts::ImageLoadResult result = provider.loadTileImage(key, cancelled);
+    QCOMPARE(result.outcome, ts::ImageLoadResult::Outcome::Image);
+    const QImage image = result.image.convertToFormat(QImage::Format_ARGB32);
+    const ts::GeoRect bounds = key.bounds();
+    const std::function<QColor(double, double)> pixelAt = [&](double lon,
+                                                              double lat) {
+      const int32_t x = static_cast<int32_t>((lon - bounds.westDeg) /
+                                             bounds.widthDeg() * image.width());
+      const int32_t y = static_cast<int32_t>(
+          (bounds.northDeg - lat) / (bounds.northDeg - bounds.southDeg) *
+          image.height());
+      return QColor::fromRgba(image.pixel(x, y));
+    };
+    // Lower right white, lower left blue, upper right green; half opaque.
+    QCOMPARE(pixelAt(15.0, 2.5), QColor(255, 255, 255, 128));
+    QCOMPARE(pixelAt(15.0, 7.5), QColor(0, 255, 0, 128));
+    // Outside the box: transparent.
+    if (bounds.northDeg > 10.5) {
+      QCOMPARE(pixelAt(15.0, 10.5).alpha(), 0);
+    }
+    // Tiles it doesn't touch have nothing.
+    QCOMPARE(provider
+                 .loadTileImage(ts::TileKey::containing(
+                                    4, ts::Geodetic{-40.0, -100.0, 0.0}),
+                                cancelled)
+                 .outcome,
+             ts::ImageLoadResult::Outcome::NoData);
+    // 0.3125° a pixel: level 2's tiles match it; one finer.
+    QCOMPARE(provider.maximumLevel(), 3);
+    // A missing picture: nothing anywhere.
+    const std::shared_ptr<const ts::KmlDocument> everything =
+        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
+                              &error);
+    if (!everything) {
+      QFAIL(qPrintable(error));
+    }
+    // A placemark isn't a ground overlay.
+    QVERIFY(!ts::KmlGroundOverlayProvider(everything, QStringLiteral("0.0"),
+                                          nullptr)
+                 .isValid());
+    // The KMZ's square, read from the archive.
+    const std::shared_ptr<const ts::KmlDocument> kmz =
+        ts::sharedKmlDocument(fixture(QStringLiteral("archive.kmz")), &error);
+    if (!kmz) {
+      QFAIL(qPrintable(error));
+    }
+    ts::KmlGroundOverlayProvider square(kmz, QStringLiteral("1"), nullptr);
+    QVERIFY(square.isValid());
+    const ts::ImageLoadResult inside = square.loadTileImage(
+        ts::TileKey::containing(6, ts::Geodetic{50.5, 10.5, 0.0}), cancelled);
+    QCOMPARE(inside.outcome, ts::ImageLoadResult::Outcome::Image);
+    // Through the registry.
+    ts::ProviderRegistry registry;
+    const std::shared_ptr<ts::ImageryProvider> fromRegistry = registry.imagery(
+        ts::kmlOverlaySource(fixture(QStringLiteral("archive.kmz")),
+                             QStringLiteral("1")),
+        &error);
+    QVERIFY(
+        std::dynamic_pointer_cast<ts::KmlGroundOverlayProvider>(fromRegistry));
+    QVERIFY(!registry.imagery(
+        ts::kmlOverlaySource(fixture(QStringLiteral("archive.kmz")),
+                             QStringLiteral("0")),
+        &error));
+  }
+
+  void screenOverlays()
+  {
+    // everything.kml's legend: its top left 10 pixels in from the top left.
+    const ts::KmlDocument document = read(QStringLiteral("everything.kml"));
+    const ts::KmlFeature* legend =
+        find(document.root, QStringLiteral("A legend"));
+    if (legend == nullptr) {
+      QFAIL("no legend");
+    }
+    const ts::KmlScreenRect placed =
+        ts::kmlScreenRect(legend->screen.value_or(ts::KmlScreenPlacement{}),
+                          QSizeF(40, 20), QSizeF(800, 600));
+    QCOMPARE(placed.rect, QRectF(10, 10, 40, 20));
+    QCOMPARE(placed.pivot, QPointF(400, 300));
+    QCOMPARE(placed.rotationDeg, -5.0);
+    // Defaults: the bottom left corner, its own size.
+    ts::KmlScreenPlacement plain;
+    QCOMPARE(ts::kmlScreenRect(plain, QSizeF(40, 20), QSizeF(800, 600)).rect,
+             QRectF(0, 580, 40, 20));
+    // Half the width, keeping its aspect, centred.
+    plain.size = ts::KmlVec2{0.5, 0.0};
+    plain.overlayXY = ts::KmlVec2{0.5, 0.5};
+    plain.screenXY = ts::KmlVec2{0.5, 0.5};
+    QCOMPARE(ts::kmlScreenRect(plain, QSizeF(40, 20), QSizeF(800, 600)).rect,
+             QRectF(200, 200, 400, 200));
+    // A ScreenOverlay's layer: the provider has it.
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> shared = ts::sharedKmlDocument(
+        fixture(QStringLiteral("everything.kml")), &error);
+    if (!shared) {
+      QFAIL(qPrintable(error));
+    }
+    QString path;
+    for (std::size_t i = 0; i < shared->root.children.size(); ++i) {
+      if (shared->root.children.at(i).kind ==
+          ts::KmlFeature::Kind::ScreenOverlay) {
+        path = QString::number(i);
+      }
+    }
+    ts::KmlFeatureProvider provider(shared, path);
+    QCOMPARE(provider.screenOverlays().size(), std::size_t{1});
+    QCOMPARE(provider.featureCount(), std::size_t{0});
   }
 
   void registryCreatesKml()

@@ -45,6 +45,7 @@
 #include "ts/geo/geodetic.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/globe/tilerenderer.h"
+#include "ts/kml/kmldocument.h"
 #include "ts/perf/frametimestats.h"
 #include "ts/regions/regiongeometry.h"
 #include "ts/render/framepacer.h"
@@ -130,6 +131,16 @@ struct RaisedShapeDraw {
   double widthPx = 1.0;
   /** The fill of the top and walls; transparent for none. */
   QColor fill;
+};
+
+/** A picture fixed to the screen over the view (a KML ScreenOverlay). */
+struct ScreenOverlayDraw {
+  /** The picture, already tinted. */
+  QImage image;
+  /** Where it goes (kmlScreenRect()). */
+  KmlScreenPlacement placement;
+  /** Higher ones are drawn over lower ones. */
+  int32_t drawOrder = 0;
 };
 
 /**
@@ -291,6 +302,15 @@ public:
    */
   void setRaisedShapes(std::vector<RaisedShapeDraw> shapes);
 
+  /** Sets the pictures fixed to the screen, drawn in order (KML). */
+  void setScreenOverlays(std::vector<ScreenOverlayDraw> overlays);
+
+  /** Returns the screen overlays set (for tests). */
+  const std::vector<ScreenOverlayDraw>& screenOverlays() const
+  {
+    return m_screens;
+  }
+
   /** Returns how many raised shapes the last frame drew (for tests). */
   int32_t raisedShapesDrawn() const { return m_raisedDrawn; }
 
@@ -445,6 +465,7 @@ private:
   void updatePointerReadout();
   void drawBillboards();
   void drawRaisedShapes();
+  void drawScreenOverlays();
   double groundHeightM(double latDeg, double lonDeg);
   Vec3 overlayEcef(double latDeg, double lonDeg, double heightM,
                    OverlayHeight height);
@@ -505,6 +526,7 @@ private:
   bool m_drawingDrag = false;
   std::vector<BillboardDraw> m_billboards;
   std::vector<RaisedShapeDraw> m_raised;
+  std::vector<ScreenOverlayDraw> m_screens;
   int32_t m_raisedDrawn = 0;
   int32_t m_billboardsDrawn = 0;
   int32_t m_labelsDrawn = 0;

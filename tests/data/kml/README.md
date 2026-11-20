@@ -11,6 +11,8 @@ the network.
 | `styles.kml` | The external style `everything.kml` refers to |
 | `heights.kml` | Shapes above the ground near London: an extruded polygon at an absolute height, an extruded line relative to the ground with a 2.4° edge, a point on a stalk, and a draped line |
 | `broken.kml` | Malformed XML (an unclosed element) |
+| `images/overlay.png` | The ground overlays' picture, 64 × 32: red top left, green top right, blue bottom left, white bottom right (to check which way round it is drawn) |
+| `images/legend.png` | The screen overlay's picture: orange, 40 × 20 |
 | `archive.kmz` | A KMZ: doc.kml with an icon and a ground overlay image inside the archive |
 
 ## From GDAL's tests (`gdal/`)

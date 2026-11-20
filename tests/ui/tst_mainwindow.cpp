@@ -2572,8 +2572,8 @@ private slots:
     QVERIFY(
         model->data(document, ts::LayerTreeModel::IsCollectionRole).toBool());
     // Shapes (its places), Times and places (its places), the document's
-    // own placemark.
-    QCOMPARE(model->rowCount(document), 3);
+    // own placemark, two ground overlays and a screen overlay.
+    QCOMPARE(model->rowCount(document), 6);
     const QModelIndex shapes = model->index(0, 0, document);
     QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
     QCOMPARE(model->rowCount(shapes), 1);
@@ -2654,6 +2654,55 @@ private slots:
     QTRY_VERIFY(view->billboardsDrawn() >= 1);
     view->setPose(ts::CameraPose{-51.5, 179.0, 600000.0, 0.0, 0.0});
     QTRY_COMPARE(view->raisedShapesDrawn(), 0);
+  }
+
+  void kmlOverlays()
+  {
+    // Ground overlays as imagery layers; a screen overlay fixed to the view.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QString error;
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    QStringList names;
+    QModelIndex picture;
+    QModelIndex legend;
+    for (int32_t row = 0; row < model->rowCount(document); ++row) {
+      const QModelIndex child = model->index(row, 0, document);
+      names << model->data(child).toString();
+      if (model->data(child).toString() == QLatin1String("A picture")) {
+        picture = child;
+      } else if (model->data(child).toString() == QLatin1String("A legend")) {
+        legend = child;
+      }
+    }
+    QVERIFY2(picture.isValid() && legend.isValid(),
+             qPrintable(names.join(QStringLiteral(", "))));
+    QCOMPARE(model->data(picture, ts::LayerTreeModel::LayerTypeRole).toInt(),
+             static_cast<int32_t>(ts::LayerType::Imagery));
+    QCOMPARE(model->layerDefinition(picture)
+                 .source.value(QStringLiteral("kind"))
+                 .toString(),
+             QStringLiteral("kmloverlay"));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    QTRY_COMPARE(view->screenOverlays().size(), std::size_t{1});
+    QCOMPARE(view->screenOverlays().front().image.size(), QSize(40, 20));
+    view->setPose(ts::CameraPose{51.5, 0.0, 600000.0, 0.0, 0.0});
+    // Off with its layer.
+    model->setData(legend, Qt::Unchecked, Qt::CheckStateRole);
+    QTRY_VERIFY(view->screenOverlays().empty());
+    // Fly There on a ground overlay frames its box.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(picture);
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(QStringLiteral(
+                                   "flyThereAction")) != nullptr);
   }
 
   void wmsWhatIsHere()

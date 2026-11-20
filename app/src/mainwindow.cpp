@@ -86,6 +86,7 @@
 #include "ts/globe/layerstackdraws.h"
 #include "ts/kml/kmldocument.h"
 #include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmloverlays.h"
 #include "ts/kml/kmlpresentation.h"
 #include "ts/kml/kmlreader.h"
 #include "ts/layers/layertreemodel.h"
@@ -1261,6 +1262,9 @@ void MainWindow::addKmlFeature(const KmlDocument& document,
     if (child.kind == KmlFeature::Kind::Document ||
         child.kind == KmlFeature::Kind::Folder) {
       addKmlFeature(document, child, childPath, collection, next++);
+    } else if (child.kind == KmlFeature::Kind::GroundOverlay ||
+               child.kind == KmlFeature::Kind::ScreenOverlay) {
+      addKmlOverlay(document, child, childPath, collection, next++);
     } else if (child.kind == KmlFeature::Kind::Placemark && !placemarks) {
       // The container's placemarks, in one layer where the first is.
       placemarks = true;
@@ -1283,6 +1287,38 @@ void MainWindow::addKmlFeature(const KmlDocument& document,
   }
   if (!container.visibility) {
     m_layers->setData(collection, Qt::Unchecked, Qt::CheckStateRole);
+  }
+}
+
+void MainWindow::addKmlOverlay(const KmlDocument& document,
+                               const KmlFeature& overlay,
+                               const QString& featurePath,
+                               const QModelIndex& parent, int32_t row)
+{
+  LayerDefinition definition;
+  definition.id = QStringLiteral("kml:") +
+                  QUuid::createUuid().toString(QUuid::WithoutBraces);
+  definition.origin = LayerOrigin::User;
+  if (overlay.kind == KmlFeature::Kind::GroundOverlay) {
+    // A picture on the ground: imagery, in the file's draw order.
+    definition.type = LayerType::Imagery;
+    definition.name =
+        overlay.name.isEmpty() ? tr("Ground overlay") : overlay.name;
+    definition.source = kmlOverlaySource(document.path, featurePath);
+  } else {
+    // A picture on the screen: drawn by the view, from its own layer.
+    definition.type = LayerType::Vector;
+    definition.name =
+        overlay.name.isEmpty() ? tr("Screen overlay") : overlay.name;
+    definition.source = kmlLayerSource(document.path, featurePath);
+    VectorStyle style;
+    definition.style = style.toJson();
+  }
+  const QModelIndex layer = m_layers->addLayer(definition, parent, row);
+  m_kmlNodes[m_layers->data(layer, LayerTreeModel::NodeIdRole).toString()] = {
+      document.path, featurePath};
+  if (!overlay.visibility) {
+    m_layers->setData(layer, Qt::Unchecked, Qt::CheckStateRole);
   }
 }
 
@@ -1339,7 +1375,8 @@ OverlayHeight overlayHeight(KmlAltitudeMode mode)
 
 } // namespace
 
-QImage MainWindow::tintedIcon(const QString& where, const QColor& tint)
+QImage MainWindow::tintedIcon(const QString& where, const QColor& tint,
+                              bool pushpin)
 {
   const std::pair<QString, QRgb> key{where, tint.rgba()};
   const std::map<std::pair<QString, QRgb>, QImage>::const_iterator known =
@@ -1347,7 +1384,12 @@ QImage MainWindow::tintedIcon(const QString& where, const QColor& tint)
   if (known != m_tintedIcons.end()) {
     return known->second;
   }
-  QImage icon = m_icons->icon(where).convertToFormat(QImage::Format_ARGB32);
+  // A missing picture is nothing; a missing icon the pushpin.
+  QImage icon = pushpin ? m_icons->icon(where) : m_icons->image(where);
+  if (icon.isNull()) {
+    return icon;
+  }
+  icon = icon.convertToFormat(QImage::Format_ARGB32);
   if (tint != QColor(255, 255, 255)) {
     // KML multiplies the icon's colours (and opacity) by the tint.
     for (int32_t y = 0; y < icon.height(); ++y) {
@@ -1372,6 +1414,7 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
   constexpr double iconPx = 32.0;
   std::vector<BillboardDraw> draws;
   std::vector<RaisedShapeDraw> raised;
+  std::vector<ScreenOverlayDraw> screens;
   for (const VectorStackEntry& entry : stack.vectors) {
     if (entry.definition.source.value(QStringLiteral("kind")).toString() !=
         QLatin1String("kml")) {
@@ -1416,6 +1459,17 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
       draw.labelScale = billboard.labelScale;
       draws.push_back(std::move(draw));
     }
+    for (const KmlFeature* screen : provider->screenOverlays()) {
+      ScreenOverlayDraw draw;
+      draw.image =
+          tintedIcon(resolveKmlHref(*provider->document(), screen->iconHref),
+                     screen->color, false);
+      draw.placement = screen->screen.value_or(KmlScreenPlacement{});
+      draw.drawOrder = screen->drawOrder;
+      if (!draw.image.isNull()) {
+        screens.push_back(std::move(draw));
+      }
+    }
     for (const KmlRaisedShape& shape : provider->raisedShapes()) {
       RaisedShapeDraw draw;
       draw.height =
@@ -1439,6 +1493,11 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
   }
   m_globeView->setBillboards(std::move(draws));
   m_globeView->setRaisedShapes(std::move(raised));
+  std::stable_sort(screens.begin(), screens.end(),
+                   [](const ScreenOverlayDraw& a, const ScreenOverlayDraw& b) {
+                     return a.drawOrder < b.drawOrder;
+                   });
+  m_globeView->setScreenOverlays(std::move(screens));
 }
 
 bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)

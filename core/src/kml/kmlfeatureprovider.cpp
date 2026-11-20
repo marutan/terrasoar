@@ -447,6 +447,13 @@ KmlFeatureProvider::KmlFeatureProvider(
             kmlBillboards(*m_document, placemark, style);
         m_billboards.insert(m_billboards.end(), points.begin(), points.end());
       };
+  // A placemark or screen overlay named itself (a file of one placemark;
+  // a screen overlay's own layer).
+  if (container->kind == KmlFeature::Kind::Placemark) {
+    add(*container);
+  } else if (container->kind == KmlFeature::Kind::ScreenOverlay) {
+    m_screens.push_back(container);
+  }
   for (const KmlFeature& child : container->children) {
     if (child.kind == KmlFeature::Kind::Placemark) {
       add(child);

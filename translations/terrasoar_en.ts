@@ -1566,6 +1566,14 @@
             <source>Open</source>
             <translation>Open</translation>
         </message>
+        <message>
+            <source>Ground overlay</source>
+            <translation>Ground overlay</translation>
+        </message>
+        <message>
+            <source>Screen overlay</source>
+            <translation>Screen overlay</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>

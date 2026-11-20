@@ -294,13 +294,13 @@ struct KmlLatLonBox {
 /** ScreenOverlay's placement. */
 struct KmlScreenPlacement {
   /** The point of the image placed at screenXY. */
-  KmlVec2 overlayXY;
+  KmlVec2 overlayXY{0.0, 0.0};
   /** Where on the screen. */
-  KmlVec2 screenXY;
+  KmlVec2 screenXY{0.0, 0.0};
   /** The point it turns about. */
-  KmlVec2 rotationXY;
+  KmlVec2 rotationXY{0.0, 0.0};
   /** −1 or 0 per axis keep the image's own size (or aspect). */
-  KmlVec2 size;
+  KmlVec2 size{-1.0, -1.0};
   /** Rotation, degrees anticlockwise. */
   double rotationDeg = 0.0;
 };
