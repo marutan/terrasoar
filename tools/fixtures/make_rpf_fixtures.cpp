@@ -116,7 +116,7 @@ bool writeChart(const std::string& directory, double west, double south,
 
 } // namespace
 
-int main(int argc, char** argv)
+int32_t main(int32_t argc, char** argv)
 {
   if (argc != 2) {
     std::fprintf(stderr, "usage: make_rpf_fixtures <output directory>\n");
