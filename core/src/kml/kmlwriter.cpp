@@ -62,7 +62,7 @@ constexpr int32_t childrenRank = 1000;
 
 QString indent(int32_t depth)
 {
-  return QString(static_cast<qsizetype>(depth) * 2, QLatin1Char(' '));
+  return QString(static_cast<int32_t>(depth) * 2, QLatin1Char(' '));
 }
 
 QString newline(int32_t depth)
@@ -882,8 +882,8 @@ public:
     if (end <= begin) {
       return QString();
     }
-    return m_text->mid(static_cast<qsizetype>(begin),
-                       static_cast<qsizetype>(end - begin));
+    return m_text->mid(static_cast<int32_t>(begin),
+                       static_cast<int32_t>(end - begin));
   }
 
 private:
@@ -1180,8 +1180,8 @@ QByteArray writeKml(const KmlDocument& document)
     // elements around the feature.
     const KmlSource& kml = *document.kmlSource;
     const QString start =
-        text->mid(static_cast<qsizetype>(kml.begin),
-                  static_cast<qsizetype>(kml.startEnd - kml.begin));
+        text->mid(static_cast<int32_t>(kml.begin),
+                  static_cast<int32_t>(kml.startEnd - kml.begin));
     Writer writer(document, start.contains(QLatin1String("xmlns:gx")));
     QString prologue = writer.slice(document.prologueBegin, kml.begin);
     out += prologue.trimmed().isEmpty()

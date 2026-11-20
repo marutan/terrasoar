@@ -1399,7 +1399,7 @@ void GlobeView::drawBillboards()
   painter.setRenderHint(QPainter::Antialiasing, true);
   QFont font = painter.font();
   const double basePt = font.pointSizeF() > 0.0 ? font.pointSizeF() : 10.0;
-  std::unordered_set<int64_t> cells;
+  std::unordered_set<uint64_t> cells;
   std::vector<QRectF> labels;
   const QRectF visible =
       QRectF(rect()).adjusted(-marginPx, -marginPx, marginPx, marginPx);
@@ -1417,9 +1417,12 @@ void GlobeView::drawBillboards()
       }
     }
     // One icon per cell where they crowd.
-    const int64_t cell =
-        (static_cast<int64_t>(std::floor(at->x() / cellPx)) << 32) ^
-        static_cast<int64_t>(std::floor(at->y() / cellPx));
+    const uint64_t cell =
+        (static_cast<uint64_t>(
+             static_cast<int64_t>(std::floor(at->x() / cellPx)))
+         << 32) ^
+        static_cast<uint64_t>(
+            static_cast<int64_t>(std::floor(at->y() / cellPx)));
     if (!cells.insert(cell).second) {
       continue;
     }

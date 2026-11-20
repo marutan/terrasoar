@@ -181,7 +181,7 @@ public:
       return 0;
     }
     return m_text->lastIndexOf(
-        QLatin1Char('<'), static_cast<qsizetype>(m_xml->characterOffset()) - 1);
+        QLatin1Char('<'), static_cast<int32_t>(m_xml->characterOffset()) - 1);
   }
 
   /** Sets the text being read (kept), to find where elements start. */
@@ -904,7 +904,7 @@ QByteArray readVsi(const QString& path)
   std::array<char, 65536> buffer{};
   size_t read = 0;
   while ((read = VSIFReadL(buffer.data(), 1, buffer.size(), file)) > 0) {
-    data.append(buffer.data(), static_cast<qsizetype>(read));
+    data.append(buffer.data(), static_cast<int32_t>(read));
   }
   VSIFCloseL(file);
   return data;

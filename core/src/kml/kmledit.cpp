@@ -238,7 +238,7 @@ QString kmlChildPath(const QString& parentPath, int32_t row)
 
 QString kmlParentPath(const QString& path)
 {
-  const qsizetype dot = path.lastIndexOf(QLatin1Char('.'));
+  const int32_t dot = static_cast<int32_t>(path.lastIndexOf(QLatin1Char('.')));
   return dot < 0 ? QString() : path.left(dot);
 }
 

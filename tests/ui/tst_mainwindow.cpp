@@ -2581,6 +2581,9 @@ private slots:
 
   void openKml()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // A KML document in the layer tree: a collection per folder, the
     // placemarks of each in a vector layer, visibility as written; a click
     // on a placemark shows its balloon; a folder can be flown to.
@@ -2676,6 +2679,9 @@ private slots:
 
   void kmlHeights()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // Shapes above the ground, with walls, drawn over the globe; flat on
     // the map.
     ts::MainWindow window;
@@ -2696,6 +2702,9 @@ private slots:
 
   void kmlOverlays()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // Ground overlays as imagery layers; a screen overlay fixed to the view.
     ts::MainWindow window;
     window.show();
@@ -2745,6 +2754,9 @@ private slots:
 
   void kmlLinksAndLists()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // NetworkLinks to local files (one waiting for its Region), a radio
     // folder, a folder listed as one entry.
     ts::MainWindow window;
@@ -2891,6 +2903,9 @@ private slots:
 
   void kmlTime()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // Placemarks with times show at the clock's; a track's marker moves.
     ts::MainWindow window;
     window.show();
@@ -3011,6 +3026,9 @@ private slots:
 
   void kmlLargeFile()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // A large file is read off the GUI thread: the window keeps going
     // (timers fire) while it opens, and its placemarks show.
     QTemporaryDir folder;
@@ -3053,6 +3071,9 @@ private slots:
 
   void kmlEditing()
   {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
     // A document of one's own: drawn elements, dragged points, undo and
     // redo, properties, the clipboard, saving and projects.
     ts::MainWindow window;

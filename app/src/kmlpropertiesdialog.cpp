@@ -313,7 +313,11 @@ QWidget* KmlPropertiesDialog::makeTime()
   m_end = new QDateTimeEdit(page);
   m_end->setObjectName(QStringLiteral("kmlEnd"));
   for (QDateTimeEdit* edit : {m_begin, m_end}) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0)
+    edit->setTimeZone(QTimeZone::utc());
+#else
     edit->setTimeSpec(Qt::UTC);
+#endif
     edit->setCalendarPopup(true);
     edit->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss 'UTC'"));
   }

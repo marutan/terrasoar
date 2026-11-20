@@ -204,7 +204,8 @@ void MainWindow::createKmlEditing()
   connect(m_addFolderAction, &QAction::triggered, this,
           [this]() { addKmlFolder(); });
   m_kmlPropertiesAction = newAction(this, "kmlPropertiesAction");
-  m_kmlPropertiesAction->setShortcut(QKeySequence(Qt::ALT | Qt::Key_Return));
+  m_kmlPropertiesAction->setShortcut(
+      QKeySequence::fromString(QStringLiteral("Alt+Return")));
   connect(m_kmlPropertiesAction, &QAction::triggered, this,
           &MainWindow::showKmlProperties);
   m_kmlCutAction = newAction(this, "kmlCutAction");
