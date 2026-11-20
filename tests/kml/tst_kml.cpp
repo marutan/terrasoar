@@ -17,16 +17,23 @@
   You should have received a copy of the GNU General Public License
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
+#include <atomic>
+#include <cmath>
 #include <cstdint>
 #include <functional>
 #include <optional>
 
 #include <QFile>
+#include <QImage>
+#include <QJsonObject>
 #include <QtTest>
 
 #include "concurrency.h"
 #include "ts/kml/kmldocument.h"
+#include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmlpresentation.h"
 #include "ts/kml/kmlreader.h"
+#include "ts/providers/providerregistry.h"
 #include "ts/time/timeextent.h"
 
 namespace
@@ -469,6 +476,253 @@ private slots:
         QString(), &error);
     QVERIFY(bare.has_value());
     QCOMPARE(bare.value_or(ts::KmlDocument{}).root.name, QStringLiteral("x"));
+  }
+
+  void placemarkFeatures()
+  {
+    const ts::KmlDocument document = read(QStringLiteral("everything.kml"));
+    ts::KmlStyleResolver resolver(document);
+    // A polygon with a hole: its fill from PolyStyle, no outline (outline 0).
+    const ts::KmlFeature* polygon =
+        find(document.root, QStringLiteral("A polygon with a hole"));
+    if (polygon == nullptr) {
+      QFAIL("no polygon");
+    }
+    const std::vector<ts::Feature> areas =
+        ts::kmlPlacemarkFeatures(*polygon, resolver.resolve(*polygon));
+    QCOMPARE(areas.size(), std::size_t{1});
+    QCOMPARE(areas.front().type, ts::Feature::Type::Polygon);
+    QCOMPARE(areas.front().parts.size(), std::size_t{2});
+    const ts::FeatureStyle area =
+        areas.front().style.value_or(ts::FeatureStyle());
+    QCOMPARE(area.fill.value_or(QColor()), QColor(0, 255, 0, 127));
+    QCOMPARE(area.outline.value_or(QColor()).alpha(), 0);
+    QCOMPARE(areas.front().attributes.value(QStringLiteral("name")).toString(),
+             QStringLiteral("A polygon with a hole"));
+    // A line: its colour and width.
+    const ts::KmlFeature* line = find(document.root, QStringLiteral("A line"));
+    if (line == nullptr) {
+      QFAIL("no line");
+    }
+    const std::vector<ts::Feature> lines =
+        ts::kmlPlacemarkFeatures(*line, resolver.resolve(*line));
+    QCOMPARE(lines.size(), std::size_t{1});
+    QCOMPARE(lines.front()
+                 .style.value_or(ts::FeatureStyle())
+                 .outline.value_or(QColor()),
+             QColor(255, 165, 0));
+    QCOMPARE(lines.front()
+                 .style.value_or(ts::FeatureStyle())
+                 .outlineWidthPx.value_or(0.0),
+             5.0);
+    // Points: the icon's colour and scale; the default icon is yellow.
+    const ts::KmlFeature* point =
+        find(document.root, QStringLiteral("A point"));
+    if (point == nullptr) {
+      QFAIL("no point");
+    }
+    const std::vector<ts::Feature> dots =
+        ts::kmlPlacemarkFeatures(*point, resolver.resolve(*point));
+    QCOMPARE(dots.front().type, ts::Feature::Type::Points);
+    QCOMPARE(dots.front()
+                 .style.value_or(ts::FeatureStyle())
+                 .outline.value_or(QColor()),
+             QColor(255, 0, 0));
+    QCOMPARE(dots.front()
+                 .style.value_or(ts::FeatureStyle())
+                 .pointSizePx.value_or(0.0),
+             13.5);
+    QCOMPARE(
+        dots.front().attributes.value(QStringLiteral("Population")).toString(),
+        QStringLiteral("1141816"));
+    const ts::KmlFeature* plain =
+        find(document.root, QStringLiteral("Spanned"));
+    if (plain == nullptr) {
+      QFAIL("no plain point");
+    }
+    QCOMPARE(ts::kmlPlacemarkFeatures(*plain, ts::KmlStyle{})
+                 .front()
+                 .style.value_or(ts::FeatureStyle())
+                 .outline.value_or(QColor()),
+             QColor(255, 214, 0));
+    // A MultiGeometry: one feature per member.
+    const ts::KmlFeature* multi =
+        find(document.root, QStringLiteral("Two points and a line"));
+    if (multi == nullptr) {
+      QFAIL("no multigeometry");
+    }
+    QCOMPARE(ts::kmlPlacemarkFeatures(*multi, ts::KmlStyle{}).size(),
+             std::size_t{3});
+  }
+
+  void antimeridian()
+  {
+    // A line from 170° E to 170° W goes the short way, and comes twice:
+    // as written past 180°, and shifted to the western side.
+    ts::KmlFeature placemark;
+    placemark.kind = ts::KmlFeature::Kind::Placemark;
+    ts::KmlGeometry line;
+    line.kind = ts::KmlGeometry::Kind::LineString;
+    line.coordinates = {ts::KmlCoordinate{170.0, 10.0, 0.0},
+                        ts::KmlCoordinate{-170.0, 12.0, 0.0}};
+    placemark.geometry = line;
+    const std::vector<ts::Feature> features =
+        ts::kmlPlacemarkFeatures(placemark, ts::KmlStyle{});
+    QCOMPARE(features.size(), std::size_t{2});
+    QCOMPARE(features.at(0).parts.front().back().lonDeg, -170.0);
+    QCOMPARE(features.at(0).parts.front().front().lonDeg, -190.0);
+    QCOMPARE(features.at(1).parts.front().back().lonDeg, 190.0);
+  }
+
+  void provider()
+  {
+    QString error;
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
+                              &error);
+    if (!document) {
+      QFAIL(qPrintable(error));
+    }
+    // One copy while anything holds it.
+    QCOMPARE(ts::sharedKmlDocument(fixture(QStringLiteral("everything.kml")),
+                                   &error),
+             document);
+    QVERIFY(
+        !ts::sharedKmlDocument(fixture(QStringLiteral("none.kml")), &error));
+    // Containers by path.
+    QCOMPARE(ts::kmlContainer(*document, QString()), &document->root);
+    const ts::KmlFeature* shapes =
+        ts::kmlContainer(*document, QStringLiteral("0"));
+    QVERIFY(shapes != nullptr);
+    QCOMPARE(shapes->name, QStringLiteral("Shapes"));
+    QVERIFY(ts::kmlContainer(*document, QStringLiteral("9")) == nullptr);
+    QVERIFY(ts::kmlContainer(*document, QStringLiteral("x")) == nullptr);
+    const QJsonObject source =
+        ts::kmlLayerSource(document->path, QStringLiteral("0"));
+    QCOMPARE(source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("kml"));
+
+    ts::KmlFeatureProvider provider(document, QStringLiteral("0"));
+    QCOMPARE(provider.name(), QStringLiteral("Shapes"));
+    // Point, line, ring, polygon and the three of the MultiGeometry.
+    QCOMPARE(provider.featureCount(), std::size_t{7});
+    const std::atomic<bool> cancelled{false};
+    // England's tile has them; the Pacific's none.
+    const std::optional<ts::FeatureTile> england = provider.loadFeatures(
+        ts::TileKey::containing(5, ts::Geodetic{52.5, -1.5, 0.0}), cancelled);
+    QVERIFY(england.has_value());
+    QVERIFY(!england.value_or(ts::FeatureTile{}).features.empty());
+    QVERIFY(!provider.loadFeatures(
+        ts::TileKey::containing(5, ts::Geodetic{0.0, -150.0, 0.0}), cancelled));
+    QCOMPARE(provider
+                 .storedKey(
+                     ts::TileKey::containing(12, ts::Geodetic{52.5, -1.5, 0.0}))
+                 .level,
+             6);
+    // Picking: inside the polygon, not in its hole; near the point.
+    const std::vector<const ts::KmlFeature*> inPolygon =
+        provider.placemarksAt(ts::GeoPoint{52.2, -1.8}, 0.01);
+    QCOMPARE(inPolygon.size(), std::size_t{1});
+    QCOMPARE(inPolygon.front()->name, QStringLiteral("A polygon with a hole"));
+    QVERIFY(provider.placemarksAt(ts::GeoPoint{52.45, -1.5}, 0.001).empty());
+    const std::vector<const ts::KmlFeature*> atPoint =
+        provider.placemarksAt(ts::GeoPoint{52.4862, -1.8904}, 0.01);
+    QVERIFY(!atPoint.empty());
+    QCOMPARE(atPoint.front()->name, QStringLiteral("A point"));
+    QCOMPARE(provider.featuresAt(ts::GeoPoint{52.2, -1.8}, 0.01).size(),
+             std::size_t{1});
+    // A container with no placemarks of its own has none.
+    ts::KmlFeatureProvider root(document, QString());
+    QCOMPARE(root.featureCount(), std::size_t{1}); // "External style"
+  }
+
+  void registryCreatesKml()
+  {
+    ts::ProviderRegistry registry;
+    QString error;
+    const QJsonObject source = ts::kmlLayerSource(
+        fixture(QStringLiteral("everything.kml")), QStringLiteral("0"));
+    const std::shared_ptr<ts::FeatureProvider> provider =
+        registry.features(source, &error);
+    if (!provider) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(std::dynamic_pointer_cast<ts::KmlFeatureProvider>(provider));
+    QCOMPARE(registry.features(source, &error), provider);
+    QVERIFY(!registry.features(
+        ts::kmlLayerSource(fixture(QStringLiteral("none.kml")), QString()),
+        &error));
+    QVERIFY(!error.isEmpty());
+  }
+
+  void views()
+  {
+    ts::KmlView lookAt;
+    lookAt.latDeg = 52.0;
+    lookAt.lonDeg = -1.0;
+    lookAt.rangeM = 5000.0;
+    lookAt.headingDeg = 30.0;
+    lookAt.tiltDeg = 89.0;
+    const ts::CameraPose pose = ts::kmlViewPose(lookAt);
+    QCOMPARE(pose.targetLatDeg, 52.0);
+    QCOMPARE(pose.rangeM, 5000.0);
+    QCOMPARE(pose.tiltDeg, 85.0); // kept off the horizon
+    // A camera looking straight down: the point below, at its height.
+    ts::KmlView camera;
+    camera.kind = ts::KmlView::Kind::Camera;
+    camera.latDeg = 10.0;
+    camera.lonDeg = 20.0;
+    camera.altM = 3000.0;
+    ts::CameraPose below = ts::kmlViewPose(camera);
+    QCOMPARE(below.targetLatDeg, 10.0);
+    QCOMPARE(below.rangeM, 3000.0);
+    // Tilted 45° facing north: the point 3 km ahead, 4.2 km away.
+    camera.tiltDeg = 45.0;
+    below = ts::kmlViewPose(camera);
+    QVERIFY(std::abs(below.targetLatDeg - (10.0 + 3000.0 / 111320.0)) < 1e-6);
+    QVERIFY(std::abs(below.rangeM - 3000.0 * std::sqrt(2.0)) < 1e-6);
+    // A feature without a view: framed.
+    const ts::KmlDocument document = read(QStringLiteral("everything.kml"));
+    const ts::KmlFeature* polygon =
+        find(document.root, QStringLiteral("A polygon with a hole"));
+    if (polygon == nullptr) {
+      QFAIL("no polygon");
+    }
+    const std::optional<ts::CameraPose> framed = ts::kmlFeaturePose(*polygon);
+    QVERIFY(framed.has_value());
+    QCOMPARE(framed.value_or(ts::CameraPose{}).targetLatDeg, 52.5);
+    QVERIFY(framed.value_or(ts::CameraPose{}).rangeM > 100000.0);
+    QVERIFY(!ts::kmlFeaturePose(ts::KmlFeature{}).has_value());
+  }
+
+  void balloons()
+  {
+    const ts::KmlDocument document = read(QStringLiteral("everything.kml"));
+    ts::KmlStyleResolver resolver(document);
+    const ts::KmlFeature* point =
+        find(document.root, QStringLiteral("A point"));
+    if (point == nullptr) {
+      QFAIL("no point");
+    }
+    // The BalloonStyle's template.
+    QCOMPARE(ts::kmlBalloonHtml(*point, resolver.resolve(*point)),
+             QStringLiteral("<b>A point</b>"));
+    // The default: name, description, extended data.
+    const QString html = ts::kmlBalloonHtml(*point, ts::KmlStyle{});
+    QVERIFY(html.contains(QLatin1String("<h3>A point</h3>")));
+    QVERIFY(html.contains(QLatin1String("<i>point</i>")));
+    QVERIFY(html.contains(QLatin1String("West Midlands")));
+    QVERIFY(html.contains(QLatin1String("<th align=\"left\">Population</th>")));
+    // Values are escaped; $[field] and $[field/displayName].
+    ts::KmlFeature tricky;
+    tricky.name = QStringLiteral("<script>");
+    tricky.extendedData = {{QStringLiteral("depth"), QStringLiteral("5 & 6")}};
+    ts::KmlStyle style;
+    ts::KmlBalloonStyle balloon;
+    balloon.text = QStringLiteral("$[name]: $[depth/displayName] $[depth]");
+    style.balloon = balloon;
+    QCOMPARE(ts::kmlBalloonHtml(tricky, style),
+             QStringLiteral("&lt;script&gt;: depth 5 &amp; 6"));
   }
 
   void concurrentOwnInstances()

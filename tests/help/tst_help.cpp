@@ -243,16 +243,16 @@ private slots:
     for (const guide::Page& page : pages) {
       files.append(page.url.fileName());
     }
-    QCOMPARE(files, (QStringList{QStringLiteral("README.md"),
-                                 QStringLiteral("installation.md"),
-                                 QStringLiteral("getting-around.md"),
-                                 QStringLiteral("layers.md"),
-                                 QStringLiteral("adding-wms-layers.md"),
-                                 QStringLiteral("adding-wmts-layers.md"),
-                                 QStringLiteral("adding-xyz-layers.md"),
-                                 QStringLiteral("adding-wfs-layers.md"),
-                                 QStringLiteral("terrain.md"),
-                                 QStringLiteral("offline-use.md")}));
+    QCOMPARE(
+        files,
+        (QStringList{
+            QStringLiteral("README.md"), QStringLiteral("installation.md"),
+            QStringLiteral("getting-around.md"), QStringLiteral("layers.md"),
+            QStringLiteral("adding-wms-layers.md"),
+            QStringLiteral("adding-wmts-layers.md"),
+            QStringLiteral("adding-xyz-layers.md"),
+            QStringLiteral("adding-wfs-layers.md"), QStringLiteral("kml.md"),
+            QStringLiteral("terrain.md"), QStringLiteral("offline-use.md")}));
     QCOMPARE(pages.front().title, QStringLiteral("Terra Soar user guide"));
     QCOMPARE(pages.back().title, QStringLiteral("Using Terra Soar offline"));
   }

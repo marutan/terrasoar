@@ -72,7 +72,7 @@ LayerTreeDock::LayerTreeDock(LayerTreeModel* model, QWidget* parent)
   m_view->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(m_view, &QTreeView::customContextMenuRequested, this,
           [this](QPoint position) {
-            QMenu* menu = timeMenu(m_view->indexAt(position));
+            QMenu* menu = contextMenu(m_view->indexAt(position));
             if (menu != nullptr) {
               menu->popup(m_view->viewport()->mapToGlobal(position));
             }
@@ -340,6 +340,40 @@ void LayerTreeDock::setTimeLookup(
     std::function<std::optional<LayerTime>(const QJsonObject&)> lookup)
 {
   m_timeLookup = std::move(lookup);
+}
+
+void LayerTreeDock::setNodeActions(
+    std::function<std::vector<QAction*>(const QModelIndex&, QObject*)> actions)
+{
+  m_nodeActions = std::move(actions);
+}
+
+QMenu* LayerTreeDock::contextMenu(const QModelIndex& index)
+{
+  if (!index.isValid()) {
+    return nullptr;
+  }
+  if (m_contextMenu == nullptr) {
+    m_contextMenu = new QMenu(this);
+    m_contextMenu->setObjectName(QStringLiteral("layerContextMenu"));
+  }
+  m_contextMenu->clear();
+  // Actions made for the last menu go with it.
+  for (QAction* old : m_contextActions) {
+    old->deleteLater();
+  }
+  m_contextActions.clear();
+  if (m_nodeActions) {
+    m_contextActions = m_nodeActions(index, m_contextMenu);
+    for (QAction* action : m_contextActions) {
+      m_contextMenu->addAction(action);
+    }
+  }
+  QMenu* time = timeMenu(index);
+  if (time != nullptr) {
+    m_contextMenu->addMenu(time);
+  }
+  return m_contextMenu->isEmpty() ? nullptr : m_contextMenu;
 }
 
 QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)

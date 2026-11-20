@@ -36,6 +36,7 @@
 #include "ts/elevation/geoidmodel.h"
 #include "ts/elevation/sqliteelevationprovider.h"
 #include "ts/elevation/webterrainprovider.h"
+#include "ts/kml/kmlfeatureprovider.h"
 #include "ts/network/networkclient.h"
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
@@ -380,6 +381,28 @@ std::shared_ptr<FeatureProvider>
 ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
+  if (source.value(QStringLiteral("kind")).toString() == QLatin1String("kml")) {
+    const QString key = canonical(source);
+    const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
+        found = m_features.find(key);
+    if (found != m_features.end()) {
+      std::shared_ptr<FeatureProvider> live = found->second.lock();
+      if (live) {
+        return live;
+      }
+    }
+    std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
+        source.value(QStringLiteral("path")).toString(), errorString);
+    if (!document) {
+      return nullptr;
+    }
+    std::shared_ptr<KmlFeatureProvider> provider =
+        std::make_shared<KmlFeatureProvider>(
+            std::move(document),
+            source.value(QStringLiteral("container")).toString());
+    m_features[key] = provider;
+    return provider;
+  }
   if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wfs")) {
     const QString key = canonical(source);
     const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator

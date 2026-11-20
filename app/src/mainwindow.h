@@ -27,6 +27,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -48,6 +49,8 @@
 class QAction;
 class QActionGroup;
 class QModelIndex;
+class QDragEnterEvent;
+class QDropEvent;
 class QEvent;
 class QLabel;
 class QMenu;
@@ -56,12 +59,15 @@ class QTimer;
 namespace ts
 {
 
+class BalloonWindow;
 class ElevationProfileDialog;
 class FeatureInfoWindow;
 struct AboutDataRow;
 
 class CountryAreas;
 class GlobeView;
+struct KmlDocument;
+struct KmlFeature;
 class ImageryProvider;
 class LayerTreeDock;
 class LayerTreeModel;
@@ -109,6 +115,24 @@ public:
    * project stays).
    */
   bool openProject(const QString& path, QString* errorString);
+
+  /**
+   * Opens @p path: a KML or KMZ file (openKml()), else a project. Returns
+   * false and sets @p errorString if it can't be read.
+   */
+  bool openFile(const QString& path, QString* errorString);
+
+  /**
+   * Adds the KML or KMZ file at @p path to the layer tree: a collection
+   * for its document with one for each folder, the placemarks of each in
+   * a vector layer, visibility as the file has it; flies to the
+   * document's view if it has one. Returns false and sets @p errorString
+   * if it can't be read.
+   */
+  bool openKml(const QString& path, QString* errorString);
+
+  /** Returns the balloon window, or null before the first balloon. */
+  BalloonWindow* balloonWindow() const { return m_balloon; }
 
   /**
    * Saves the layer tree and camera to @p path. Returns false and sets
@@ -282,6 +306,10 @@ signals:
 protected:
   /** Re-applies all text on QEvent::LanguageChange. */
   void changeEvent(QEvent* event) override;
+  /** Accepts KML, KMZ and project files dragged onto the window. */
+  void dragEnterEvent(QDragEnterEvent* event) override;
+  /** Opens the KML, KMZ or project files dropped on the window. */
+  void dropEvent(QDropEvent* event) override;
 
 private:
   void createActions();
@@ -295,6 +323,12 @@ private:
   void refreshLayers();
   void watchLayerStatus(const LayerStack& stack);
   void clockMoved();
+  void openKmlDialog();
+  void addKmlFeature(const KmlDocument& document, const KmlFeature& container,
+                     const QString& featurePath, const QModelIndex& parent,
+                     int32_t row);
+  std::vector<QAction*> nodeActions(const QModelIndex& index, QObject* parent);
+  bool showBalloonAt(LonLat point, double degreesPerPixel);
   LayerStack timedStack() const;
   void updateTimeBar(const LayerStack& stack);
   void applyImageryDraws(const LayerStack& stack, QStringList* errors);
@@ -352,6 +386,10 @@ private:
   QAction* m_addWmtsAction = nullptr;
   QAction* m_addXyzAction = nullptr;
   QAction* m_addWfsAction = nullptr;
+  QAction* m_openKmlAction = nullptr;
+  BalloonWindow* m_balloon = nullptr;
+  /** KML nodes of the layer tree: node id → file and feature path. */
+  std::map<QString, std::pair<QString, QString>> m_kmlNodes;
   QAction* m_featureInfoAction = nullptr;
   FeatureInfoWindow* m_featureInfoWindow = nullptr;
   QAction* m_offlineRegionsAction = nullptr;

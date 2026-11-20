@@ -223,9 +223,9 @@ int32_t main(int32_t argc, char* argv[])
   parser.addOption(measureOption);
   parser.addOption(idleOption);
   parser.addPositionalArgument(
-      QStringLiteral("project"),
-      QCoreApplication::translate("main", "Project file to open."),
-      QCoreApplication::translate("main", "[project]"));
+      QStringLiteral("file"),
+      QCoreApplication::translate("main", "Project, KML or KMZ file to open."),
+      QCoreApplication::translate("main", "[file…]"));
   parser.process(app);
 
   if (parser.isSet(glCheckOption)) {
@@ -244,10 +244,11 @@ int32_t main(int32_t argc, char* argv[])
   }
 
   ts::MainWindow window;
-  if (!parser.positionalArguments().isEmpty()) {
+  // Each file given: a project, or KML and KMZ files added to it.
+  const QStringList files = parser.positionalArguments();
+  for (const QString& file : files) {
     QString error;
-    if (!window.openProject(parser.positionalArguments().constFirst(),
-                            &error)) {
+    if (!window.openFile(file, &error)) {
       static_cast<void>(
           std::fputs(qPrintable(error + QLatin1Char('\n')), stderr));
       return ExitFailure;

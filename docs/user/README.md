@@ -21,9 +21,11 @@ services.
    web maps served as `{z}/{x}/{y}` tiles.
 7. [Adding WFS layers](adding-wfs-layers.md): points, lines and areas with
    their attributes from web feature services.
-8. [Terrain](terrain.md): relief, your own elevation files, web terrain,
+8. [KML and KMZ](kml.md): places, paths and areas from Google Earth and
+   other programs.
+9. [Terrain](terrain.md): relief, your own elevation files, web terrain,
    hillshade, the height readout, elevation profiles, sea level.
-9. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
+10. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
    disk space.
 
 You can read this guide inside Terra Soar too, offline: **Help → User

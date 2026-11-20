@@ -34,6 +34,8 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDir>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -46,6 +48,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QMimeData>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
@@ -60,6 +63,7 @@
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
+#include "balloonwindow.h"
 #include "elevationprofiledialog.h"
 #include "featureinfowindow.h"
 #include "globeview.h"
@@ -79,6 +83,10 @@
 #include "ts/geo/geodetic.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/layerstackdraws.h"
+#include "ts/kml/kmldocument.h"
+#include "ts/kml/kmlfeatureprovider.h"
+#include "ts/kml/kmlpresentation.h"
+#include "ts/kml/kmlreader.h"
 #include "ts/layers/layertreemodel.h"
 #include "ts/layers/projectfile.h"
 #include "ts/packs/basepack.h"
@@ -90,6 +98,7 @@
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
+#include "ts/vector/vectorstyle.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 
@@ -215,6 +224,11 @@ MainWindow::MainWindow(QWidget* parent)
   m_layerDock->setTimeLookup([this](const QJsonObject& source) {
     return m_registry->basePackTime(source);
   });
+  m_layerDock->setNodeActions(
+      [this](const QModelIndex& index, QObject* parent) {
+        return nodeActions(index, parent);
+      });
+  setAcceptDrops(true);
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
@@ -562,6 +576,10 @@ void MainWindow::createActions()
   m_featureInfoAction->setObjectName(QStringLiteral("featureInfoAction"));
   m_featureInfoAction->setCheckable(true);
   m_featureInfoAction->setChecked(true);
+  m_openKmlAction = new QAction(this);
+  m_openKmlAction->setObjectName(QStringLiteral("openKmlAction"));
+  connect(m_openKmlAction, &QAction::triggered, this,
+          &MainWindow::openKmlDialog);
   m_addWfsAction = new QAction(this);
   m_addWfsAction->setObjectName(QStringLiteral("addWfsAction"));
   connect(m_addWfsAction, &QAction::triggered, this,
@@ -846,6 +864,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addWmtsAction);
   m_fileMenu->addAction(m_addXyzAction);
+  m_fileMenu->addAction(m_openKmlAction);
   m_fileMenu->addAction(m_addWfsAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
@@ -965,6 +984,10 @@ void MainWindow::retranslateUi()
   m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
   m_addWmtsAction->setStatusTip(
       tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
+  m_openKmlAction->setText(tr("Open &KML or KMZ…"));
+  m_openKmlAction->setStatusTip(
+      tr("Add a KML or KMZ file (from Google Earth and other programs) to "
+         "the layer tree"));
   m_addWfsAction->setText(tr("Add W&FS Layer…"));
   m_addWfsAction->setStatusTip(
       tr("Add features (points, lines and areas) from a web feature service "
@@ -1162,10 +1185,217 @@ LayerStack MainWindow::timedStack() const
   return stack;
 }
 
+bool MainWindow::openFile(const QString& path, QString* errorString)
+{
+  if (path.endsWith(QLatin1String(".kml"), Qt::CaseInsensitive) ||
+      path.endsWith(QLatin1String(".kmz"), Qt::CaseInsensitive)) {
+    return openKml(path, errorString);
+  }
+  return openProject(path, errorString);
+}
+
+void MainWindow::openKmlDialog()
+{
+  const QString path = QFileDialog::getOpenFileName(
+      this, tr("Open KML or KMZ"), QString(),
+      tr("KML and KMZ files (*.kml *.kmz);;All files (*)"));
+  if (path.isEmpty()) {
+    return;
+  }
+  QString error;
+  if (!openKml(path, &error)) {
+    QMessageBox::warning(this, tr("Open KML or KMZ"), error);
+  }
+}
+
+bool MainWindow::openKml(const QString& path, QString* errorString)
+{
+  const QString absolute = QFileInfo(path).absoluteFilePath();
+  const std::shared_ptr<const KmlDocument> document =
+      sharedKmlDocument(absolute, errorString);
+  if (!document) {
+    return false;
+  }
+  addKmlFeature(*document, document->root, QString(), QModelIndex(), 0);
+  if (!document->skipped.isEmpty()) {
+    statusBar()->showMessage(
+        tr("%1: %n element(s) Terra Soar doesn't show were skipped.", nullptr,
+           static_cast<int32_t>(document->skipped.size()))
+            .arg(QFileInfo(path).fileName()),
+        10000);
+  }
+  if (m_globeView != nullptr && document->root.view) {
+    m_globeView->flyTo(kmlViewPose(*document->root.view), 0.0);
+  }
+  return true;
+}
+
+void MainWindow::addKmlFeature(const KmlDocument& document,
+                               const KmlFeature& container,
+                               const QString& featurePath,
+                               const QModelIndex& parent, int32_t row)
+{
+  QString name = container.name;
+  if (name.isEmpty() && featurePath.isEmpty()) {
+    name = QFileInfo(document.path).completeBaseName();
+  }
+  const QModelIndex collection = m_layers->addCollection(
+      name.isEmpty() ? tr("Folder") : name, parent, row);
+  m_kmlNodes[m_layers->data(collection, LayerTreeModel::NodeIdRole)
+                 .toString()] = {document.path, featurePath};
+  int32_t next = 0;
+  bool placemarks = false;
+  for (std::size_t i = 0; i < container.children.size(); ++i) {
+    const KmlFeature& child = container.children[i];
+    const QString childPath =
+        featurePath.isEmpty()
+            ? QString::number(i)
+            : featurePath + QLatin1Char('.') + QString::number(i);
+    if (child.kind == KmlFeature::Kind::Document ||
+        child.kind == KmlFeature::Kind::Folder) {
+      addKmlFeature(document, child, childPath, collection, next++);
+    } else if (child.kind == KmlFeature::Kind::Placemark && !placemarks) {
+      // The container's placemarks, in one layer where the first is.
+      placemarks = true;
+      LayerDefinition definition;
+      definition.id = QStringLiteral("kml:") +
+                      QUuid::createUuid().toString(QUuid::WithoutBraces);
+      definition.origin = LayerOrigin::User;
+      definition.type = LayerType::Vector;
+      definition.name = tr("Places");
+      definition.source = kmlLayerSource(document.path, featurePath);
+      VectorStyle style;
+      style.fill = QColor(255, 255, 255);
+      style.outline = QColor(255, 255, 255);
+      definition.style = style.toJson();
+      const QModelIndex layer =
+          m_layers->addLayer(definition, collection, next++);
+      m_kmlNodes[m_layers->data(layer, LayerTreeModel::NodeIdRole).toString()] =
+          {document.path, featurePath};
+    }
+  }
+  if (!container.visibility) {
+    m_layers->setData(collection, Qt::Unchecked, Qt::CheckStateRole);
+  }
+}
+
+std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
+                                              QObject* parent)
+{
+  const QString id =
+      m_layers->data(index, LayerTreeModel::NodeIdRole).toString();
+  const std::map<QString, std::pair<QString, QString>>::const_iterator found =
+      m_kmlNodes.find(id);
+  if (found == m_kmlNodes.end() || m_globeView == nullptr) {
+    return {};
+  }
+  const std::shared_ptr<const KmlDocument> document =
+      sharedKmlDocument(found->second.first, nullptr);
+  const KmlFeature* feature =
+      document ? kmlContainer(*document, found->second.second) : nullptr;
+  if (feature == nullptr) {
+    return {};
+  }
+  // Its own view, else one framing its first placemark with a geometry.
+  std::optional<CameraPose> pose = kmlFeaturePose(*feature);
+  for (std::size_t i = 0; !pose && i < feature->children.size(); ++i) {
+    pose = kmlFeaturePose(feature->children[i]);
+  }
+  if (!pose) {
+    return {};
+  }
+  QAction* fly = new QAction(tr("Fly There"), parent);
+  fly->setObjectName(QStringLiteral("flyThereAction"));
+  const CameraPose target = *pose;
+  connect(fly, &QAction::triggered, this,
+          [this, target]() { m_globeView->flyTo(target, 0.0); });
+  return {fly};
+}
+
+bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)
+{
+  const LayerStack stack = m_layers->layerStack();
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const std::shared_ptr<KmlFeatureProvider> provider =
+        std::dynamic_pointer_cast<KmlFeatureProvider>(
+            m_registry->features(definition.source, nullptr));
+    if (!provider) {
+      continue;
+    }
+    const std::vector<const KmlFeature*> found = provider->placemarksAt(
+        GeoPoint{point.latDeg, point.lonDeg}, 4.0 * degreesPerPixel);
+    if (found.empty()) {
+      continue;
+    }
+    const KmlFeature& placemark = *found.front();
+    KmlStyleResolver resolver(*provider->document());
+    const KmlStyle style = resolver.resolve(placemark);
+    if (style.balloon && !style.balloon->display) {
+      return true; // hidden on purpose
+    }
+    if (m_balloon == nullptr) {
+      m_balloon = new BalloonWindow(this);
+      connect(m_balloon, &BalloonWindow::flyToRequested, this,
+              [this](const CameraPose& pose) {
+                if (m_globeView != nullptr) {
+                  m_globeView->flyTo(pose, 0.0);
+                }
+              });
+    }
+    const QString base =
+        provider->document()->kmz ? QString() : provider->document()->base;
+    m_balloon->showBalloon(placemark.name, kmlBalloonHtml(placemark, style),
+                           style.balloon ? style.balloon->backgroundColor
+                                         : QColor(Qt::white),
+                           kmlFeaturePose(placemark), base);
+    return true;
+  }
+  return false;
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+  const QList<QUrl> urls = event->mimeData()->urls();
+  const bool any = std::any_of(urls.begin(), urls.end(), [](const QUrl& url) {
+    const QString path = url.toLocalFile().toLower();
+    return path.endsWith(QLatin1String(".kml")) ||
+           path.endsWith(QLatin1String(".kmz")) ||
+           path.endsWith(QLatin1String(".terrasoar"));
+  });
+  if (any) {
+    event->acceptProposedAction();
+  }
+}
+
+void MainWindow::dropEvent(QDropEvent* event)
+{
+  const QList<QUrl> urls = event->mimeData()->urls();
+  for (const QUrl& url : urls) {
+    const QString path = url.toLocalFile();
+    if (path.isEmpty()) {
+      continue;
+    }
+    QString error;
+    if (!openFile(path, &error)) {
+      QMessageBox::warning(this, tr("Open"), error);
+    }
+  }
+  event->acceptProposedAction();
+}
+
 int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
 {
   if (!m_featureInfoAction->isChecked()) {
     return 0;
+  }
+  // A KML placemark there: its balloon.
+  if (showBalloonAt(point, degreesPerPixel)) {
+    return 1;
   }
   // The visible WMS layers that can be asked, topmost first, as drawn now;
   // then the WFS layers, whose features are here already.

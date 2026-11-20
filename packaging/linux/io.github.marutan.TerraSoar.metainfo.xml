@@ -71,6 +71,8 @@
   <provides>
     <binary>terrasoar</binary>
     <mediatype>application/x-terrasoar-project</mediatype>
+    <mediatype>application/vnd.google-earth.kml+xml</mediatype>
+    <mediatype>application/vnd.google-earth.kmz</mediatype>
   </provides>
   <categories>
     <category>Science</category>

@@ -54,12 +54,12 @@
 </translation>
         </message>
         <message>
-            <source>Project file to open.</source>
-            <translation>Project file to open.</translation>
+            <source>Project, KML or KMZ file to open.</source>
+            <translation>Project, KML or KMZ file to open.</translation>
         </message>
         <message>
-            <source>[project]</source>
-            <translation>[project]</translation>
+            <source>[file…]</source>
+            <translation>[file…]</translation>
         </message>
     </context>
     <context>
@@ -571,6 +571,17 @@
         <message>
             <source>Give the layer a name.</source>
             <translation>Give the layer a name.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::BalloonWindow</name>
+        <message>
+            <source>Placemark</source>
+            <translation>Placemark</translation>
+        </message>
+        <message>
+            <source>Fly there</source>
+            <translation>Fly there</translation>
         </message>
     </context>
     <context>
@@ -1515,6 +1526,45 @@
         <message>
             <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</source>
             <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</translation>
+        </message>
+        <message>
+            <source>Open &amp;KML or KMZ…</source>
+            <translation>Open &amp;KML or KMZ…</translation>
+        </message>
+        <message>
+            <source>Add a KML or KMZ file (from Google Earth and other programs) to the layer tree</source>
+            <translation>Add a KML or KMZ file (from Google Earth and other programs) to the layer tree</translation>
+        </message>
+        <message>
+            <source>Open KML or KMZ</source>
+            <translation>Open KML or KMZ</translation>
+        </message>
+        <message>
+            <source>KML and KMZ files (*.kml *.kmz);;All files (*)</source>
+            <translation>KML and KMZ files (*.kml *.kmz);;All files (*)</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n element(s) Terra Soar doesn't show were skipped.</source>
+            <translation>
+                <numerusform>%1: %n element Terra Soar doesn't show were skipped.</numerusform>
+                <numerusform>%1: %n elements Terra Soar doesn't show were skipped.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Folder</source>
+            <translation>Folder</translation>
+        </message>
+        <message>
+            <source>Places</source>
+            <translation>Places</translation>
+        </message>
+        <message>
+            <source>Fly There</source>
+            <translation>Fly There</translation>
+        </message>
+        <message>
+            <source>Open</source>
+            <translation>Open</translation>
         </message>
     </context>
     <context>

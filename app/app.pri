@@ -37,6 +37,7 @@ HEADERS += \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
     $$PWD/src/addxyzdialog.h \
+    $$PWD/src/balloonwindow.h \
     $$PWD/src/elevationprofiledialog.h \
     $$PWD/src/featureinfowindow.h \
     $$PWD/src/globeview.h \
@@ -64,6 +65,7 @@ SOURCES += \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
     $$PWD/src/addxyzdialog.cpp \
+    $$PWD/src/balloonwindow.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
     $$PWD/src/featureinfowindow.cpp \
     $$PWD/src/globeview.cpp \

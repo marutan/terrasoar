@@ -70,6 +70,7 @@
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
 #include "appsettings.h"
+#include "balloonwindow.h"
 #include "elevationprofiledialog.h"
 #include "featureinfowindow.h"
 #include "fixturepack.h"
@@ -2545,6 +2546,78 @@ private slots:
       dialog.grab().save(
           QDir(shots).filePath(QStringLiteral("add-wfs-dialog.png")));
     }
+  }
+
+  void openKml()
+  {
+    // A KML document in the layer tree: a collection per folder, the
+    // placemarks of each in a vector layer, visibility as written; a click
+    // on a placemark shows its balloon; a folder can be flown to.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    const int32_t before = window.layerModel()->rowCount();
+    QString error;
+    QVERIFY(!window.openFile(
+        QStringLiteral(TS_TEST_DATA_DIR "/kml/nothing.kml"), &error));
+    QVERIFY(!error.isEmpty());
+    QVERIFY2(
+        window.openFile(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        &error),
+        qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    QCOMPARE(model->rowCount(), before + 1);
+    const QModelIndex document = model->index(0, 0);
+    QCOMPARE(model->data(document).toString(), QStringLiteral("Everything"));
+    QVERIFY(
+        model->data(document, ts::LayerTreeModel::IsCollectionRole).toBool());
+    // Shapes (its places), Times and places (its places), the document's
+    // own placemark.
+    QCOMPARE(model->rowCount(document), 3);
+    const QModelIndex shapes = model->index(0, 0, document);
+    QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
+    QCOMPARE(model->rowCount(shapes), 1);
+    const QModelIndex places = model->index(0, 0, shapes);
+    QCOMPARE(model->data(places, ts::LayerTreeModel::LayerTypeRole).toInt(),
+             static_cast<int32_t>(ts::LayerType::Vector));
+    QCOMPARE(model->layerDefinition(places)
+                 .source.value(QStringLiteral("kind"))
+                 .toString(),
+             QStringLiteral("kml"));
+    // A click on the point: its balloon.
+    QCOMPARE(window.identifyAt(ts::LonLat{-1.8904, 52.4862}, 0.001), 1);
+    ts::BalloonWindow* balloon = window.balloonWindow();
+    if (balloon == nullptr) {
+      QFAIL("no balloon");
+    }
+    QVERIFY(balloon->isVisible());
+    QVERIFY2(balloon->text().contains(QStringLiteral("A point")),
+             qPrintable(balloon->text()));
+    QVERIFY(balloon->text().contains(QStringLiteral("Fly there")));
+    // Nowhere near a placemark: nothing.
+    QCOMPARE(window.identifyAt(ts::LonLat{100.0, -40.0}, 0.001), 0);
+    // Fly There on the Shapes folder.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(shapes);
+    if (menu == nullptr) {
+      QFAIL("no context menu");
+    }
+    QAction* fly = menu->findChild<QAction*>(QStringLiteral("flyThereAction"));
+    if (fly == nullptr) {
+      QFAIL("no Fly There");
+    }
+    fly->trigger();
+    // A KMZ, through the same door.
+    QVERIFY2(window.openFile(
+                 QStringLiteral(TS_TEST_DATA_DIR "/kml/archive.kmz"), &error),
+             qPrintable(error));
+    QCOMPARE(model->data(model->index(0, 0)).toString(),
+             QStringLiteral("In an archive"));
+    const QJsonObject state = window.stateReport();
+    QVERIFY(state.value(QStringLiteral("layers"))
+                .toArray()
+                .contains(QStringLiteral("Places")));
   }
 
   void wmsWhatIsHere()
