@@ -56,9 +56,10 @@ Subsections so far:
 | `deps` | Owning handles for GDAL datasets, PROJ contexts, GEOS contexts and SQLite connections; library versions |
 | `geo` | WGS 84 constants, geodetic ↔ ECEF, normals and local frames, ray–ellipsoid picking, geodesics (`docs/design/coordinates.md`) |
 | `gl` | OpenGL capability probe, software-renderer detection |
-| `globe` | The globe and map renderer: ray-cast WGS 84 ellipsoid, the graticule, imagery tiles, vector layers (fills and outlines), markers relative to the eye, all blended between globe and flat map in the vertex shaders; layer stack to draws (`docs/design/vector-rendering.md`, `docs/design/morph.md`) |
+| `globe` | The globe and map renderer: ray-cast WGS 84 ellipsoid, the graticule, imagery tiles, vector layers (fills and outlines), markers relative to the eye, lines through space (satellite tracks) depth-tested against the globe, all blended between globe and flat map in the vertex shaders; layer stack to draws (`docs/design/vector-rendering.md`, `docs/design/morph.md`) |
 | `i18n` | Translation loading with English fallback, pseudo-translator |
 | `kml` | KML 2.2 and KMZ: the element model, the reader (gx: extensions, unknown elements kept), style resolution, placemarks as vector features, views and balloons (`docs/design/kml.md`) |
+| `orbits` | Satellites: TLE and OMM element sets, our own SGP4/SDP4, sidereal time and TEME to Earth-fixed, tracks over time spans, the antimeridian, footprints, look angles and passes, positions and tracks computed on a worker thread, CelesTrak groups downloaded through a cache, satellite layers' sources and styles, and their markers and tracks for the globe (`docs/design/satellites.md`) |
 | `layers` | Layer tree model (layers, nestable collections, visibility, opacity, composite groups), layer definitions, project files (`docs/design/layer-model.md`) |
 | `maths` | Double-precision `Vec3`, `Vec4`, `Mat4`, `Ray`, angle conversion, high/low float split |
 | `packs` | Data pack manifests (files with checksums, datasets with sources, licences and attribution), verification, finding the base pack (`docs/data/base-pack.md`) |
@@ -73,7 +74,7 @@ Subsections so far:
 | `wfs` | WFS capabilities (2.0.0, 1.1.0), sources with their stored levels, GetFeature with paging, GeoJSON and GML features with their axis orders, the feature provider with its disk cache, offline regions and picking (`docs/design/wfs.md`) |
 | `wms` | WMS capabilities (1.1.1, 1.3.0), GetMap requests with the axis-order rules, the WMS imagery provider with its disk cache and offline behaviour, the catalogue of open services and their bulk-download terms (`docs/design/wms.md`) |
 | `wmts` | WMTS capabilities (1.0.0, KVP and RESTful), tile matrix sets and fitting their tiles to the quadtree, GetTile and RESTful requests, the WMTS imagery provider sharing WMS's network, cache and offline behaviour (`docs/design/wmts.md`) |
-| `time` | The program clock, ISO 8601 times and time extents (lists and intervals), a layer's time settings and the source drawn at a time (`docs/design/wms.md#time`) |
+| `time` | The program clock (running at a rate, paused, real time; ticking only while something moves with it), ISO 8601 times and time extents (lists and intervals), a layer's time settings and the source drawn at a time (`docs/design/wms.md#time`) |
 | `xyz` | XYZ and TMS tile services (`{z}/{x}/{y}` templates, subdomains, TMS rows), drawn as Web Mercator tile matrix sets through the WMTS provider; the XYZ catalogue (`docs/design/xyz.md`) |
 
 ### app (`terrasoar`)

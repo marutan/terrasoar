@@ -9,6 +9,19 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- Satellites (File → Add Satellites…): CelesTrak's groups (kept for use
+  offline), TLE and OMM files, or TLEs pasted in, shown where they are
+  at the clock's time with their names, past tracks fading with age and
+  dashed future tracks over chosen spans (in orbits or minutes, per layer
+  or per satellite), optional ground tracks and footprints; on the maps as
+  ground tracks. A list to show, hide and filter them; details and the
+  next pass on click; old elements marked, with Refresh Elements.
+  Positions come from Terra Soar's own SGP4/SDP4, checked against the
+  reference test set. Whole constellations such as Starlink can be shown.
+- A clock in the status bar (and View → Clock): real time at first, play
+  and pause, faster and slower (backwards too), steps, and jumping to a
+  date and time. Projects keep it.
+
 - File → Add XYZ Tile Layer…: web maps served as `{z}/{x}/{y}` tiles
   (OpenStreetMap, OpenTopoMap, USGS imagery, NASA GIBS, EMODnet), TMS row
   order and subdomains, from a catalogue or typed in; cached and kept
