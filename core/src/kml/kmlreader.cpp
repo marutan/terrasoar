@@ -184,6 +184,12 @@ public:
         QLatin1Char('<'), static_cast<int32_t>(m_xml->characterOffset()) - 1);
   }
 
+  /** Sets the namespaces declared on the document's root element. */
+  void setNamespaces(const QXmlStreamNamespaceDeclarations& namespaces)
+  {
+    m_namespaces = namespaces;
+  }
+
   /** Sets the text being read (kept), to find where elements start. */
   void setText(const QString* text) { m_text = text; }
 
@@ -239,6 +245,16 @@ public:
     note(n);
     QString captured;
     QXmlStreamWriter writer(&captured);
+    // The document's namespaces declared on it, so it stands alone
+    // (its prefixes, atom: and gx:, are declared on the kml element).
+    for (const QXmlStreamNamespaceDeclaration& declaration : m_namespaces) {
+      if (declaration.prefix().isEmpty()) {
+        writer.writeDefaultNamespace(declaration.namespaceUri().toString());
+      } else {
+        writer.writeNamespace(declaration.namespaceUri().toString(),
+                              declaration.prefix().toString());
+      }
+    }
     int32_t depth = 0;
     for (;;) {
       if (m_xml->isStartElement()) {
@@ -858,6 +874,7 @@ private:
   KmlDocument* m_document;
   bool m_keep = false;
   const QString* m_text = nullptr;
+  QXmlStreamNamespaceDeclarations m_namespaces;
   int64_t m_featureBegin = 0;
 };
 
@@ -1033,6 +1050,7 @@ std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
                     .arg(stream.columnNumber()));
   }
   const QString root = stream.name().toString();
+  reader.setNamespaces(stream.namespaceDeclarations());
   bool found = false;
   if (root == QLatin1String("kml")) {
     found = readKmlElement(stream, reader, document, text.has_value(), begin);

@@ -62,7 +62,8 @@ constexpr int32_t childrenRank = 1000;
 
 QString indent(int32_t depth)
 {
-  return QString(static_cast<int32_t>(depth) * 2, QLatin1Char(' '));
+  const int32_t width = depth * 2;
+  return QString(width, QLatin1Char(' '));
 }
 
 QString newline(int32_t depth)
@@ -1183,10 +1184,14 @@ QByteArray writeKml(const KmlDocument& document)
         text->mid(static_cast<int32_t>(kml.begin),
                   static_cast<int32_t>(kml.startEnd - kml.begin));
     Writer writer(document, start.contains(QLatin1String("xmlns:gx")));
-    QString prologue = writer.slice(document.prologueBegin, kml.begin);
-    out += prologue.trimmed().isEmpty()
-               ? QString()
-               : prologue.trimmed() + QLatin1Char('\n');
+    // What came before and after the kml element, exactly (line ends and
+    // all); the source's own declaration is replaced by this one.
+    if (document.prologueBegin == 0) {
+      out += QLatin1Char('\n');
+    } else {
+      out.chop(1);
+    }
+    out += writer.slice(document.prologueBegin, kml.begin);
     out += start;
     int64_t previous = kml.startEnd;
     for (const KmlSourcePart& part : kml.parts) {
@@ -1196,7 +1201,9 @@ QByteArray writeKml(const KmlDocument& document)
                  ? writer.feature(document.root, 1)
                  : writer.slice(part.begin, part.end);
     }
-    out += writer.slice(previous, kml.end) + QLatin1Char('\n');
+    out += writer.slice(previous, kml.end);
+    const QString after = text->mid(static_cast<int32_t>(kml.end));
+    out += after.isEmpty() ? QStringLiteral("\n") : after;
     return out.toUtf8();
   }
   Writer writer(document, true);

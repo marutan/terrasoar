@@ -1325,6 +1325,19 @@ private slots:
       QCOMPARE(withoutDeclaration(ts::writeKml(*document)),
                withoutDeclaration(original));
     }
+    // With Windows line ends (as a Windows checkout has them): the same.
+    QFile file(fixture(QStringLiteral("everything.kml")));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    QByteArray crlf = file.readAll();
+    crlf.replace("\n", "\r\n");
+    QString error;
+    const std::optional<ts::KmlDocument> windows =
+        ts::parseKml(crlf, fixture(QString()), &error, keeping());
+    if (!windows) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(withoutDeclaration(ts::writeKml(*windows)),
+             withoutDeclaration(crlf));
   }
 
   void roundTripEdited()

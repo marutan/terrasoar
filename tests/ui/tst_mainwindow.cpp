@@ -2650,21 +2650,25 @@ private slots:
     // Double-clicking the folder flies there too (not renaming it).
     view->setPose(ts::CameraPose{0.0, 100.0, 2.0e7, 0.0, 0.0});
     dock->doubleClick(shapes);
-    QTRY_VERIFY(
-        std::abs(view->controller().camera().pose().targetLatDeg - 52.0) < 2.0);
+    QVERIFY(QTest::qWaitFor([&]() {
+      return std::abs(view->controller().camera().pose().targetLatDeg - 52.0) <
+             2.0;
+    }));
     QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
     view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
-    QTRY_VERIFY(view->billboardsDrawn() >= 1);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() >= 1; }));
     QVERIFY(view->labelsDrawn() >= 1);
     // From the other side of the Earth they are hidden.
     view->setPose(ts::CameraPose{-52.0, 178.0, 400000.0, 0.0, 0.0});
-    QTRY_COMPARE(view->billboardsDrawn(), 0);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() == 0; }));
+    QCOMPARE(view->billboardsDrawn(), 0);
     // Switched off with their folder: none.
     view->setPose(ts::CameraPose{52.4862, -1.8904, 400000.0, 0.0, 0.0});
     model->setData(shapes, Qt::Unchecked, Qt::CheckStateRole);
-    QTRY_COMPARE(view->billboardsDrawn(), 0);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() == 0; }));
+    QCOMPARE(view->billboardsDrawn(), 0);
     model->setData(shapes, Qt::Checked, Qt::CheckStateRole);
-    QTRY_VERIFY(view->billboardsDrawn() >= 1);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() >= 1; }));
     // A KMZ, through the same door.
     QVERIFY2(window.openFile(
                  QStringLiteral(TS_TEST_DATA_DIR "/kml/archive.kmz"), &error),
@@ -2694,10 +2698,12 @@ private slots:
     ts::GlobeView* view = window.findChild<ts::GlobeView*>();
     QVERIFY(view != nullptr);
     view->setPose(ts::CameraPose{51.5, 0.5, 600000.0, 0.0, 50.0});
-    QTRY_COMPARE(view->raisedShapesDrawn(), 2);
-    QTRY_VERIFY(view->billboardsDrawn() >= 1);
+    QVERIFY(QTest::qWaitFor([&]() { return view->raisedShapesDrawn() == 2; }));
+    QCOMPARE(view->raisedShapesDrawn(), 2);
+    QVERIFY(QTest::qWaitFor([&]() { return view->billboardsDrawn() >= 1; }));
     view->setPose(ts::CameraPose{-51.5, 179.0, 600000.0, 0.0, 0.0});
-    QTRY_COMPARE(view->raisedShapesDrawn(), 0);
+    QVERIFY(QTest::qWaitFor([&]() { return view->raisedShapesDrawn() == 0; }));
+    QCOMPARE(view->raisedShapesDrawn(), 0);
   }
 
   void kmlOverlays()
@@ -2738,12 +2744,14 @@ private slots:
              QStringLiteral("kmloverlay"));
     ts::GlobeView* view = window.findChild<ts::GlobeView*>();
     QVERIFY(view != nullptr);
-    QTRY_COMPARE(view->screenOverlays().size(), std::size_t{1});
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return view->screenOverlays().size() == std::size_t{1}; }));
+    QCOMPARE(view->screenOverlays().size(), std::size_t{1});
     QCOMPARE(view->screenOverlays().front().image.size(), QSize(40, 20));
     view->setPose(ts::CameraPose{51.5, 0.0, 600000.0, 0.0, 0.0});
     // Off with its layer.
     model->setData(legend, Qt::Unchecked, Qt::CheckStateRole);
-    QTRY_VERIFY(view->screenOverlays().empty());
+    QVERIFY(QTest::qWaitFor([&]() { return view->screenOverlays().empty(); }));
     // Fly There on a ground overlay frames its box.
     ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
     QVERIFY(dock != nullptr);
@@ -2777,7 +2785,8 @@ private slots:
     const QModelIndex radio = model->index(2, 0, document);
     const QModelIndex hidden = model->index(3, 0, document);
     // The local link: heights.kml inside it.
-    QTRY_COMPARE(model->rowCount(local), 1);
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(local) == 1; }));
+    QCOMPARE(model->rowCount(local), 1);
     QCOMPARE(model->data(model->index(0, 0, local)).toString(),
              QStringLiteral("Heights"));
     // The Region-bound link: not until the view comes close.
@@ -2787,7 +2796,8 @@ private slots:
     QCOMPARE(model->rowCount(london), 0);
     view->setPose(ts::CameraPose{51.5, -0.1, 40000.0, 0.0, 0.0});
     window.updateKmlRegions();
-    QTRY_COMPARE(model->rowCount(london), 1);
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(london) == 1; }));
+    QCOMPARE(model->rowCount(london), 1);
     QCOMPARE(model->data(model->index(0, 0, london)).toString(),
              QStringLiteral("In an archive"));
     QVERIFY(window.kmlHiddenNodes().isEmpty());
@@ -2807,7 +2817,8 @@ private slots:
       QFAIL("no Refresh");
     }
     refresh->trigger();
-    QTRY_COMPARE(model->rowCount(local), 1);
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(local) == 1; }));
+    QCOMPARE(model->rowCount(local), 1);
     // The radio folder: one on at a time.
     const QModelIndex first = model->index(0, 0, radio);
     const QModelIndex second = model->index(1, 0, radio);
@@ -2863,7 +2874,8 @@ private slots:
     ts::LayerTreeModel* model = window.layerModel();
     const QModelIndex link = model->index(0, 0);
     QCOMPARE(model->data(link).toString(), QStringLiteral("Web"));
-    QTRY_COMPARE(model->rowCount(link), 1);
+    QVERIFY(QTest::qWaitFor([&]() { return model->rowCount(link) == 1; }));
+    QCOMPARE(model->rowCount(link), 1);
     QCOMPARE(model->data(model->index(0, 0, link)).toString(),
              QStringLiteral("From the web"));
     QVERIFY(server.requestCount() >= 1);
@@ -2882,12 +2894,16 @@ private slots:
       });
       QVERIFY2(offline.openFile(path, &error), qPrintable(error));
       const QModelIndex copied = offline.layerModel()->index(0, 0);
-      QTRY_COMPARE(offline.layerModel()->rowCount(copied), 1);
+      QVERIFY(QTest::qWaitFor(
+          [&]() { return offline.layerModel()->rowCount(copied) == 1; }));
+      QCOMPARE(offline.layerModel()->rowCount(copied), 1);
       QCOMPARE(
           offline.layerModel()->data(offline.layerModel()->index(0, 0, copied)),
           QVariant(QStringLiteral("From the web")));
-      QTRY_VERIFY(offline.statusBar()->currentMessage().contains(
-          QLatin1String("last time")));
+      QVERIFY(QTest::qWaitFor([&]() {
+        return offline.statusBar()->currentMessage().contains(
+            QLatin1String("last time"));
+      }));
     }
     // A failure: told in the status bar, what was there stays.
     server.setHandler([](const ts::test::MockHttpRequest&) {
@@ -2896,8 +2912,10 @@ private slots:
     const QString id =
         model->data(link, ts::LayerTreeModel::NodeIdRole).toString();
     window.kmlLinks()->load(id, ts::KmlViewParameters{});
-    QTRY_VERIFY(
-        window.statusBar()->currentMessage().contains(QLatin1String("500")));
+    QVERIFY(QTest::qWaitFor([&]() {
+      return window.statusBar()->currentMessage().contains(
+          QLatin1String("500"));
+    }));
     QCOMPARE(model->rowCount(link), 1);
   }
 
@@ -2926,13 +2944,15 @@ private slots:
     };
     window.clock()->setTime(
         QDateTime(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::utc()));
-    QTRY_VERIFY(labels().contains(QStringLiteral("Spanned")));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return labels().contains(QStringLiteral("Spanned")); }));
     QVERIFY(!labels().contains(QStringLiteral("Stamped")));
     QVERIFY(!labels().contains(QStringLiteral("Track")));
     // On the track's day, half way along it: its marker, the stamp not yet.
     window.clock()->setTime(
         QDateTime(QDate(2026, 11, 20), QTime(10, 30), QTimeZone::utc()));
-    QTRY_VERIFY(labels().contains(QStringLiteral("Track")));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return labels().contains(QStringLiteral("Track")); }));
     QVERIFY(!labels().contains(QStringLiteral("Spanned")));
     QVERIFY(!labels().contains(QStringLiteral("Stamped")));
     double lon = 0.0;
@@ -2945,7 +2965,8 @@ private slots:
     // Later: the stamp.
     window.clock()->setTime(
         QDateTime(QDate(2026, 11, 21), QTime(0, 0), QTimeZone::utc()));
-    QTRY_VERIFY(labels().contains(QStringLiteral("Stamped")));
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return labels().contains(QStringLiteral("Stamped")); }));
     QVERIFY(!labels().contains(QStringLiteral("Track")));
   }
 
@@ -3066,7 +3087,9 @@ private slots:
              QVariant(QStringLiteral("Large")));
     ts::GlobeView* view = window.findChild<ts::GlobeView*>();
     QVERIFY(view != nullptr);
-    QTRY_COMPARE(view->billboards().size(), std::size_t{100000});
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return view->billboards().size() == std::size_t{100000}; }));
+    QCOMPARE(view->billboards().size(), std::size_t{100000});
   }
 
   void kmlEditing()
@@ -3093,7 +3116,7 @@ private slots:
     QCOMPARE(window.selectedKmlFeature().value_or(QString()),
              QStringLiteral("0"));
     QCOMPARE(view->editHandles().size(), std::size_t{1});
-    QTRY_VERIFY(!view->billboards().empty());
+    QVERIFY(QTest::qWaitFor([&]() { return !view->billboards().empty(); }));
     // Dragging its handle moves it.
     view->dragHandle(0, ts::LonLat{3.0, 4.0});
     QCOMPARE(document->document()
@@ -3350,8 +3373,12 @@ private slots:
     }
     QVERIFY(shapes.isValid() && times.isValid());
     QVERIFY(model->moveNode(shapes, times, 0));
-    QTRY_COMPARE(document->document().root.children.front().name,
-                 QStringLiteral("Times and places"));
+    QVERIFY(QTest::qWaitFor([&]() {
+      return document->document().root.children.front().name ==
+             QStringLiteral("Times and places");
+    }));
+    QCOMPARE(document->document().root.children.front().name,
+             QStringLiteral("Times and places"));
     const ts::KmlFeature& moved =
         document->document().root.children.front().children.back();
     QCOMPARE(moved.name, QStringLiteral("Shapes"));
