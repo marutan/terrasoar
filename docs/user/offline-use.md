@@ -117,6 +117,7 @@ install once and then use offline:
 | Pack | What you get | Download |
 | --- | --- | --- |
 | Blue Marble, full resolution | The same picture of the Earth, about 1.2 km per pixel instead of 4.9 km | 67 MB |
+| Blue Marble, month by month | Blue Marble for each month of the year: snow, ice and vegetation change with the seasons, following the program's clock (see [Time](layers.md#time)); about 9.8 km per pixel | 25 MB |
 | Shoreline, full resolution | Detailed coasts and small islands: high resolution from zoom level 6, full resolution from level 8 (the built-in shoreline stays at about 1 km) | 241 MB |
 
 Pick a pack and press **Install**. The download runs in the background

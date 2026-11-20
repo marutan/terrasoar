@@ -69,6 +69,7 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "projectionsettingsdialog.h"
+#include "timebar.h"
 #include "ts/base/buildinfo.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/elevationprofile.h"
@@ -83,6 +84,9 @@
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/regions/countryareas.h"
+#include "ts/time/layertime.h"
+#include "ts/time/programclock.h"
+#include "ts/time/timeextent.h"
 #include "ts/wms/wmsimageryprovider.h"
 
 namespace ts
@@ -189,8 +193,20 @@ MainWindow::MainWindow(QWidget* parent)
       }
     }
   }
+  // The clock layers with times follow, and its slider under the view
+  // (shown when a layer that follows it is added).
+  m_clock = new ProgramClock(this);
+  m_timeBar = new TimeBar(m_clock, this);
+  addToolBar(Qt::BottomToolBarArea, m_timeBar);
+  m_timeBar->hide();
+  m_timeBar->toggleViewAction()->setObjectName(
+      QStringLiteral("timeSliderAction"));
+  connect(m_clock, &ProgramClock::timeChanged, this, &MainWindow::clockMoved);
   m_layerDock = new LayerTreeDock(m_layers, this);
   addDockWidget(Qt::LeftDockWidgetArea, m_layerDock);
+  m_layerDock->setTimeLookup([this](const QJsonObject& source) {
+    return m_registry->basePackTime(source);
+  });
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
@@ -832,6 +848,7 @@ void MainWindow::createMenus()
   m_projectionMenu->addAction(m_projectionSettingsAction);
   m_viewMenu->addAction(m_scaleBarAction);
   m_viewMenu->addAction(m_attributionsAction);
+  m_viewMenu->addAction(m_timeBar->toggleViewAction());
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
@@ -896,6 +913,9 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_timeBar->toggleViewAction()->setText(tr("&Time Slider"));
+  m_timeBar->toggleViewAction()->setStatusTip(
+      tr("Show the slider that sets the time shown by layers with dates"));
   m_attributionsAction->setText(tr("&Attributions"));
   m_attributionsAction->setStatusTip(
       tr("Show the sources of the layers drawn in the corner of the view"));
@@ -1042,7 +1062,10 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
 
 void MainWindow::refreshLayers()
 {
-  const LayerStack stack = m_layers->layerStack();
+  const LayerStack tree = timedStack();
+  updateTimeBar(tree);
+  // Layers with times draw the clock's.
+  const LayerStack stack = stackAtTime(tree, m_clock->time());
   if (!m_globeView) {
     // No OpenGL view: nothing is drawn, but layers that can't be opened are
     // still marked in the dock.
@@ -1055,8 +1078,7 @@ void MainWindow::refreshLayers()
   m_globeView->setMapProjection(
       projectionWith(projection->id(), projection->parameterValues()));
   QStringList errors;
-  m_globeView->setImageryDraws(
-      imageryDrawsForStack(stack, *m_registry, &errors));
+  applyImageryDraws(stack, &errors);
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setElevationDraw(
       elevationDrawForStack(stack, *m_registry, &errors));
@@ -1065,6 +1087,76 @@ void MainWindow::refreshLayers()
     statusBar()->showMessage(errors.join(QLatin1Char(' ')), 10000);
   }
   watchLayerStatus(stack);
+}
+
+void MainWindow::applyImageryDraws(const LayerStack& stack, QStringList* errors)
+{
+  QJsonArray sources;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    sources.append(entry.definition.source);
+  }
+  m_drawnImagery = sources;
+  if (m_globeView) {
+    m_globeView->setImageryDraws(
+        imageryDrawsForStack(stack, *m_registry, errors));
+  }
+}
+
+void MainWindow::clockMoved()
+{
+  // Only the imagery whose time changed is drawn anew: the other layers'
+  // providers (and their tiles) stay.
+  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
+  QJsonArray sources;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    sources.append(entry.definition.source);
+  }
+  if (sources == m_drawnImagery) {
+    return;
+  }
+  QStringList errors;
+  applyImageryDraws(stack, &errors);
+  watchLayerStatus(stack);
+}
+
+LayerStack MainWindow::timedStack() const
+{
+  // Base pack layers with month variants installed (Blue Marble's months)
+  // follow the clock's month unless told otherwise.
+  LayerStack stack = m_layers->layerStack();
+  for (ImageryStackEntry& entry : stack.imagery) {
+    const std::optional<LayerTime> time =
+        m_registry->basePackTime(entry.definition.source);
+    if (time) {
+      entry.definition.source.insert(QStringLiteral("time"), time->toJson());
+    }
+  }
+  return stack;
+}
+
+void MainWindow::updateTimeBar(const LayerStack& stack)
+{
+  // The times of the visible layers that follow the clock, joined; those
+  // following the month of the year step through the clock's year.
+  QStringList extents;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    const std::optional<LayerTime> time =
+        LayerTime::fromSource(entry.definition.source);
+    if (!time || !time->followsClock()) {
+      continue;
+    }
+    if (time->mode == LayerTime::Mode::MonthOfYear) {
+      const int32_t year = m_clock->time().date().year();
+      extents.append(QStringLiteral("%1-01-01/%1-12-01/P1M").arg(year));
+    } else {
+      extents.append(time->extent);
+    }
+  }
+  m_timeBar->setExtent(TimeExtent::parse(extents));
+  if (!extents.isEmpty() && !m_timeBarOffered) {
+    m_timeBarOffered = true;
+    m_timeBar->show();
+  }
 }
 
 void MainWindow::watchLayerStatus(const LayerStack& stack)
@@ -1297,9 +1389,9 @@ NewRegionDialog* MainWindow::newOfflineRegion()
     return m_newRegionDialog;
   }
   // The WMS, WMTS and XYZ layers of the project, each source once, top
-  // first.
+  // first; layers with times as drawn now.
   std::vector<RegionLayerChoice> layers;
-  const LayerStack stack = m_layers->layerStack();
+  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
   for (std::size_t i = stack.imagery.size(); i-- > 0;) {
     const LayerDefinition& definition = stack.imagery[i].definition;
     const QString kind =
@@ -1361,6 +1453,9 @@ bool MainWindow::openProject(const QString& path, QString* errorString)
                              false);
     m_globeView->setPose(project->camera);
   }
+  if (project->time.isValid()) {
+    m_clock->setTime(project->time);
+  }
   m_projectPath = path;
   return true;
 }
@@ -1376,6 +1471,7 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
     project.projectionParameters =
         m_globeView->mapProjection()->parameterValues();
   }
+  project.time = m_clock->time();
   project.layers = m_layers->toJson();
   if (!ts::saveProject(path, project, errorString)) {
     return false;

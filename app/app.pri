@@ -46,6 +46,8 @@ HEADERS += \
     $$PWD/src/packmanagerdialog.h \
     $$PWD/src/offlineregionsdialog.h \
     $$PWD/src/startupmeasurement.h \
+    $$PWD/src/timebar.h \
+    $$PWD/src/timemodebox.h \
     $$PWD/src/userguide.h \
     $$PWD/src/wmscataloguefile.h
 
@@ -69,6 +71,8 @@ SOURCES += \
     $$PWD/src/packmanagerdialog.cpp \
     $$PWD/src/offlineregionsdialog.cpp \
     $$PWD/src/startupmeasurement.cpp \
+    $$PWD/src/timebar.cpp \
+    $$PWD/src/timemodebox.cpp \
     $$PWD/src/userguide.cpp \
     $$PWD/src/wmscataloguefile.cpp
 

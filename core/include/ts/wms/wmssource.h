@@ -27,6 +27,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
+#include <vector>
 
 #include <QJsonObject>
 #include <QString>
@@ -79,6 +81,12 @@ struct WmsSource {
   QString title;
   /** Who to credit, shown while the layer is on screen. */
   QString attribution;
+  /**
+   * Dimension values (name in lower case, value) sent with GetMap: "time"
+   * as TIME, "elevation" as ELEVATION, others as DIM_<NAME>. Empty for the
+   * server's defaults.
+   */
+  std::vector<std::pair<QString, QString>> dimensions;
 
   /**
    * Returns a string identifying the tiles: two sources with the same id
@@ -157,6 +165,12 @@ std::optional<GeoRect> webMercatorCoverage(const GeoRect& rect);
  * parameters, which are replaced.
  */
 QUrl getMapUrl(const WmsSource& source, TileKey key);
+
+/**
+ * Returns the GetMap parameter for dimension @p name: TIME, ELEVATION, or
+ * DIM_ and the name in upper case (WMS 1.3.0 C.3.2).
+ */
+QString wmsDimensionParameter(const QString& name);
 
 /**
  * Returns the GetCapabilities URL for the service at @p serviceUrl (any

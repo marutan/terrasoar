@@ -225,6 +225,8 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
     dataset.source.url = text(source, "url");
     dataset.source.sha256 = text(source, "sha256");
     dataset.replaces = text(entry, "replaces");
+    dataset.variantOf = text(entry, "variantOf");
+    dataset.variant = text(entry, "variant");
     bool listed = false;
     for (const PackFile& packFile : manifest.files) {
       listed = listed || packFile.path == dataset.file;
@@ -286,6 +288,10 @@ QJsonObject PackManifest::toJson() const
     entry.insert(QStringLiteral("source"), source);
     if (!dataset.replaces.isEmpty()) {
       entry.insert(QStringLiteral("replaces"), dataset.replaces);
+    }
+    if (!dataset.variantOf.isEmpty()) {
+      entry.insert(QStringLiteral("variantOf"), dataset.variantOf);
+      entry.insert(QStringLiteral("variant"), dataset.variant);
     }
     datasetArray.append(entry);
   }

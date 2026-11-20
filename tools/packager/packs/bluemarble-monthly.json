@@ -1,0 +1,255 @@
+{
+  "id": "bluemarble-monthly",
+  "version": "2004.1",
+  "index": {
+    "name": "Blue Marble, month by month",
+    "description": "NASA's Blue Marble for each month of 2004: snow, ice and vegetation as the seasons change. The Blue Marble layer then shows the month of the program's clock (or a month you choose), about 9.8 km per pixel.",
+    "licence": "Public domain (NASA)"
+  },
+  "sizeLimitBytes": 80000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "bmng-2004-01",
+      "file": "world.topo.bathy.200401.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/january/world.topo.bathy.200401.3x5400x2700.jpg",
+      "sha256": "1684c4f8f51970dcb4a7451302bf3be17bed657aed9fece6f80d7b191e8afa3d",
+      "name": "Blue Marble Next Generation with topography and bathymetry, January 2004",
+      "version": "2004-01"
+    },
+    {
+      "id": "bmng-2004-02",
+      "file": "world.topo.bathy.200402.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/february/world.topo.bathy.200402.3x5400x2700.jpg",
+      "sha256": "9ec9b87ea351c354f18997e252497f1f207041dee4ab90b24839b63ab90afb24",
+      "name": "Blue Marble Next Generation with topography and bathymetry, February 2004",
+      "version": "2004-02"
+    },
+    {
+      "id": "bmng-2004-03",
+      "file": "world.topo.bathy.200403.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/march/world.topo.bathy.200403.3x5400x2700.jpg",
+      "sha256": "1df1a3ff1067a5ccf99031280f77acc3fff4dab202b18b6b2c7f913a9a78a0a4",
+      "name": "Blue Marble Next Generation with topography and bathymetry, March 2004",
+      "version": "2004-03"
+    },
+    {
+      "id": "bmng-2004-04",
+      "file": "world.topo.bathy.200404.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/april/world.topo.bathy.200404.3x5400x2700.jpg",
+      "sha256": "859a6aa3055f97bd28b4190a0cf3f0e9377111cc971985fb087d6a4211d94ce3",
+      "name": "Blue Marble Next Generation with topography and bathymetry, April 2004",
+      "version": "2004-04"
+    },
+    {
+      "id": "bmng-2004-05",
+      "file": "world.topo.bathy.200405.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/may/world.topo.bathy.200405.3x5400x2700.jpg",
+      "sha256": "04310dba908ab5e24bf73fbd3ef0be01bb1b820c76ae05ad7489b81a714c69a1",
+      "name": "Blue Marble Next Generation with topography and bathymetry, May 2004",
+      "version": "2004-05"
+    },
+    {
+      "id": "bmng-2004-06",
+      "file": "world.topo.bathy.200406.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/june/world.topo.bathy.200406.3x5400x2700.jpg",
+      "sha256": "d37ab2654ce7181cf869455bb7cb8dbad9edc2075a0751d030544f90c55b4d37",
+      "name": "Blue Marble Next Generation with topography and bathymetry, June 2004",
+      "version": "2004-06"
+    },
+    {
+      "id": "bmng-2004-07",
+      "file": "world.topo.bathy.200407.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x5400x2700.jpg",
+      "sha256": "4f4240673a3a1b173d61b92ca4b07bac5fd17059ea5f725ba6da5a9c5386b7ba",
+      "name": "Blue Marble Next Generation with topography and bathymetry, July 2004",
+      "version": "2004-07"
+    },
+    {
+      "id": "bmng-2004-08",
+      "file": "world.topo.bathy.200408.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/august/world.topo.bathy.200408.3x5400x2700.jpg",
+      "sha256": "f76d7b94445e8975a755c849ddaa93ed07b7e01118fb0b7e6bc5546a68c18d5c",
+      "name": "Blue Marble Next Generation with topography and bathymetry, August 2004",
+      "version": "2004-08"
+    },
+    {
+      "id": "bmng-2004-09",
+      "file": "world.topo.bathy.200409.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/september/world.topo.bathy.200409.3x5400x2700.jpg",
+      "sha256": "4c6723e79dc7c1bdb8c193cdf8f946b10b9407bc9fd1164cdf5e75d0aa79ad3b",
+      "name": "Blue Marble Next Generation with topography and bathymetry, September 2004",
+      "version": "2004-09"
+    },
+    {
+      "id": "bmng-2004-10",
+      "file": "world.topo.bathy.200410.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/october/world.topo.bathy.200410.3x5400x2700.jpg",
+      "sha256": "f9ad745c780281dbfdda9769f10b161aacb0a03c83888ab24d4be16575aa4a7c",
+      "name": "Blue Marble Next Generation with topography and bathymetry, October 2004",
+      "version": "2004-10"
+    },
+    {
+      "id": "bmng-2004-11",
+      "file": "world.topo.bathy.200411.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/november/world.topo.bathy.200411.3x5400x2700.jpg",
+      "sha256": "388422e3bfc62517af2a9d538989a2f859fc193e6f6cde72c3d230ef29c2e69f",
+      "name": "Blue Marble Next Generation with topography and bathymetry, November 2004",
+      "version": "2004-11"
+    },
+    {
+      "id": "bmng-2004-12",
+      "file": "world.topo.bathy.200412.3x5400x2700.jpg",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/december/world.topo.bathy.200412.3x5400x2700.jpg",
+      "sha256": "a9f0088972dee0254610af851c4d6838ca3f2cf79176987e0a5713e2c15ec042",
+      "name": "Blue Marble Next Generation with topography and bathymetry, December 2004",
+      "version": "2004-12"
+    }
+  ],
+  "imageryVariants": [
+    {
+      "dataset": "bluemarble-2004-01",
+      "variantOf": "bluemarble",
+      "variant": "2004-01",
+      "source": "bmng-2004-01",
+      "name": "Blue Marble, January",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-02",
+      "variantOf": "bluemarble",
+      "variant": "2004-02",
+      "source": "bmng-2004-02",
+      "name": "Blue Marble, February",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-03",
+      "variantOf": "bluemarble",
+      "variant": "2004-03",
+      "source": "bmng-2004-03",
+      "name": "Blue Marble, March",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-04",
+      "variantOf": "bluemarble",
+      "variant": "2004-04",
+      "source": "bmng-2004-04",
+      "name": "Blue Marble, April",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-05",
+      "variantOf": "bluemarble",
+      "variant": "2004-05",
+      "source": "bmng-2004-05",
+      "name": "Blue Marble, May",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-06",
+      "variantOf": "bluemarble",
+      "variant": "2004-06",
+      "source": "bmng-2004-06",
+      "name": "Blue Marble, June",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-07",
+      "variantOf": "bluemarble",
+      "variant": "2004-07",
+      "source": "bmng-2004-07",
+      "name": "Blue Marble, July",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-08",
+      "variantOf": "bluemarble",
+      "variant": "2004-08",
+      "source": "bmng-2004-08",
+      "name": "Blue Marble, August",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-09",
+      "variantOf": "bluemarble",
+      "variant": "2004-09",
+      "source": "bmng-2004-09",
+      "name": "Blue Marble, September",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-10",
+      "variantOf": "bluemarble",
+      "variant": "2004-10",
+      "source": "bmng-2004-10",
+      "name": "Blue Marble, October",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-11",
+      "variantOf": "bluemarble",
+      "variant": "2004-11",
+      "source": "bmng-2004-11",
+      "name": "Blue Marble, November",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "bluemarble-2004-12",
+      "variantOf": "bluemarble",
+      "variant": "2004-12",
+      "source": "bmng-2004-12",
+      "name": "Blue Marble, December",
+      "licence": "Public domain (NASA)",
+      "attribution": "Blue Marble: NASA Earth Observatory",
+      "maxLevel": 3,
+      "tileSize": 256,
+      "jpegQuality": 85
+    }
+  ]
+}

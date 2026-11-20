@@ -27,8 +27,13 @@
 #define TS_APP_LAYERTREEDOCK_H
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 
 #include <QDockWidget>
+#include <QJsonObject>
+
+#include "ts/time/layertime.h"
 
 class QCheckBox;
 class QEvent;
@@ -71,6 +76,22 @@ public:
 
   /** Returns the tree view. */
   QTreeView* view() const { return m_view; }
+
+  /**
+   * Sets how the dock finds a layer's time settings: the source's own
+   * (LayerTime::fromSource()) unless @p lookup gives some (the registry's
+   * for Blue Marble's month variants). For the Time menu.
+   */
+  void setTimeLookup(
+      std::function<std::optional<LayerTime>(const QJsonObject&)> lookup);
+
+  /**
+   * Returns the Time menu for the layer at @p index (null if it has no
+   * times): follow the clock, the clock's month if its times are monthly,
+   * or one of its times. Choosing one changes the layer's definition.
+   * Shown by the layer's context menu.
+   */
+  QMenu* timeMenu(const QModelIndex& index);
 
   /**
    * Tells the dock whether composite groups are drawn as such; when not
@@ -120,6 +141,8 @@ private:
 
   LayerTreeModel* m_model;
   QTreeView* m_view = nullptr;
+  std::function<std::optional<LayerTime>(const QJsonObject&)> m_timeLookup;
+  QMenu* m_timeMenu = nullptr;
   QToolButton* m_addLayerButton = nullptr;
   QMenu* m_addLayerMenu = nullptr;
   QPushButton* m_addCollectionButton = nullptr;

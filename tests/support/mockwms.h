@@ -63,6 +63,11 @@ struct MockWmsBehaviour {
   std::atomic<bool> etag{false};
   /** Answer GetCapabilities for 1.3.0 with an exception (an old server). */
   std::atomic<bool> refuse130{false};
+  /**
+   * Offer a third layer, "clouds", with a TIME dimension: 1 to 5 November
+   * 2026, daily (default the 5th).
+   */
+  std::atomic<bool> timeLayer{false};
 };
 
 /** Longitude and latitude to colour: the picture every GetMap draws. */
@@ -137,7 +142,8 @@ inline QImage mockWmsImage(const QUrlQuery& query)
 
 /** Returns capabilities of the mock WMS, @p version, served at @p url. */
 inline QByteArray mockWmsCapabilities(const QString& version, const QUrl& url,
-                                      const QString& crs)
+                                      const QString& crs,
+                                      bool timeLayer = false)
 {
   const bool v13 = version.startsWith(QLatin1String("1.3"));
   const QString crsElement =
@@ -167,6 +173,18 @@ inline QByteArray mockWmsCapabilities(const QString& version, const QUrl& url,
                         "</Layer>");
   xml += QStringLiteral("<Layer opaque=\"1\"><Name>background</Name>"
                         "<Title>Opaque background</Title></Layer>");
+  if (timeLayer) {
+    xml += v13 ? QStringLiteral(
+                     "<Layer><Name>clouds</Name><Title>Daily clouds</Title>"
+                     "<Dimension name=\"time\" units=\"ISO8601\" "
+                     "default=\"2026-11-05\">2026-11-01/2026-11-05/P1D"
+                     "</Dimension></Layer>")
+               : QStringLiteral(
+                     "<Layer><Name>clouds</Name><Title>Daily clouds</Title>"
+                     "<Dimension name=\"time\" units=\"ISO8601\"/>"
+                     "<Extent name=\"time\" default=\"2026-11-05\">"
+                     "2026-11-01/2026-11-05/P1D</Extent></Layer>");
+  }
   xml += QStringLiteral("</Layer></Capability>");
   xml += v13 ? QStringLiteral("</WMS_Capabilities>")
              : QStringLiteral("</WMT_MS_Capabilities>");
@@ -196,7 +214,9 @@ inline MockHttpResponse mockWmsCapabilitiesResponse(
   self.setHost(QStringLiteral("127.0.0.1"));
   const QByteArray host = request.header("host");
   self.setPort(host.mid(host.lastIndexOf(':') + 1).toInt());
-  return mockResponse(200, mockWmsCapabilities(version, self, crs), "text/xml");
+  return mockResponse(
+      200, mockWmsCapabilities(version, self, crs, behaviour.timeLayer.load()),
+      "text/xml");
 }
 
 /** The failure @p behaviour asks for instead of a GetMap image, if any. */

@@ -26,6 +26,7 @@ Written for the tests, to cover valid but unusual cases compactly.
 | --- | --- |
 | `synthetic-111-inheritance.xml` | Inheritance of SRS, styles, bounding boxes and attribution; several SRS codes in one element and an empty one; ScaleHint; a group without a name; noSubsets and fixed sizes; a GetMap URL with its own query (`map=`) |
 | `synthetic-130-axes.xml` | A byte-order mark; a latitude-first EPSG:4326 BoundingBox as the only box; lower-case and empty CRS elements; a Web Mercator-only layer (EPSG:900913); scale limits; LayerLimit; a MaxWidth below the tile size |
+| `synthetic-111-time.xml` | 1.1.1 `Dimension` declared at the root with its `Extent`, inherited by one child and given other values by another (`TIME` in upper case, `elevation`) |
 | `exception-111.xml` | A ServiceExceptionReport instead of capabilities (MapServer's wording) |
 | `error-page.html` | An HTML error page |
 | `truncated-130.xml` | The first 3,000 bytes of `terrestris-130.xml` |

@@ -22,6 +22,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -52,6 +53,8 @@
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/tiling/tilekey.h"
+#include "ts/time/layertime.h"
+#include "ts/time/timeextent.h"
 
 namespace
 {
@@ -860,6 +863,104 @@ private slots:
     QCOMPARE(registry.attribution(source), QStringLiteral("Fixture imagery"));
     registry.setInstalledPacks({});
     QCOMPARE(registry.imagery(source, &error), before);
+  }
+
+  void manifestVariants()
+  {
+    // Optional: absent unless set, kept when set.
+    const QTemporaryDir dir;
+    ts::PackManifest manifest =
+        writePack(dir.path(), QStringLiteral("test-pack"));
+    QVERIFY(!manifest.toJson()
+                 .value(QStringLiteral("datasets"))
+                 .toArray()
+                 .at(0)
+                 .toObject()
+                 .contains(QStringLiteral("variantOf")));
+    manifest.datasets.at(0).variantOf = QStringLiteral("bluemarble");
+    manifest.datasets.at(0).variant = QStringLiteral("2004-01");
+    const ts::PackManifest read =
+        ts::PackManifest::fromJson(manifest.toJson(), nullptr)
+            .value_or(ts::PackManifest());
+    QCOMPARE(read.datasets.at(0).variantOf, QStringLiteral("bluemarble"));
+    QCOMPARE(read.datasets.at(0).variant, QStringLiteral("2004-01"));
+    QCOMPARE(read.toJson(), manifest.toJson());
+  }
+
+  void registryUsesMonthVariants()
+  {
+    // Blue Marble's months: a base pack source with a "month" dimension
+    // draws that month's file; without one, or a month not installed, the
+    // base pack's; base pack layers get the clock's month by default.
+    const QTemporaryDir base;
+    const ts::PackManifest baseManifest =
+        ts::test::writeFixtureBasePack(base.path(), QColor(10, 20, 30));
+    const QTemporaryDir january;
+    ts::test::writeFixtureBasePack(january.path(), QColor(240, 240, 250));
+    const QTemporaryDir july;
+    ts::test::writeFixtureBasePack(july.path(), QColor(30, 120, 40));
+    QVERIFY(QFile::rename(january.filePath(QStringLiteral("bluemarble.sqlite")),
+                          july.filePath(QStringLiteral("january.sqlite"))));
+    ts::InstalledPack monthly;
+    monthly.directory = july.path();
+    monthly.manifest.id = QStringLiteral("bluemarble-monthly");
+    for (const char* month : {"2004-01", "2004-07"}) {
+      ts::PackDataset dataset;
+      dataset.id = QStringLiteral("bluemarble-") + QLatin1String(month);
+      dataset.kind = ts::PackDataset::Kind::Imagery;
+      dataset.file = QLatin1String(month) == QLatin1String("2004-01")
+                         ? QStringLiteral("january.sqlite")
+                         : QStringLiteral("bluemarble.sqlite");
+      dataset.variantOf = QStringLiteral("bluemarble");
+      dataset.variant = QLatin1String(month);
+      dataset.attribution = QStringLiteral("Month ") + QLatin1String(month);
+      monthly.manifest.datasets.push_back(dataset);
+    }
+    ts::ProviderRegistry registry;
+    registry.setBasePack(base.path(), baseManifest);
+    const QJsonObject plain{
+        {QStringLiteral("kind"), QStringLiteral("basepack")},
+        {QStringLiteral("dataset"), QStringLiteral("bluemarble")}};
+    QVERIFY(registry.basePackVariants(QStringLiteral("bluemarble")).isEmpty());
+    QVERIFY(!registry.basePackTime(plain).has_value());
+    registry.setInstalledPacks({monthly});
+    QCOMPARE(registry.basePackVariants(QStringLiteral("bluemarble")),
+             QStringLiteral("2004-01,2004-07"));
+    const std::optional<ts::LayerTime> time = registry.basePackTime(plain);
+    QVERIFY(time.has_value());
+    QCOMPARE(time->mode, ts::LayerTime::Mode::MonthOfYear);
+    QCOMPARE(time->dimension, QStringLiteral("month"));
+
+    const ts::TileKey root = ts::TileKey::roots().at(0);
+    QString error;
+    const std::function<QColor(const QJsonObject&)> colourOf =
+        [&](const QJsonObject& source) {
+          const std::shared_ptr<ts::ImageryProvider> provider =
+              registry.imagery(source, &error);
+          return provider
+                     ? provider->loadImage(root, notCancelled).pixelColor(5, 5)
+                     : QColor();
+        };
+    QCOMPARE(colourOf(plain), QColor(10, 20, 30));
+    QJsonObject timed = plain;
+    timed.insert(QStringLiteral("time"), time->toJson());
+    const QDateTime januaryClock =
+        ts::parseIsoTime(QStringLiteral("2031-01-15"), QDateTime()).value();
+    const QDateTime julyClock =
+        ts::parseIsoTime(QStringLiteral("1999-07-04"), QDateTime()).value();
+    QCOMPARE(colourOf(ts::sourceAtTime(timed, januaryClock)),
+             QColor(240, 240, 250));
+    QCOMPARE(colourOf(ts::sourceAtTime(timed, julyClock)), QColor(30, 120, 40));
+    QCOMPARE(registry.attribution(ts::sourceAtTime(timed, julyClock)),
+             QStringLiteral("Month 2004-07"));
+    // A month the pack hasn't got: the base pack's picture.
+    QJsonObject march = plain;
+    march.insert(QStringLiteral("dimensions"),
+                 QJsonArray{QJsonArray{QStringLiteral("month"),
+                                       QStringLiteral("2004-03")}});
+    QCOMPARE(colourOf(march), QColor(10, 20, 30));
+    // A layer with time settings of its own keeps them.
+    QVERIFY(!registry.basePackTime(timed).has_value());
   }
 };
 

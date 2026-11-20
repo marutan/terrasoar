@@ -28,6 +28,8 @@
 #include <QJsonObject>
 #include <QSaveFile>
 
+#include "ts/time/timeextent.h"
+
 namespace ts
 {
 
@@ -108,6 +110,10 @@ QByteArray projectToJson(const Project& project)
     }
     view.insert(QStringLiteral("projectionParameters"), parameters);
   }
+  if (project.time.isValid()) {
+    view.insert(QStringLiteral("time"),
+                project.time.toUTC().toString(Qt::ISODateWithMs));
+  }
   document.insert(QStringLiteral("view"), view);
   document.insert(QStringLiteral("layers"), project.layers);
   return QJsonDocument(document).toJson(QJsonDocument::Indented);
@@ -163,6 +169,12 @@ std::optional<Project> projectFromJson(const QByteArray& json,
     if (it.value().isDouble()) {
       project.projectionParameters[it.key()] = it.value().toDouble();
     }
+  }
+  const std::optional<QDateTime> time =
+      parseIsoTime(view.value(QStringLiteral("time")).toString(), QDateTime());
+  if (time && !view.value(QStringLiteral("time")).toString().isEmpty() &&
+      time->isValid()) {
+    project.time = *time;
   }
   project.layers = object.value(QStringLiteral("layers")).toArray();
   return project;

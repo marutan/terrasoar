@@ -119,6 +119,9 @@ HEADERS += \
     include/ts/wms/wmscatalogue.h \
     include/ts/wms/wmsimageryprovider.h \
     include/ts/wms/wmssource.h \
+    include/ts/time/layertime.h \
+    include/ts/time/programclock.h \
+    include/ts/time/timeextent.h \
     include/ts/wmts/wmtscapabilities.h \
     include/ts/wmts/wmtscrs.h \
     include/ts/wmts/wmtsimageryprovider.h \
@@ -210,6 +213,9 @@ SOURCES += \
     src/wms/wmscatalogue.cpp \
     src/wms/wmsimageryprovider.cpp \
     src/wms/wmssource.cpp \
+    src/time/layertime.cpp \
+    src/time/programclock.cpp \
+    src/time/timeextent.cpp \
     src/wmts/wmtscapabilities.cpp \
     src/wmts/wmtscrs.cpp \
     src/wmts/wmtsimageryprovider.cpp \

@@ -42,6 +42,7 @@
 #include "ts/network/tilediskcache.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/tiling/tileloader.h"
+#include "ts/time/timeextent.h"
 #include "ts/wms/wmscapabilities.h"
 #include "ts/wms/wmscatalogue.h"
 #include "ts/wms/wmsimageryprovider.h"
@@ -290,6 +291,69 @@ private slots:
     QCOMPARE(caps.findLayer(QStringLiteral("poster"))->noSubsets, true);
     QCOMPARE(caps.findLayer(QStringLiteral("fixed"))->fixedWidth, 512);
     QVERIFY(caps.findLayer(QStringLiteral("nothing")) == nullptr);
+  }
+
+  void dimensions()
+  {
+    // WMS 1.3.0: Dimension elements with their values (GIBS: monthly
+    // intervals with gaps; nowCOAST: a list of instants).
+    const ts::WmsCapabilities gibs = capabilitiesOf("gibs-4326-130.xml");
+    const ts::WmsLayer* merra =
+        gibs.findLayer(QStringLiteral("MERRA2_2m_Air_Temperature_Monthly"));
+    QVERIFY(merra != nullptr);
+    const ts::WmsDimension* time = merra->timeDimension();
+    QVERIFY(time != nullptr);
+    QCOMPARE(time->units, QStringLiteral("ISO8601"));
+    QCOMPARE(time->defaultValue, QStringLiteral("2026-08-01"));
+    QVERIFY(!time->nearestValue);
+    QVERIFY(
+        time->extent.startsWith(QLatin1String("1980-01-01/2023-11-01/P1M,")));
+    const ts::TimeExtent months = ts::TimeExtent::parse(time->extent);
+    QCOMPARE(months.format(
+                 months.atOrBefore(QDateTime::fromMSecsSinceEpoch(0).toUTC())
+                     .value()),
+             QStringLiteral("1980-01-01"));
+    const ts::WmsCapabilities nowcoast = capabilitiesOf("nowcoast-130.xml");
+    const ts::WmsLayer* radar = nowcoast.findLayer(
+        QStringLiteral("weather_radar:conus_base_reflectivity_mosaic"));
+    QVERIFY(radar != nullptr && radar->timeDimension() != nullptr);
+    QVERIFY(radar->timeDimension()->nearestValue);
+    QCOMPARE(ts::TimeExtent::parse(radar->timeDimension()->extent).count(),
+             int64_t{125});
+    // A layer without dimensions has none.
+    QVERIFY(capabilitiesOf("gebco-130.xml")
+                .namedLayers()
+                .front()
+                ->timeDimension() == nullptr);
+
+    // WMS 1.1.1: Dimension and Extent apart, inherited, names in lower case.
+    const ts::WmsCapabilities synthetic =
+        capabilitiesOf("synthetic-111-time.xml");
+    const ts::WmsLayer* monthly =
+        synthetic.findLayer(QStringLiteral("monthly"));
+    QVERIFY(monthly != nullptr && monthly->timeDimension() != nullptr);
+    QCOMPARE(monthly->timeDimension()->extent,
+             QStringLiteral("2004-01-01/2004-12-01/P1M"));
+    QCOMPARE(monthly->timeDimension()->defaultValue,
+             QStringLiteral("2004-07-01"));
+    QCOMPARE(monthly->timeDimension()->units, QStringLiteral("ISO8601"));
+    const ts::WmsLayer* daily = synthetic.findLayer(QStringLiteral("daily"));
+    QVERIFY(daily != nullptr && daily->timeDimension() != nullptr);
+    QCOMPARE(daily->timeDimension()->extent,
+             QStringLiteral("2020-01-01/2020-01-03/P1D"));
+    QVERIFY(daily->timeDimension()->nearestValue);
+    QCOMPARE(daily->dimensions.size(), std::size_t{2});
+    QCOMPARE(daily->dimensions.at(1).name, QStringLiteral("elevation"));
+    QCOMPARE(daily->dimensions.at(1).extent, QStringLiteral("0,100,500"));
+    QCOMPARE(daily->dimensions.at(1).units, QStringLiteral("EPSG:5030"));
+
+    // Dimension values in GetMap: TIME, ELEVATION, DIM_ for others.
+    QCOMPARE(ts::wmsDimensionParameter(QStringLiteral("time")),
+             QStringLiteral("TIME"));
+    QCOMPARE(ts::wmsDimensionParameter(QStringLiteral("elevation")),
+             QStringLiteral("ELEVATION"));
+    QCOMPARE(ts::wmsDimensionParameter(QStringLiteral("band")),
+             QStringLiteral("DIM_BAND"));
   }
 
   void axesAndOddities()
@@ -665,6 +729,21 @@ private slots:
     ts::WmsSource other = source;
     other.styles = QStringList{QString(), QString()};
     QVERIFY(other.id() != source.id());
+    // Dimension values: kept, sent, and part of the id.
+    other = source;
+    other.dimensions = {{QStringLiteral("time"), QStringLiteral("2004-07-01")},
+                        {QStringLiteral("band"), QStringLiteral("3")}};
+    QVERIFY(other.id() != source.id());
+    const std::optional<ts::WmsSource> timed =
+        ts::WmsSource::fromJson(other.toJson(), &error);
+    QVERIFY2(timed.has_value(), qPrintable(error));
+    QCOMPARE(timed->dimensions, other.dimensions);
+    QCOMPARE(timed->id(), other.id());
+    const QUrlQuery dimensionQuery(ts::getMapUrl(other, ts::TileKey{1, 2, 0}));
+    QCOMPARE(dimensionQuery.queryItemValue(QStringLiteral("TIME")),
+             QStringLiteral("2004-07-01"));
+    QCOMPARE(dimensionQuery.queryItemValue(QStringLiteral("DIM_BAND")),
+             QStringLiteral("3"));
 
     QJsonObject bad = json;
     bad.insert(QStringLiteral("url"), QStringLiteral("ftp://x/"));

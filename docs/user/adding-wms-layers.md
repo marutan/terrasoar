@@ -20,7 +20,12 @@ layers at the opacity you choose, and saved with your project.
    server offers more than one, and the image **Format**. Terra Soar
    suggests PNG for layers drawn over others (it keeps the background
    clear) and JPEG for layers that cover everything (smaller and faster).
-5. Read the lines under the list: which coordinate system will be used,
+5. If the layer changes with time (daily satellite pictures, forecasts,
+   radar), a **Time** choice appears: **Follow the program's clock**
+   (the time slider, see [Time](layers.md#time)), **The clock's month,
+   any year** for monthly pictures, or **Always this time** with the
+   time chosen from the list.
+6. Read the lines under the list: which coordinate system will be used,
    who to credit, and the server's own terms. Then press **Add**.
 
 The layer goes to the top of the Layers panel (or into the collection you

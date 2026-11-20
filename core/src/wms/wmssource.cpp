@@ -106,11 +106,19 @@ std::optional<WmsSource> fail(QString* errorString, const QString& message)
 
 QString WmsSource::id() const
 {
-  return QStringLiteral("wms:%1|%2|%3|%4|%5|%6|%7|%8")
-      .arg(url.toString(QUrl::FullyEncoded), version,
-           layers.join(QLatin1Char(',')), styles.join(QLatin1Char(',')), format,
-           crs, transparent ? QStringLiteral("t") : QStringLiteral("o"))
-      .arg(tileSizePx);
+  QString id = QStringLiteral("wms:%1|%2|%3|%4|%5|%6|%7|%8")
+                   .arg(url.toString(QUrl::FullyEncoded), version,
+                        layers.join(QLatin1Char(',')),
+                        styles.join(QLatin1Char(',')), format, crs,
+                        transparent ? QStringLiteral("t") : QStringLiteral("o"))
+                   .arg(tileSizePx);
+  // Only with dimensions, so the ids (and disk caches) of sources without
+  // stay as they were.
+  for (const std::pair<QString, QString>& dimension : dimensions) {
+    id += QLatin1Char('|') + dimension.first + QLatin1Char('=') +
+          dimension.second;
+  }
+  return id;
 }
 
 TileImageProjection WmsSource::imageProjection() const
@@ -142,6 +150,13 @@ QJsonObject WmsSource::toJson() const
   }
   if (!attribution.isEmpty()) {
     json.insert(QStringLiteral("attribution"), attribution);
+  }
+  if (!dimensions.empty()) {
+    QJsonArray dimensionArray;
+    for (const std::pair<QString, QString>& dimension : dimensions) {
+      dimensionArray.append(QJsonArray{dimension.first, dimension.second});
+    }
+    json.insert(QStringLiteral("dimensions"), dimensionArray);
   }
   return json;
 }
@@ -204,6 +219,16 @@ std::optional<WmsSource> WmsSource::fromJson(const QJsonObject& json,
   }
   source.title = json.value(QStringLiteral("title")).toString();
   source.attribution = json.value(QStringLiteral("attribution")).toString();
+  const QJsonArray dimensions =
+      json.value(QStringLiteral("dimensions")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < dimensions.size(); ++i) {
+    const QJsonArray pair = dimensions.at(i).toArray();
+    const QString name = pair.at(0).toString().trimmed().toLower();
+    if (pair.size() == 2 && !name.isEmpty()) {
+      source.dimensions.emplace_back(name, pair.at(1).toString());
+    }
+  }
   return source;
 }
 
@@ -345,9 +370,24 @@ QUrl getMapUrl(const WmsSource& source, TileKey key)
                      isVersion13(source.version)
                          ? QStringLiteral("XML")
                          : QStringLiteral("application/vnd.ogc.se_xml"));
+  for (const std::pair<QString, QString>& dimension : source.dimensions) {
+    if (!dimension.second.isEmpty()) {
+      query.addQueryItem(wmsDimensionParameter(dimension.first),
+                         dimension.second);
+    }
+  }
   QUrl url = source.url;
   url.setQuery(query);
   return url;
+}
+
+QString wmsDimensionParameter(const QString& name)
+{
+  const QString lower = name.toLower();
+  if (lower == QLatin1String("time") || lower == QLatin1String("elevation")) {
+    return lower.toUpper();
+  }
+  return QStringLiteral("DIM_") + name.toUpper();
 }
 
 QUrl capabilitiesUrl(const QUrl& serviceUrl, const QString& version)

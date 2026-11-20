@@ -305,6 +305,14 @@
             <source>The server's terms: %1</source>
             <translation>The server's terms: %1</translation>
         </message>
+        <message>
+            <source>T&amp;ime:</source>
+            <translation>T&amp;ime:</translation>
+        </message>
+        <message>
+            <source>Its time follows the program's clock (View → Time Slider).</source>
+            <translation>Its time follows the program's clock (View → Time Slider).</translation>
+        </message>
     </context>
     <context>
         <name>ts::AddWmtsDialog</name>
@@ -959,6 +967,18 @@
             <source>XYZ Tile Layer…</source>
             <translation>XYZ Tile Layer…</translation>
         </message>
+        <message>
+            <source>Time</source>
+            <translation>Time</translation>
+        </message>
+        <message>
+            <source>Follow the program's clock</source>
+            <translation>Follow the program's clock</translation>
+        </message>
+        <message>
+            <source>The clock's month, any year</source>
+            <translation>The clock's month, any year</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -1300,6 +1320,14 @@
         <message>
             <source>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer… or Add XYZ Tile Layer…).</source>
             <translation>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer… or Add XYZ Tile Layer…).</translation>
+        </message>
+        <message>
+            <source>&amp;Time Slider</source>
+            <translation>&amp;Time Slider</translation>
+        </message>
+        <message>
+            <source>Show the slider that sets the time shown by layers with dates</source>
+            <translation>Show the slider that sets the time shown by layers with dates</translation>
         </message>
     </context>
     <context>
@@ -2083,6 +2111,88 @@
         <message>
             <source>Checkerboard</source>
             <translation>Checkerboard</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::TimeBar</name>
+        <message>
+            <source>Time</source>
+            <translation>Time</translation>
+        </message>
+        <message>
+            <source>Previous time</source>
+            <translation>Previous time</translation>
+        </message>
+        <message>
+            <source>Next time</source>
+            <translation>Next time</translation>
+        </message>
+        <message>
+            <source>Play the layers' times one after another</source>
+            <translation>Play the layers' times one after another</translation>
+        </message>
+        <message>
+            <source>The time the layers show</source>
+            <translation>The time the layers show</translation>
+        </message>
+        <message>
+            <source>How long each time is shown while playing</source>
+            <translation>How long each time is shown while playing</translation>
+        </message>
+        <message>
+            <source>¼ s each</source>
+            <translation>¼ s each</translation>
+        </message>
+        <message>
+            <source>½ s each</source>
+            <translation>½ s each</translation>
+        </message>
+        <message>
+            <source>1 s each</source>
+            <translation>1 s each</translation>
+        </message>
+        <message>
+            <source>2 s each</source>
+            <translation>2 s each</translation>
+        </message>
+        <message>
+            <source>5 s each</source>
+            <translation>5 s each</translation>
+        </message>
+        <message>
+            <source>Pause</source>
+            <translation>Pause</translation>
+        </message>
+        <message>
+            <source>Play</source>
+            <translation>Play</translation>
+        </message>
+        <message>
+            <source>Time slider</source>
+            <translation>Time slider</translation>
+        </message>
+        <message>
+            <source>Speed</source>
+            <translation>Speed</translation>
+        </message>
+        <message>
+            <source>%1 UTC</source>
+            <translation>%1 UTC</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::TimeModeBox</name>
+        <message>
+            <source>Follow the program's clock</source>
+            <translation>Follow the program's clock</translation>
+        </message>
+        <message>
+            <source>The clock's month, any year</source>
+            <translation>The clock's month, any year</translation>
+        </message>
+        <message>
+            <source>Always this time:</source>
+            <translation>Always this time:</translation>
         </message>
     </context>
     <context>

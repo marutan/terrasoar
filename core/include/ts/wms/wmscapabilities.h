@@ -64,6 +64,35 @@ struct WmsBoundingBox {
 };
 
 /**
+ * A dimension of a layer (WMS 1.3.0 Dimension; 1.1.1 Dimension with its
+ * Extent): TIME, ELEVATION or a named one.
+ *
+ * @reentrant
+ */
+struct WmsDimension {
+  /** Name, lower case as WMS compares it ("time", "elevation", …). */
+  QString name;
+  /** Units ("ISO8601" for time). */
+  QString units;
+  /** The value used when the request gives none. */
+  QString defaultValue;
+  /**
+   * The allowed values as written: a comma-separated list of values and
+   * start/end/resolution intervals (see TimeExtent for time).
+   */
+  QString extent;
+  /** True if the server accepts several values at once. */
+  bool multipleValues = false;
+  /** True if the server answers with the nearest value it has. */
+  bool nearestValue = false;
+  /** True if "current" is allowed (the latest data). */
+  bool current = false;
+
+  /** Returns true for the TIME dimension. */
+  bool isTime() const { return name == QLatin1String("time"); }
+};
+
+/**
  * A layer, with what it inherits from its parents already applied (WMS
  * 1.3.0 section 7.2.4.8, the same in 1.1.1): CRS, styles and
  * authority are added to the parent's; bounding boxes, scale limits,
@@ -100,6 +129,11 @@ struct WmsLayer {
   double minScaleDenominator = 0.0;
   /** Drawn only at scales finer than 1 : this (0: no limit). */
   double maxScaleDenominator = 0.0;
+  /**
+   * Its dimensions (inherited: a child's of the same name replaces its
+   * parent's).
+   */
+  std::vector<WmsDimension> dimensions;
   /** Who to credit, as text. */
   QString attributionTitle;
   /** Who to credit, as a link. */
@@ -112,6 +146,9 @@ struct WmsLayer {
    * regard to case).
    */
   bool supportsCrs(const QString& code) const;
+
+  /** Returns the TIME dimension, or null if it has none. */
+  const WmsDimension* timeDimension() const;
 };
 
 /**

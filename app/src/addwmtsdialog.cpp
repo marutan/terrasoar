@@ -41,6 +41,7 @@
 #include <QVBoxLayout>
 
 #include "helpwindow.h"
+#include "timemodebox.h"
 #include "ts/network/networkclient.h"
 #include "ts/wms/wmssource.h"
 #include "wmscataloguefile.h"
@@ -415,6 +416,11 @@ bool AddWmtsDialog::setDimension(const QString& identifier,
 {
   for (const std::pair<QString, QComboBox*>& dimension : m_dimensionBoxes) {
     if (dimension.first.compare(identifier, Qt::CaseInsensitive) == 0) {
+      if (m_timeModeBox != nullptr &&
+          dimension.first == m_timeDimension.identifier) {
+        // A date of one's own: the layer stays at it.
+        m_timeModeBox->setMode(LayerTime::Mode::Fixed);
+      }
       dimension.second->setEditText(value);
       showDetails();
       return true;
@@ -455,6 +461,9 @@ void AddWmtsDialog::fillChoices(const WmtsLayer& layer)
   }
   m_dimensionBoxes.clear();
   m_dimensionLabels.clear();
+  delete m_timeModeBox;
+  m_timeModeBox = nullptr;
+  m_timeDimension = WmtsDimension{};
   if (!m_capabilities || layer.identifier.isEmpty()) {
     return;
   }
@@ -506,7 +515,41 @@ void AddWmtsDialog::fillChoices(const WmtsLayer& layer)
     m_choicesLayout->addWidget(box, row, 1);
     m_dimensionBoxes.emplace_back(dimension.identifier, box);
     m_dimensionLabels.push_back(label);
+    if (dimension.identifier.compare(QLatin1String("time"),
+                                     Qt::CaseInsensitive) == 0) {
+      // Time follows the program's clock unless a value is chosen.
+      m_timeDimension = dimension;
+      m_timeModeBox = new TimeModeBox(this);
+      m_timeModeBox->setObjectName(QStringLiteral("wmtsTimeModeBox"));
+      m_timeModeBox->setExtent(TimeExtent::parse(dimension.values));
+      m_choicesLayout->addWidget(m_timeModeBox, row, 2);
+      box->setEnabled(false);
+      connect(
+          m_timeModeBox, qOverload<int32_t>(&QComboBox::currentIndexChanged),
+          this, [this, box]() {
+            box->setEnabled(m_timeModeBox->mode() == LayerTime::Mode::Fixed);
+            showDetails();
+          });
+    }
   }
+}
+
+std::optional<LayerTime> AddWmtsDialog::chosenTime() const
+{
+  if (m_timeModeBox == nullptr) {
+    return std::nullopt;
+  }
+  LayerTime time;
+  time.dimension = m_timeDimension.identifier;
+  time.extent = m_timeDimension.values.join(QLatin1Char(','));
+  time.defaultValue = m_timeDimension.defaultValue;
+  time.mode = m_timeModeBox->mode();
+  for (const std::pair<QString, QComboBox*>& dimension : m_dimensionBoxes) {
+    if (dimension.first == m_timeDimension.identifier) {
+      time.value = dimension.second->currentText().trimmed();
+    }
+  }
+  return time;
 }
 
 void AddWmtsDialog::showDetails()
@@ -580,8 +623,13 @@ AddWmtsDialog::chosenSource(QString* errorString) const
   choices.style = m_styleBox->currentData().toString();
   choices.format = m_formatBox->currentText();
   choices.tileMatrixSet = m_setBox->currentData().toString();
+  const std::optional<LayerTime> time = chosenTime();
   for (const std::pair<QString, QComboBox*>& dimension : m_dimensionBoxes) {
-    const QString value = dimension.second->currentText().trimmed();
+    QString value = dimension.second->currentText().trimmed();
+    if (time && dimension.first == time->dimension) {
+      // The value now; the main window puts in the clock's as it moves.
+      value = time->valueAt(QDateTime::currentDateTimeUtc());
+    }
     if (!value.isEmpty()) {
       choices.dimensions.emplace_back(dimension.first, value);
     }
@@ -615,6 +663,10 @@ void AddWmtsDialog::accept()
   definition.type = LayerType::Imagery;
   definition.name = source->title;
   definition.source = source->toJson();
+  const std::optional<LayerTime> time = chosenTime();
+  if (time) {
+    definition.source.insert(QStringLiteral("time"), time->toJson());
+  }
   m_definition = definition;
   QDialog::accept();
 }

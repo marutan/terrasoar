@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WMT_MS_Capabilities version="1.1.1">
+  <Service>
+    <Name>OGC:WMS</Name>
+    <Title>Synthetic time</Title>
+  </Service>
+  <Capability>
+    <Request>
+      <GetMap>
+        <Format>image/png</Format>
+        <DCPType><HTTP><Get><OnlineResource xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://example.invalid/wms?"/></Get></HTTP></DCPType>
+      </GetMap>
+    </Request>
+    <Layer>
+      <Title>Root</Title>
+      <SRS>EPSG:4326</SRS>
+      <LatLonBoundingBox minx="-180" miny="-90" maxx="180" maxy="90"/>
+      <Dimension name="TIME" units="ISO8601"/>
+      <Dimension name="elevation" units="EPSG:5030"/>
+      <Extent name="time" default="2004-07-01">2004-01-01/2004-12-01/P1M</Extent>
+      <Layer>
+        <Name>monthly</Name>
+        <Title>Inherits the root's months</Title>
+      </Layer>
+      <Layer>
+        <Name>daily</Name>
+        <Title>Its own days</Title>
+        <Extent name="time" default="2020-01-03" nearestValue="1">2020-01-01/2020-01-03/P1D</Extent>
+        <Extent name="elevation" default="0">0,100,500</Extent>
+      </Layer>
+    </Layer>
+  </Capability>
+</WMT_MS_Capabilities>

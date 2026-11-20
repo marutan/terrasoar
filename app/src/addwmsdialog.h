@@ -34,6 +34,7 @@
 #include <QUrl>
 
 #include "ts/layers/layerdefinition.h"
+#include "ts/time/layertime.h"
 #include "ts/wms/wmscapabilities.h"
 #include "ts/wms/wmscatalogue.h"
 #include "ts/wms/wmssource.h"
@@ -52,6 +53,7 @@ namespace ts
 
 class NetworkClient;
 class NetworkTicket;
+class TimeModeBox;
 
 /**
  * Adds a layer from a WMS server: the user picks a service from the
@@ -117,6 +119,15 @@ public:
   /** Returns the status line (for tests). */
   QString statusText() const;
 
+  /**
+   * Returns the time settings of the chosen layer, or nothing if it has no
+   * time dimension.
+   */
+  std::optional<LayerTime> chosenTime() const;
+
+  /** Returns the box choosing how the layer's time is chosen (tests). */
+  TimeModeBox* timeModeBox() const { return m_timeModeBox; }
+
   /** Returns true while a request runs. */
   bool isBusy() const;
 
@@ -148,6 +159,7 @@ private:
   void layerChosen();
   void accept() override;
   std::optional<WmsSource> chosenSource(QString* errorString) const;
+  void fillTime(const WmsLayer* layer);
   void setStatus(const QString& text, bool error);
 
   std::shared_ptr<NetworkClient> m_network;
@@ -162,6 +174,9 @@ private:
   QComboBox* m_styleBox = nullptr;
   QLabel* m_formatLabel = nullptr;
   QComboBox* m_formatBox = nullptr;
+  QLabel* m_timeLabel = nullptr;
+  TimeModeBox* m_timeModeBox = nullptr;
+  QComboBox* m_timeValueBox = nullptr;
   QLabel* m_detailsLabel = nullptr;
   QDialogButtonBox* m_buttons = nullptr;
   QPushButton* m_addButton = nullptr;

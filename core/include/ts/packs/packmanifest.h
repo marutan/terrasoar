@@ -109,6 +109,16 @@ struct PackDataset {
    * installed, or empty. See docs/design/packs.md.
    */
   QString replaces;
+  /**
+   * For one of several pictures of a base pack dataset chosen by time
+   * (Blue Marble's months): the dataset it is a variant of, or empty.
+   */
+  QString variantOf;
+  /**
+   * Which variant: the value of the time-like dimension that picks it
+   * ("2004-01" for January), see docs/design/packs.md.
+   */
+  QString variant;
 };
 
 /** The result of checking a pack's files against its manifest. */
@@ -134,7 +144,8 @@ struct PackVerification {
  *                  "name": "...", "licence": "...", "attribution": "...",
  *                  "source": {"name": "...", "version": "...",
  *                             "url": "...", "sha256": "..."},
- *                  "replaces": "..."} ],
+ *                  "replaces": "...",
+ *                  "variantOf": "...", "variant": "..."} ],
  *   "datumShifts": [ {"id": "ostn15", "file": "...", "name": "...",
  *                     "licence": "...", "attribution": "...",
  *                     "source": {...}} ],

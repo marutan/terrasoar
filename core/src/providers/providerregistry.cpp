@@ -27,6 +27,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDir>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QStringList>
 
@@ -112,6 +113,10 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
                                        QString* errorString) const
 {
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const Replacement* variant = basePackVariant(source);
+  if (variant != nullptr && variant->features == features) {
+    return variant->path;
+  }
   const std::unordered_map<QString, Replacement>::const_iterator replacement =
       m_replacements.find(dataset);
   if (replacement != m_replacements.end() &&
@@ -262,6 +267,7 @@ void ProviderRegistry::setInstalledPacks(
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   m_replacements.clear();
+  m_variants.clear();
   m_packGeoids.clear();
   // Providers created from now on use the packs' geoids.
   m_geoids.clear();
@@ -287,6 +293,15 @@ void ProviderRegistry::setInstalledPacks(
                                            dataset.name, dataset.attribution});
         continue;
       }
+      if (!dataset.variantOf.isEmpty() && !dataset.variant.isEmpty()) {
+        Replacement variant;
+        variant.path = QDir(pack.directory).filePath(dataset.file);
+        variant.features = dataset.kind == PackDataset::Kind::Features;
+        variant.attribution = dataset.attribution;
+        // The first pack with this variant wins.
+        m_variants[dataset.variantOf].try_emplace(dataset.variant, variant);
+        continue;
+      }
       if (dataset.replaces.isEmpty() ||
           m_replacements.count(dataset.replaces) != 0) {
         continue;
@@ -299,6 +314,64 @@ void ProviderRegistry::setInstalledPacks(
     }
   }
   setDatumShiftGrids(shiftGrids);
+}
+
+const ProviderRegistry::Replacement*
+ProviderRegistry::basePackVariant(const QJsonObject& source) const
+{
+  const std::unordered_map<
+      QString, std::map<QString, Replacement>>::const_iterator variants =
+      m_variants.find(source.value(QStringLiteral("dataset")).toString());
+  if (variants == m_variants.end()) {
+    return nullptr;
+  }
+  const QJsonArray dimensions =
+      source.value(QStringLiteral("dimensions")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < dimensions.size(); ++i) {
+    const QJsonArray pair = dimensions.at(i).toArray();
+    if (pair.at(0).toString() == QLatin1String("month")) {
+      const std::map<QString, Replacement>::const_iterator found =
+          variants->second.find(pair.at(1).toString());
+      return found == variants->second.end() ? nullptr : &found->second;
+    }
+  }
+  return nullptr;
+}
+
+QString ProviderRegistry::basePackVariants(const QString& dataset) const
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  const std::unordered_map<
+      QString, std::map<QString, Replacement>>::const_iterator variants =
+      m_variants.find(dataset);
+  if (variants == m_variants.end()) {
+    return QString();
+  }
+  QStringList values;
+  for (const std::pair<const QString, Replacement>& variant :
+       variants->second) {
+    values.append(variant.first);
+  }
+  return values.join(QLatin1Char(','));
+}
+
+std::optional<LayerTime>
+ProviderRegistry::basePackTime(const QJsonObject& source) const
+{
+  if (!isBasePackSource(source) || source.contains(QStringLiteral("time"))) {
+    return std::nullopt;
+  }
+  const QString extent =
+      basePackVariants(source.value(QStringLiteral("dataset")).toString());
+  if (extent.isEmpty()) {
+    return std::nullopt;
+  }
+  LayerTime time;
+  time.dimension = QStringLiteral("month");
+  time.extent = extent;
+  time.mode = LayerTime::Mode::MonthOfYear;
+  return time;
 }
 
 std::shared_ptr<FeatureProvider>
@@ -640,6 +713,10 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
     return QString();
   }
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const Replacement* variant = basePackVariant(source);
+  if (variant != nullptr) {
+    return variant->attribution;
+  }
   const std::unordered_map<QString, Replacement>::const_iterator replacement =
       m_replacements.find(dataset);
   if (replacement != m_replacements.end()) {

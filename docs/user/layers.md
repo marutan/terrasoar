@@ -50,6 +50,32 @@ Select a layer or collection and set its **Opacity** with the slider.
 **Remove** deletes the selected entry (not its data: a WMS layer's saved
 tiles stay until you clear them).
 
+## Time
+
+Some layers show a different picture for each time: daily satellite
+images, forecasts, radar, or Blue Marble month by month once its pack is
+installed. These follow the program's **clock**, which starts at the
+current time.
+
+When you add the first such layer, the **time slider** appears under the
+view (**View → Time Slider** shows or hides it):
+
+- Drag the **slider** to move through the times the layers have; the
+  date next to it is the time shown. Each place on the slider is a time
+  at least one layer has a picture for.
+- **◀◀** and **▶▶** go to the previous and next time.
+- **▶ Play** shows the times one after another, each for as long as the
+  box beside it says (¼ s to 5 s), and stops at the last. Each time's
+  tiles are fetched as it comes; times seen before come back from the
+  saved tiles at once.
+
+A layer shows the latest of its times not after the clock's, so layers
+with daily and monthly pictures can be shown together. Right-click a layer
+and use **Time** to have it follow the clock, follow only the clock's
+month (for monthly pictures, in any year), or stay at one time of its own.
+
+The clock's time is saved in projects.
+
 ## Projects
 
 A project keeps the layer list (with each layer's settings, such as

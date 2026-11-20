@@ -71,6 +71,7 @@
 #include "fixturepack.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "layertreedock.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
 #include "mockpacks.h"
@@ -82,6 +83,8 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "projectionsettingsdialog.h"
+#include "timebar.h"
+#include "timemodebox.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
@@ -90,6 +93,9 @@
 #include "ts/network/tilediskcache.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/time/layertime.h"
+#include "ts/time/programclock.h"
+#include "ts/time/timeextent.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "userguide.h"
@@ -2230,6 +2236,149 @@ private slots:
       globe->grabFramebuffer().save(
           QDir(shots).filePath(QStringLiteral("wms-layer.png")));
     }
+  }
+
+  void wmsTimeSlider()
+  {
+    // A WMS layer with TIME: the dialog makes it follow the clock; the
+    // time slider appears; each slider position asks GetMap for its own
+    // TIME (and the play button steps through them); a fixed time stays.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    behaviour->timeLayer = true;
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    window.registry().setWmsNetwork(network, wms);
+
+    ts::AddWmsDialog dialog(network, nullptr);
+    QSignalSpy loaded(&dialog, &ts::AddWmsDialog::capabilitiesLoaded);
+    dialog.connectTo(server.url(QStringLiteral("/wms")).toString());
+    QVERIFY(loaded.wait(5000));
+    QVERIFY(dialog.selectLayer(QStringLiteral("clouds")));
+    QVERIFY(dialog.timeModeBox() != nullptr);
+    QVERIFY(dialog.timeModeBox()->isVisibleTo(&dialog));
+    QCOMPARE(dialog.timeModeBox()->mode(), ts::LayerTime::Mode::Clock);
+    const std::optional<ts::LayerTime> chosen = dialog.chosenTime();
+    QVERIFY(chosen.has_value());
+    QCOMPARE(chosen->extent, QStringLiteral("2026-11-01/2026-11-05/P1D"));
+    QComboBox* values =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmsTimeValueBox"));
+    QVERIFY(values != nullptr && !values->isEnabled());
+    // A layer without TIME hides the choice.
+    QVERIFY(dialog.selectLayer(QStringLiteral("pattern")));
+    QVERIFY(!dialog.timeModeBox()->isVisibleTo(&dialog));
+    QVERIFY(!dialog.chosenTime().has_value());
+    QVERIFY(dialog.selectLayer(QStringLiteral("clouds")));
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("wmsAddButton"));
+    QVERIFY(add != nullptr && add->isEnabled());
+    add->click();
+    QVERIFY(dialog.layerDefinition().has_value());
+    const ts::LayerDefinition definition = *dialog.layerDefinition();
+    QVERIFY(definition.source.contains(QStringLiteral("time")));
+
+    // Before the layer: no slider.
+    QVERIFY(!window.timeBar()->isVisible());
+    window.clock()->setTime(
+        ts::parseIsoTime(QStringLiteral("2026-11-03T12:00Z"), QDateTime())
+            .value());
+    window.layerModel()->addLayer(definition);
+    QVERIFY(window.timeBar()->isVisible());
+    QCOMPARE(window.timeBar()->extent().count(), int64_t{5});
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-03"));
+    QSlider* slider = window.timeBar()->slider();
+    QCOMPARE(slider->maximum(), 4);
+    QCOMPARE(slider->value(), 2);
+
+    const std::function<QStringList()> requestedTimes = [&server]() {
+      QStringList times;
+      for (const ts::test::MockHttpRequest& request : server.requests()) {
+        const QUrlQuery query(request.url);
+        if (query.queryItemValue(QStringLiteral("REQUEST")) ==
+            QLatin1String("GetMap")) {
+          const QString time = query.queryItemValue(QStringLiteral("TIME"));
+          if (!times.contains(time)) {
+            times.append(time);
+          }
+        }
+      }
+      return times;
+    };
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QVERIFY(QTest::qWaitFor(
+          [&]() {
+            return requestedTimes().contains(QStringLiteral("2026-11-03"));
+          },
+          10000));
+    }
+    // Each slider position: its day, in the clock and in GetMap.
+    for (int32_t position = 0; position <= slider->maximum(); ++position) {
+      slider->setValue(position);
+      const QString day = QStringLiteral("2026-11-0%1").arg(position + 1);
+      QCOMPARE(window.timeBar()->timeText(), day);
+      QCOMPARE(window.clock()->time(),
+               ts::parseIsoTime(day, QDateTime()).value());
+      if (globe != nullptr) {
+        QVERIFY2(QTest::qWaitFor(
+                     [&]() { return requestedTimes().contains(day); }, 10000),
+                 qPrintable(requestedTimes().join(QLatin1Char(' '))));
+      }
+    }
+    // Every request asked for one of the layer's days (none for "now").
+    for (const QString& time : requestedTimes()) {
+      QVERIFY2(time.startsWith(QLatin1String("2026-11-0")), qPrintable(time));
+    }
+    // Back and forward; playing stops at the last day.
+    QVERIFY(window.timeBar()->stepBack());
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-04"));
+    QVERIFY(window.timeBar()->stepForward());
+    QVERIFY(!window.timeBar()->stepForward());
+    window.timeBar()->setStepIntervalMs(20);
+    window.timeBar()->play();
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-01"));
+    QVERIFY(window.timeBar()->isPlaying());
+    QVERIFY(QTest::qWaitFor([&]() { return !window.timeBar()->isPlaying(); },
+                            5000));
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-05"));
+
+    // The layer's Time menu fixes it at a day; the clock no longer moves it.
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    QMenu* menu = window.findChild<ts::LayerTreeDock*>()->timeMenu(layer);
+    QVERIFY(menu != nullptr);
+    QAction* second = nullptr;
+    for (QAction* action : menu->actions()) {
+      if (action->text() == QLatin1String("2026-11-02")) {
+        second = action;
+      }
+    }
+    QVERIFY(second != nullptr);
+    second->trigger();
+    const std::optional<ts::LayerTime> fixed = ts::LayerTime::fromSource(
+        window.layerModel()->layerDefinition(layer).source);
+    QVERIFY(fixed.has_value());
+    QCOMPARE(fixed->mode, ts::LayerTime::Mode::Fixed);
+    QCOMPARE(fixed->valueAt(window.clock()->time()),
+             QStringLiteral("2026-11-02"));
+    QVERIFY(!window.timeBar()->slider()->isEnabled());
+
+    // Saved in the project.
+    QTemporaryDir projects;
+    const QString path = projects.filePath(QStringLiteral("time.terrasoar"));
+    QString error;
+    QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+    ts::MainWindow reopened;
+    QVERIFY2(reopened.openProject(path, &error), qPrintable(error));
+    QCOMPARE(reopened.clock()->time(), window.clock()->time());
   }
 
   void offlineRegionEndToEnd()

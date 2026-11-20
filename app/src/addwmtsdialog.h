@@ -34,6 +34,7 @@
 #include <QUrl>
 
 #include "ts/layers/layerdefinition.h"
+#include "ts/time/layertime.h"
 #include "ts/wms/wmscatalogue.h"
 #include "ts/wmts/wmtscapabilities.h"
 #include "ts/wmts/wmtssource.h"
@@ -53,6 +54,7 @@ namespace ts
 
 class NetworkClient;
 class NetworkTicket;
+class TimeModeBox;
 
 /**
  * Adds a layer from a WMTS server: the user picks a service from the
@@ -126,6 +128,15 @@ public:
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   bool setDimension(const QString& identifier, const QString& value);
 
+  /**
+   * Returns the time settings of the chosen layer (its Time dimension),
+   * or nothing if it has none.
+   */
+  std::optional<LayerTime> chosenTime() const;
+
+  /** Returns the box choosing how the layer's time is chosen, or null. */
+  TimeModeBox* timeModeBox() const { return m_timeModeBox; }
+
   /** Returns the status line (for tests). */
   QString statusText() const;
 
@@ -185,6 +196,10 @@ private:
   std::vector<std::pair<QString, QComboBox*>> m_dimensionBoxes;
   /** The dimension rows' labels (removed with the boxes). */
   std::vector<QLabel*> m_dimensionLabels;
+  /** How the Time dimension follows the clock; null without one. */
+  TimeModeBox* m_timeModeBox = nullptr;
+  /** The Time dimension as the capabilities give it. */
+  WmtsDimension m_timeDimension;
   QLabel* m_detailsLabel = nullptr;
   QDialogButtonBox* m_buttons = nullptr;
   QPushButton* m_addButton = nullptr;
