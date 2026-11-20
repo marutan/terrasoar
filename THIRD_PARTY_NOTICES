@@ -131,6 +131,24 @@ each carries its licence notices in its licences/ folder. They contain:
 bluemarble-full: the Blue Marble image above at full resolution
   (world.topo.bathy.200407.3x21600x10800.jpg). Public domain (NASA).
 
+bluemarble-monthly: Blue Marble Next Generation with topography and
+  bathymetry for each month of 2004, NASA Earth Observatory, at
+  5400 x 2700 pixels
+  (world.topo.bathy.200401.3x5400x2700.jpg
+  world.topo.bathy.200402.3x5400x2700.jpg
+  world.topo.bathy.200403.3x5400x2700.jpg
+  world.topo.bathy.200404.3x5400x2700.jpg
+  world.topo.bathy.200405.3x5400x2700.jpg
+  world.topo.bathy.200406.3x5400x2700.jpg
+  world.topo.bathy.200407.3x5400x2700.jpg
+  world.topo.bathy.200408.3x5400x2700.jpg
+  world.topo.bathy.200409.3x5400x2700.jpg
+  world.topo.bathy.200410.3x5400x2700.jpg
+  world.topo.bathy.200411.3x5400x2700.jpg
+  world.topo.bathy.200412.3x5400x2700.jpg).
+  Public domain (NASA). Attribution: "Blue Marble: NASA Earth
+  Observatory"
+
 shoreline-full: GSHHG 2.3.7 above with its high and full resolutions
   (gshhg-shp-2.3.7.zip). GNU LGPL v3 or later.
 

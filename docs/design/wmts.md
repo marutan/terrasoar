@@ -241,8 +241,10 @@ user's choices (`ts::WmtsChoices`, which the dialog fills in):
 - **Tile matrix set:** the given one, or the first of
   `usableTileMatrixSets()`.
 - **Dimensions:** each the given value, else the layer's default, else its
-  first value. TIME takes the service's default until the program has a
-  clock (Phase 15).
+  first value. A Time dimension follows the program's clock unless the
+  user fixes a value: the dialog adds a `"time"` object to the source and
+  the main window puts in the value for the clock's time as it moves
+  ([wms.md](wms.md#time)).
 - **Attribution:** the provider's name, else the service's title.
 
 ## The dialog

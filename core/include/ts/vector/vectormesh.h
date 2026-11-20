@@ -35,12 +35,11 @@
 #include <vector>
 
 #include "ts/maths/vec3.h"
+#include "ts/providers/tileprovider.h"
 #include "ts/tiling/tilekey.h"
 
 namespace ts
 {
-
-struct FeatureTile;
 
 /**
  * One vertex on the ellipsoid: its offset from the tile centre in metres
@@ -76,6 +75,24 @@ struct VectorSegment {
 static_assert(sizeof(VectorSegment) == 56, "segment stride");
 
 /**
+ * A run of a mesh's triangles or segments drawn in one style: the layer's
+ * (style 0) or a feature's (VectorTileMesh::styles[style − 1]).
+ */
+struct VectorRun {
+  /** First triangle vertex or segment. */
+  int32_t first = 0;
+  /** Number of triangle vertices or segments. */
+  int32_t count = 0;
+  /** 0 for the layer's style, else 1 + an index into styles. */
+  int32_t style = 0;
+  /**
+   * True for points (zero-length segments, drawn as dots of the point
+   * size), false for lines.
+   */
+  bool points = false;
+};
+
+/**
  * The triangles and segments of one stored feature tile.
  *
  * @reentrant
@@ -108,6 +125,15 @@ struct VectorTileMesh {
    * edges (cuts, the antimeridian, the poles), and line strings.
    */
   std::vector<VectorSegment> segments;
+  /** The features' own styles the runs refer to. */
+  std::vector<FeatureStyle> styles;
+  /**
+   * The triangles in runs of one style each, covering them all in order
+   * (one run of the layer's style when no feature has its own).
+   */
+  std::vector<VectorRun> fillRuns;
+  /** The segments in runs, as fillRuns; points come after lines. */
+  std::vector<VectorRun> segmentRuns;
 
   /** Returns the bytes the vertex data takes. */
   std::size_t bytes() const

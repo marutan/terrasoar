@@ -83,11 +83,67 @@ std::vector<WmsCatalogueEntry> currentWmtsCatalogue()
   return catalogue;
 }
 
+QString xyzCatalogueCachePath()
+{
+  return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+      .filePath(QStringLiteral("xyz-catalogue.json"));
+}
+
+std::vector<XyzCatalogueEntry> readXyzCatalogueFile(const QString& path)
+{
+  QFile file(path);
+  if (!file.open(QIODevice::ReadOnly)) {
+    return {};
+  }
+  QString error;
+  return parseXyzCatalogue(file.readAll(), &error)
+      .value_or(std::vector<XyzCatalogueEntry>{});
+}
+
+std::vector<XyzCatalogueEntry> currentXyzCatalogue()
+{
+  std::vector<XyzCatalogueEntry> catalogue =
+      readXyzCatalogueFile(xyzCatalogueCachePath());
+  if (catalogue.empty()) {
+    catalogue =
+        readXyzCatalogueFile(QStringLiteral(":/data/xyz-catalogue.json"));
+  }
+  return catalogue;
+}
+
+QString wfsCatalogueCachePath()
+{
+  return QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
+      .filePath(QStringLiteral("wfs-catalogue.json"));
+}
+
+std::vector<WmsCatalogueEntry> currentWfsCatalogue()
+{
+  for (const QString& path :
+       {wfsCatalogueCachePath(), QStringLiteral(":/data/wfs-catalogue.json")}) {
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly)) {
+      QString error;
+      const std::optional<std::vector<WmsCatalogueEntry>> entries =
+          parseWfsCatalogue(file.readAll(), &error);
+      if (entries && !entries->empty()) {
+        return *entries;
+      }
+    }
+  }
+  return {};
+}
+
 std::vector<WmsCatalogueEntry> currentServiceCatalogues()
 {
   std::vector<WmsCatalogueEntry> catalogues = currentWmsCatalogue();
   const std::vector<WmsCatalogueEntry> wmts = currentWmtsCatalogue();
   catalogues.insert(catalogues.end(), wmts.begin(), wmts.end());
+  const std::vector<WmsCatalogueEntry> wfs = currentWfsCatalogue();
+  catalogues.insert(catalogues.end(), wfs.begin(), wfs.end());
+  for (const XyzCatalogueEntry& entry : currentXyzCatalogue()) {
+    catalogues.push_back(entry.serviceEntry());
+  }
   return catalogues;
 }
 

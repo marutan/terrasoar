@@ -69,8 +69,11 @@ Subsections so far:
 | `render` | Renderer backend interface (`RenderDevice`) and its OpenGL 3.3 core implementation; frame pacing (`docs/design/renderer-backend.md`) |
 | `tiling` | EPSG:4326 quadtree keys, tile meshes, level-of-detail selection with culling on the globe and on the flat map, worker-thread loader, LRU cache (`docs/design/tiling.md`) |
 | `vector` | Vector styles, meshing feature tiles into triangles and outline segments on the ellipsoid, the worker-thread feature loader (`docs/design/vector-rendering.md`) |
+| `wfs` | WFS capabilities (2.0.0, 1.1.0), sources with their stored levels, GetFeature with paging, GeoJSON and GML features with their axis orders, the feature provider with its disk cache, offline regions and picking (`docs/design/wfs.md`) |
 | `wms` | WMS capabilities (1.1.1, 1.3.0), GetMap requests with the axis-order rules, the WMS imagery provider with its disk cache and offline behaviour, the catalogue of open services and their bulk-download terms (`docs/design/wms.md`) |
 | `wmts` | WMTS capabilities (1.0.0, KVP and RESTful), tile matrix sets and fitting their tiles to the quadtree, GetTile and RESTful requests, the WMTS imagery provider sharing WMS's network, cache and offline behaviour (`docs/design/wmts.md`) |
+| `time` | The program clock, ISO 8601 times and time extents (lists and intervals), a layer's time settings and the source drawn at a time (`docs/design/wms.md#time`) |
+| `xyz` | XYZ and TMS tile services (`{z}/{x}/{y}` templates, subdomains, TMS rows), drawn as Web Mercator tile matrix sets through the WMTS provider; the XYZ catalogue (`docs/design/xyz.md`) |
 
 ### app (`terrasoar`)
 

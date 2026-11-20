@@ -22,9 +22,13 @@
 
 #include <cmath>
 #include <cstdint>
+#include <functional>
+#include <optional>
+#include <utility>
 #include <vector>
 
 #include <QAction>
+#include <QActionGroup>
 #include <QCheckBox>
 #include <QColorDialog>
 #include <QEvent>
@@ -35,6 +39,7 @@
 #include <QLabel>
 #include <QLocale>
 #include <QMenu>
+#include <QPersistentModelIndex>
 #include <QPushButton>
 #include <QSlider>
 #include <QToolButton>
@@ -64,6 +69,14 @@ LayerTreeDock::LayerTreeDock(LayerTreeModel* model, QWidget* parent)
   m_view->setEditTriggers(QAbstractItemView::DoubleClicked |
                           QAbstractItemView::EditKeyPressed);
   m_view->expandAll();
+  m_view->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(m_view, &QTreeView::customContextMenuRequested, this,
+          [this](QPoint position) {
+            QMenu* menu = timeMenu(m_view->indexAt(position));
+            if (menu != nullptr) {
+              menu->popup(m_view->viewport()->mapToGlobal(position));
+            }
+          });
   layout->addWidget(m_view, 1);
 
   // The drawing rule the tree order can't show: vectors over imagery.
@@ -181,6 +194,12 @@ void LayerTreeDock::rebuildAddLayerMenu()
   wmts->setObjectName(QStringLiteral("addWmtsLayerAction"));
   connect(wmts, &QAction::triggered, this,
           &LayerTreeDock::addWmtsLayerRequested);
+  QAction* wfs = m_addLayerMenu->addAction(tr("WFS Layer…"));
+  wfs->setObjectName(QStringLiteral("addWfsLayerAction"));
+  connect(wfs, &QAction::triggered, this, &LayerTreeDock::addWfsLayerRequested);
+  QAction* xyz = m_addLayerMenu->addAction(tr("XYZ Tile Layer…"));
+  xyz->setObjectName(QStringLiteral("addXyzLayerAction"));
+  connect(xyz, &QAction::triggered, this, &LayerTreeDock::addXyzLayerRequested);
   QAction* imagery = m_addLayerMenu->addAction(tr("Imagery File…"));
   imagery->setObjectName(QStringLiteral("addImageryFileAction"));
   connect(imagery, &QAction::triggered, this,
@@ -315,6 +334,79 @@ void LayerTreeDock::setCompositeAsGroup(bool composite)
   if (current.isValid()) {
     m_model->setData(current, composite, LayerTreeModel::CompositeAsGroupRole);
   }
+}
+
+void LayerTreeDock::setTimeLookup(
+    std::function<std::optional<LayerTime>(const QJsonObject&)> lookup)
+{
+  m_timeLookup = std::move(lookup);
+}
+
+QMenu* LayerTreeDock::timeMenu(const QModelIndex& index)
+{
+  if (!index.isValid()) {
+    return nullptr;
+  }
+  const LayerDefinition definition = m_model->layerDefinition(index);
+  std::optional<LayerTime> time = LayerTime::fromSource(definition.source);
+  if (!time && m_timeLookup) {
+    time = m_timeLookup(definition.source);
+  }
+  if (!time || time->times().isEmpty()) {
+    return nullptr;
+  }
+  const LayerTime current = *time;
+  if (m_timeMenu == nullptr) {
+    m_timeMenu = new QMenu(this);
+    m_timeMenu->setObjectName(QStringLiteral("layerTimeMenu"));
+  }
+  m_timeMenu->clear();
+  for (QActionGroup* old : m_timeMenu->findChildren<QActionGroup*>()) {
+    delete old;
+  }
+  m_timeMenu->setTitle(tr("Time"));
+  const QPersistentModelIndex layer(index);
+  const std::function<void(const LayerTime&)> choose =
+      [this, layer](const LayerTime& chosen) {
+        if (!layer.isValid()) {
+          return;
+        }
+        LayerDefinition changed = m_model->layerDefinition(layer);
+        changed.source.insert(QStringLiteral("time"), chosen.toJson());
+        m_model->setLayerDefinition(layer, changed);
+      };
+  QActionGroup* group = new QActionGroup(m_timeMenu);
+  const std::function<QAction*(const QString&, LayerTime::Mode, const QString&)>
+      add =
+          [&](const QString& text, LayerTime::Mode mode, const QString& value) {
+            QAction* action = m_timeMenu->addAction(text);
+            action->setCheckable(true);
+            action->setActionGroup(group);
+            action->setChecked(
+                current.mode == mode &&
+                (mode != LayerTime::Mode::Fixed || current.value == value));
+            LayerTime chosen = current;
+            chosen.mode = mode;
+            chosen.value = value;
+            connect(action, &QAction::triggered, this,
+                    [choose, chosen]() { choose(chosen); });
+            return action;
+          };
+  add(tr("Follow the program's clock"), LayerTime::Mode::Clock, QString())
+      ->setObjectName(QStringLiteral("timeFollowClockAction"));
+  const TimeExtent extent = current.times();
+  if (LayerTime::isMonthly(extent)) {
+    add(tr("The clock's month, any year"), LayerTime::Mode::MonthOfYear,
+        QString())
+        ->setObjectName(QStringLiteral("timeMonthAction"));
+  }
+  m_timeMenu->addSeparator();
+  // Its latest times (at most 24), latest first.
+  for (const QDateTime& latest : extent.latest(24)) {
+    const QString value = extent.format(latest);
+    add(value, LayerTime::Mode::Fixed, value);
+  }
+  return m_timeMenu;
 }
 
 } // namespace ts

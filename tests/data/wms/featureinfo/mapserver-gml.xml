@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<msGMLOutput xmlns:gml="http://www.opengis.net/gml" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+	<gebco_layer>
+	<gml:name>GEBCO_LATEST</gml:name>
+		<GEBCO_LATEST_feature>
+			<gml:boundedBy>
+				<gml:Box srsName="EPSG:4326">
+					<gml:coordinates>-30.000000,45.000000 -30.000000,45.000000</gml:coordinates>
+				</gml:Box>
+			</gml:boundedBy>
+			<x>-30.002083</x>
+			<y>45.002083</y>
+			<value_0>-3412</value_0>
+		</GEBCO_LATEST_feature>
+	</gebco_layer>
+</msGMLOutput>

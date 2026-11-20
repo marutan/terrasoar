@@ -128,6 +128,30 @@ inline constexpr const char* wmtsCatalogueUrl =
 std::optional<std::vector<WmsCatalogueEntry>>
 parseWmtsCatalogue(const QByteArray& json, QString* errorString);
 
+/** Format name in every WFS catalogue file. */
+inline constexpr const char* wfsCatalogueFormatName = "terrasoar-wfs-catalogue";
+
+/** Version of the WFS catalogue format this build reads. */
+inline constexpr int32_t wfsCatalogueFormatVersion = 1;
+
+/**
+ * Where the application fetches the current WFS catalogue: the file
+ * `data/wfs-catalogue.json` on the main branch of the repository.
+ */
+inline constexpr const char* wfsCatalogueUrl =
+    "https://raw.githubusercontent.com/marutan/terrasoar/main/data/"
+    "wfs-catalogue.json";
+
+/**
+ * Reads a WFS catalogue document: the same as a WMS one
+ * (parseWmsCatalogue()) with the format name "terrasoar-wfs-catalogue";
+ * an entry's url is the service's address (capabilities are asked of it).
+ *
+ * @reentrant
+ */
+std::optional<std::vector<WmsCatalogueEntry>>
+parseWfsCatalogue(const QByteArray& json, QString* errorString);
+
 /**
  * Returns the catalogue entry for the service at @p url (a GetMap or
  * GetCapabilities address): the entry with the same host and path, else

@@ -1,0 +1,9 @@
+GetFeatureInfo results:
+
+Layer 'roads'
+  Feature 12: 
+    NAME = 'A1'
+    CLASS = 'motorway'
+  Feature 13: 
+    NAME = 'M25'
+    CLASS = 'motorway'

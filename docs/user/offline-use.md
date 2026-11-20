@@ -2,15 +2,17 @@
 
 Terra Soar works without a network. The built-in layers (Blue Marble, the
 shoreline, the graticule) are always on your computer. Layers from web map
-servers (WMS and WMTS) need the server, but you can download an area of
+servers (WMS, WMTS, XYZ tiles and WFS) need the server, but you can download an area of
 one in advance as an **offline region** and view it later on a plane, at sea or
 in the field.
 
 ## Downloading a region
 
-1. Add the WMS or WMTS layer you want to keep (see
-   [Adding WMS layers](adding-wms-layers.md) and
-   [Adding WMTS layers](adding-wmts-layers.md)).
+1. Add the WMS, WMTS, XYZ or WFS layer you want to keep (see
+   [Adding WMS layers](adding-wms-layers.md),
+   [Adding WMTS layers](adding-wmts-layers.md),
+   [Adding XYZ tile layers](adding-xyz-layers.md) and
+   [Adding WFS layers](adding-wfs-layers.md)).
 2. Choose **File → Offline Regions…** and press **New Region…**.
 3. Give the region a **name** and pick the **layer**.
 4. Choose the **area**:
@@ -116,6 +118,7 @@ install once and then use offline:
 | Pack | What you get | Download |
 | --- | --- | --- |
 | Blue Marble, full resolution | The same picture of the Earth, about 1.2 km per pixel instead of 4.9 km | 67 MB |
+| Blue Marble, month by month | Blue Marble for each month of the year: snow, ice and vegetation change with the seasons, following the program's clock (see [Time](layers.md#time)); about 9.8 km per pixel | 25 MB |
 | Shoreline, full resolution | Detailed coasts and small islands: high resolution from zoom level 6, full resolution from level 8 (the built-in shoreline stays at about 1 km) | 241 MB |
 
 Pick a pack and press **Install**. The download runs in the background
@@ -135,5 +138,5 @@ and `%LOCALAPPDATA%\Terra Soar\terrasoar\packs` on Windows.
 
 ## Limits
 
-- Only WMS and WMTS layers can be kept this way. The built-in layers need no
+- Only WMS, WMTS, XYZ and WFS layers can be kept this way. The built-in layers need no
   download; for more detail in them, install a data pack (below).

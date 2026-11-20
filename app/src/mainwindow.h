@@ -34,6 +34,7 @@
 #include <utility>
 #include <vector>
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QMainWindow>
 #include <QPointer>
@@ -56,6 +57,7 @@ namespace ts
 {
 
 class ElevationProfileDialog;
+class FeatureInfoWindow;
 struct AboutDataRow;
 
 class CountryAreas;
@@ -68,7 +70,9 @@ class OfflineRegionManager;
 class OfflineRegionsDialog;
 class PackManager;
 class PackManagerDialog;
+class ProgramClock;
 class ProviderRegistry;
+class TimeBar;
 struct LayerStack;
 
 /**
@@ -129,6 +133,15 @@ public:
    * @p address, connects to it at once (tests).
    */
   void addWmtsLayer(const QString& address = QString());
+
+  /** Opens the Add XYZ Tile Layer dialog and adds what the user chooses. */
+  void addXyzLayer();
+
+  /**
+   * Opens the Add WFS Layer dialog and adds what the user chooses. With
+   * @p address, connects to it at once (tests).
+   */
+  void addWfsLayer(const QString& address = QString());
 
   /**
    * Asks for a raster file (a GeoTIFF, an RPF A.TOC, …) and adds it as an
@@ -219,6 +232,23 @@ public:
   /** Returns the provider registry (tests). */
   ProviderRegistry& registry() const { return *m_registry; }
 
+  /** Returns the program's clock, which layers with times follow. */
+  ProgramClock* clock() const { return m_clock; }
+
+  /** Returns the time slider (for tests). */
+  TimeBar* timeBar() const { return m_timeBar; }
+
+  /**
+   * Asks the visible WMS layers that can be queried what they have at
+   * @p point (GetFeatureInfo, at the scale of @p degreesPerPixel) and shows
+   * the answers in the What Is Here window. Returns the number of layers
+   * asked; none if View → What Is Here on Click is off.
+   */
+  int32_t identifyAt(LonLat point, double degreesPerPixel);
+
+  /** Returns the What Is Here window, or null before the first click. */
+  FeatureInfoWindow* featureInfoWindow() const { return m_featureInfoWindow; }
+
   /** Returns the path of the current project, empty if never saved. */
   const QString& projectPath() const { return m_projectPath; }
 
@@ -264,6 +294,10 @@ private:
   void showEyeHeight(double eyeHeightM);
   void refreshLayers();
   void watchLayerStatus(const LayerStack& stack);
+  void clockMoved();
+  LayerStack timedStack() const;
+  void updateTimeBar(const LayerStack& stack);
+  void applyImageryDraws(const LayerStack& stack, QStringList* errors);
   void updateLayerStatus();
   void syncViewActions();
   void showProjectionSettings();
@@ -316,6 +350,10 @@ private:
   std::unique_ptr<ProviderRegistry> m_registry;
   QAction* m_addWmsAction = nullptr;
   QAction* m_addWmtsAction = nullptr;
+  QAction* m_addXyzAction = nullptr;
+  QAction* m_addWfsAction = nullptr;
+  QAction* m_featureInfoAction = nullptr;
+  FeatureInfoWindow* m_featureInfoWindow = nullptr;
   QAction* m_offlineRegionsAction = nullptr;
   /** Destroyed before the registry. */
   std::unique_ptr<OfflineRegionManager> m_offlineRegions;
@@ -333,6 +371,12 @@ private:
   std::vector<std::pair<QString, QString>> m_brokenLayers;
   /** Passes status changes from loader threads to this window. */
   std::shared_ptr<QTimer> m_statusRelay;
+  ProgramClock* m_clock = nullptr;
+  TimeBar* m_timeBar = nullptr;
+  /** The imagery sources last drawn, as drawn at the clock's time. */
+  QJsonArray m_drawnImagery;
+  /** True once the time slider was shown for a layer with times. */
+  bool m_timeBarOffered = false;
   QString m_basePackDirectory;
   /** The base pack's country outlines, if it has them (read when needed). */
   QString m_countriesFile;

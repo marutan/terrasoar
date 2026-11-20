@@ -29,6 +29,7 @@
 #include <optional>
 
 #include <QByteArray>
+#include <QDateTime>
 #include <QJsonArray>
 #include <QString>
 
@@ -53,6 +54,12 @@ struct Project {
    * for none. An optional member of `view`.
    */
   ProjectionParameterValues projectionParameters;
+  /**
+   * The program clock's time (UTC), which layers with a time dimension
+   * follow; invalid for none (the current time when opened). An optional
+   * member of `view`, written as ISO 8601.
+   */
+  QDateTime time;
   /** The layer tree (LayerTreeModel::toJson()). */
   QJsonArray layers;
 };

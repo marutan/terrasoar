@@ -79,6 +79,10 @@ struct ImagerySpec {
   QString attribution;
   /** Base pack dataset it replaces (PackDataset::replaces), or empty. */
   QString replaces;
+  /** Dataset it is a variant of (PackDataset::variantOf), or empty. */
+  QString variantOf;
+  /** Which variant (PackDataset::variant). */
+  QString variant;
   /** Tiling. */
   ImageryTilerOptions tiling;
 };
@@ -197,6 +201,11 @@ struct PackConfig {
   std::vector<SourceSpec> sources;
   /** Imagery dataset, if any. */
   std::optional<ImagerySpec> imagery;
+  /**
+   * Further imagery datasets ("imageryVariants"), each a variant of a base
+   * pack dataset (Blue Marble's months).
+   */
+  std::vector<ImagerySpec> imageryVariants;
   /** Shoreline dataset, if any. */
   std::optional<ShorelineSpec> shoreline;
   /** Country outlines, if any. */

@@ -54,6 +54,7 @@ versions ignore the field.
 | `bluemarble-full` | `bluemarble` | The same Blue Marble image as the base pack (21600 × 10800 px), tiled to level 6 instead of 4: about 1.2 km per pixel instead of 4.9 km | 67 MB |
 | `shoreline-full` | `shoreline` | GSHHG 2.3.7 with the high and full resolutions: crude to intermediate as in the base pack, high (0.2 km) from level 6, full (10.9 million vertices) from level 8 | 241 MB |
 | `geoid-egm2008-fine` | `egm2008` | EGM2008 at its published 2.5′ grid (PROJ's `us_nga_egm08_25.tif`) instead of the base pack's 5′, as 16-bit centimetres: within 1 cm of PROJ's grid instead of 0.4 m | 13.4 MB |
+| `bluemarble-monthly` | (variants of `bluemarble`, see [Variants](#variants)) | Blue Marble for each month of 2004 (5400 × 2700 px each), tiled to level 3: the seasons follow the program's clock | 24.9 MB |
 | `geoid-osgm15` ("UK grids") | (a datum of its own, `osgm15`) | Ordnance Survey's OSGM15 for Ordnance Datum Newlyn (PROJ's `uk_os_OSGM15_GB.tif`, shipped as it is, BSD-2-Clause); from version 2015.2 also OSTN15 (PROJ's `uk_os_OSTN15_NTv2_OSGBtoETRS.tif`, BSD-2-Clause) for the UK National Grid projection | 4.5 MB |
 
 A geoid pack replacing a base pack geoid makes every elevation source on
@@ -76,6 +77,23 @@ unknown key, so the UK grids pack still installs there (OSGM15 only).
 Their packager configurations are `tools/packager/packs/*.json`; `make packs`
 builds them with their release files and index entries
 ([docs/tools/packager.md](../tools/packager.md#extra-packs)).
+
+## Variants
+
+A dataset may instead be one of several pictures of a base pack dataset
+chosen by a time-like value: `"variantOf": "bluemarble", "variant":
+"2004-01"` (both optional, so the manifest format stays 1). The
+`bluemarble-monthly` pack has twelve, one per month of 2004, from NASA's
+5400 × 2700 monthly images tiled to level 3 (about 9.8 km per pixel,
+24.9 MB in all). The registry keeps them by dataset and value
+(`setInstalledPacks()`); a base pack source whose `dimensions` give
+`["month", "<variant>"]` reads that variant's file and shows its
+attribution, and any other value reads the dataset as usual
+(`basePackFile()`). Base pack layers without time settings get them from
+`basePackTime()` while variants are installed, following the clock's
+month ([wms.md](wms.md#time)). The packager builds variants from
+`"imageryVariants"`, a list of imagery entries each with `variantOf` and
+`variant` ([docs/tools/packager.md](../tools/packager.md)).
 
 ## The index
 

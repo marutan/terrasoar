@@ -184,6 +184,131 @@ The provider reports its status ([providers.md](providers.md)):
 A layer whose source can't even be created (an unusable CRS in a
 hand-edited project) is marked Error at once.
 
+## Time
+
+Layers whose data changes with time (satellite days, forecasts, radar,
+monthly climatologies) declare a TIME dimension; Phase 12 makes Terra
+Soar's layers follow a **program clock**. Code: `core/include/ts/time/`.
+
+**Capabilities.** `WmsLayer::dimensions` holds each `Dimension`: name
+(lower case, as WMS compares names), units, default, the values as
+written (`extent`), and `multipleValues`, `nearestValue` and `current`.
+In 1.1.1 the values are in a separate `Extent` of the same name, which may
+sit on a child of the layer declaring the `Dimension`; both are inherited,
+a child's of the same name replacing its parent's.
+
+**Values.** `ts::TimeExtent` reads an extent: a comma-separated list of
+instants and `start/end/period` intervals (WMS 1.3.0 Annex C), ISO 8601
+times of any precision (`2004`, `2004-07`, `2004-07-01`,
+`…T12:00Z`, `…T12:00:00.000Z`, an offset or none, read as UTC), `current`
+for now, periods with years, months, weeks, days, hours, minutes and
+seconds. Intervals stay intervals (GIBS' daily imagery since 2000 is
+one part, not 9 000 values): the latest time not after a given one is
+found by stepping from an estimate. A time is written back the way the
+extent writes its values, so a server listing dates gets a date.
+
+**The clock.** `ts::ProgramClock`, one per main window, holds a UTC time,
+the current time at start and saved in projects as `view.time` (optional,
+so older files are unchanged). It doesn't run by itself; the time bar
+moves it. Phases 14 (the sun) and 15 (satellites) use the same clock.
+
+**A layer's time.** The source object keeps `"time"`
+(`ts::LayerTime`): the dimension's name, its extent and default, and a
+mode:
+
+| Mode | The value requested |
+| --- | --- |
+| `clock` (default) | The latest of the layer's times not after the clock's; the earliest if the clock is before them all |
+| `month` | The layer's time in the clock's month, whatever the year (Blue Marble's months, other monthly climatologies); offered for twelve monthly values of one year |
+| `fixed` | `value`, whatever the clock |
+
+`ts::sourceAtTime()` turns a source with `"time"` into the one drawn at a
+given time: the value goes into the source's `dimensions`, which
+`WmsSource` sends as `TIME` (and `ELEVATION`, or `DIM_<NAME>` for other
+dimensions, WMS 1.3.0 C.3.2) and includes in `id()`. So each time is a
+**source of its own**: its own provider, its own disk cache file, and
+cached tiles of one day are never shown for another. Sources without
+dimensions keep the ids they had, so existing caches stay valid. WMTS
+sources work the same way with their `Time` dimension
+([wmts.md](wmts.md)).
+
+**Drawing.** `MainWindow::refreshLayers()` draws `stackAtTime()` of the
+layer stack. When the clock moves, only the imagery is drawn again, and
+only if some source's value changed (`clockMoved()`): layers that don't
+change keep their providers and tiles, and a layer that does starts on
+its new provider (from its disk cache if that time was seen before).
+
+**The time bar** (`app/src/timebar.*`): a tool bar under the view, shown
+when the first layer that follows the clock is added and from View →
+Time Slider. Its slider spans the times of the visible layers that follow
+the clock, joined (`TimeExtent::parse()` of their extents): one step per
+time up to 2 000 of them, else 10 000 positions over the span, each
+snapped to the latest time not after it. So every position is a time some
+layer has. Back and forward go to the previous and next of those times;
+Play steps forward at the chosen interval (¼ s to 5 s per time) and stops
+at the last. A layer following the month of the year contributes the
+twelve months of the clock's year.
+
+**Choosing.** The Add WMS and Add WMTS dialogs offer, for a layer with
+times, "Follow the program's clock" (chosen at first), "The clock's
+month, any year" for monthly times, or "Always this time" with a list of
+the latest values (`app/src/timemodebox.*`). The layer's context menu in
+the Layers panel (**Time**) changes it later.
+
+**Blue Marble's months.** NASA's Blue Marble exists for each month of
+2004; there is no live web service for them (NASA's NEO WMS, which had
+them, now redirects to a web page), so they come as a data pack,
+`bluemarble-monthly`, whose twelve imagery datasets are *variants* of
+`bluemarble` (`PackDataset::variantOf`, `variant` = `2004-01` …
+[packs.md](packs.md#variants)). While it is installed, the built-in Blue
+Marble layer gets the time settings `{"dimension": "month", "mode":
+"month"}` over the installed months (`ProviderRegistry::basePackTime()`),
+and the registry draws the variant its `month` value names. So the
+seasons follow the clock; a fixed month can be chosen from the layer's
+Time menu, and removing the pack brings back the July picture.
+
+## GetFeatureInfo
+
+**Capabilities.** `WmsCapabilities::getFeatureInfoUrl` and
+`getFeatureInfoFormats` come from the `GetFeatureInfo` request's `DCPType`
+and `Format`s. `wmsSourceFor()` gives a source a `featureInfoUrl` and an
+`infoFormat` (kept as `"featureInfo": {"url", "format"}`, not part of
+`id()`) when every chosen layer is `queryable`. `chooseInfoFormat()`
+prefers GeoJSON (names and values exactly), then GML and the other XML
+forms (ArcGIS's `vnd.esri.wms_featureinfo_xml`, `text/xml`), then HTML,
+then plain text: nowCOAST answers in JSON, GEBCO in GML, the USGS in
+GeoJSON, terrestris in XML.
+
+**The request.** A click on the globe or the map (a press and release
+within 4 px, reported after the double-click interval so a double click
+isn't one; `GlobeView::pointClicked`) carries the point and the view's
+degrees per pixel there. `MainWindow::identifyAt()` picks, for each
+visible queryable WMS layer as drawn at the clock's time, the quadtree
+tile at the view's scale containing the point (so the server judges
+scale-dependent layers as for what is drawn), and `getFeatureInfoUrl()`
+asks as if the point were clicked in that tile's GetMap image: the same
+BBOX, size, CRS, styles and dimensions, `QUERY_LAYERS`, `INFO_FORMAT`,
+`FEATURE_COUNT` (10), and the pixel as `I`/`J` (1.3.0) or `X`/`Y`
+(1.1.1), rows even in latitude or, for Web Mercator, in northing.
+
+**The answer.** `parseFeatureInfo()` reads, by the response's content type
+(else the format asked for, else by sniffing):
+
+| Answer | Read as |
+| --- | --- |
+| GeoJSON (GeoServer, QGIS Server, MapServer, ArcGIS) | Each feature's id and properties; numbers without needless decimals, nested values as compact JSON |
+| GML `featureMember`/`featureMembers` (GeoServer) | Each member's simple elements; geometry (`*geom*`, `boundedBy`, `shape`) and nested elements left out; `fid` as the id |
+| MapServer `msGMLOutput` | `<x_layer>` (its `gml:name`) and its `<x_feature>`s |
+| ArcGIS `FeatureInfoResponse` | `<FIELDS name="value" …/>` attributes, or `FeatureInfoCollection`'s `Field`s |
+| Other XML | Its text; a service exception is an error with its message |
+| HTML | Each table with a header row: one feature per row; a two-column table: one feature of names and values; else the page's text. Scripts, styles and comments are dropped, entities decoded; nothing is loaded |
+| Plain text | `name = value` lines grouped by GeoServer's and MapServer's headings and rules; geometry summaries left out; "no features" is nothing |
+
+**The window** (`app/src/featureinfowindow.*`) asks every layer at once
+through the shared network client and lists the answers as they come.
+A new click cancels the requests of the last one. View → What Is Here on
+Click turns clicking off.
+
 ## The catalogue
 
 `data/wms-catalogue.json` lists open services for the dialog:
@@ -219,6 +344,15 @@ tests and offline installations.
   each server's quirk is checked. Synthetic documents for inheritance,
   axis order and the odd cases above; broken documents give the right
   message.
+- TIME and other dimensions: 1.3.0 `Dimension` values (GIBS' monthly
+  intervals with gaps, nowCOAST's 125 listed instants), 1.1.1 `Dimension`
+  and `Extent` inherited and overridden (`synthetic-111-time.xml`), the
+  GetMap parameter names, dimension values in JSON, requests and ids;
+  `tests/time` covers time extents and the source drawn for each time.
+- GetFeatureInfo: addresses and formats from real capabilities, the
+  format chosen, sources of queryable layers only, the request for a
+  point (BBOX, I/J or X/Y, Web Mercator rows, dimensions), and answers in
+  every form above (`tests/data/wms/featureinfo`).
 - The BBOX for every version and CRS, Web Mercator's edges, full GetMap
   and GetCapabilities URLs, CRS and format choice, sources from
   capabilities (several layers, layer limits, fixed sizes), JSON round

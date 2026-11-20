@@ -1,0 +1,1011 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wfs:WFS_Capabilities xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:ows="http://www.opengis.net/ows/1.1" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:fes="http://www.opengis.net/fes/2.0" xmlns:ec-msc="urn:x-msc-smc:md:weather-meteo" xmlns="http://www.opengis.net/wfs/2.0" version="2.0.0" updateSequence="2026-11-20T01:45:01Z" xsi:schemaLocation="http://www.opengis.net/wfs/2.0 http://schemas.opengis.net/wfs/2.0/wfs.xsd">
+  <ows:ServiceIdentification>
+    <ows:Title>MSC GeoMet — GeoMet-Weather 2.40.4</ows:Title>
+    <ows:Abstract>GeoMet-Weather provides public access to the Meteorological Service of Canada (MSC) and Environment and Climate Change Canada (ECCC) data via interoperable web services and application programming interfaces (API). Through open standards, users can freely and quickly access thousands of real-time and archived weather, climate and water datasets and products and integrate them in their domain-specific applications and decision support systems. Users can build mobile apps, create interactive web maps, and display and animate MSC data in desktop software. MSC GeoMet also enables on demand raw data clipping and reprojection, on demand format conversion and custom visualization.</ows:Abstract>
+    <ows:Keywords>
+      <ows:Keyword>Weather</ows:Keyword>
+      <ows:Keyword>Meteorology</ows:Keyword>
+      <ows:Keyword>Climate</ows:Keyword>
+      <ows:Keyword>Forecasting</ows:Keyword>
+      <ows:Keyword>Floods</ows:Keyword>
+      <ows:Keyword>Weather alerts</ows:Keyword>
+      <ows:Keyword>Storms</ows:Keyword>
+      <ows:Keyword>Wind</ows:Keyword>
+      <ows:Keyword>Temperature</ows:Keyword>
+      <ows:Keyword>Precipitations</ows:Keyword>
+      <ows:Keyword>Snow</ows:Keyword>
+      <ows:Keyword>Ice</ows:Keyword>
+    </ows:Keywords>
+    <ows:ServiceType codeSpace="OGC">WFS</ows:ServiceType>
+    <ows:ServiceTypeVersion>2.0.0</ows:ServiceTypeVersion>
+    <ows:Fees>None</ows:Fees>
+    <ows:AccessConstraints>None</ows:AccessConstraints>
+  </ows:ServiceIdentification>
+  <ows:ServiceProvider>
+    <ows:ProviderName>Government of Canada, Environment and Climate Change Canada, Meteorological Service of Canada</ows:ProviderName>
+    <ows:ProviderSite xlink:type="simple" xlink:href="https://eccc-msc.github.io/open-data/msc-geomet/readme_en/"/>
+    
+  </ows:ServiceProvider>
+  <ows:OperationsMetadata>
+    <ows:Operation name="GetCapabilities">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+          <ows:Post xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+        </ows:HTTP>
+      </ows:DCP>
+      <ows:Parameter name="AcceptVersions">
+        <ows:AllowedValues>
+          <ows:Value>2.0.0</ows:Value>
+          <ows:Value>1.1.0</ows:Value>
+          <ows:Value>1.0.0</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+      <ows:Parameter name="AcceptFormats">
+        <ows:AllowedValues>
+          <ows:Value>text/xml</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+      <ows:Parameter name="Sections">
+        <ows:AllowedValues>
+          <ows:Value>ServiceIdentification</ows:Value>
+          <ows:Value>ServiceProvider</ows:Value>
+          <ows:Value>OperationsMetadata</ows:Value>
+          <ows:Value>FeatureTypeList</ows:Value>
+          <ows:Value>Filter_Capabilities</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+    </ows:Operation>
+    <ows:Operation name="DescribeFeatureType">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+          <ows:Post xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+        </ows:HTTP>
+      </ows:DCP>
+      <ows:Parameter name="outputFormat">
+        <ows:AllowedValues>
+          <ows:Value>application/gml+xml; version=3.2</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.2.1</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.1.1</ows:Value>
+          <ows:Value>text/xml; subtype=gml/2.1.2</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+    </ows:Operation>
+    <ows:Operation name="GetFeature">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+          <ows:Post xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+        </ows:HTTP>
+      </ows:DCP>
+      <ows:Parameter name="outputFormat">
+        <ows:AllowedValues>
+          <ows:Value>application/gml+xml; version=3.2</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.2.1</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.1.1</ows:Value>
+          <ows:Value>text/xml; subtype=gml/2.1.2</ows:Value>
+          <ows:Value>application/json</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+    </ows:Operation>
+    <ows:Operation name="GetPropertyValue">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+          <ows:Post xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+        </ows:HTTP>
+      </ows:DCP>
+      <ows:Parameter name="outputFormat">
+        <ows:AllowedValues>
+          <ows:Value>application/gml+xml; version=3.2</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.2.1</ows:Value>
+          <ows:Value>text/xml; subtype=gml/3.1.1</ows:Value>
+          <ows:Value>text/xml; subtype=gml/2.1.2</ows:Value>
+        </ows:AllowedValues>
+      </ows:Parameter>
+    </ows:Operation>
+    <ows:Operation name="ListStoredQueries">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+          <ows:Post xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+        </ows:HTTP>
+      </ows:DCP>
+    </ows:Operation>
+    <ows:Operation name="DescribeStoredQueries">
+      <ows:DCP>
+        <ows:HTTP>
+          <ows:Get xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+          <ows:Post xlink:type="simple" xlink:href="https://geo.weather.gc.ca/geomet?"/>
+        </ows:HTTP>
+      </ows:DCP>
+    </ows:Operation>
+    <ows:Parameter name="version">
+      <ows:AllowedValues>
+        <ows:Value>2.0.0</ows:Value>
+        <ows:Value>1.1.0</ows:Value>
+        <ows:Value>1.0.0</ows:Value>
+      </ows:AllowedValues>
+    </ows:Parameter>
+    <ows:Constraint name="ImplementsBasicWFS">
+      <ows:NoValues/>
+      <ows:DefaultValue>TRUE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsTransactionalWFS">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsLockingWFS">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="KVPEncoding">
+      <ows:NoValues/>
+      <ows:DefaultValue>TRUE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="XMLEncoding">
+      <ows:NoValues/>
+      <ows:DefaultValue>TRUE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="SOAPEncoding">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsInheritance">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsRemoteResolve">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsResultPaging">
+      <ows:NoValues/>
+      <ows:DefaultValue>TRUE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsStandardJoins">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsSpatialJoins">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsTemporalJoins">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ImplementsFeatureVersioning">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="ManageStoredQueries">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="PagingIsTransactionSafe">
+      <ows:NoValues/>
+      <ows:DefaultValue>FALSE</ows:DefaultValue>
+    </ows:Constraint>
+    <ows:Constraint name="QueryExpressions">
+      <ows:AllowedValues>
+        <ows:Value>wfs:Query</ows:Value>
+        <ows:Value>wfs:StoredQuery</ows:Value>
+      </ows:AllowedValues>
+    </ows:Constraint>
+  </ows:OperationsMetadata>
+  <FeatureTypeList>
+    <FeatureType>
+      <Name>ec-msc:AQHI-OBS</Name>
+      <Title>AQHI - Observations</Title>
+      <Abstract>The Air Quality Health Index (AQHI) is a scale designed to help quantify the quality of the air in a certain region on a scale from 1 to 10. When the amount of air pollution is very high, the number is reported as 10+. It also includes a category that describes the health risk associated with the index reading (e.g. Low, Moderate, High, or Very High Health Risk). The AQHI is calculated based on the relative risks of a combination of common air pollutants that are known to harm human health, including ground-level ozone, particulate matter, and nitrogen dioxide. The AQHI formulation captures only the short term or acute health risk (exposure of hour or days at a maximum). The formulation of the AQHI may change over time to reflect new understanding associated with air pollution health effects. The AQHI is calculated from data observed in real time, without being verified (quality control).</Abstract>
+      <ows:Keywords>
+        <ows:Keyword/>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 -90.000000</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id=ed66f36e-e43a-5ad1-91de-fe0cc91cf0cc"/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CAPS_3km_Thickness-Contour_1000to500mb</Name>
+      <Title>CAPS - Thickness between 1000mb and 500mb (contour) [m] [experimental]</Title>
+      <Abstract>The Canadian Arctic Prediction System (CAPS) is an experimental coupled atmosphere-ocean-ice prediction system based on a limited-area configuration (LAM) of the Global Environmental Multiscale (GEM) model, coupled with the Nucleus of European Modeling of the Ocean (NEMO) and the Community ICe Code (CICE). It covers the entire Arctic basin with a horizontal grid resolution of approximately 3 km. The system CAPS is driven by ECCC's Global Deterministic Prediction System (GDPS), which provides initial and lateral boundary conditions for atmospheric fields. Initial hydrometeorological fields are recycled from the 12-hour forecast of the previous CAPS integration. In addition, the GDPS is used to force the ocean-ice model outside the coupled regions. Initial conditions for ocean-ice fields are taken from the Regional Ocean-Ice Prediction System (RIOPS). Ocean boundary conditions in the North Atlantic and North Pacific come from the GDPS. The system CAPS runs twice a day and is initialized at 00 and 12 UTC, respectively, with a 48-hour integration.</Abstract>
+      <ows:Keywords>
+        <ows:Keyword>Prediction</ows:Keyword>
+        <ows:Keyword>High resolution</ows:Keyword>
+        <ows:Keyword>Deterministic</ows:Keyword>
+        <ows:Keyword>Arctic</ows:Keyword>
+        <ows:Keyword>Weather forecasts</ows:Keyword>
+        <ows:Keyword>Precipitation</ows:Keyword>
+        <ows:Keyword>Air temperature</ows:Keyword>
+        <ows:Keyword>Humidity</ows:Keyword>
+        <ows:Keyword>Snow</ows:Keyword>
+        <ows:Keyword>Wind</ows:Keyword>
+        <ows:Keyword>Meteorological data</ows:Keyword>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 43.936456</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id=20c97e23-073f-489e-974b-f6d015783e1c"/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CIOPS-East_Footprint</Name>
+      <Title>CIOPS-East footprint</Title>
+      <Abstract></Abstract>
+      <ows:Keywords>
+        <ows:Keyword/>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 -90.000000</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id="/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CIOPS-SalishSea_Footprint</Name>
+      <Title>CIOPS-SalishSea footprint [experimental]</Title>
+      <Abstract>The Coastal Ice Ocean Predicton System (CIOPS) provides a 48 hour ocean and ice forecast over different domains (East, West, Salish Sea) four times a day at 1/36° resolution. A pseudo-analysis component is forced at the ocean boundaries by the Regional Ice Ocean Prediction System (RIOPS) forecasts and spectrally nudged to the RIOPS solution in the deep ocean. Fields from the pseudo-analysis are used to initialize the 00Z forecast, whilst the 06, 12 and 18Z forecasts use a restart files saved at hour 6 from the previous forecast. The atmospheric fluxes for both the pseudo-analysis and forecast components are provided by the High Resolution Deterministic Prediction System (HRDPS) blended both spatially and temporally with either the Global Deterministic Prediction System (GDPS) (for CIOPS-East) or an uncoupled component of the Global Deterministic Prediction System (GDPS) at 10km horizontal resolution (for CIOPS-West) for areas not covered by the HRDPS. The ocean-ice forecasts from the CIOPS-East and CIOPS-West systems are available as hourly products. These products are available in NetCDF format on a latitude and longitude grid. The CIOPS-East domain covers the Gulf of St. Lawrence, the North West Atlantic and the east coast of Canada at a resolution of 2km (0.03 x 0.02 degree). The CIOPS-West main domain covers the North East Pacific and the west coast of Canada, also at a resolution of 2km (0.03 x 0.02 degree). The CIOPS-West system also outputs a regional enhancement at 500m resolution (0.008 x 0.005 degree) that covers the Salish Sea region only.</Abstract>
+      <ows:Keywords>
+        <ows:Keyword>Ocean</ows:Keyword>
+        <ows:Keyword>Ice</ows:Keyword>
+        <ows:Keyword>Coast</ows:Keyword>
+        <ows:Keyword>Ice</ows:Keyword>
+        <ows:Keyword>Tides</ows:Keyword>
+        <ows:Keyword>Water</ows:Keyword>
+        <ows:Keyword>Environmental emergencies</ows:Keyword>
+        <ows:Keyword>Coastal waters</ows:Keyword>
+        <ows:Keyword>Coasts</ows:Keyword>
+        <ows:Keyword>Oceans</ows:Keyword>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 -90.000000</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id=5118425c-e815-5b20-bdbf-653ec6dde4be"/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CIOPS-West_Footprint</Name>
+      <Title>CIOPS-West footprint</Title>
+      <Abstract></Abstract>
+      <ows:Keywords>
+        <ows:Keyword/>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 -90.000000</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id="/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CURRENT_CONDITIONS</Name>
+      <Title>Current Conditions</Title>
+      <Abstract>Current conditions and forecasts for selected Canadian cities. Raw XML data are used to generate each city page on the Environment Canada web site https://www.weather.gc.ca/.</Abstract>
+      <ows:Keywords>
+        <ows:Keyword>Meteorology</ows:Keyword>
+        <ows:Keyword>Weather</ows:Keyword>
+        <ows:Keyword>Weather</ows:Keyword>
+        <ows:Keyword>Weather forecasts</ows:Keyword>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-140.880000 42.100000</ows:LowerCorner>
+        <ows:UpperCorner>-52.730000 82.500000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id=1f864766-7f7f-4be7-8292-295065c65c78"/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CaLDAS-NSRPS_Footprint</Name>
+      <Title>CaLDAS-NSRPS footprint</Title>
+      <Abstract>CaLDAS-NSRPS was installed within the National Surface and River Prediction System (NSRPS) at Environment and Climate Change Canada's (ECCC) Canadian Centre for Meteorological and Environmental Prediction (CCMEP) in July 2019. CaLDAS-NSRPS is a continuous offline land-surface assimilation system, which provides analyses of the land surface every 3 h over the domain of the High-Resolution Deterministic Prediction System (HRDPS) at a 2.5 km grid spacing. The emphasis in CaLDAS-NSRPS is to focus upon the assimilation of satellite based remote sensing observations to provide the optimal initial conditions for the predictive components of the NSRPS, the High Resolution Deterministic/Ensemble Land Surface Prediction System (HRDLPS/HRELPS) and the Deterministic/Ensemble Hydrological Prediction Systems (DHPS/EHPS). CaLDAS-NSRPS is launched 4 times per day, at 0000, 0600, 1200, and 1800 UTC.</Abstract>
+      <ows:Keywords>
+        <ows:Keyword>Assimilation</ows:Keyword>
+        <ows:Keyword>Prediction</ows:Keyword>
+        <ows:Keyword>Land surface</ows:Keyword>
+        <ows:Keyword>Soil moisture</ows:Keyword>
+        <ows:Keyword>Dew point</ows:Keyword>
+        <ows:Keyword>Surface radiative temperature</ows:Keyword>
+        <ows:Keyword>Rivers</ows:Keyword>
+        <ows:Keyword>Air temperature</ows:Keyword>
+        <ows:Keyword>Meteorological data</ows:Keyword>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 -90.000000</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id=3959c86b-b555-4ad8-9fcc-8fecfb79918c"/>
+    </FeatureType>
+    <FeatureType>
+      <Name>ec-msc:CanSIPS_Footprint</Name>
+      <Title>CanSIPS footprint</Title>
+      <Abstract>The Canadian Seasonal to Inter-annual Prediction System (CanSIPS) carries out physics calculations to arrive at probabilistic predictions of atmospheric elements from the beginning of a month out to up to 12 months into the future, resulting in seasonal forecasts. Atmospheric elements include temperature, precipitation, wind speed and direction and others. This product contains raw numerical results of these calculations. Geographical coverage is global. Data is available on a grid at a horizontal resolution of 1 degree and for a few selected vertical levels. In addition, forecast probabilities for below, near, and above normal temperature and precipitation are available at both resolutions. Predictions and corresponding hindcast are made available monthly.</Abstract>
+      <ows:Keywords>
+        <ows:Keyword>Probabilistic predictions</ows:Keyword>
+        <ows:Keyword>Weather forecasts</ows:Keyword>
+        <ows:Keyword>Precipitation</ows:Keyword>
+        <ows:Keyword>Air temperature</ows:Keyword>
+        <ows:Keyword>Snow</ows:Keyword>
+        <ows:Keyword>Wind</ows:Keyword>
+        <ows:Keyword>Meteorological data</ows:Keyword>
+      </ows:Keywords>
+      <DefaultCRS>urn:ogc:def:crs:EPSG::4326</DefaultCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2294</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2295</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::2950</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3005</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3408</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3410</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3571</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3572</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3573</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3574</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3575</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3576</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3776</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3857</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3978</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::3995</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4267</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::4269</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26707</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26708</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26709</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26710</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26711</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26712</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26713</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26714</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26715</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26716</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26717</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26718</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26719</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26720</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26721</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26722</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26907</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26908</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26909</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26910</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26911</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26912</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26914</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26915</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26916</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26917</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26918</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26919</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26920</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26921</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::26922</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32187</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32188</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32198</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::32661</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42101</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42102</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::42304</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102100</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::102185</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:EPSG::900913</OtherCRS>
+      <OtherCRS>urn:ogc:def:crs:AUTO2::42003</OtherCRS>
+      <OutputFormats>
+        <Format>application/gml+xml; version=3.2</Format>
+        <Format>text/xml; subtype=gml/3.2.1</Format>
+        <Format>text/xml; subtype=gml/3.1.1</Format>
+        <Format>text/xml; subtype=gml/2.1.2</Format>
+        <Format>application/json</Format>
+      </OutputFormats>
+      <ows:WGS84BoundingBox dimensions="2">
+        <ows:LowerCorner>-180.000000 -90.000000</ows:LowerCorner>
+        <ows:UpperCorner>180.000000 90.000000</ows:UpperCorner>
+      </ows:WGS84BoundingBox>
+      <MetadataURL xlink:href="https://csw.open.canada.ca/geonetwork/srv/csw?service=CSW&amp;version=2.0.2&amp;request=GetRecordById&amp;outputschema=csw:IsoRecord&amp;elementsetname=full&amp;id=922781a9-bfef-56b9-a438-493ada629d47"/>
+    </FeatureType>
+</FeatureTypeList>
+  <fes:Filter_Capabilities>
+    <fes:Conformance>
+      <fes:Constraint name="ImplementsQuery">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsAdHocQuery">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsFunctions">
+        <ows:NoValues/>
+        <ows:DefaultValue>FALSE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsResourceId">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsMinStandardFilter">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsStandardFilter">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsMinSpatialFilter">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsSpatialFilter">
+        <ows:NoValues/>
+        <ows:DefaultValue>FALSE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsMinTemporalFilter">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsTemporalFilter">
+        <ows:NoValues/>
+        <ows:DefaultValue>FALSE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsVersionNav">
+        <ows:NoValues/>
+        <ows:DefaultValue>FALSE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsSorting">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsExtendedOperators">
+        <ows:NoValues/>
+        <ows:DefaultValue>FALSE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsMinimumXPath">
+        <ows:NoValues/>
+        <ows:DefaultValue>TRUE</ows:DefaultValue>
+      </fes:Constraint>
+      <fes:Constraint name="ImplementsSchemaElementFunc">
+        <ows:NoValues/>
+        <ows:DefaultValue>FALSE</ows:DefaultValue>
+      </fes:Constraint>
+    </fes:Conformance>
+    <fes:Id_Capabilities>
+      <fes:ResourceIdentifier name="fes:ResourceId"/>
+    </fes:Id_Capabilities>
+    <fes:Scalar_Capabilities>
+      <fes:LogicalOperators/>
+      <fes:ComparisonOperators>
+        <fes:ComparisonOperator name="PropertyIsEqualTo"/>
+        <fes:ComparisonOperator name="PropertyIsNotEqualTo"/>
+        <fes:ComparisonOperator name="PropertyIsLessThan"/>
+        <fes:ComparisonOperator name="PropertyIsGreaterThan"/>
+        <fes:ComparisonOperator name="PropertyIsLessThanOrEqualTo"/>
+        <fes:ComparisonOperator name="PropertyIsGreaterThanOrEqualTo"/>
+        <fes:ComparisonOperator name="PropertyIsLike"/>
+        <fes:ComparisonOperator name="PropertyIsBetween"/>
+      </fes:ComparisonOperators>
+    </fes:Scalar_Capabilities>
+    <fes:Spatial_Capabilities>
+      <fes:GeometryOperands>
+        <fes:GeometryOperand name="gml:Point"/>
+        <fes:GeometryOperand name="gml:MultiPoint"/>
+        <fes:GeometryOperand name="gml:LineString"/>
+        <fes:GeometryOperand name="gml:MultiLineString"/>
+        <fes:GeometryOperand name="gml:Curve"/>
+        <fes:GeometryOperand name="gml:MultiCurve"/>
+        <fes:GeometryOperand name="gml:Polygon"/>
+        <fes:GeometryOperand name="gml:MultiPolygon"/>
+        <fes:GeometryOperand name="gml:Surface"/>
+        <fes:GeometryOperand name="gml:MultiSurface"/>
+        <fes:GeometryOperand name="gml:Box"/>
+        <fes:GeometryOperand name="gml:Envelope"/>
+      </fes:GeometryOperands>
+      <fes:SpatialOperators>
+        <fes:SpatialOperator name="Equals"/>
+        <fes:SpatialOperator name="Disjoint"/>
+        <fes:SpatialOperator name="Touches"/>
+        <fes:SpatialOperator name="Within"/>
+        <fes:SpatialOperator name="Overlaps"/>
+        <fes:SpatialOperator name="Crosses"/>
+        <fes:SpatialOperator name="Intersects"/>
+        <fes:SpatialOperator name="Contains"/>
+        <fes:SpatialOperator name="DWithin"/>
+        <fes:SpatialOperator name="Beyond"/>
+        <fes:SpatialOperator name="BBOX"/>
+      </fes:SpatialOperators>
+    </fes:Spatial_Capabilities>
+    <fes:Temporal_Capabilities>
+      <fes:TemporalOperands>
+        <fes:TemporalOperand name="gml:TimePeriod"/>
+        <fes:TemporalOperand name="gml:TimeInstant"/>
+      </fes:TemporalOperands>
+      <fes:TemporalOperators>
+        <fes:TemporalOperator name="During"/>
+      </fes:TemporalOperators>
+    </fes:Temporal_Capabilities>
+  </fes:Filter_Capabilities>
+</wfs:WFS_Capabilities>

@@ -29,13 +29,16 @@
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QKeyEvent>
+#include <QLineF>
 #include <QLocale>
 #include <QMouseEvent>
 #include <QOpenGLContext>
 #include <QPainter>
 #include <QScreen>
 #include <QStringList>
+#include <QStyleHints>
 #include <QSurfaceFormat>
+#include <QTimer>
 #include <QWheelEvent>
 
 #include "ts/camera/scalebar.h"
@@ -52,6 +55,9 @@ namespace ts
 
 namespace
 {
+
+/** How far the pointer may move between press and release of a click. */
+constexpr double clickSlopPx = 4.0;
 
 /** Range factor for a double click: fly three times closer. */
 constexpr double doubleClickZoom = 1.0 / 3.0;
@@ -144,13 +150,17 @@ uint32_t keyMotion(int32_t key)
 
 } // namespace
 
-GlobeView::GlobeView(QWidget* parent) : QOpenGLWidget(parent)
+GlobeView::GlobeView(QWidget* parent)
+    : QOpenGLWidget(parent), m_clickTimer(new QTimer(this))
 {
   setObjectName(QStringLiteral("globeView"));
   // Qt 5 needs the type registered by name for queued connections and
   // QSignalSpy.
   qRegisterMetaType<ts::RegionGeometry>("ts::RegionGeometry");
   qRegisterMetaType<std::vector<ts::LonLat>>("std::vector<ts::LonLat>");
+  qRegisterMetaType<ts::LonLat>("ts::LonLat");
+  m_clickTimer->setSingleShot(true);
+  connect(m_clickTimer, &QTimer::timeout, this, &GlobeView::reportClick);
   QSurfaceFormat format = QSurfaceFormat::defaultFormat();
   format.setRenderableType(QSurfaceFormat::OpenGL);
   format.setVersion(3, 3);
@@ -529,6 +539,7 @@ void GlobeView::mousePressEvent(QMouseEvent* event)
     m_controller.beginRotate(position);
   } else if (event->button() == Qt::LeftButton) {
     m_controller.beginPan(position, nowS());
+    m_clickPressPx = position;
   }
   requestFrame();
   event->accept();
@@ -538,6 +549,10 @@ void GlobeView::mouseMoveEvent(QMouseEvent* event)
 {
   m_pointerInside = true;
   m_pointerPx = eventPosition(event);
+  if (m_clickPressPx &&
+      QLineF(*m_clickPressPx, m_pointerPx).length() > clickSlopPx) {
+    m_clickPressPx.reset(); // a drag, not a click
+  }
   if (m_drawing != RegionDrawing::None && !m_drawnPoints.empty()) {
     update(); // the rubber band follows the pointer
   }
@@ -583,11 +598,42 @@ void GlobeView::mouseReleaseEvent(QMouseEvent* event)
     m_controller.endDrag(nowS());
     requestFrame();
   }
+  if (m_clickPressPx && event->button() == Qt::LeftButton) {
+    // A click: reported once a double click can no longer follow.
+    m_clickPx = *m_clickPressPx;
+    m_clickPressPx.reset();
+    m_clickTimer->start(
+        QGuiApplication::styleHints()->mouseDoubleClickInterval());
+  }
   event->accept();
+}
+
+void GlobeView::reportClick()
+{
+  const std::optional<LonLat> point = pickLonLat(m_clickPx);
+  if (!point) {
+    return;
+  }
+  // The view's scale there: a pixel to the side (or above, at the edge of
+  // the globe), in degrees of longitude.
+  double degreesPerPixel = 0.0;
+  for (const QPointF offset : {QPointF(1.0, 0.0), QPointF(-1.0, 0.0),
+                               QPointF(0.0, 1.0), QPointF(0.0, -1.0)}) {
+    const std::optional<LonLat> next = pickLonLat(m_clickPx + offset);
+    if (next) {
+      const double dLon = std::abs(shortLonDelta(next->lonDeg - point->lonDeg));
+      const double dLat = std::abs(next->latDeg - point->latDeg);
+      degreesPerPixel = std::max(dLon, dLat);
+      break;
+    }
+  }
+  emit pointClicked(*point, degreesPerPixel);
 }
 
 void GlobeView::mouseDoubleClickEvent(QMouseEvent* event)
 {
+  m_clickTimer->stop();
+  m_clickPressPx.reset();
   if (event->button() != Qt::LeftButton) {
     QOpenGLWidget::mouseDoubleClickEvent(event);
     return;

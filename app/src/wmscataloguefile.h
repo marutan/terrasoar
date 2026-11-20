@@ -20,7 +20,8 @@
 
 /**
  * @file
- * Where the application keeps its copies of the WMS and WMTS catalogues.
+ * Where the application keeps its copies of the WMS, WMTS, WFS and XYZ
+ * catalogues.
  */
 #ifndef TS_APP_WMSCATALOGUEFILE_H
 #define TS_APP_WMSCATALOGUEFILE_H
@@ -30,6 +31,7 @@
 #include <QString>
 
 #include "ts/wms/wmscatalogue.h"
+#include "ts/xyz/xyzsource.h"
 
 namespace ts
 {
@@ -72,8 +74,39 @@ std::vector<WmsCatalogueEntry> readWmtsCatalogueFile(const QString& path);
 std::vector<WmsCatalogueEntry> currentWmtsCatalogue();
 
 /**
- * Returns both catalogues, WMS then WMTS: for the terms of offline
- * regions, which may be of either kind (their addresses tell them apart).
+ * Returns the path of the copy of the XYZ catalogue last fetched (in the
+ * cache directory).
+ */
+QString xyzCatalogueCachePath();
+
+/**
+ * Returns the XYZ catalogue in the file at @p path, or an empty list if it
+ * can't be read.
+ */
+std::vector<XyzCatalogueEntry> readXyzCatalogueFile(const QString& path);
+
+/**
+ * Returns the newest XYZ catalogue at hand: the copy last fetched, else
+ * the one built into the program.
+ */
+std::vector<XyzCatalogueEntry> currentXyzCatalogue();
+
+/**
+ * Returns the path of the copy of the WFS catalogue last fetched (in the
+ * cache directory).
+ */
+QString wfsCatalogueCachePath();
+
+/**
+ * Returns the newest WFS catalogue at hand: the copy last fetched, else
+ * the one built into the program.
+ */
+std::vector<WmsCatalogueEntry> currentWfsCatalogue();
+
+/**
+ * Returns every catalogue, WMS, WMTS, WFS then XYZ (as service entries, see
+ * XyzCatalogueEntry::serviceEntry()): for the terms of offline regions,
+ * which may be of any kind (their addresses tell them apart).
  */
 std::vector<WmsCatalogueEntry> currentServiceCatalogues();
 

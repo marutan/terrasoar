@@ -217,6 +217,92 @@
         </message>
     </context>
     <context>
+        <name>ts::AddWfsDialog</name>
+        <message>
+            <source>Add WFS Layer</source>
+            <translation>Add WFS Layer</translation>
+        </message>
+        <message>
+            <source>&amp;Service (choose one or type its address):</source>
+            <translation>&amp;Service (choose one or type its address):</translation>
+        </message>
+        <message>
+            <source>&amp;Connect</source>
+            <translation>&amp;Connect</translation>
+        </message>
+        <message>
+            <source>&amp;Feature types:</source>
+            <translation>&amp;Feature types:</translation>
+        </message>
+        <message>
+            <source>C&amp;olour:</source>
+            <translation>C&amp;olour:</translation>
+        </message>
+        <message>
+            <source>The colour the features are drawn in</source>
+            <translation>The colour the features are drawn in</translation>
+        </message>
+        <message>
+            <source>&amp;Add</source>
+            <translation>&amp;Add</translation>
+        </message>
+        <message>
+            <source>https://example.org/wfs</source>
+            <translation>https://example.org/wfs</translation>
+        </message>
+        <message>
+            <source>Connect to see the feature types the server offers.</source>
+            <translation>Connect to see the feature types the server offers.</translation>
+        </message>
+        <message>
+            <source>Credit: %1</source>
+            <translation>Credit: %1</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>Enter the address of a WFS, starting with http:// or https://.</source>
+            <translation>Enter the address of a WFS, starting with http:// or https://.</translation>
+        </message>
+        <message>
+            <source>Connecting to %1…</source>
+            <translation>Connecting to %1…</translation>
+        </message>
+        <message>
+            <source>Can't reach %1: %2</source>
+            <translation>Can't reach %1: %2</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n feature type(s).</source>
+            <translation>
+                <numerusform>%1: %n feature type.</numerusform>
+                <numerusform>%1: %n feature types.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Features come as %1, %2 at a time.</source>
+            <translation>Features come as %1, %2 at a time.</translation>
+        </message>
+        <message>
+            <source>the server's GML</source>
+            <translation>the server's GML</translation>
+        </message>
+        <message>
+            <source>They show when the view is about %1 across or less.</source>
+            <translation>They show when the view is about %1 across or less.</translation>
+        </message>
+        <message>
+            <source>The server's terms: %1</source>
+            <translation>The server's terms: %1</translation>
+        </message>
+        <message>
+            <source>Colour of the Features</source>
+            <translation>Colour of the Features</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::AddWmsDialog</name>
         <message>
             <source>Add WMS Layer</source>
@@ -304,6 +390,14 @@
         <message>
             <source>The server's terms: %1</source>
             <translation>The server's terms: %1</translation>
+        </message>
+        <message>
+            <source>T&amp;ime:</source>
+            <translation>T&amp;ime:</translation>
+        </message>
+        <message>
+            <source>Its time follows the program's clock (View → Time Slider).</source>
+            <translation>Its time follows the program's clock (View → Time Slider).</translation>
         </message>
     </context>
     <context>
@@ -410,6 +504,73 @@
         <message>
             <source>Drawn from %1 tiles in %2, reprojected.</source>
             <translation>Drawn from %1 tiles in %2, reprojected.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::AddXyzDialog</name>
+        <message>
+            <source>Add XYZ Tile Layer</source>
+            <translation>Add XYZ Tile Layer</translation>
+        </message>
+        <message>
+            <source>&amp;Service (choose one, or fill in the fields):</source>
+            <translation>&amp;Service (choose one, or fill in the fields):</translation>
+        </message>
+        <message>
+            <source>Another service</source>
+            <translation>Another service</translation>
+        </message>
+        <message>
+            <source>&amp;Name:</source>
+            <translation>&amp;Name:</translation>
+        </message>
+        <message>
+            <source>&amp;Address:</source>
+            <translation>&amp;Address:</translation>
+        </message>
+        <message>
+            <source>https://tile.example.org/{z}/{x}/{y}.png</source>
+            <translation>https://tile.example.org/{z}/{x}/{y}.png</translation>
+        </message>
+        <message>
+            <source>S&amp;ubdomains for {s}:</source>
+            <translation>S&amp;ubdomains for {s}:</translation>
+        </message>
+        <message>
+            <source>a, b, c</source>
+            <translation>a, b, c</translation>
+        </message>
+        <message>
+            <source>Rows are counted from the south (&amp;TMS)</source>
+            <translation>Rows are counted from the south (&amp;TMS)</translation>
+        </message>
+        <message>
+            <source>&amp;Zoom levels:</source>
+            <translation>&amp;Zoom levels:</translation>
+        </message>
+        <message>
+            <source>&amp;Credit:</source>
+            <translation>&amp;Credit:</translation>
+        </message>
+        <message>
+            <source>&amp;Add</source>
+            <translation>&amp;Add</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>Its terms don't allow keeping areas for offline use.</source>
+            <translation>Its terms don't allow keeping areas for offline use.</translation>
+        </message>
+        <message>
+            <source>The first zoom level can't be deeper than the last.</source>
+            <translation>The first zoom level can't be deeper than the last.</translation>
+        </message>
+        <message>
+            <source>Give the layer a name.</source>
+            <translation>Give the layer a name.</translation>
         </message>
     </context>
     <context>
@@ -541,6 +702,52 @@
         <message>
             <source>Point at the chart to see where a height is on the globe.</source>
             <translation>Point at the chart to see where a height is on the globe.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::FeatureInfoWindow</name>
+        <message>
+            <source>What Is Here</source>
+            <translation>What Is Here</translation>
+        </message>
+        <message>
+            <source>Layer and feature</source>
+            <translation>Layer and feature</translation>
+        </message>
+        <message>
+            <source>Value</source>
+            <translation>Value</translation>
+        </message>
+        <message>
+            <source>At %1, %2:</source>
+            <translation>At %1, %2:</translation>
+        </message>
+        <message>
+            <source>Click a WMS layer on the globe or the map to see what is there.</source>
+            <translation>Click a WMS layer on the globe or the map to see what is there.</translation>
+        </message>
+        <message>
+            <source>Asking…</source>
+            <translation>Asking…</translation>
+        </message>
+        <message>
+            <source>The server answered %1.</source>
+            <translation>The server answered %1.</translation>
+        </message>
+        <message>
+            <source>Nothing here</source>
+            <translation>Nothing here</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n feature(s)</source>
+            <translation>
+                <numerusform>%n feature</numerusform>
+                <numerusform>%n features</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Feature %1</source>
+            <translation>Feature %1</translation>
         </message>
     </context>
     <context>
@@ -888,6 +1095,26 @@
             <source>Imagery File…</source>
             <translation>Imagery File…</translation>
         </message>
+        <message>
+            <source>XYZ Tile Layer…</source>
+            <translation>XYZ Tile Layer…</translation>
+        </message>
+        <message>
+            <source>Time</source>
+            <translation>Time</translation>
+        </message>
+        <message>
+            <source>Follow the program's clock</source>
+            <translation>Follow the program's clock</translation>
+        </message>
+        <message>
+            <source>The clock's month, any year</source>
+            <translation>The clock's month, any year</translation>
+        </message>
+        <message>
+            <source>WFS Layer…</source>
+            <translation>WFS Layer…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -1191,14 +1418,6 @@
             <translation>Add a layer from a web map tile server (WMTS) to the layer tree</translation>
         </message>
         <message>
-            <source>Keep areas of WMS and WMTS layers on this computer for use without a network</source>
-            <translation>Keep areas of WMS and WMTS layers on this computer for use without a network</translation>
-        </message>
-        <message>
-            <source>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</source>
-            <translation>Only layers from WMS and WMTS servers can be kept for offline use. Add one first (File → Add WMS Layer… or Add WMTS Layer…).</translation>
-        </message>
-        <message>
             <source>Projection &amp;Settings…</source>
             <translation>Projection &amp;Settings…</translation>
         </message>
@@ -1221,6 +1440,46 @@
         <message>
             <source>Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and imagery through their A.TOC) as a layer</source>
             <translation>Add a georeferenced image (GeoTIFF, JPEG 2000, or RPF charts and imagery through their A.TOC) as a layer</translation>
+        </message>
+        <message>
+            <source>Add &amp;XYZ Tile Layer…</source>
+            <translation>Add &amp;XYZ Tile Layer…</translation>
+        </message>
+        <message>
+            <source>Add a layer from an XYZ or TMS tile service, such as OpenStreetMap, to the layer tree</source>
+            <translation>Add a layer from an XYZ or TMS tile service, such as OpenStreetMap, to the layer tree</translation>
+        </message>
+        <message>
+            <source>&amp;Time Slider</source>
+            <translation>&amp;Time Slider</translation>
+        </message>
+        <message>
+            <source>Show the slider that sets the time shown by layers with dates</source>
+            <translation>Show the slider that sets the time shown by layers with dates</translation>
+        </message>
+        <message>
+            <source>What Is &amp;Here on Click</source>
+            <translation>What Is &amp;Here on Click</translation>
+        </message>
+        <message>
+            <source>Clicking the globe or the map asks WMS layers what they show there</source>
+            <translation>Clicking the globe or the map asks WMS layers what they show there</translation>
+        </message>
+        <message>
+            <source>Add W&amp;FS Layer…</source>
+            <translation>Add W&amp;FS Layer…</translation>
+        </message>
+        <message>
+            <source>Add features (points, lines and areas) from a web feature service (WFS) to the layer tree</source>
+            <translation>Add features (points, lines and areas) from a web feature service (WFS) to the layer tree</translation>
+        </message>
+        <message>
+            <source>Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for use without a network</source>
+            <translation>Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for use without a network</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</source>
+            <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</translation>
         </message>
     </context>
     <context>
@@ -1371,8 +1630,8 @@
             <translation>Downloading “%1”: %2 %</translation>
         </message>
         <message>
-            <source>Only layers from WMS and WMTS servers can be kept for offline use.</source>
-            <translation>Only layers from WMS and WMTS servers can be kept for offline use.</translation>
+            <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use.</source>
+            <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use.</translation>
         </message>
     </context>
     <context>
@@ -2007,6 +2266,88 @@
         </message>
     </context>
     <context>
+        <name>ts::TimeBar</name>
+        <message>
+            <source>Time</source>
+            <translation>Time</translation>
+        </message>
+        <message>
+            <source>Previous time</source>
+            <translation>Previous time</translation>
+        </message>
+        <message>
+            <source>Next time</source>
+            <translation>Next time</translation>
+        </message>
+        <message>
+            <source>Play the layers' times one after another</source>
+            <translation>Play the layers' times one after another</translation>
+        </message>
+        <message>
+            <source>The time the layers show</source>
+            <translation>The time the layers show</translation>
+        </message>
+        <message>
+            <source>How long each time is shown while playing</source>
+            <translation>How long each time is shown while playing</translation>
+        </message>
+        <message>
+            <source>¼ s each</source>
+            <translation>¼ s each</translation>
+        </message>
+        <message>
+            <source>½ s each</source>
+            <translation>½ s each</translation>
+        </message>
+        <message>
+            <source>1 s each</source>
+            <translation>1 s each</translation>
+        </message>
+        <message>
+            <source>2 s each</source>
+            <translation>2 s each</translation>
+        </message>
+        <message>
+            <source>5 s each</source>
+            <translation>5 s each</translation>
+        </message>
+        <message>
+            <source>Pause</source>
+            <translation>Pause</translation>
+        </message>
+        <message>
+            <source>Play</source>
+            <translation>Play</translation>
+        </message>
+        <message>
+            <source>Time slider</source>
+            <translation>Time slider</translation>
+        </message>
+        <message>
+            <source>Speed</source>
+            <translation>Speed</translation>
+        </message>
+        <message>
+            <source>%1 UTC</source>
+            <translation>%1 UTC</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::TimeModeBox</name>
+        <message>
+            <source>Follow the program's clock</source>
+            <translation>Follow the program's clock</translation>
+        </message>
+        <message>
+            <source>The clock's month, any year</source>
+            <translation>The clock's month, any year</translation>
+        </message>
+        <message>
+            <source>Always this time:</source>
+            <translation>Always this time:</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::WebTerrainProvider</name>
         <message>
             <source>The terrain server answered %1.</source>
@@ -2027,6 +2368,83 @@
         <message>
             <source>The terrain tiles' zoom must be 0–22 and their size 256 or 512.</source>
             <translation>The terrain tiles' zoom must be 0–22 and their size 256 or 512.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WfsCapabilities</name>
+        <message>
+            <source>The address gave a web page, not a WFS. Check the service's address.</source>
+            <translation>The address gave a web page, not a WFS. Check the service's address.</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't XML.</source>
+            <translation>The server's answer isn't XML.</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>This is a map service (WMS or WMTS), not a WFS: add it with Add WMS Layer or Add WMTS Layer.</source>
+            <translation>This is a map service (WMS or WMTS), not a WFS: add it with Add WMS Layer or Add WMTS Layer.</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't a WFS capabilities document.</source>
+            <translation>The server's answer isn't a WFS capabilities document.</translation>
+        </message>
+        <message>
+            <source>The capabilities document is damaged: %1</source>
+            <translation>The capabilities document is damaged: %1</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WfsFeatureProvider</name>
+        <message>
+            <source>The server answered %1.</source>
+            <translation>The server answered %1.</translation>
+        </message>
+        <message>
+            <source>The server sent something that isn't features.</source>
+            <translation>The server sent something that isn't features.</translation>
+        </message>
+        <message>
+            <source>Not all features are shown here: zoom in to see them all.</source>
+            <translation>Not all features are shown here: zoom in to see them all.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WfsSource</name>
+        <message>
+            <source>The server's answer isn't valid GeoJSON: %1</source>
+            <translation>The server's answer isn't valid GeoJSON: %1</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't GML or GeoJSON.</source>
+            <translation>The server's answer isn't GML or GeoJSON.</translation>
+        </message>
+        <message>
+            <source>The server's answer is damaged: %1</source>
+            <translation>The server's answer is damaged: %1</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>The WFS layer has no valid address or feature type.</source>
+            <translation>The WFS layer has no valid address or feature type.</translation>
+        </message>
+        <message>
+            <source>The server has no feature type %1.</source>
+            <translation>The server has no feature type %1.</translation>
+        </message>
+        <message>
+            <source>The server gives no address for GetFeature.</source>
+            <translation>The server gives no address for GetFeature.</translation>
+        </message>
+        <message>
+            <source>The server offers no format Terra Soar reads (GeoJSON or GML).</source>
+            <translation>The server offers no format Terra Soar reads (GeoJSON or GML).</translation>
         </message>
     </context>
     <context>
@@ -2077,6 +2495,33 @@
         <message>
             <source>The WMTS catalogue is of a newer format than this program reads.</source>
             <translation>The WMTS catalogue is of a newer format than this program reads.</translation>
+        </message>
+        <message>
+            <source>This is not a WFS catalogue.</source>
+            <translation>This is not a WFS catalogue.</translation>
+        </message>
+        <message>
+            <source>The WFS catalogue is of a newer format than this program reads.</source>
+            <translation>The WFS catalogue is of a newer format than this program reads.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WmsFeatureInfo</name>
+        <message>
+            <source>The server's answer isn't valid JSON: %1</source>
+            <translation>The server's answer isn't valid JSON: %1</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't valid XML.</source>
+            <translation>The server's answer isn't valid XML.</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't valid XML: %1</source>
+            <translation>The server's answer isn't valid XML: %1</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
         </message>
     </context>
     <context>
@@ -2236,6 +2681,45 @@
         <message>
             <source>Layer %1 is only offered in coordinate systems that can't be drawn (%2): they aren't EPSG codes PROJ knows.</source>
             <translation>Layer %1 is only offered in coordinate systems that can't be drawn (%2): they aren't EPSG codes PROJ knows.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::XyzSource</name>
+        <message>
+            <source>The address must start with http:// or https://.</source>
+            <translation>The address must start with http:// or https://.</translation>
+        </message>
+        <message>
+            <source>The address has a variable {%1} this program doesn't know. It understands {z}, {x}, {y}, {-y} and {s}.</source>
+            <translation>The address has a variable {%1} this program doesn't know. It understands {z}, {x}, {y}, {-y} and {s}.</translation>
+        </message>
+        <message>
+            <source>The address must contain {z}, {x} and {y} (or {-y}) where the zoom, column and row go.</source>
+            <translation>The address must contain {z}, {x} and {y} (or {-y}) where the zoom, column and row go.</translation>
+        </message>
+        <message>
+            <source>The address contains {s}: give the subdomains it stands for (such as a, b, c).</source>
+            <translation>The address contains {s}: give the subdomains it stands for (such as a, b, c).</translation>
+        </message>
+        <message>
+            <source>This is not an XYZ source.</source>
+            <translation>This is not an XYZ source.</translation>
+        </message>
+        <message>
+            <source>The zoom levels must be from 0 to %1, the first no deeper than the last.</source>
+            <translation>The zoom levels must be from 0 to %1, the first no deeper than the last.</translation>
+        </message>
+        <message>
+            <source>The tile size must be from 64 to 1024 pixels.</source>
+            <translation>The tile size must be from 64 to 1024 pixels.</translation>
+        </message>
+        <message>
+            <source>This is not an XYZ catalogue.</source>
+            <translation>This is not an XYZ catalogue.</translation>
+        </message>
+        <message>
+            <source>The XYZ catalogue is of a newer format than this program reads.</source>
+            <translation>The XYZ catalogue is of a newer format than this program reads.</translation>
         </message>
     </context>
 </TS>

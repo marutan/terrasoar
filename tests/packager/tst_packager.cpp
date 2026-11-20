@@ -1229,6 +1229,43 @@ private slots:
              qPrintable(error));
   }
 
+  void imageryVariantsConfig()
+  {
+    // Blue Marble's months: twelve variants of "bluemarble", each from its
+    // month's picture, picked by "2004-MM".
+    QString error;
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::read(
+            QStringLiteral(TS_TEST_DATA_DIR "/../../tools/packager/packs/"
+                                            "bluemarble-monthly.json"),
+            &error);
+    if (!config) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(!config->imagery.has_value());
+    QCOMPARE(config->imageryVariants.size(), std::size_t{12});
+    for (std::size_t i = 0; i < config->imageryVariants.size(); ++i) {
+      const ts::packager::ImagerySpec& spec = config->imageryVariants.at(i);
+      QCOMPARE(spec.variantOf, QStringLiteral("bluemarble"));
+      QCOMPARE(spec.variant,
+               QStringLiteral("2004-%1").arg(i + 1, 2, 10, QLatin1Char('0')));
+      QVERIFY(spec.replaces.isEmpty());
+      QCOMPARE(spec.tiling.maxLevel, 3);
+    }
+    // A variant must say what it is a variant of.
+    QJsonObject json = QJsonDocument::fromJson(
+                           "{\"id\": \"p\", \"version\": \"1\", "
+                           "\"sources\": [{\"id\": \"s\", \"file\": "
+                           "\"s.jpg\", \"url\": \"https://e.org/s.jpg\", "
+                           "\"sha256\": \"0000000000000000000000000000000000"
+                           "000000000000000000000000000000\"}], "
+                           "\"imageryVariants\": [{\"dataset\": \"v\", "
+                           "\"source\": \"s\", \"variant\": \"1\"}]}")
+                           .object();
+    QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+    QVERIFY(error.contains(QLatin1String("variant")));
+  }
+
   void basePack()
   {
     // The real base pack, when TS_BASEPACK_DIR names one (CI's base pack
@@ -1278,6 +1315,7 @@ private slots:
     // base pack).
     QCOMPARE(manifest.value().datasets.size(),
              std::size_t{config->imagery ? 1U : 0U} +
+                 config->imageryVariants.size() +
                  std::size_t{config->shoreline ? 1U : 0U} +
                  std::size_t{config->countries ? 1U : 0U} +
                  std::size_t{config->elevation ? 1U : 0U} +
@@ -1289,7 +1327,9 @@ private slots:
     for (const ts::PackDataset& dataset : manifest.value().datasets) {
       switch (dataset.kind) {
       case ts::PackDataset::Kind::Imagery:
-        QCOMPARE(dataset.replaces, imageryReplaces);
+        // Variants replace nothing: they are picked by their month.
+        QCOMPARE(dataset.replaces,
+                 dataset.variantOf.isEmpty() ? imageryReplaces : QString());
         break;
       case ts::PackDataset::Kind::Features:
         QCOMPARE(dataset.replaces, shorelineReplaces);

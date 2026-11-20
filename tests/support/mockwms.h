@@ -63,6 +63,17 @@ struct MockWmsBehaviour {
   std::atomic<bool> etag{false};
   /** Answer GetCapabilities for 1.3.0 with an exception (an old server). */
   std::atomic<bool> refuse130{false};
+  /**
+   * Offer a third layer, "clouds", with a TIME dimension: 1 to 5 November
+   * 2026, daily (default the 5th).
+   */
+  std::atomic<bool> timeLayer{false};
+  /**
+   * Make "pattern" queryable and answer GetFeatureInfo (GeoJSON, HTML or
+   * plain text) with the asked point's longitude and latitude (from BBOX,
+   * I and J) and TIME.
+   */
+  std::atomic<bool> featureInfo{false};
 };
 
 /** Longitude and latitude to colour: the picture every GetMap draws. */
@@ -137,7 +148,9 @@ inline QImage mockWmsImage(const QUrlQuery& query)
 
 /** Returns capabilities of the mock WMS, @p version, served at @p url. */
 inline QByteArray mockWmsCapabilities(const QString& version, const QUrl& url,
-                                      const QString& crs)
+                                      const QString& crs,
+                                      bool timeLayer = false,
+                                      bool featureInfo = false)
 {
   const bool v13 = version.startsWith(QLatin1String("1.3"));
   const QString crsElement =
@@ -155,18 +168,42 @@ inline QByteArray mockWmsCapabilities(const QString& version, const QUrl& url,
              "<Capability><Request><GetMap><Format>image/png</Format>"
              "<Format>image/jpeg</Format><DCPType><HTTP><Get><OnlineResource "
              "xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
-             "xlink:href=\"%1\"/></Get></HTTP></DCPType></GetMap></Request>")
+             "xlink:href=\"%1\"/></Get></HTTP></DCPType></GetMap>")
              .arg(href);
+  if (featureInfo) {
+    xml += QStringLiteral(
+               "<GetFeatureInfo><Format>text/plain</Format><Format>text/html"
+               "</Format><Format>application/json</Format><DCPType><HTTP>"
+               "<Get><OnlineResource "
+               "xmlns:xlink=\"http://www.w3.org/1999/xlink\" "
+               "xlink:href=\"%1\"/></Get></HTTP></DCPType></GetFeatureInfo>")
+               .arg(href);
+  }
+  xml += QStringLiteral("</Request>");
   xml += QStringLiteral("<Layer><Title>Mock</Title><%1>%2</%1>")
              .arg(crsElement, crs);
   xml +=
       QStringLiteral("<Attribution><Title>Mock Agency</Title></Attribution>");
-  xml += QStringLiteral("<Layer queryable=\"0\"><Name>pattern</Name>"
+  xml += QStringLiteral("<Layer queryable=\"%1\"><Name>pattern</Name>")
+             .arg(featureInfo ? 1 : 0);
+  xml += QStringLiteral(""
                         "<Title>Test pattern</Title>"
                         "<Style><Name>plain</Name><Title>Plain</Title></Style>"
                         "</Layer>");
   xml += QStringLiteral("<Layer opaque=\"1\"><Name>background</Name>"
                         "<Title>Opaque background</Title></Layer>");
+  if (timeLayer) {
+    xml += v13 ? QStringLiteral(
+                     "<Layer><Name>clouds</Name><Title>Daily clouds</Title>"
+                     "<Dimension name=\"time\" units=\"ISO8601\" "
+                     "default=\"2026-11-05\">2026-11-01/2026-11-05/P1D"
+                     "</Dimension></Layer>")
+               : QStringLiteral(
+                     "<Layer><Name>clouds</Name><Title>Daily clouds</Title>"
+                     "<Dimension name=\"time\" units=\"ISO8601\"/>"
+                     "<Extent name=\"time\" default=\"2026-11-05\">"
+                     "2026-11-01/2026-11-05/P1D</Extent></Layer>");
+  }
   xml += QStringLiteral("</Layer></Capability>");
   xml += v13 ? QStringLiteral("</WMS_Capabilities>")
              : QStringLiteral("</WMT_MS_Capabilities>");
@@ -196,7 +233,11 @@ inline MockHttpResponse mockWmsCapabilitiesResponse(
   self.setHost(QStringLiteral("127.0.0.1"));
   const QByteArray host = request.header("host");
   self.setPort(host.mid(host.lastIndexOf(':') + 1).toInt());
-  return mockResponse(200, mockWmsCapabilities(version, self, crs), "text/xml");
+  return mockResponse(200,
+                      mockWmsCapabilities(version, self, crs,
+                                          behaviour.timeLayer.load(),
+                                          behaviour.featureInfo.load()),
+                      "text/xml");
 }
 
 /** The failure @p behaviour asks for instead of a GetMap image, if any. */
@@ -282,6 +323,71 @@ inline MockHttpResponse mockWmsGetMap(const MockHttpRequest& request,
 }
 
 /**
+ * Answers a GetFeatureInfo request: the point the pixel (I, J) or (X, Y)
+ * of the BBOX stands for, in the INFO_FORMAT asked for (geographic CRSs).
+ */
+inline MockHttpResponse mockWmsFeatureInfo(const QUrlQuery& query)
+{
+  const QStringList box =
+      query.queryItemValue(QStringLiteral("BBOX"), QUrl::FullyDecoded)
+          .split(QLatin1Char(','));
+  if (box.size() != 4) {
+    return mockResponse(400, "bad BBOX", "text/plain");
+  }
+  const bool v13 =
+      query.queryItemValue(QStringLiteral("VERSION")) == QLatin1String("1.3.0");
+  const QString crs =
+      query.queryItemValue(v13 ? QStringLiteral("CRS") : QStringLiteral("SRS"));
+  const bool latFirst = v13 && crs == QLatin1String("EPSG:4326");
+  const double west = box.at(latFirst ? 1 : 0).toDouble();
+  const double south = box.at(latFirst ? 0 : 1).toDouble();
+  const double east = box.at(latFirst ? 3 : 2).toDouble();
+  const double north = box.at(latFirst ? 2 : 3).toDouble();
+  const double width = query.queryItemValue(QStringLiteral("WIDTH")).toDouble();
+  const double height =
+      query.queryItemValue(QStringLiteral("HEIGHT")).toDouble();
+  const double i =
+      query.queryItemValue(v13 ? QStringLiteral("I") : QStringLiteral("X"))
+          .toDouble();
+  const double j =
+      query.queryItemValue(v13 ? QStringLiteral("J") : QStringLiteral("Y"))
+          .toDouble();
+  const double lon = west + (i + 0.5) / width * (east - west);
+  const double lat = north - (j + 0.5) / height * (north - south);
+  const QString time = query.queryItemValue(QStringLiteral("TIME"));
+  const QString format =
+      query.queryItemValue(QStringLiteral("INFO_FORMAT"), QUrl::FullyDecoded);
+  const QString lonText = QString::number(lon, 'f', 4);
+  const QString latText = QString::number(lat, 'f', 4);
+  if (format == QLatin1String("text/html")) {
+    return mockResponse(
+        200,
+        QStringLiteral("<html><body><table><tr><th>lon</th><th>lat</th></tr>"
+                       "<tr><td>%1</td><td>%2</td></tr></table></body></html>")
+            .arg(lonText, latText)
+            .toUtf8(),
+        "text/html");
+  }
+  if (format == QLatin1String("text/plain")) {
+    return mockResponse(200,
+                        QStringLiteral("Layer 'pattern'\n  Feature 1:\n    "
+                                       "lon = '%1'\n    lat = '%2'\n")
+                            .arg(lonText, latText)
+                            .toUtf8(),
+                        "text/plain");
+  }
+  return mockResponse(
+      200,
+      QStringLiteral("{\"type\": \"FeatureCollection\", \"features\": "
+                     "[{\"type\": \"Feature\", \"id\": \"pattern.1\", "
+                     "\"properties\": {\"lon\": %1, \"lat\": %2, "
+                     "\"time\": \"%3\"}}]}")
+          .arg(lonText, latText, time)
+          .toUtf8(),
+      "application/json");
+}
+
+/**
  * Returns a handler that serves the mock WMS: GetCapabilities (in the
  * version asked for, offering @p crs) and GetMap (mockWmsImage(), as PNG or
  * JPEG), behaving as @p behaviour says.
@@ -298,6 +404,10 @@ mockWmsHandler(const std::shared_ptr<MockWmsBehaviour>& behaviour,
     }
     if (std::optional<MockHttpResponse> failure = mockWmsFailure(*behaviour)) {
       return std::move(*failure);
+    }
+    if (query.queryItemValue(QStringLiteral("REQUEST")) ==
+        QLatin1String("GetFeatureInfo")) {
+      return mockWmsFeatureInfo(query);
     }
     return mockWmsGetMap(request, query, *behaviour);
   };

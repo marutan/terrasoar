@@ -26,6 +26,7 @@
 #define TS_PROVIDERS_PROVIDERREGISTRY_H
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <unordered_map>
@@ -33,6 +34,8 @@
 
 #include <QJsonObject>
 #include <QString>
+
+#include "ts/time/layertime.h"
 
 namespace ts
 {
@@ -166,6 +169,24 @@ public:
   void setInstalledPacks(const std::vector<InstalledPack>& packs);
 
   /**
+   * Returns the times of the installed variants of base pack dataset
+   * @p dataset (PackDataset::variantOf: Blue Marble's months), as a time
+   * extent ("2004-01,2004-02,…"), or empty if it has none. A source
+   * `{"kind": "basepack", "dataset": "<id>", "dimensions": [["month",
+   * "<variant>"]]}` draws that variant's file; with another value, or
+   * none, the dataset itself.
+   */
+  QString basePackVariants(const QString& dataset) const;
+
+  /**
+   * Returns the time settings a base pack layer of @p source gets when it
+   * has none of its own but its dataset has variants: the clock's month
+   * (LayerTime::Mode::MonthOfYear) over them, dimension "month"; nothing
+   * otherwise.
+   */
+  std::optional<LayerTime> basePackTime(const QJsonObject& source) const;
+
+  /**
    * Sets the network client and settings for WMS sources (`{"kind":
    * "wms", …}`, see WmsSource). A null @p network is created with default
    * settings when the first WMS source needs it (so that a program without
@@ -198,7 +219,12 @@ private:
                                                     QString* errorString);
   std::shared_ptr<ImageryProvider> createWmtsImagery(const QJsonObject& source,
                                                      QString* errorString);
+  std::shared_ptr<ImageryProvider> createXyzImagery(const QJsonObject& source,
+                                                    QString* errorString);
   std::shared_ptr<NetworkClient> networkLocked();
+  struct Replacement;
+  /** The variant a base pack source's dimensions pick; null if none. */
+  const Replacement* basePackVariant(const QJsonObject& source) const;
   std::shared_ptr<const GeoidModel> geoidLocked(const QString& dataset,
                                                 QString* errorString);
   std::shared_ptr<ElevationProvider>
@@ -251,6 +277,8 @@ private:
   std::unordered_map<QString, PackGeoid> m_packGeoids;
   /** Base pack dataset id → what replaces it. */
   std::unordered_map<QString, Replacement> m_replacements;
+  /** Base pack dataset id → variant → the pack's dataset for it. */
+  std::unordered_map<QString, std::map<QString, Replacement>> m_variants;
   std::shared_ptr<NetworkClient> m_network;
   std::unique_ptr<WebTileSettings> m_wmsSettings;
 };

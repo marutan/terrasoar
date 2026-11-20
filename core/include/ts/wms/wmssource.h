@@ -27,6 +27,8 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
+#include <vector>
 
 #include <QJsonObject>
 #include <QString>
@@ -79,6 +81,19 @@ struct WmsSource {
   QString title;
   /** Who to credit, shown while the layer is on screen. */
   QString attribution;
+  /**
+   * Dimension values (name in lower case, value) sent with GetMap: "time"
+   * as TIME, "elevation" as ELEVATION, others as DIM_<NAME>. Empty for the
+   * server's defaults.
+   */
+  std::vector<std::pair<QString, QString>> dimensions;
+  /**
+   * Where GetFeatureInfo requests go; empty if the layers can't be
+   * queried. Not part of id(): it changes no tile.
+   */
+  QUrl featureInfoUrl;
+  /** The format asked for in GetFeatureInfo (see chooseInfoFormat()). */
+  QString infoFormat;
 
   /**
    * Returns a string identifying the tiles: two sources with the same id
@@ -157,6 +172,34 @@ std::optional<GeoRect> webMercatorCoverage(const GeoRect& rect);
  * parameters, which are replaced.
  */
 QUrl getMapUrl(const WmsSource& source, TileKey key);
+
+/**
+ * Returns the GetMap parameter for dimension @p name: TIME, ELEVATION, or
+ * DIM_ and the name in upper case (WMS 1.3.0 C.3.2).
+ */
+QString wmsDimensionParameter(const QString& name);
+
+/**
+ * Returns the GetFeatureInfo format to ask for of those @p offered:
+ * GeoJSON first (names and values as they are), then GML and the other
+ * XML forms, then HTML, then plain text; empty if none is known.
+ */
+QString chooseInfoFormat(const QStringList& offered);
+
+/**
+ * Returns the GetFeatureInfo request for the point at @p lonDeg,
+ * @p latDeg of @p source, as if it were clicked in the GetMap image of
+ * quadtree tile @p key (the tile at the view's scale containing it, so
+ * the server judges scale-dependent layers right): the tile's BBOX and
+ * size, the point's pixel (I and J in 1.3.0, X and Y in 1.1.1),
+ * QUERY_LAYERS, INFO_FORMAT, FEATURE_COUNT and the source's dimensions.
+ * An empty URL if the source can't be queried or the point is outside
+ * the tile or the source's area.
+ */
+// Longitude then latitude, as everywhere in WMS requests.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+QUrl getFeatureInfoUrl(const WmsSource& source, TileKey key, double lonDeg,
+                       double latDeg, int32_t featureCount = 10);
 
 /**
  * Returns the GetCapabilities URL for the service at @p serviceUrl (any

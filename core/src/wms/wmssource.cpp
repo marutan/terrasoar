@@ -106,11 +106,19 @@ std::optional<WmsSource> fail(QString* errorString, const QString& message)
 
 QString WmsSource::id() const
 {
-  return QStringLiteral("wms:%1|%2|%3|%4|%5|%6|%7|%8")
-      .arg(url.toString(QUrl::FullyEncoded), version,
-           layers.join(QLatin1Char(',')), styles.join(QLatin1Char(',')), format,
-           crs, transparent ? QStringLiteral("t") : QStringLiteral("o"))
-      .arg(tileSizePx);
+  QString id = QStringLiteral("wms:%1|%2|%3|%4|%5|%6|%7|%8")
+                   .arg(url.toString(QUrl::FullyEncoded), version,
+                        layers.join(QLatin1Char(',')),
+                        styles.join(QLatin1Char(',')), format, crs,
+                        transparent ? QStringLiteral("t") : QStringLiteral("o"))
+                   .arg(tileSizePx);
+  // Only with dimensions, so the ids (and disk caches) of sources without
+  // stay as they were.
+  for (const std::pair<QString, QString>& dimension : dimensions) {
+    id += QLatin1Char('|') + dimension.first + QLatin1Char('=') +
+          dimension.second;
+  }
+  return id;
 }
 
 TileImageProjection WmsSource::imageProjection() const
@@ -142,6 +150,19 @@ QJsonObject WmsSource::toJson() const
   }
   if (!attribution.isEmpty()) {
     json.insert(QStringLiteral("attribution"), attribution);
+  }
+  if (!dimensions.empty()) {
+    QJsonArray dimensionArray;
+    for (const std::pair<QString, QString>& dimension : dimensions) {
+      dimensionArray.append(QJsonArray{dimension.first, dimension.second});
+    }
+    json.insert(QStringLiteral("dimensions"), dimensionArray);
+  }
+  if (!featureInfoUrl.isEmpty() && !infoFormat.isEmpty()) {
+    json.insert(QStringLiteral("featureInfo"),
+                QJsonObject{{QStringLiteral("url"),
+                             featureInfoUrl.toString(QUrl::FullyEncoded)},
+                            {QStringLiteral("format"), infoFormat}});
   }
   return json;
 }
@@ -204,6 +225,24 @@ std::optional<WmsSource> WmsSource::fromJson(const QJsonObject& json,
   }
   source.title = json.value(QStringLiteral("title")).toString();
   source.attribution = json.value(QStringLiteral("attribution")).toString();
+  const QJsonArray dimensions =
+      json.value(QStringLiteral("dimensions")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < dimensions.size(); ++i) {
+    const QJsonArray pair = dimensions.at(i).toArray();
+    const QString name = pair.at(0).toString().trimmed().toLower();
+    if (pair.size() == 2 && !name.isEmpty()) {
+      source.dimensions.emplace_back(name, pair.at(1).toString());
+    }
+  }
+  const QJsonObject featureInfo =
+      json.value(QStringLiteral("featureInfo")).toObject();
+  const QUrl infoUrl(featureInfo.value(QStringLiteral("url")).toString());
+  if (infoUrl.isValid() && (infoUrl.scheme() == QLatin1String("http") ||
+                            infoUrl.scheme() == QLatin1String("https"))) {
+    source.featureInfoUrl = infoUrl;
+    source.infoFormat = featureInfo.value(QStringLiteral("format")).toString();
+  }
   return source;
 }
 
@@ -345,9 +384,126 @@ QUrl getMapUrl(const WmsSource& source, TileKey key)
                      isVersion13(source.version)
                          ? QStringLiteral("XML")
                          : QStringLiteral("application/vnd.ogc.se_xml"));
+  for (const std::pair<QString, QString>& dimension : source.dimensions) {
+    if (!dimension.second.isEmpty()) {
+      query.addQueryItem(wmsDimensionParameter(dimension.first),
+                         dimension.second);
+    }
+  }
   QUrl url = source.url;
   url.setQuery(query);
   return url;
+}
+
+QString chooseInfoFormat(const QStringList& offered)
+{
+  static const std::array<const char*, 10> preferred = {
+      "application/json",
+      "application/geo+json",
+      "application/geojson",
+      "application/vnd.ogc.gml",
+      "application/vnd.ogc.gml/3.1.1",
+      "application/vnd.esri.wms_featureinfo_xml",
+      "text/xml",
+      "application/vnd.ogc.wms_xml",
+      "text/html",
+      "text/plain"};
+  for (const char* format : preferred) {
+    for (const QString& candidate : offered) {
+      if (candidate.trimmed().compare(QLatin1String(format),
+                                      Qt::CaseInsensitive) == 0) {
+        return candidate.trimmed();
+      }
+    }
+  }
+  // Another XML or JSON variant (GML 3.2 and the like).
+  for (const QString& candidate : offered) {
+    const QString lower = candidate.toLower();
+    if (lower.contains(QLatin1String("json")) ||
+        lower.contains(QLatin1String("gml")) ||
+        lower.contains(QLatin1String("xml"))) {
+      return candidate.trimmed();
+    }
+  }
+  return QString();
+}
+
+// Longitude then latitude, as everywhere in WMS requests.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+QUrl getFeatureInfoUrl(const WmsSource& source, TileKey key, double lonDeg,
+                       double latDeg, int32_t featureCount)
+// NOLINTEND(bugprone-easily-swappable-parameters)
+{
+  if (source.featureInfoUrl.isEmpty() || source.infoFormat.isEmpty()) {
+    return QUrl();
+  }
+  const GeoRect rect = key.bounds();
+  if (lonDeg < rect.westDeg || lonDeg > rect.eastDeg ||
+      latDeg < rect.southDeg || latDeg > rect.northDeg) {
+    return QUrl();
+  }
+  WmsSource asked = source;
+  asked.url = source.featureInfoUrl;
+  const QUrl map = getMapUrl(asked, key);
+  if (map.isEmpty()) {
+    return QUrl();
+  }
+  // The point's pixel in the GetMap image: rows even in latitude, or in
+  // northing for Web Mercator (the image's bounds are the tile's clipped
+  // to its limit).
+  const double size = static_cast<double>(source.tileSizePx);
+  double column = (lonDeg - rect.westDeg) / rect.widthDeg() * size;
+  double row = 0.0;
+  if (isWebMercatorCrs(source.crs)) {
+    const std::optional<GeoRect> covered = webMercatorCoverage(rect);
+    if (!covered || latDeg > covered->northDeg || latDeg < covered->southDeg) {
+      return QUrl();
+    }
+    const double north = webMercator().northingM(covered->northDeg);
+    const double south = webMercator().northingM(covered->southDeg);
+    row = (north - webMercator().northingM(latDeg)) / (north - south) * size;
+  } else {
+    row = (rect.northDeg - latDeg) / rect.heightDeg() * size;
+  }
+  const int32_t last = source.tileSizePx - 1;
+  const int32_t i =
+      std::clamp(static_cast<int32_t>(std::floor(column)), 0, last);
+  const int32_t j = std::clamp(static_cast<int32_t>(std::floor(row)), 0, last);
+  QUrlQuery query(map);
+  query.removeQueryItem(QStringLiteral("REQUEST"));
+  query.removeQueryItem(QStringLiteral("TRANSPARENT"));
+  QUrlQuery info;
+  const QList<QPair<QString, QString>> items =
+      query.queryItems(QUrl::FullyDecoded);
+  for (const QPair<QString, QString>& item : items) {
+    info.addQueryItem(item.first, item.second);
+    if (item.first == QLatin1String("VERSION")) {
+      info.addQueryItem(QStringLiteral("REQUEST"),
+                        QStringLiteral("GetFeatureInfo"));
+    }
+  }
+  const bool v13 = isVersion13(source.version);
+  info.addQueryItem(QStringLiteral("QUERY_LAYERS"),
+                    source.layers.join(QLatin1Char(',')));
+  info.addQueryItem(QStringLiteral("INFO_FORMAT"), source.infoFormat);
+  info.addQueryItem(QStringLiteral("FEATURE_COUNT"),
+                    QString::number(featureCount));
+  info.addQueryItem(v13 ? QStringLiteral("I") : QStringLiteral("X"),
+                    QString::number(i));
+  info.addQueryItem(v13 ? QStringLiteral("J") : QStringLiteral("Y"),
+                    QString::number(j));
+  QUrl url = map;
+  url.setQuery(info);
+  return url;
+}
+
+QString wmsDimensionParameter(const QString& name)
+{
+  const QString lower = name.toLower();
+  if (lower == QLatin1String("time") || lower == QLatin1String("elevation")) {
+    return lower.toUpper();
+  }
+  return QStringLiteral("DIM_") + name.toUpper();
 }
 
 QUrl capabilitiesUrl(const QUrl& serviceUrl, const QString& version)
@@ -501,6 +657,20 @@ std::optional<WmsSource> wmsSourceFor(const WmsCapabilities& capabilities,
   source.tileSizePx = tileSizeWithin(capabilities, source.tileSizePx);
   source.title = titles.join(QStringLiteral(", "));
   source.attribution = attributions.join(QStringLiteral("; "));
+  // Features can be asked for on a click if every layer is queryable.
+  const bool queryable = std::all_of(
+      layerNames.begin(), layerNames.end(), [&capabilities](const QString& n) {
+        const WmsLayer* layer = capabilities.findLayer(n);
+        return layer != nullptr && layer->queryable;
+      });
+  const QString infoFormat =
+      chooseInfoFormat(capabilities.getFeatureInfoFormats);
+  if (queryable && !infoFormat.isEmpty()) {
+    source.featureInfoUrl = capabilities.getFeatureInfoUrl.isEmpty()
+                                ? capabilities.getMapUrl
+                                : capabilities.getFeatureInfoUrl;
+    source.infoFormat = infoFormat;
+  }
   return source;
 }
 

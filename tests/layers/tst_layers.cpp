@@ -487,6 +487,34 @@ private slots:
     QVERIFY(oddLoaded->projectionParameters.empty());
   }
 
+  void projectTime()
+  {
+    // The clock's time is an optional member of the view: absent without
+    // one (older files' bytes unchanged), kept to the millisecond in UTC.
+    ts::Project project;
+    QVERIFY(!ts::projectToJson(project).contains("\"time\""));
+    project.time = QDateTime::fromMSecsSinceEpoch(int64_t{1089072000123})
+                       .toUTC(); // 2004-07-06T00:00:00.123Z
+    const QByteArray json = ts::projectToJson(project);
+    QVERIFY2(json.contains("\"time\": \"2004-07-06T00:00:00.123Z\""),
+             json.constData());
+    QString error;
+    const std::optional<ts::Project> loaded = ts::projectFromJson(json, &error);
+    if (!loaded) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(loaded->time, project.time);
+    QCOMPARE(ts::projectToJson(*loaded), json);
+    QByteArray odd = json;
+    odd.replace("2004-07-06T00:00:00.123Z", "next Tuesday");
+    const std::optional<ts::Project> oddLoaded =
+        ts::projectFromJson(odd, &error);
+    if (!oddLoaded) {
+      QFAIL("oddLoaded is missing");
+    }
+    QVERIFY(!oddLoaded->time.isValid());
+  }
+
   void projectVersions()
   {
     // Every earlier format version keeps loading: each has a fixture.
@@ -550,7 +578,9 @@ private slots:
       QString error;
       const std::optional<ts::LayerDefinition> back =
           ts::LayerDefinition::fromJson(definition.toJson(), &error);
-      QVERIFY2(back.has_value(), qPrintable(error));
+      if (!back) {
+        QFAIL(qPrintable(error));
+      }
       QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
       const QString kind =
           definition.source.value(QStringLiteral("kind")).toString();
@@ -612,7 +642,9 @@ private slots:
     QString error;
     const std::optional<ts::LayerDefinition> back =
         ts::LayerDefinition::fromJson(definition.toJson(), &error);
-    QVERIFY(back.has_value());
+    if (!back) {
+      QFAIL("back is missing");
+    }
     QCOMPARE(back.value_or(ts::LayerDefinition()), definition);
   }
 

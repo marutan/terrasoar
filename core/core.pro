@@ -112,17 +112,27 @@ HEADERS += \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
     include/ts/tiling/tileselector.h \
+    include/ts/vector/stylerules.h \
     include/ts/vector/vectormesh.h \
     include/ts/vector/vectorstyle.h \
     include/ts/vector/vectortileloader.h \
     include/ts/wms/wmscapabilities.h \
     include/ts/wms/wmscatalogue.h \
+    include/ts/wms/wmsfeatureinfo.h \
     include/ts/wms/wmsimageryprovider.h \
     include/ts/wms/wmssource.h \
+    include/ts/time/layertime.h \
+    include/ts/time/programclock.h \
+    include/ts/time/timeextent.h \
+    include/ts/wfs/wfscapabilities.h \
+    include/ts/wfs/wfsfeatureprovider.h \
+    include/ts/wfs/wfssource.h \
     include/ts/wmts/wmtscapabilities.h \
     include/ts/wmts/wmtscrs.h \
     include/ts/wmts/wmtsimageryprovider.h \
     include/ts/wmts/wmtssource.h \
+    include/ts/xyz/xyzimageryprovider.h \
+    include/ts/xyz/xyzsource.h \
     src/globe/globeuniforms.h \
     src/providers/sqlitestatementpool.h
 
@@ -201,14 +211,24 @@ SOURCES += \
     src/tiling/tileloader.cpp \
     src/tiling/tilemesh.cpp \
     src/tiling/tileselector.cpp \
+    src/vector/stylerules.cpp \
     src/vector/vectormesh.cpp \
     src/vector/vectorstyle.cpp \
     src/vector/vectortileloader.cpp \
     src/wms/wmscapabilities.cpp \
     src/wms/wmscatalogue.cpp \
+    src/wms/wmsfeatureinfo.cpp \
     src/wms/wmsimageryprovider.cpp \
     src/wms/wmssource.cpp \
+    src/time/layertime.cpp \
+    src/time/programclock.cpp \
+    src/time/timeextent.cpp \
+    src/wfs/wfscapabilities.cpp \
+    src/wfs/wfsfeatureprovider.cpp \
+    src/wfs/wfssource.cpp \
     src/wmts/wmtscapabilities.cpp \
     src/wmts/wmtscrs.cpp \
     src/wmts/wmtsimageryprovider.cpp \
-    src/wmts/wmtssource.cpp
+    src/wmts/wmtssource.cpp \
+    src/xyz/xyzimageryprovider.cpp \
+    src/xyz/xyzsource.cpp

@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FeatureInfoResponse xmlns="http://www.esri.com/wms"><FeatureInfoCollection layername="Rivers"><FeatureInfo><Field><FieldName>OBJECTID</FieldName><FieldValue>7</FieldValue></Field><Field><FieldName>NAME</FieldName><FieldValue>Thames</FieldValue></Field></FeatureInfo></FeatureInfoCollection></FeatureInfoResponse>

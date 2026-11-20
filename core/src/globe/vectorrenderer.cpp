@@ -24,6 +24,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <unordered_set>
 #include <utility>
 
@@ -295,6 +296,10 @@ struct VectorRenderer::GpuMesh {
   int32_t fillVertices = 0;
   std::unique_ptr<GpuBuffer> segments;
   int32_t segmentCount = 0;
+  /** The mesh's runs and the features' styles they use. */
+  std::vector<VectorRun> fillRuns;
+  std::vector<VectorRun> segmentRuns;
+  std::vector<FeatureStyle> styles;
   Float4 centreHigh{};
   Float4 centreLow{};
   double centreLonDeg = 0.0;
@@ -518,6 +523,16 @@ VectorRenderer::createGpuMesh(const VectorTileMesh& mesh) const
     gpu->segmentCount =
         gpu->segments ? static_cast<int32_t>(mesh.segments.size()) : 0;
   }
+  gpu->fillRuns = mesh.fillRuns;
+  gpu->segmentRuns = mesh.segmentRuns;
+  gpu->styles = mesh.styles;
+  // A mesh made without runs: all in the layer's style.
+  if (gpu->fillRuns.empty() && gpu->fillVertices > 0) {
+    gpu->fillRuns.push_back(VectorRun{0, gpu->fillVertices, 0, false});
+  }
+  if (gpu->segmentRuns.empty() && gpu->segmentCount > 0) {
+    gpu->segmentRuns.push_back(VectorRun{0, gpu->segmentCount, 0, false});
+  }
   gpu->bytes = mesh.bytes();
   return gpu;
 }
@@ -656,6 +671,131 @@ void VectorRenderer::evict()
   }
 }
 
+namespace
+{
+
+/** Where one draw of a mesh goes: its mesh's centre and its clip. */
+struct Placement {
+  Float4 centreHigh{};
+  Float4 centreLow{};
+  double lonDeg = 0.0;
+  double latDeg = 0.0;
+  GeoRect clip;
+  double mapShiftM = 0.0;
+};
+
+/**
+ * The block's placement for @p place: the clip rectangle, and on the map
+ * (@p frame not null) the reference point and projection values.
+ */
+VectorBlock placedBlock(const Placement& place, const MapFrame* frame)
+{
+  VectorBlock values;
+  values.centreHigh = place.centreHigh;
+  values.centreLow = place.centreLow;
+  const double lon = place.lonDeg;
+  const double lat = place.latDeg;
+  values.clipRect = {
+      static_cast<float>(place.clip.westDeg - lon - clipSlackDeg),
+      static_cast<float>(place.clip.southDeg - lat - clipSlackDeg),
+      static_cast<float>(place.clip.eastDeg - lon + clipSlackDeg),
+      static_cast<float>(place.clip.northDeg - lat + clipSlackDeg)};
+  if (frame != nullptr) {
+    const Projection& projection = *frame->projection;
+    if (!projection.repeats()) {
+      // Nothing beyond the edge of a map that ends at its domain:
+      // there it would be squashed onto the edge, and lines and
+      // fills would show along it. Relative to the mesh's centre.
+      const double limit = projection.maximumLonOffsetDeg();
+      const double domainLon =
+          normaliseLonDeg(projection.centralMeridianDeg() - lon);
+      values.clipRect = {
+          std::max(values.clipRect[0], static_cast<float>(domainLon - limit)),
+          std::max(values.clipRect[1],
+                   static_cast<float>(projection.minimumLatDeg() - lat)),
+          std::min(values.clipRect[2], static_cast<float>(domainLon + limit)),
+          std::min(values.clipRect[3],
+                   static_cast<float>(projection.maximumLatDeg() - lat))};
+    }
+    // The reference point: the mesh's centre, held inside the domain.
+    const Geodetic inside = projection.clampToDomain(lat, lon);
+    const double referenceLatDeg = inside.latDeg;
+    const double referenceLonDeg = inside.lonDeg;
+    const double dLatRad = degToRad(lat - referenceLatDeg);
+    const double dLonRad = degToRad(normaliseLonDeg(lon - referenceLonDeg));
+    const MapPoint offset = frame->offsetOf(referenceLatDeg, referenceLonDeg);
+    // offsetOf() takes the copy nearest the view's centre; the copies
+    // of this piece were counted from the middle of its clip rectangle.
+    const double pieceXM =
+        frame
+            ->offsetOf(projection.forward(frame->centreLatDeg,
+                                          place.clip.centreLonDeg()))
+            .xM;
+    double originXM = offset.xM;
+    const double halfWorldM = 0.5 * frame->worldWidthM;
+    if (originXM - pieceXM > halfWorldM) {
+      originXM -= frame->worldWidthM;
+    } else if (originXM - pieceXM < -halfWorldM) {
+      originXM += frame->worldWidthM;
+    }
+    // Its vertices reach the clip rectangle (and a little past it).
+    const double halfSpanRad =
+        degToRad(std::max({std::abs(place.clip.westDeg - lon),
+                           std::abs(place.clip.eastDeg - lon),
+                           std::abs(place.clip.southDeg - lat),
+                           std::abs(place.clip.northDeg - lat)}) +
+                 clipSlackDeg) +
+        std::max(std::abs(dLatRad), std::abs(dLonRad));
+    const ProjectionShaderReference reference = projection.shaderReferenceFor(
+        referenceLatDeg, referenceLonDeg, halfSpanRad);
+    values.mapOrigin = {
+        static_cast<float>((originXM + place.mapShiftM) * frame->planeScale),
+        static_cast<float>(offset.yM * frame->planeScale),
+        static_cast<float>(dLatRad), static_cast<float>(dLonRad)};
+    values.projR0 = reference.r0;
+    values.projR1 = reference.r1;
+    values.projR2 = reference.r2;
+    values.projR3 = reference.r3;
+  }
+  return values;
+}
+
+/** How a run looks: the layer's style where the feature's leaves it. */
+struct RunLook {
+  QColor fill;
+  QColor outline;
+  double widthPx = 0.0;
+  bool showsFill = false;
+  bool showsLine = false;
+};
+
+RunLook runLook(const std::vector<FeatureStyle>& styles, VectorRun run,
+                const VectorStyle& layer)
+{
+  const FeatureStyle none;
+  const FeatureStyle& own =
+      run.style > 0 && static_cast<std::size_t>(run.style) <= styles.size()
+          ? styles.at(static_cast<std::size_t>(run.style) - 1)
+          : none;
+  RunLook look;
+  look.fill = own.fill.value_or(layer.fill);
+  look.outline = own.outline.value_or(layer.outline);
+  look.widthPx = own.outlineWidthPx.value_or(layer.outlineWidthPx);
+  if (run.points) {
+    // Dots in the outline's colour (the fill's without one).
+    if (!own.outline && !layer.hasOutline()) {
+      look.outline = layer.fill;
+    }
+    look.widthPx = own.pointSizePx.value_or(layer.pointSizePx);
+  }
+  look.showsFill = look.fill.isValid() && look.fill.alpha() > 0;
+  look.showsLine =
+      look.outline.isValid() && look.outline.alpha() > 0 && look.widthPx > 0.0;
+  return look;
+}
+
+} // namespace
+
 void VectorRenderer::writeUniforms(const Camera& camera)
 {
   std::vector<std::uint8_t> staging;
@@ -671,87 +811,28 @@ void VectorRenderer::writeUniforms(const Camera& camera)
     }
     const VectorLayerDraw& draw = m_layers[i].second;
     for (const DrawItem& item : source->items) {
-      VectorBlock values;
-      values.centreHigh = item.mesh->centreHigh;
-      values.centreLow = item.mesh->centreLow;
-      const double lon = item.mesh->centreLonDeg;
-      const double lat = item.mesh->centreLatDeg;
-      values.clipRect = {
-          static_cast<float>(item.clip.westDeg - lon - clipSlackDeg),
-          static_cast<float>(item.clip.southDeg - lat - clipSlackDeg),
-          static_cast<float>(item.clip.eastDeg - lon + clipSlackDeg),
-          static_cast<float>(item.clip.northDeg - lat + clipSlackDeg)};
-      if (onMap) {
-        const Projection& projection = *frame.projection;
-        if (!projection.repeats()) {
-          // Nothing beyond the edge of a map that ends at its domain:
-          // there it would be squashed onto the edge, and lines and
-          // fills would show along it. Relative to the mesh's centre.
-          const double limit = projection.maximumLonOffsetDeg();
-          const double domainLon =
-              normaliseLonDeg(projection.centralMeridianDeg() - lon);
-          values.clipRect = {
-              std::max(values.clipRect[0],
-                       static_cast<float>(domainLon - limit)),
-              std::max(values.clipRect[1],
-                       static_cast<float>(projection.minimumLatDeg() - lat)),
-              std::min(values.clipRect[2],
-                       static_cast<float>(domainLon + limit)),
-              std::min(values.clipRect[3],
-                       static_cast<float>(projection.maximumLatDeg() - lat))};
-        }
-        // The reference point: the mesh's centre, held inside the domain.
-        const Geodetic inside = projection.clampToDomain(lat, lon);
-        const double referenceLatDeg = inside.latDeg;
-        const double referenceLonDeg = inside.lonDeg;
-        const double dLatRad = degToRad(lat - referenceLatDeg);
-        const double dLonRad = degToRad(normaliseLonDeg(lon - referenceLonDeg));
-        const MapPoint offset =
-            frame.offsetOf(referenceLatDeg, referenceLonDeg);
-        // offsetOf() takes the copy nearest the view's centre; the copies
-        // of this piece were counted from the middle of its clip rectangle.
-        const double pieceXM =
-            frame
-                .offsetOf(projection.forward(frame.centreLatDeg,
-                                             item.clip.centreLonDeg()))
-                .xM;
-        double originXM = offset.xM;
-        const double halfWorldM = 0.5 * frame.worldWidthM;
-        if (originXM - pieceXM > halfWorldM) {
-          originXM -= frame.worldWidthM;
-        } else if (originXM - pieceXM < -halfWorldM) {
-          originXM += frame.worldWidthM;
-        }
-        // Its vertices reach the clip rectangle (and a little past it).
-        const double halfSpanRad =
-            degToRad(std::max({std::abs(item.clip.westDeg - lon),
-                               std::abs(item.clip.eastDeg - lon),
-                               std::abs(item.clip.southDeg - lat),
-                               std::abs(item.clip.northDeg - lat)}) +
-                     clipSlackDeg) +
-            std::max(std::abs(dLatRad), std::abs(dLonRad));
-        const ProjectionShaderReference reference =
-            projection.shaderReferenceFor(referenceLatDeg, referenceLonDeg,
-                                          halfSpanRad);
-        values.mapOrigin = {
-            static_cast<float>((originXM + item.mapShiftM) * frame.planeScale),
-            static_cast<float>(offset.yM * frame.planeScale),
-            static_cast<float>(dLatRad), static_cast<float>(dLonRad)};
-        values.projR0 = reference.r0;
-        values.projR1 = reference.r1;
-        values.projR2 = reference.r2;
-        values.projR3 = reference.r3;
+      const GpuMesh& mesh = *item.mesh;
+      VectorBlock values = placedBlock(
+          Placement{mesh.centreHigh, mesh.centreLow, mesh.centreLonDeg,
+                    mesh.centreLatDeg, item.clip, item.mapShiftM},
+          onMap ? &frame : nullptr);
+      // One block per run: the same place, the run's colours and width;
+      // fill runs first, then segment runs (drawLayer() counts so).
+      std::vector<VectorRun> runs = mesh.fillRuns;
+      runs.insert(runs.end(), mesh.segmentRuns.begin(), mesh.segmentRuns.end());
+      for (const VectorRun run : runs) {
+        const RunLook look = runLook(mesh.styles, run, draw.style);
+        values.fillColor = premultipliedRgba(look.fill, draw.alpha);
+        values.outlineColor = premultipliedRgba(look.outline, draw.alpha);
+        values.params = {static_cast<float>(look.widthPx),
+                         static_cast<float>(camera.nearM()),
+                         static_cast<float>(mesh.centreLonDeg),
+                         static_cast<float>(mesh.centreLatDeg)};
+        staging.resize((block + 1) * m_uniformStride);
+        std::memcpy(staging.data() + block * m_uniformStride, &values,
+                    sizeof(values));
+        ++block;
       }
-      values.fillColor = premultipliedRgba(draw.style.fill, draw.alpha);
-      values.outlineColor = premultipliedRgba(draw.style.outline, draw.alpha);
-      values.params = {static_cast<float>(draw.style.outlineWidthPx),
-                       static_cast<float>(camera.nearM()),
-                       static_cast<float>(item.mesh->centreLonDeg),
-                       static_cast<float>(item.mesh->centreLatDeg)};
-      staging.resize((block + 1) * m_uniformStride);
-      std::memcpy(staging.data() + block * m_uniformStride, &values,
-                  sizeof(values));
-      ++block;
     }
   }
   if (staging.empty()) {
@@ -791,40 +872,77 @@ void VectorRenderer::drawLayer(std::size_t index)
   }
   const Source& source = *m_layers[index].first;
   const VectorStyle& style = m_layers[index].second.style;
-  const std::size_t start = m_layerUniformStart[index];
-  if (style.hasFill()) {
-    m_device.setPipeline(m_morph > 0.0 ? *m_fillMapPipeline : *m_fillPipeline);
-    for (std::size_t i = 0; i < source.items.size(); ++i) {
-      const GpuMesh& mesh = *source.items[i].mesh;
-      if (mesh.fillVertices == 0) {
+  // The blocks follow writeUniforms(): per item, its fill runs, then its
+  // segment runs.
+  std::size_t block = m_layerUniformStart[index];
+  std::vector<std::size_t> firstBlock;
+  firstBlock.reserve(source.items.size());
+  for (const DrawItem& item : source.items) {
+    firstBlock.push_back(block);
+    block += item.mesh->fillRuns.size() + item.mesh->segmentRuns.size();
+  }
+  drawFills(source, style, firstBlock);
+  drawSegments(source, style, firstBlock);
+  m_statistics.tilesDrawn += static_cast<int32_t>(source.items.size());
+}
+
+void VectorRenderer::drawFills(const Source& source, const VectorStyle& style,
+                               const std::vector<std::size_t>& firstBlock)
+{
+  bool pipeline = false;
+  for (std::size_t i = 0; i < source.items.size(); ++i) {
+    const GpuMesh& mesh = *source.items[i].mesh;
+    for (std::size_t r = 0; r < mesh.fillRuns.size() && mesh.fill; ++r) {
+      const VectorRun run = mesh.fillRuns[r];
+      if (!runLook(mesh.styles, run, style).showsFill) {
         continue;
+      }
+      if (!pipeline) {
+        m_device.setPipeline(m_morph > 0.0 ? *m_fillMapPipeline
+                                           : *m_fillPipeline);
+        pipeline = true;
       }
       m_device.setVertexBuffer(0, *mesh.fill, 0);
       m_device.setUniformBuffer(vectorBinding, *m_uniforms,
-                                (start + i) * m_uniformStride,
+                                (firstBlock[i] + r) * m_uniformStride,
                                 sizeof(VectorBlock));
-      m_device.draw(mesh.fillVertices, 0, 1);
+      m_device.draw(run.count, run.first, 1);
       ++m_statistics.drawCalls;
-      m_statistics.triangles += mesh.fillVertices / 3;
+      m_statistics.triangles += run.count / 3;
     }
   }
-  if (style.hasOutline()) {
-    m_device.setPipeline(m_morph > 0.0 ? *m_lineMapPipeline : *m_linePipeline);
-    for (std::size_t i = 0; i < source.items.size(); ++i) {
-      const GpuMesh& mesh = *source.items[i].mesh;
-      if (mesh.segmentCount == 0) {
+}
+
+void VectorRenderer::drawSegments(const Source& source,
+                                  const VectorStyle& style,
+                                  const std::vector<std::size_t>& firstBlock)
+{
+  bool pipeline = false;
+  for (std::size_t i = 0; i < source.items.size(); ++i) {
+    const GpuMesh& mesh = *source.items[i].mesh;
+    for (std::size_t r = 0; r < mesh.segmentRuns.size() && mesh.segments; ++r) {
+      const VectorRun run = mesh.segmentRuns[r];
+      if (!runLook(mesh.styles, run, style).showsLine) {
         continue;
       }
-      m_device.setVertexBuffer(0, *mesh.segments, 0);
+      if (!pipeline) {
+        m_device.setPipeline(m_morph > 0.0 ? *m_lineMapPipeline
+                                           : *m_linePipeline);
+        pipeline = true;
+      }
+      // Instanced: the run's segments start at its offset in the buffer.
+      m_device.setVertexBuffer(0, *mesh.segments,
+                               static_cast<std::size_t>(run.first) *
+                                   sizeof(VectorSegment));
       m_device.setUniformBuffer(vectorBinding, *m_uniforms,
-                                (start + i) * m_uniformStride,
+                                (firstBlock[i] + mesh.fillRuns.size() + r) *
+                                    m_uniformStride,
                                 sizeof(VectorBlock));
-      m_device.draw(4, 0, mesh.segmentCount);
+      m_device.draw(4, 0, run.count);
       ++m_statistics.drawCalls;
-      m_statistics.segments += mesh.segmentCount;
+      m_statistics.segments += run.count;
     }
   }
-  m_statistics.tilesDrawn += static_cast<int32_t>(source.items.size());
 }
 
 } // namespace ts

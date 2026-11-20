@@ -27,6 +27,7 @@
 #include <QColor>
 #include <QCoreApplication>
 #include <QDir>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QStringList>
 
@@ -44,10 +45,14 @@
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/tilekey.h"
+#include "ts/wfs/wfsfeatureprovider.h"
+#include "ts/wfs/wfssource.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "ts/wmts/wmtsimageryprovider.h"
 #include "ts/wmts/wmtssource.h"
+#include "ts/xyz/xyzimageryprovider.h"
+#include "ts/xyz/xyzsource.h"
 
 namespace ts
 {
@@ -110,6 +115,10 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
                                        QString* errorString) const
 {
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const Replacement* variant = basePackVariant(source);
+  if (variant != nullptr && variant->features == features) {
+    return variant->path;
+  }
   const std::unordered_map<QString, Replacement>::const_iterator replacement =
       m_replacements.find(dataset);
   if (replacement != m_replacements.end() &&
@@ -189,6 +198,18 @@ ProviderRegistry::createWmtsImagery(const QJsonObject& source,
 }
 
 std::shared_ptr<ImageryProvider>
+ProviderRegistry::createXyzImagery(const QJsonObject& source,
+                                   QString* errorString)
+{
+  const std::optional<XyzSource> xyz = XyzSource::fromJson(source, errorString);
+  if (!xyz) {
+    return nullptr;
+  }
+  return std::make_shared<XyzImageryProvider>(*xyz, networkLocked(),
+                                              *m_wmsSettings);
+}
+
+std::shared_ptr<ImageryProvider>
 ProviderRegistry::createBasePackImagery(const QJsonObject& source,
                                         QString* errorString) const
 {
@@ -248,6 +269,7 @@ void ProviderRegistry::setInstalledPacks(
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
   m_replacements.clear();
+  m_variants.clear();
   m_packGeoids.clear();
   // Providers created from now on use the packs' geoids.
   m_geoids.clear();
@@ -273,6 +295,15 @@ void ProviderRegistry::setInstalledPacks(
                                            dataset.name, dataset.attribution});
         continue;
       }
+      if (!dataset.variantOf.isEmpty() && !dataset.variant.isEmpty()) {
+        Replacement variant;
+        variant.path = QDir(pack.directory).filePath(dataset.file);
+        variant.features = dataset.kind == PackDataset::Kind::Features;
+        variant.attribution = dataset.attribution;
+        // The first pack with this variant wins.
+        m_variants[dataset.variantOf].try_emplace(dataset.variant, variant);
+        continue;
+      }
       if (dataset.replaces.isEmpty() ||
           m_replacements.count(dataset.replaces) != 0) {
         continue;
@@ -287,10 +318,91 @@ void ProviderRegistry::setInstalledPacks(
   setDatumShiftGrids(shiftGrids);
 }
 
+const ProviderRegistry::Replacement*
+ProviderRegistry::basePackVariant(const QJsonObject& source) const
+{
+  const std::unordered_map<
+      QString, std::map<QString, Replacement>>::const_iterator variants =
+      m_variants.find(source.value(QStringLiteral("dataset")).toString());
+  if (variants == m_variants.end()) {
+    return nullptr;
+  }
+  const QJsonArray dimensions =
+      source.value(QStringLiteral("dimensions")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < dimensions.size(); ++i) {
+    const QJsonArray pair = dimensions.at(i).toArray();
+    if (pair.at(0).toString() == QLatin1String("month")) {
+      const std::map<QString, Replacement>::const_iterator found =
+          variants->second.find(pair.at(1).toString());
+      return found == variants->second.end() ? nullptr : &found->second;
+    }
+  }
+  return nullptr;
+}
+
+QString ProviderRegistry::basePackVariants(const QString& dataset) const
+{
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  const std::unordered_map<
+      QString, std::map<QString, Replacement>>::const_iterator variants =
+      m_variants.find(dataset);
+  if (variants == m_variants.end()) {
+    return QString();
+  }
+  QStringList values;
+  for (const std::pair<const QString, Replacement>& variant :
+       variants->second) {
+    values.append(variant.first);
+  }
+  return values.join(QLatin1Char(','));
+}
+
+std::optional<LayerTime>
+ProviderRegistry::basePackTime(const QJsonObject& source) const
+{
+  if (!isBasePackSource(source) || source.contains(QStringLiteral("time"))) {
+    return std::nullopt;
+  }
+  const QString extent =
+      basePackVariants(source.value(QStringLiteral("dataset")).toString());
+  if (extent.isEmpty()) {
+    return std::nullopt;
+  }
+  LayerTime time;
+  time.dimension = QStringLiteral("month");
+  time.extent = extent;
+  time.mode = LayerTime::Mode::MonthOfYear;
+  return time;
+}
+
 std::shared_ptr<FeatureProvider>
 ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
+  if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wfs")) {
+    const QString key = canonical(source);
+    const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
+        found = m_features.find(key);
+    if (found != m_features.end()) {
+      std::shared_ptr<FeatureProvider> live = found->second.lock();
+      if (live) {
+        return live;
+      }
+    }
+    const std::optional<WfsSource> wfs =
+        WfsSource::fromJson(source, errorString);
+    if (!wfs) {
+      return nullptr;
+    }
+    // The network client and cache settings of WMS: one limit on
+    // concurrent requests, one cache directory.
+    std::shared_ptr<WfsFeatureProvider> provider =
+        std::make_shared<WfsFeatureProvider>(*wfs, networkLocked(),
+                                             *m_wmsSettings);
+    m_features[key] = provider;
+    return provider;
+  }
   if (!isBasePackSource(source)) {
     if (errorString) {
       *errorString =
@@ -617,6 +729,7 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
 {
   const QString kind = source.value(QStringLiteral("kind")).toString();
   if (kind == QLatin1String("wms") || kind == QLatin1String("wmts") ||
+      kind == QLatin1String("xyz") || kind == QLatin1String("wfs") ||
       kind == QLatin1String("web") || kind == QLatin1String("file")) {
     return source.value(QStringLiteral("attribution")).toString();
   }
@@ -625,6 +738,10 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
     return QString();
   }
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const Replacement* variant = basePackVariant(source);
+  if (variant != nullptr) {
+    return variant->attribution;
+  }
   const std::unordered_map<QString, Replacement>::const_iterator replacement =
       m_replacements.find(dataset);
   if (replacement != m_replacements.end()) {
@@ -694,6 +811,9 @@ ProviderRegistry::imagery(const QJsonObject& source, QString* errorString)
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("wmts")) {
     provider = createWmtsImagery(source, errorString);
+  } else if (source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("xyz")) {
+    provider = createXyzImagery(source, errorString);
   } else if (source.value(QStringLiteral("kind")).toString() ==
              QLatin1String("file")) {
     provider = createFileImagery(source, errorString);

@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <utility>
 
 #define GEOS_USE_ONLY_R_API
@@ -110,7 +111,39 @@ bool isTiny(const std::vector<GeoPoint>& ring, double limitDeg,
 } // namespace
 
 /** The GEOS context and settings. */
+namespace
+{
+
+/** One style's triangles, lines and points, joined into runs at the end. */
+struct Bucket {
+  std::vector<VectorVertex> triangles;
+  std::vector<VectorSegment> lines;
+  std::vector<VectorSegment> points;
+};
+
+/** What meshing a tile's features needs to know about the tile. */
+struct MeshFrame {
+  Centre centre;
+  Rect rect;
+  double cellDeg = 0.0;
+  double segmentDeg = 0.0;
+  double minimumDeg = 0.0;
+};
+
+} // namespace
+
 struct VectorMesher::Private {
+  /**
+   * Meshes the lines and polygons of @p feature into @p bucket; false if
+   * cancelled.
+   */
+  bool meshShape(const Feature& feature, const MeshFrame& frame,
+                 const std::atomic<bool>& cancelled, Bucket& bucket) const;
+
+  /** Points as dots: segments of no length, drawn as round caps. */
+  static void addPoints(const Feature& feature, const MeshFrame& frame,
+                        Bucket& bucket);
+
   VectorMeshSettings settings;
   GeosContext geos;
 
@@ -342,6 +375,109 @@ visibleParts(const Feature& feature, double minimumDeg, const Rect& rect)
 
 } // namespace
 
+namespace
+{
+
+/** The index of @p feature's style in @p mesh's (0 for the layer's). */
+std::size_t styleIndex(const Feature& feature, VectorTileMesh& mesh,
+                       std::vector<Bucket>& buckets)
+{
+  if (!feature.style || feature.style->isEmpty()) {
+    return 0;
+  }
+  const std::vector<FeatureStyle>::const_iterator known =
+      std::find(mesh.styles.begin(), mesh.styles.end(), *feature.style);
+  const std::size_t index =
+      static_cast<std::size_t>(known - mesh.styles.begin()) + 1;
+  if (known == mesh.styles.end()) {
+    mesh.styles.push_back(*feature.style);
+    buckets.emplace_back();
+  }
+  return index;
+}
+
+template <typename T>
+void appendRun(std::vector<T>& all, const std::vector<T>& part,
+               std::vector<VectorRun>& runs, int32_t style, bool points)
+{
+  const std::size_t before = all.size();
+  all.insert(all.end(), part.begin(), part.end());
+  if (all.size() > before) {
+    runs.push_back(VectorRun{static_cast<int32_t>(before),
+                             static_cast<int32_t>(all.size() - before), style,
+                             points});
+  }
+}
+
+/** Joins the buckets into @p mesh: fills and lines by style, then points. */
+void joinRuns(const std::vector<Bucket>& buckets, VectorTileMesh& mesh)
+{
+  for (std::size_t s = 0; s < buckets.size(); ++s) {
+    appendRun(mesh.triangles, buckets[s].triangles, mesh.fillRuns,
+              static_cast<int32_t>(s), false);
+    appendRun(mesh.segments, buckets[s].lines, mesh.segmentRuns,
+              static_cast<int32_t>(s), false);
+  }
+  for (std::size_t s = 0; s < buckets.size(); ++s) {
+    appendRun(mesh.segments, buckets[s].points, mesh.segmentRuns,
+              static_cast<int32_t>(s), true);
+  }
+}
+
+} // namespace
+
+bool VectorMesher::Private::meshShape(const Feature& feature,
+                                      const MeshFrame& frame,
+                                      const std::atomic<bool>& cancelled,
+                                      Bucket& bucket) const
+{
+  const bool rings = feature.type == Feature::Type::Polygon;
+  const std::vector<const std::vector<GeoPoint>*> parts =
+      visibleParts(feature, frame.minimumDeg, frame.rect);
+  if (rings && !parts.empty()) {
+    // The fill's boundary gets the outline's vertices.
+    std::vector<std::vector<GeoPoint>> dense;
+    dense.reserve(parts.size());
+    std::vector<const std::vector<GeoPoint>*> denseParts;
+    for (const std::vector<GeoPoint>* part : parts) {
+      dense.push_back(densified(*part, frame.segmentDeg));
+      denseParts.push_back(&dense.back());
+    }
+    const GeomPtr shape = polygon(denseParts);
+    if (shape && GEOSisEmpty_r(context(), shape.get()) == 0 &&
+        !cut(shape.get(), frame.rect, frame.cellDeg, frame.centre, cancelled,
+             &bucket.triangles)) {
+      return false;
+    }
+  }
+  // Outlines: every ring or line, without the tile's own edges.
+  for (const std::vector<GeoPoint>* part : parts) {
+    for (std::size_t i = 0; i + 1 < part->size(); ++i) {
+      const GeoPoint a = (*part)[i];
+      const GeoPoint b = (*part)[i + 1];
+      if (!rings || !onTileEdge(a, b, frame.rect)) {
+        addSegments(a, b, frame.segmentDeg, frame.centre, &bucket.lines);
+      }
+    }
+  }
+  return true;
+}
+
+void VectorMesher::Private::addPoints(const Feature& feature,
+                                      const MeshFrame& frame, Bucket& bucket)
+{
+  const Rect& rect = frame.rect;
+  for (const std::vector<GeoPoint>& part : feature.parts) {
+    for (const GeoPoint& point : part) {
+      if (point.lonDeg >= rect.west && point.lonDeg <= rect.east &&
+          point.latDeg >= rect.south && point.latDeg <= rect.north) {
+        const VectorVertex v = vertex(point.lonDeg, point.latDeg, frame.centre);
+        bucket.points.push_back(VectorSegment{v, v});
+      }
+    }
+  }
+}
+
 std::optional<VectorTileMesh>
 VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
 {
@@ -351,51 +487,28 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
   const GeoRect bounds = tile.key.bounds();
   mesh.centreLonDeg = bounds.centreLonDeg();
   mesh.centreLatDeg = bounds.centreLatDeg();
-  const Centre centre{mesh.centreEcef, mesh.centreLonDeg, mesh.centreLatDeg};
-  const Rect rect{bounds.westDeg, bounds.southDeg, bounds.eastDeg,
-                  bounds.northDeg};
-  const double cellDeg = cellSizeDeg(tile.key.level);
-  const double segmentDeg = cellDeg * d->settings.segmentFraction;
-  const double minimumDeg =
+  MeshFrame frame;
+  frame.centre = Centre{mesh.centreEcef, mesh.centreLonDeg, mesh.centreLatDeg};
+  frame.rect =
+      Rect{bounds.westDeg, bounds.southDeg, bounds.eastDeg, bounds.northDeg};
+  frame.cellDeg = cellSizeDeg(tile.key.level);
+  frame.segmentDeg = frame.cellDeg * d->settings.segmentFraction;
+  frame.minimumDeg =
       TileKey::sizeDeg(tile.key.level) * d->settings.minimumExtentFraction;
-
+  // Each style's output apart: bucket 0 is the layer's style.
+  std::vector<Bucket> buckets(1);
   for (const Feature& feature : tile.features) {
     if (cancelled.load()) {
       return std::nullopt;
     }
+    const std::size_t style = styleIndex(feature, mesh, buckets);
     if (feature.type == Feature::Type::Points) {
-      continue;
-    }
-    const bool rings = feature.type == Feature::Type::Polygon;
-    const std::vector<const std::vector<GeoPoint>*> parts =
-        visibleParts(feature, minimumDeg, rect);
-    if (rings && !parts.empty()) {
-      // The fill's boundary gets the outline's vertices.
-      std::vector<std::vector<GeoPoint>> dense;
-      dense.reserve(parts.size());
-      std::vector<const std::vector<GeoPoint>*> denseParts;
-      for (const std::vector<GeoPoint>* part : parts) {
-        dense.push_back(densified(*part, segmentDeg));
-        denseParts.push_back(&dense.back());
-      }
-      const GeomPtr polygon = d->polygon(denseParts);
-      if (polygon && GEOSisEmpty_r(d->context(), polygon.get()) == 0 &&
-          !d->cut(polygon.get(), rect, cellDeg, centre, cancelled,
-                  &mesh.triangles)) {
-        return std::nullopt;
-      }
-    }
-    // Outlines: every ring or line, without the tile's own edges.
-    for (const std::vector<GeoPoint>* part : parts) {
-      for (std::size_t i = 0; i + 1 < part->size(); ++i) {
-        const GeoPoint a = (*part)[i];
-        const GeoPoint b = (*part)[i + 1];
-        if (!rings || !onTileEdge(a, b, rect)) {
-          Private::addSegments(a, b, segmentDeg, centre, &mesh.segments);
-        }
-      }
+      Private::addPoints(feature, frame, buckets.at(style));
+    } else if (!d->meshShape(feature, frame, cancelled, buckets.at(style))) {
+      return std::nullopt;
     }
   }
+  joinRuns(buckets, mesh);
   return mesh;
 }
 

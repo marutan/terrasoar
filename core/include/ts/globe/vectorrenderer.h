@@ -200,6 +200,10 @@ private:
                       const GeoRect& clip);
   void evict();
   void writeUniforms(const Camera& camera);
+  void drawFills(const Source& source, const VectorStyle& style,
+                 const std::vector<std::size_t>& firstBlock);
+  void drawSegments(const Source& source, const VectorStyle& style,
+                    const std::vector<std::size_t>& firstBlock);
 
   RenderDevice& m_device;
   VectorRendererSettings m_settings;

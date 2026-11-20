@@ -22,6 +22,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <initializer_list>
+#include <optional>
 
 #include <QComboBox>
 #include <QDialogButtonBox>
@@ -45,6 +47,7 @@
 #include <QVBoxLayout>
 
 #include "helpwindow.h"
+#include "timemodebox.h"
 #include "ts/network/networkclient.h"
 #include "ts/wms/wmssource.h"
 #include "wmscataloguefile.h"
@@ -115,8 +118,10 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
       m_statusLabel(new QLabel(this)), m_layersLabel(new QLabel(this)),
       m_layerTree(new QTreeWidget(this)), m_styleLabel(new QLabel(this)),
       m_styleBox(new QComboBox(this)), m_formatLabel(new QLabel(this)),
-      m_formatBox(new QComboBox(this)), m_detailsLabel(new QLabel(this)),
-      m_buttons(new QDialogButtonBox(this)), m_pollTimer(new QTimer(this))
+      m_formatBox(new QComboBox(this)), m_timeLabel(new QLabel(this)),
+      m_timeModeBox(new TimeModeBox(this)), m_timeValueBox(new QComboBox(this)),
+      m_detailsLabel(new QLabel(this)), m_buttons(new QDialogButtonBox(this)),
+      m_pollTimer(new QTimer(this))
 {
   QShortcut* help = new QShortcut(QKeySequence::HelpContents, this);
   connect(help, &QShortcut::activated, this,
@@ -142,6 +147,11 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
   m_styleLabel->setBuddy(m_styleBox);
   m_formatBox->setObjectName(QStringLiteral("wmsFormatBox"));
   m_formatLabel->setBuddy(m_formatBox);
+  m_timeModeBox->setObjectName(QStringLiteral("wmsTimeModeBox"));
+  m_timeValueBox->setObjectName(QStringLiteral("wmsTimeValueBox"));
+  m_timeValueBox->setEditable(true);
+  m_timeValueBox->setInsertPolicy(QComboBox::NoInsert);
+  m_timeLabel->setBuddy(m_timeModeBox);
   m_detailsLabel->setObjectName(QStringLiteral("wmsDetailsLabel"));
   m_detailsLabel->setWordWrap(true);
   m_addButton = m_buttons->addButton(QString(), QDialogButtonBox::AcceptRole);
@@ -158,6 +168,11 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
   choices->addWidget(m_styleBox, 0, 1);
   choices->addWidget(m_formatLabel, 1, 0);
   choices->addWidget(m_formatBox, 1, 1);
+  QHBoxLayout* time = new QHBoxLayout;
+  time->addWidget(m_timeModeBox);
+  time->addWidget(m_timeValueBox, 1);
+  choices->addWidget(m_timeLabel, 2, 0);
+  choices->addLayout(time, 2, 1);
   choices->setColumnStretch(1, 1);
   QVBoxLayout* layout = new QVBoxLayout(this);
   layout->addWidget(m_serviceLabel);
@@ -182,11 +197,16 @@ AddWmsDialog::AddWmsDialog(std::shared_ptr<NetworkClient> network,
           &AddWmsDialog::layerChosen);
   connect(m_formatBox, qOverload<int32_t>(&QComboBox::currentIndexChanged),
           this, &AddWmsDialog::layerChosen);
+  connect(m_timeModeBox, qOverload<int32_t>(&QComboBox::currentIndexChanged),
+          this, &AddWmsDialog::layerChosen);
+  connect(m_timeValueBox, &QComboBox::currentTextChanged, this,
+          &AddWmsDialog::layerChosen);
   connect(m_buttons, &QDialogButtonBox::accepted, this, &AddWmsDialog::accept);
   connect(m_buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   connect(m_pollTimer, &QTimer::timeout, this, &AddWmsDialog::poll);
 
   loadCatalogue();
+  fillTime(nullptr);
   retranslateUi();
   resize(640, 560);
 }
@@ -217,6 +237,7 @@ void AddWmsDialog::retranslateUi()
   m_layersLabel->setText(tr("&Layers:"));
   m_styleLabel->setText(tr("S&tyle:"));
   m_formatLabel->setText(tr("&Format:"));
+  m_timeLabel->setText(tr("T&ime:"));
   m_addButton->setText(tr("&Add"));
   m_serviceBox->lineEdit()->setPlaceholderText(tr("https://example.org/wms"));
   if (m_status.isEmpty()) {
@@ -472,7 +493,9 @@ void AddWmsDialog::layerChosen()
           m_formatBox->findText(chooseFormat(offered, layer->opaque));
       m_formatBox->setCurrentIndex(std::max(preferred, 0));
     }
+    fillTime(layer);
   }
+  m_timeValueBox->setEnabled(m_timeModeBox->mode() == LayerTime::Mode::Fixed);
   QString error;
   const std::optional<WmsSource> source = chosenSource(&error);
   m_addButton->setEnabled(source.has_value());
@@ -485,6 +508,12 @@ void AddWmsDialog::layerChosen()
     m_detailsLabel->setText(error);
     return;
   }
+  showDetails(*source);
+}
+
+void AddWmsDialog::showDetails(const WmsSource& chosen)
+{
+  const WmsSource* source = &chosen;
   QStringList details;
   details << (source->imageProjection() == TileImageProjection::WebMercator
                   ? tr("Drawn from Web Mercator images (%1), reprojected.")
@@ -493,13 +522,72 @@ void AddWmsDialog::layerChosen()
   if (!source->attribution.isEmpty()) {
     details << tr("Credit: %1").arg(source->attribution);
   }
-  if (!m_capabilities->accessConstraints.isEmpty() &&
-      m_capabilities->accessConstraints.compare(QLatin1String("none"),
-                                                Qt::CaseInsensitive) != 0) {
-    details << tr("The server's terms: %1")
-                   .arg(m_capabilities->accessConstraints.left(400));
+  const std::optional<LayerTime> time = chosenTime();
+  if (time && time->followsClock()) {
+    details << tr("Its time follows the program's clock (View → Time "
+                  "Slider).");
+  }
+  const QString terms =
+      m_capabilities ? m_capabilities->accessConstraints : QString();
+  if (!terms.isEmpty() &&
+      terms.compare(QLatin1String("none"), Qt::CaseInsensitive) != 0) {
+    details << tr("The server's terms: %1").arg(terms.left(400));
   }
   m_detailsLabel->setText(details.join(QLatin1Char('\n')));
+}
+
+void AddWmsDialog::fillTime(const WmsLayer* layer)
+{
+  const WmsDimension* dimension =
+      layer != nullptr ? layer->timeDimension() : nullptr;
+  for (QWidget* widget : std::initializer_list<QWidget*>{
+           m_timeLabel, m_timeModeBox, m_timeValueBox}) {
+    widget->setVisible(dimension != nullptr);
+  }
+  const QSignalBlocker modes(m_timeModeBox);
+  const QSignalBlocker values(m_timeValueBox);
+  m_timeValueBox->clear();
+  if (dimension == nullptr) {
+    return;
+  }
+  const TimeExtent extent = TimeExtent::parse(dimension->extent);
+  m_timeModeBox->setExtent(extent);
+  // The default, then the latest values (the newest pictures are the
+  // likeliest).
+  QStringList listed;
+  if (!dimension->defaultValue.isEmpty()) {
+    listed.append(dimension->defaultValue);
+  }
+  for (const QDateTime& time : extent.latest(500)) {
+    const QString value = extent.format(time);
+    if (!listed.contains(value)) {
+      listed.append(value);
+    }
+  }
+  m_timeValueBox->addItems(listed);
+  m_timeValueBox->setCurrentIndex(listed.isEmpty() ? -1 : 0);
+}
+
+std::optional<LayerTime> AddWmsDialog::chosenTime() const
+{
+  const QTreeWidgetItem* item = m_layerTree->currentItem();
+  if (!m_capabilities || item == nullptr) {
+    return std::nullopt;
+  }
+  const WmsLayer* layer =
+      m_capabilities->findLayer(item->data(0, layerNameRole).toString());
+  const WmsDimension* dimension =
+      layer != nullptr ? layer->timeDimension() : nullptr;
+  if (dimension == nullptr) {
+    return std::nullopt;
+  }
+  LayerTime time;
+  time.dimension = QStringLiteral("time");
+  time.extent = dimension->extent;
+  time.defaultValue = dimension->defaultValue;
+  time.mode = m_timeModeBox->mode();
+  time.value = m_timeValueBox->currentText().trimmed();
+  return time;
 }
 
 std::optional<WmsSource> AddWmsDialog::chosenSource(QString* errorString) const
@@ -513,6 +601,14 @@ std::optional<WmsSource> AddWmsDialog::chosenSource(QString* errorString) const
       *m_capabilities, QStringList{item->data(0, layerNameRole).toString()},
       QStringList{m_styleBox->currentData().toString()},
       m_formatBox->currentText(), errorString);
+  const std::optional<LayerTime> time = chosenTime();
+  if (source && time) {
+    // The value now; the main window puts in the clock's as it moves.
+    const QString value = time->valueAt(QDateTime::currentDateTimeUtc());
+    if (!value.isEmpty()) {
+      source->dimensions.emplace_back(QStringLiteral("time"), value);
+    }
+  }
   if (source && source->attribution.isEmpty()) {
     // Credit as the catalogue says, if the layer doesn't.
     for (const WmsCatalogueEntry& entry : m_catalogue) {
@@ -538,6 +634,10 @@ void AddWmsDialog::accept()
   definition.type = LayerType::Imagery;
   definition.name = source->title;
   definition.source = source->toJson();
+  const std::optional<LayerTime> time = chosenTime();
+  if (time) {
+    definition.source.insert(QStringLiteral("time"), time->toJson());
+  }
   m_definition = definition;
   QDialog::accept();
 }

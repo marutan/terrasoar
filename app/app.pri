@@ -33,9 +33,12 @@ HEADERS += \
     $$PWD/src/helpwindow.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/projectionsettingsdialog.h \
+    $$PWD/src/addwfsdialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
+    $$PWD/src/addxyzdialog.h \
     $$PWD/src/elevationprofiledialog.h \
+    $$PWD/src/featureinfowindow.h \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
     $$PWD/src/mainwindow.h \
@@ -45,6 +48,8 @@ HEADERS += \
     $$PWD/src/packmanagerdialog.h \
     $$PWD/src/offlineregionsdialog.h \
     $$PWD/src/startupmeasurement.h \
+    $$PWD/src/timebar.h \
+    $$PWD/src/timemodebox.h \
     $$PWD/src/userguide.h \
     $$PWD/src/wmscataloguefile.h
 
@@ -55,9 +60,12 @@ SOURCES += \
     $$PWD/src/helpwindow.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/projectionsettingsdialog.cpp \
+    $$PWD/src/addwfsdialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
+    $$PWD/src/addxyzdialog.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
+    $$PWD/src/featureinfowindow.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \
@@ -67,6 +75,8 @@ SOURCES += \
     $$PWD/src/packmanagerdialog.cpp \
     $$PWD/src/offlineregionsdialog.cpp \
     $$PWD/src/startupmeasurement.cpp \
+    $$PWD/src/timebar.cpp \
+    $$PWD/src/timemodebox.cpp \
     $$PWD/src/userguide.cpp \
     $$PWD/src/wmscataloguefile.cpp
 

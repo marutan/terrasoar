@@ -56,9 +56,12 @@
 
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
+#include "addwfsdialog.h"
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
+#include "addxyzdialog.h"
 #include "elevationprofiledialog.h"
+#include "featureinfowindow.h"
 #include "globeview.h"
 #include "helpwindow.h"
 #include "layertreedock.h"
@@ -68,6 +71,7 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "projectionsettingsdialog.h"
+#include "timebar.h"
 #include "ts/base/buildinfo.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/elevationprofile.h"
@@ -82,7 +86,12 @@
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/regions/countryareas.h"
+#include "ts/tiling/tilekey.h"
+#include "ts/time/layertime.h"
+#include "ts/time/programclock.h"
+#include "ts/time/timeextent.h"
 #include "ts/wms/wmsimageryprovider.h"
+#include "ts/wms/wmssource.h"
 
 namespace ts
 {
@@ -145,6 +154,10 @@ MainWindow::MainWindow(QWidget* parent)
             &MainWindow::showPointerPosition);
     connect(m_globeView, &GlobeView::cameraChanged, this,
             &MainWindow::showEyeHeight);
+    connect(m_globeView, &GlobeView::pointClicked, this,
+            [this](LonLat point, double degreesPerPixel) {
+              identifyAt(point, degreesPerPixel);
+            });
   } else {
     // Headless runs (the offscreen platform) and broken drivers: the rest
     // of the window still works.
@@ -188,12 +201,28 @@ MainWindow::MainWindow(QWidget* parent)
       }
     }
   }
+  // The clock layers with times follow, and its slider under the view
+  // (shown when a layer that follows it is added).
+  m_clock = new ProgramClock(this);
+  m_timeBar = new TimeBar(m_clock, this);
+  addToolBar(Qt::BottomToolBarArea, m_timeBar);
+  m_timeBar->hide();
+  m_timeBar->toggleViewAction()->setObjectName(
+      QStringLiteral("timeSliderAction"));
+  connect(m_clock, &ProgramClock::timeChanged, this, &MainWindow::clockMoved);
   m_layerDock = new LayerTreeDock(m_layers, this);
   addDockWidget(Qt::LeftDockWidgetArea, m_layerDock);
+  m_layerDock->setTimeLookup([this](const QJsonObject& source) {
+    return m_registry->basePackTime(source);
+  });
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addWmtsLayerRequested, this,
           [this]() { addWmtsLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addXyzLayerRequested, this,
+          [this]() { addXyzLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addWfsLayerRequested, this,
+          [this]() { addWfsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addImageryFileRequested, this,
           [this]() { addImageryFile(); });
   connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
@@ -529,6 +558,18 @@ void MainWindow::createActions()
   m_addWmtsAction->setObjectName(QStringLiteral("addWmtsAction"));
   connect(m_addWmtsAction, &QAction::triggered, this,
           [this]() { addWmtsLayer(); });
+  m_featureInfoAction = new QAction(this);
+  m_featureInfoAction->setObjectName(QStringLiteral("featureInfoAction"));
+  m_featureInfoAction->setCheckable(true);
+  m_featureInfoAction->setChecked(true);
+  m_addWfsAction = new QAction(this);
+  m_addWfsAction->setObjectName(QStringLiteral("addWfsAction"));
+  connect(m_addWfsAction, &QAction::triggered, this,
+          [this]() { addWfsLayer(); });
+  m_addXyzAction = new QAction(this);
+  m_addXyzAction->setObjectName(QStringLiteral("addXyzAction"));
+  connect(m_addXyzAction, &QAction::triggered, this,
+          [this]() { addXyzLayer(); });
 
   m_addWebTerrainAction = new QAction(this);
   m_addWebTerrainAction->setObjectName(QStringLiteral("addWebTerrainAction"));
@@ -804,6 +845,8 @@ void MainWindow::createMenus()
   m_fileMenu->addSeparator();
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addWmtsAction);
+  m_fileMenu->addAction(m_addXyzAction);
+  m_fileMenu->addAction(m_addWfsAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
@@ -824,6 +867,8 @@ void MainWindow::createMenus()
   m_projectionMenu->addAction(m_projectionSettingsAction);
   m_viewMenu->addAction(m_scaleBarAction);
   m_viewMenu->addAction(m_attributionsAction);
+  m_viewMenu->addAction(m_timeBar->toggleViewAction());
+  m_viewMenu->addAction(m_featureInfoAction);
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
@@ -888,6 +933,13 @@ void MainWindow::retranslateUi()
   m_scaleBarAction->setText(tr("&Scale Bar"));
   m_scaleBarAction->setStatusTip(
       tr("Show a ground distance at the centre of the view"));
+  m_featureInfoAction->setText(tr("What Is &Here on Click"));
+  m_featureInfoAction->setStatusTip(
+      tr("Clicking the globe or the map asks WMS layers what they show "
+         "there"));
+  m_timeBar->toggleViewAction()->setText(tr("&Time Slider"));
+  m_timeBar->toggleViewAction()->setStatusTip(
+      tr("Show the slider that sets the time shown by layers with dates"));
   m_attributionsAction->setText(tr("&Attributions"));
   m_attributionsAction->setStatusTip(
       tr("Show the sources of the layers drawn in the corner of the view"));
@@ -913,10 +965,18 @@ void MainWindow::retranslateUi()
   m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
   m_addWmtsAction->setStatusTip(
       tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
+  m_addWfsAction->setText(tr("Add W&FS Layer…"));
+  m_addWfsAction->setStatusTip(
+      tr("Add features (points, lines and areas) from a web feature service "
+         "(WFS) to the layer tree"));
+  m_addXyzAction->setText(tr("Add &XYZ Tile Layer…"));
+  m_addXyzAction->setStatusTip(
+      tr("Add a layer from an XYZ or TMS tile service, such as "
+         "OpenStreetMap, to the layer tree"));
   m_offlineRegionsAction->setText(tr("Offline &Regions…"));
   m_offlineRegionsAction->setStatusTip(
-      tr("Keep areas of WMS and WMTS layers on this computer for use "
-         "without a network"));
+      tr("Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for "
+         "use without a network"));
   m_dataPacksAction->setText(tr("&Data Packs…"));
   m_dataPacksAction->setStatusTip(
       tr("Install more detailed imagery and shorelines, or remove them"));
@@ -1030,7 +1090,10 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
 
 void MainWindow::refreshLayers()
 {
-  const LayerStack stack = m_layers->layerStack();
+  const LayerStack tree = timedStack();
+  updateTimeBar(tree);
+  // Layers with times draw the clock's.
+  const LayerStack stack = stackAtTime(tree, m_clock->time());
   if (!m_globeView) {
     // No OpenGL view: nothing is drawn, but layers that can't be opened are
     // still marked in the dock.
@@ -1043,8 +1106,7 @@ void MainWindow::refreshLayers()
   m_globeView->setMapProjection(
       projectionWith(projection->id(), projection->parameterValues()));
   QStringList errors;
-  m_globeView->setImageryDraws(
-      imageryDrawsForStack(stack, *m_registry, &errors));
+  applyImageryDraws(stack, &errors);
   m_globeView->setVectorDraws(vectorDrawsForStack(stack, *m_registry, &errors));
   m_globeView->setElevationDraw(
       elevationDrawForStack(stack, *m_registry, &errors));
@@ -1053,6 +1115,143 @@ void MainWindow::refreshLayers()
     statusBar()->showMessage(errors.join(QLatin1Char(' ')), 10000);
   }
   watchLayerStatus(stack);
+}
+
+void MainWindow::applyImageryDraws(const LayerStack& stack, QStringList* errors)
+{
+  QJsonArray sources;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    sources.append(entry.definition.source);
+  }
+  m_drawnImagery = sources;
+  if (m_globeView) {
+    m_globeView->setImageryDraws(
+        imageryDrawsForStack(stack, *m_registry, errors));
+  }
+}
+
+void MainWindow::clockMoved()
+{
+  // Only the imagery whose time changed is drawn anew: the other layers'
+  // providers (and their tiles) stay.
+  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
+  QJsonArray sources;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    sources.append(entry.definition.source);
+  }
+  if (sources == m_drawnImagery) {
+    return;
+  }
+  QStringList errors;
+  applyImageryDraws(stack, &errors);
+  watchLayerStatus(stack);
+}
+
+LayerStack MainWindow::timedStack() const
+{
+  // Base pack layers with month variants installed (Blue Marble's months)
+  // follow the clock's month unless told otherwise.
+  LayerStack stack = m_layers->layerStack();
+  for (ImageryStackEntry& entry : stack.imagery) {
+    const std::optional<LayerTime> time =
+        m_registry->basePackTime(entry.definition.source);
+    if (time) {
+      entry.definition.source.insert(QStringLiteral("time"), time->toJson());
+    }
+  }
+  return stack;
+}
+
+int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
+{
+  if (!m_featureInfoAction->isChecked()) {
+    return 0;
+  }
+  // The visible WMS layers that can be asked, topmost first, as drawn now;
+  // then the WFS layers, whose features are here already.
+  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
+  std::vector<FeatureInfoQuery> queries;
+  for (std::size_t i = stack.imagery.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.imagery[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wms")) {
+      continue;
+    }
+    const std::optional<WmsSource> source =
+        WmsSource::fromJson(definition.source, nullptr);
+    if (!source || source->featureInfoUrl.isEmpty()) {
+      continue;
+    }
+    // The tile at the view's scale (its pixels about the screen's).
+    const double perPixel = std::max(degreesPerPixel, 1e-9);
+    const int32_t level = std::clamp(
+        static_cast<int32_t>(std::lround(std::log2(
+            180.0 / (static_cast<double>(source->tileSizePx) * perPixel)))),
+        0, std::min(source->maximumLevel, TileKey::maximumLevel));
+    const TileKey key =
+        TileKey::containing(level, Geodetic{point.latDeg, point.lonDeg, 0.0});
+    const QUrl url =
+        getFeatureInfoUrl(*source, key, point.lonDeg, point.latDeg);
+    if (!url.isEmpty()) {
+      queries.push_back(
+          FeatureInfoQuery{definition.name, url, source->infoFormat});
+    }
+  }
+  // Vector layers whose features are at hand (WFS), topmost first: within
+  // a few pixels of the click.
+  std::vector<FeatureInfoLocal> local;
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wfs")) {
+      continue;
+    }
+    const std::shared_ptr<FeatureProvider> provider =
+        m_registry->features(definition.source, nullptr);
+    if (!provider) {
+      continue;
+    }
+    const std::vector<Feature> found = provider->featuresAt(
+        GeoPoint{point.latDeg, point.lonDeg}, 4.0 * degreesPerPixel);
+    if (!found.empty()) {
+      local.push_back(FeatureInfoLocal{definition.name, found});
+    }
+  }
+  if (queries.empty() && local.empty()) {
+    return 0;
+  }
+  if (m_featureInfoWindow == nullptr) {
+    m_featureInfoWindow = new FeatureInfoWindow(m_registry->network(), this);
+  }
+  m_featureInfoWindow->query(point, queries, local);
+  m_featureInfoWindow->show();
+  m_featureInfoWindow->raise();
+  return static_cast<int32_t>(queries.size() + local.size());
+}
+
+void MainWindow::updateTimeBar(const LayerStack& stack)
+{
+  // The times of the visible layers that follow the clock, joined; those
+  // following the month of the year step through the clock's year.
+  QStringList extents;
+  for (const ImageryStackEntry& entry : stack.imagery) {
+    const std::optional<LayerTime> time =
+        LayerTime::fromSource(entry.definition.source);
+    if (!time || !time->followsClock()) {
+      continue;
+    }
+    if (time->mode == LayerTime::Mode::MonthOfYear) {
+      const int32_t year = m_clock->time().date().year();
+      extents.append(QStringLiteral("%1-01-01/%1-12-01/P1M").arg(year));
+    } else {
+      extents.append(time->extent);
+    }
+  }
+  m_timeBar->setExtent(TimeExtent::parse(extents));
+  if (!extents.isEmpty() && !m_timeBarOffered) {
+    m_timeBarOffered = true;
+    m_timeBar->show();
+  }
 }
 
 void MainWindow::watchLayerStatus(const LayerStack& stack)
@@ -1132,6 +1331,33 @@ void MainWindow::addWmtsLayer(const QString& address)
   if (!address.isEmpty()) {
     dialog.connectTo(address);
   }
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
+  }
+}
+
+void MainWindow::addWfsLayer(const QString& address)
+{
+  AddWfsDialog dialog(m_registry->network(), this);
+  if (!address.isEmpty()) {
+    dialog.connectTo(address);
+  }
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
+  }
+}
+
+void MainWindow::addXyzLayer()
+{
+  AddXyzDialog dialog(m_registry->network(), this);
   if (dialog.exec() != QDialog::Accepted) {
     return;
   }
@@ -1272,14 +1498,30 @@ NewRegionDialog* MainWindow::newOfflineRegion()
     m_newRegionDialog->raise();
     return m_newRegionDialog;
   }
-  // The WMS and WMTS layers of the project, each source once, top first.
+  // The WMS, WMTS and XYZ layers of the project, each source once, top
+  // first; layers with times as drawn now.
   std::vector<RegionLayerChoice> layers;
-  const LayerStack stack = m_layers->layerStack();
+  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
   for (std::size_t i = stack.imagery.size(); i-- > 0;) {
     const LayerDefinition& definition = stack.imagery[i].definition;
     const QString kind =
         definition.source.value(QStringLiteral("kind")).toString();
-    if (kind != QLatin1String("wms") && kind != QLatin1String("wmts")) {
+    if (kind != QLatin1String("wms") && kind != QLatin1String("wmts") &&
+        kind != QLatin1String("xyz")) {
+      continue;
+    }
+    const bool seen = std::any_of(layers.begin(), layers.end(),
+                                  [&](const RegionLayerChoice& layer) {
+                                    return layer.source == definition.source;
+                                  });
+    if (!seen) {
+      layers.push_back(RegionLayerChoice{definition.name, definition.source});
+    }
+  }
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wfs")) {
       continue;
     }
     const bool seen = std::any_of(layers.begin(), layers.end(),
@@ -1293,9 +1535,9 @@ NewRegionDialog* MainWindow::newOfflineRegion()
   if (layers.empty()) {
     QMessageBox::information(
         this, tr("New Offline Region"),
-        tr("Only layers from WMS and WMTS servers can be kept for offline "
-           "use. Add one first (File → Add WMS Layer… or Add WMTS "
-           "Layer…)."));
+        tr("Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept "
+           "for offline use. Add one first (File → Add WMS Layer…, Add WMTS "
+           "Layer…, Add XYZ Tile Layer… or Add WFS Layer…)."));
     return nullptr;
   }
   if (!m_countries && !m_countriesFile.isEmpty()) {
@@ -1335,6 +1577,9 @@ bool MainWindow::openProject(const QString& path, QString* errorString)
                              false);
     m_globeView->setPose(project->camera);
   }
+  if (project->time.isValid()) {
+    m_clock->setTime(project->time);
+  }
   m_projectPath = path;
   return true;
 }
@@ -1350,6 +1595,7 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
     project.projectionParameters =
         m_globeView->mapProjection()->parameterValues();
   }
+  project.time = m_clock->time();
   project.layers = m_layers->toJson();
   if (!ts::saveProject(path, project, errorString)) {
     return false;

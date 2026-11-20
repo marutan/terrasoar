@@ -42,6 +42,8 @@ struct RawLayer {
   std::optional<int32_t> fixedWidth;
   std::optional<int32_t> fixedHeight;
   bool hasScale = false;
+  /** 1.1.1 Extent elements (values for Dimensions declared here or above). */
+  std::vector<WmsDimension> extents;
   std::vector<RawLayer> children;
 };
 
@@ -255,6 +257,40 @@ void readBoundingBox(QXmlStreamReader& reader, const QString& name,
   }
 }
 
+/**
+ * Reads a Dimension (1.3.0: with its values; 1.1.1: without) or a 1.1.1
+ * Extent element.
+ */
+WmsDimension parseDimension(QXmlStreamReader& reader)
+{
+  WmsDimension dimension;
+  dimension.name = attribute(reader, QLatin1String("name")).trimmed().toLower();
+  dimension.units = attribute(reader, QLatin1String("units"));
+  dimension.defaultValue =
+      attribute(reader, QLatin1String("default")).trimmed();
+  dimension.multipleValues =
+      boolAttribute(reader, QLatin1String("multipleValues")).value_or(false);
+  dimension.nearestValue =
+      boolAttribute(reader, QLatin1String("nearestValue")).value_or(false);
+  dimension.current =
+      boolAttribute(reader, QLatin1String("current")).value_or(false);
+  dimension.extent = text(reader).simplified().remove(QLatin1Char(' '));
+  return dimension;
+}
+
+/** Puts @p dimension in @p dimensions, replacing one of the same name. */
+void putDimension(std::vector<WmsDimension>& dimensions,
+                  const WmsDimension& dimension)
+{
+  for (WmsDimension& known : dimensions) {
+    if (known.name == dimension.name) {
+      known = dimension;
+      return;
+    }
+  }
+  dimensions.push_back(dimension);
+}
+
 void parseLayer(QXmlStreamReader& reader, RawLayer& layer)
 {
   layer.opaque = boolAttribute(reader, QLatin1String("opaque"));
@@ -292,6 +328,16 @@ void parseLayer(QXmlStreamReader& reader, RawLayer& layer)
       parseScaleHint(reader, layer);
     } else if (name == QLatin1String("Attribution")) {
       parseAttribution(reader, own);
+    } else if (name == QLatin1String("Dimension")) {
+      const WmsDimension dimension = parseDimension(reader);
+      if (!dimension.name.isEmpty()) {
+        putDimension(own.dimensions, dimension);
+      }
+    } else if (name == QLatin1String("Extent")) {
+      const WmsDimension extent = parseDimension(reader);
+      if (!extent.name.isEmpty()) {
+        putDimension(layer.extents, extent);
+      }
     } else if (name == QLatin1String("Layer")) {
       layer.children.emplace_back();
       parseLayer(reader, layer.children.back());
@@ -358,6 +404,38 @@ void inheritFrom(const RawLayer& raw, const WmsLayer& parent, WmsLayer& layer)
     layer.attributionTitle = parent.attributionTitle;
     layer.attributionUrl = parent.attributionUrl;
   }
+  layer.dimensions = parent.dimensions;
+  for (const WmsDimension& dimension : raw.own.dimensions) {
+    WmsDimension own = dimension;
+    // A 1.1.1 Dimension declared again without its Extent keeps the
+    // values from above.
+    for (const WmsDimension& inherited : parent.dimensions) {
+      if (inherited.name == own.name && own.extent.isEmpty()) {
+        own.extent = inherited.extent;
+        own.defaultValue = inherited.defaultValue;
+      }
+    }
+    putDimension(layer.dimensions, own);
+  }
+}
+
+/**
+ * Gives 1.1.1 Extents their values: each fills the Dimension of its name
+ * (declared on the layer or above); the Dimension's units stay.
+ */
+void applyExtents(const RawLayer& raw, WmsLayer& layer)
+{
+  for (const WmsDimension& extent : raw.extents) {
+    for (WmsDimension& dimension : layer.dimensions) {
+      if (dimension.name == extent.name) {
+        dimension.defaultValue = extent.defaultValue;
+        dimension.extent = extent.extent;
+        dimension.multipleValues = extent.multipleValues;
+        dimension.nearestValue = extent.nearestValue;
+        dimension.current = extent.current;
+      }
+    }
+  }
 }
 
 /** The first BoundingBox in a geographic CRS, as a rectangle. */
@@ -387,6 +465,7 @@ WmsLayer resolve(const RawLayer& raw, const WmsLayer* parent, bool lonLatAxes)
   if (parent != nullptr) {
     inheritFrom(raw, *parent, layer);
   }
+  applyExtents(raw, layer);
   layer.opaque = raw.opaque.value_or(parent != nullptr && parent->opaque);
   layer.queryable =
       raw.queryable.value_or(parent != nullptr && parent->queryable);
@@ -446,6 +525,26 @@ void parseGetMap(QXmlStreamReader& reader, WmsCapabilities& capabilities)
   }
 }
 
+void parseGetFeatureInfo(QXmlStreamReader& reader,
+                         WmsCapabilities& capabilities)
+{
+  while (reader.readNextStartElement()) {
+    if (reader.name() == QLatin1String("Format")) {
+      const QString format = text(reader);
+      if (!format.isEmpty()) {
+        capabilities.getFeatureInfoFormats.append(format);
+      }
+    } else if (reader.name() == QLatin1String("DCPType")) {
+      const QUrl get = dcpGetUrl(reader);
+      if (capabilities.getFeatureInfoUrl.isEmpty()) {
+        capabilities.getFeatureInfoUrl = get;
+      }
+    } else {
+      reader.skipCurrentElement();
+    }
+  }
+}
+
 void parseCapability(QXmlStreamReader& reader, WmsCapabilities& capabilities,
                      std::vector<RawLayer>& layers)
 {
@@ -454,6 +553,8 @@ void parseCapability(QXmlStreamReader& reader, WmsCapabilities& capabilities,
       while (reader.readNextStartElement()) {
         if (reader.name() == QLatin1String("GetMap")) {
           parseGetMap(reader, capabilities);
+        } else if (reader.name() == QLatin1String("GetFeatureInfo")) {
+          parseGetFeatureInfo(reader, capabilities);
         } else {
           reader.skipCurrentElement();
         }
@@ -520,6 +621,16 @@ bool WmsLayer::supportsCrs(const QString& code) const
   return std::any_of(crs.begin(), crs.end(), [&code](const QString& known) {
     return sameCode(known, code);
   });
+}
+
+const WmsDimension* WmsLayer::timeDimension() const
+{
+  for (const WmsDimension& dimension : dimensions) {
+    if (dimension.isTime()) {
+      return &dimension;
+    }
+  }
+  return nullptr;
 }
 
 const WmsLayer* WmsCapabilities::findLayer(const QString& layerName) const

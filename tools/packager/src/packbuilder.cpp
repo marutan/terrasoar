@@ -254,6 +254,31 @@ bool readCountries(const QJsonObject& json, PackConfig* config,
   return true;
 }
 
+/** An imagery entry of @p config's; nothing if it can't be used. */
+std::optional<ImagerySpec> readImagery(const PackConfig& config,
+                                       const QJsonObject& entry)
+{
+  ImagerySpec spec;
+  spec.dataset = text(entry, "dataset");
+  spec.source = text(entry, "source");
+  spec.name = text(entry, "name");
+  spec.licence = text(entry, "licence");
+  spec.attribution = text(entry, "attribution");
+  spec.replaces = text(entry, "replaces");
+  spec.variantOf = text(entry, "variantOf");
+  spec.variant = text(entry, "variant");
+  spec.tiling.maxLevel = integer(entry, "maxLevel", 4);
+  spec.tiling.tileSizePx = integer(entry, "tileSize", 256);
+  spec.tiling.jpegQuality = integer(entry, "jpegQuality", 85);
+  if (findSource(config, spec.source) == nullptr || spec.dataset.isEmpty() ||
+      spec.tiling.maxLevel < 0 || spec.tiling.maxLevel > 8 ||
+      spec.tiling.tileSizePx < 16 ||
+      spec.variantOf.isEmpty() != spec.variant.isEmpty()) {
+    return std::nullopt;
+  }
+  return spec;
+}
+
 } // namespace
 
 std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
@@ -280,23 +305,24 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
 
   const QJsonObject imagery = json.value(QStringLiteral("imagery")).toObject();
   if (!imagery.isEmpty()) {
-    ImagerySpec spec;
-    spec.dataset = text(imagery, "dataset");
-    spec.source = text(imagery, "source");
-    spec.name = text(imagery, "name");
-    spec.licence = text(imagery, "licence");
-    spec.attribution = text(imagery, "attribution");
-    spec.replaces = text(imagery, "replaces");
-    spec.tiling.maxLevel = integer(imagery, "maxLevel", 4);
-    spec.tiling.tileSizePx = integer(imagery, "tileSize", 256);
-    spec.tiling.jpegQuality = integer(imagery, "jpegQuality", 85);
-    if (findSource(config, spec.source) == nullptr || spec.dataset.isEmpty() ||
-        spec.tiling.maxLevel < 0 || spec.tiling.maxLevel > 8 ||
-        spec.tiling.tileSizePx < 16) {
+    const std::optional<ImagerySpec> spec = readImagery(config, imagery);
+    if (!spec) {
       fail(errorString, QStringLiteral("Bad imagery entry"));
       return std::nullopt;
     }
     config.imagery = spec;
+  }
+  const QJsonArray variants =
+      json.value(QStringLiteral("imageryVariants")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < variants.size(); ++i) {
+    const std::optional<ImagerySpec> spec =
+        readImagery(config, variants.at(i).toObject());
+    if (!spec || spec->variantOf.isEmpty()) {
+      fail(errorString, QStringLiteral("Bad imagery variant %1").arg(i));
+      return std::nullopt;
+    }
+    config.imageryVariants.push_back(*spec);
   }
 
   const QJsonObject shoreline =
@@ -488,10 +514,16 @@ private:
 
   bool buildImagery()
   {
-    if (!m_config->imagery) {
-      return true;
+    if (m_config->imagery && !buildImagery(*m_config->imagery)) {
+      return false;
     }
-    const ImagerySpec& spec = *m_config->imagery;
+    return std::all_of(
+        m_config->imageryVariants.begin(), m_config->imageryVariants.end(),
+        [this](const ImagerySpec& spec) { return buildImagery(spec); });
+  }
+
+  bool buildImagery(const ImagerySpec& spec)
+  {
     const SourceSpec& source = *findSource(*m_config, spec.source);
     const QString file = spec.dataset + QStringLiteral(".sqlite");
     const int32_t width =
@@ -514,18 +546,23 @@ private:
     SqliteTileStoreWriter writer(m_output.filePath(file), info);
     ImageryTilerOptions tiling = spec.tiling;
     tiling.progress = m_progress;
+    ImageryTilerStats stats;
     if (!writer.errorString().isEmpty() ||
-        !tileMosaic(mosaic, tiling, &writer, &m_report->imagery, m_error) ||
+        !tileMosaic(mosaic, tiling, &writer, &stats, m_error) ||
         !writer.finish()) {
       return fail(m_error,
                   m_error->isEmpty() ? writer.errorString() : *m_error);
     }
+    m_report->imagery.tiles += stats.tiles;
+    m_report->imagery.bytes += stats.bytes;
     addDataset(spec.dataset, PackDataset::Kind::Imagery, file, source);
     PackDataset& dataset = m_manifest.datasets.back();
     dataset.name = spec.name;
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
     dataset.replaces = spec.replaces;
+    dataset.variantOf = spec.variantOf;
+    dataset.variant = spec.variant;
     return true;
   }
 

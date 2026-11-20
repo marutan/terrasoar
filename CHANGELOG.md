@@ -9,6 +9,24 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- File → Add XYZ Tile Layer…: web maps served as `{z}/{x}/{y}` tiles
+  (OpenStreetMap, OpenTopoMap, USGS imagery, NASA GIBS, EMODnet), TMS row
+  order and subdomains, from a catalogue or typed in; cached and kept
+  offline like WMS layers where their terms allow it.
+- A program clock and the time slider (View → Time Slider): WMS and WMTS
+  layers with dates (daily satellite pictures, forecasts, radar) follow
+  it, with back, forward and play; each layer can instead keep a time of
+  its own (its Time menu in the Layers panel). Projects save the time.
+- Blue Marble month by month: a data pack with NASA's picture for every
+  month, so the seasons follow the clock.
+- What Is Here: clicking the globe or the map lists what the WMS layers
+  that can be asked, and WFS layers, have at that point (View → What Is
+  Here on Click).
+- File → Add WFS Layer…: points, lines and areas from web feature
+  services (WFS 2.0, GeoJSON or GML) with their attributes, loaded for
+  the area in view, cached and kept offline; features drawn in their own
+  colours where the data or style rules give them.
+
 - Three more projections for the flat map (View → Map Projection):
   Equidistant Cylindrical (Plate Carrée), Gall Stereographic and
   Gall–Peters (Gall Orthographic, equal-area).

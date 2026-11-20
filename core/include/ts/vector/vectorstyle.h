@@ -54,6 +54,8 @@ struct VectorStyle {
   QColor outline = QColor(0, 0, 0, 0);
   /** Outline width in logical pixels. */
   double outlineWidthPx = 1.0;
+  /** Diameter of point features in logical pixels. */
+  double pointSizePx = 6.0;
 
   /** Returns true if the fill shows (alpha above zero). */
   bool hasFill() const { return fill.isValid() && fill.alpha() > 0; }

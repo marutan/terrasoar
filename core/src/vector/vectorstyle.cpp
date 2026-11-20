@@ -89,6 +89,10 @@ VectorStyle VectorStyle::fromJson(const QJsonObject& json)
   if (width >= 0.0) {
     style.outlineWidthPx = width;
   }
+  const double point = json.value(QStringLiteral("pointSizePx")).toDouble(-1.0);
+  if (point >= 0.0) {
+    style.pointSizePx = point;
+  }
   return style;
 }
 
@@ -98,6 +102,10 @@ QJsonObject VectorStyle::toJson() const
   json.insert(QStringLiteral("fill"), colorToRgbaHex(fill));
   json.insert(QStringLiteral("outline"), colorToRgbaHex(outline));
   json.insert(QStringLiteral("outlineWidthPx"), outlineWidthPx);
+  // Only when not the default, so styles without points stay as they were.
+  if (pointSizePx != VectorStyle().pointSizePx) {
+    json.insert(QStringLiteral("pointSizePx"), pointSizePx);
+  }
   return json;
 }
 

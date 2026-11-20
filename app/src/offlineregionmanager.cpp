@@ -88,13 +88,17 @@ OfflineRegionManager::providerFor(const QJsonObject& source,
                                   QString* errorString)
 {
   QString error;
+  // Imagery (WMS, WMTS, XYZ) or features (WFS).
   std::shared_ptr<RegionTileSource> provider =
-      std::dynamic_pointer_cast<RegionTileSource>(
-          m_registry.imagery(source, &error));
+      source.value(QStringLiteral("kind")).toString() == QLatin1String("wfs")
+          ? std::dynamic_pointer_cast<RegionTileSource>(
+                m_registry.features(source, &error))
+          : std::dynamic_pointer_cast<RegionTileSource>(
+                m_registry.imagery(source, &error));
   if (!provider && errorString) {
     *errorString = error.isEmpty()
-                       ? tr("Only layers from WMS and WMTS servers can be "
-                            "kept for offline use.")
+                       ? tr("Only layers from WMS, WMTS, XYZ tile and WFS "
+                            "servers can be kept for offline use.")
                        : error;
   }
   if (provider && !provider->diskCache() && errorString) {

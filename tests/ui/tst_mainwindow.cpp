@@ -26,6 +26,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QDirIterator>
@@ -45,11 +46,14 @@
 #include <QNetworkProxy>
 #include <QPointer>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QShortcut>
 #include <QSignalSpy>
 #include <QSlider>
+#include <QSpinBox>
 #include <QStandardPaths>
 #include <QStatusBar>
+#include <QStyleHints>
 #include <QTabWidget>
 #include <QTemporaryDir>
 #include <QTimer>
@@ -61,16 +65,21 @@
 
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
+#include "addwfsdialog.h"
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
+#include "addxyzdialog.h"
 #include "appsettings.h"
 #include "elevationprofiledialog.h"
+#include "featureinfowindow.h"
 #include "fixturepack.h"
 #include "globeview.h"
 #include "helpwindow.h"
+#include "layertreedock.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
 #include "mockpacks.h"
+#include "mockwfs.h"
 #include "mockwms.h"
 #include "mockwmts.h"
 #include "newregiondialog.h"
@@ -79,6 +88,8 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "projectionsettingsdialog.h"
+#include "timebar.h"
+#include "timemodebox.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/layers/layertreemodel.h"
@@ -87,9 +98,15 @@
 #include "ts/network/tilediskcache.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
+#include "ts/time/layertime.h"
+#include "ts/time/programclock.h"
+#include "ts/time/timeextent.h"
+#include "ts/vector/vectorstyle.h"
+#include "ts/wms/wmscapabilities.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "userguide.h"
+#include "wmscataloguefile.h"
 
 namespace
 {
@@ -437,6 +454,8 @@ private slots:
     // catalogue isn't fetched from the internet.
     QStandardPaths::setTestModeEnabled(true);
     qputenv("TS_WMS_CATALOGUE_URL", QByteArray());
+    qputenv("TS_XYZ_CATALOGUE_URL", QByteArray());
+    qputenv("TS_WFS_CATALOGUE_URL", QByteArray());
     // No offline regions left over from an earlier run.
     QFile::remove(
         QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
@@ -546,7 +565,9 @@ private slots:
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
     QAction* quit = window.findChild<QAction*>(QStringLiteral("quitAction"));
-    QVERIFY(quit != nullptr);
+    if (!quit) {
+      QFAIL("quit is missing");
+    }
     quit->trigger();
     QVERIFY(!window.isVisible());
   }
@@ -556,10 +577,14 @@ private slots:
     ts::MainWindow window;
     QCOMPARE(window.windowTitle(), QStringLiteral("Terra Soar"));
     QLabel* status = window.findChild<QLabel*>(QStringLiteral("statusLabel"));
-    QVERIFY(status != nullptr);
+    if (!status) {
+      QFAIL("status is missing");
+    }
     QCOMPARE(status->text(), QStringLiteral("Ready"));
     QMenu* file = window.findChild<QMenu*>(QStringLiteral("fileMenu"));
-    QVERIFY(file != nullptr);
+    if (!file) {
+      QFAIL("file is missing");
+    }
     QCOMPARE(file->title(), QStringLiteral("&File"));
     QAction* about = window.findChild<QAction*>(QStringLiteral("aboutAction"));
     QCOMPARE(about->text(), QStringLiteral("&About Terra Soar"));
@@ -612,10 +637,19 @@ private slots:
                          nullptr);
     ts::AddWmtsDialog wmts(std::make_shared<ts::NetworkClient>(settings),
                            nullptr);
+    ts::AddXyzDialog xyz(std::make_shared<ts::NetworkClient>(settings),
+                         nullptr);
     ts::AddWebTerrainDialog terrain(nullptr);
+    ts::FeatureInfoWindow featureInfo(
+        std::make_shared<ts::NetworkClient>(settings), nullptr);
+    ts::AddWfsDialog wfsDialog(std::make_shared<ts::NetworkClient>(settings),
+                               nullptr);
     const std::vector<std::pair<QDialog*, QString>> dialogs{
+        {&featureInfo, ts::FeatureInfoWindow::helpTarget()},
+        {&wfsDialog, ts::AddWfsDialog::helpTarget()},
         {&wms, ts::AddWmsDialog::helpTarget()},
         {&wmts, ts::AddWmtsDialog::helpTarget()},
+        {&xyz, ts::AddXyzDialog::helpTarget()},
         {&terrain, ts::AddWebTerrainDialog::helpTarget()}};
     for (const std::pair<QDialog*, QString>& entry : dialogs) {
       QVERIFY2(helpKeyOpens(entry.first, entry.second),
@@ -1096,7 +1130,9 @@ private slots:
     }
     QVERIFY(globe->terrainShown());
     QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
-    QVERIFY(pointer != nullptr);
+    if (!pointer) {
+      QFAIL("pointer is missing");
+    }
     // The start view's centre, 20° N 10° E, is on the DEM: 1500 m (the
     // fixture pack has no geoid, so sea level is the ellipsoid).
     const QString metres = QLocale().toString(1500) + QStringLiteral(" m");
@@ -1367,7 +1403,9 @@ private slots:
 
     // The pointer readout works on the map: the centre is where it was.
     QLabel* pointer = window.findChild<QLabel*>(QStringLiteral("pointerLabel"));
-    QVERIFY(pointer != nullptr);
+    if (!pointer) {
+      QFAIL("pointer is missing");
+    }
     const QPointF centre(globe->width() / 2.0, globe->height() / 2.0);
     sendMouse(globe, QEvent::MouseMove, centre, Qt::NoButton, Qt::NoButton);
     QVERIFY2(pointer->text().startsWith(QStringLiteral("48.0")),
@@ -1552,7 +1590,9 @@ private slots:
     // fills the centre and azimuth; the same place twice says why not.
     const ts::Projection* rotated =
         ts::projectionById(QStringLiteral("rotated-mercator"));
-    QVERIFY(rotated != nullptr);
+    if (!rotated) {
+      QFAIL("rotated is missing");
+    }
     ts::ProjectionSettingsDialog dialog(nullptr, rotated);
     QPushButton* use =
         dialog.findChild<QPushButton*>(QStringLiteral("projectionUsePoints"));
@@ -1727,7 +1767,9 @@ private slots:
     QCOMPARE(dialog.catalogue().size(), std::size_t{1});
     QComboBox* services =
         dialog.findChild<QComboBox*>(QStringLiteral("wmsServiceBox"));
-    QVERIFY(services != nullptr);
+    if (!services) {
+      QFAIL("services is missing");
+    }
     QCOMPARE(services->count(), 1);
     QCOMPARE(services->itemText(0), QStringLiteral("Mock service"));
     services->setCurrentIndex(0);
@@ -1777,7 +1819,9 @@ private slots:
     QString error;
     const std::optional<ts::WmsSource> source =
         ts::WmsSource::fromJson(definition.source, &error);
-    QVERIFY2(source.has_value(), qPrintable(error));
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
     const ts::WmsSource added = source.value_or(ts::WmsSource{});
     QCOMPARE(added.layers, QStringList{QStringLiteral("background")});
     QCOMPARE(added.format, QStringLiteral("image/jpeg"));
@@ -1935,6 +1979,111 @@ private slots:
     QVERIFY(failed.wait(5000));
     QVERIFY2(wrong.statusText().contains(QStringLiteral("Add WMS Layer")),
              qPrintable(wrong.statusText()));
+  }
+
+  void addXyzDialog()
+  {
+    // The current catalogue arrives; choosing a service fills the fields;
+    // a template the program can't use is explained and Add stays off;
+    // Add makes the layer's definition.
+    ts::test::MockHttpServer server;
+    server.setHandler([](const ts::test::MockHttpRequest& request) {
+      if (request.url.path() == QLatin1String("/catalogue.json")) {
+        return ts::test::mockResponse(
+            200,
+            "{\"format\": \"terrasoar-xyz-catalogue\", \"version\": 1, "
+            "\"services\": [{\"title\": \"Mock tiles\", \"template\": "
+            "\"https://{s}.tiles.example.invalid/{z}/{x}/{y}.png\", "
+            "\"subdomains\": [\"a\", \"b\"], \"maxZoom\": 12, "
+            "\"description\": \"Circles and lines\", \"attribution\": "
+            "\"Mock Mapping Agency\", \"terms\": "
+            "\"https://example.invalid/terms\", \"allowBulkDownload\": "
+            "false}]}",
+            "application/json");
+      }
+      return ts::test::mockResponse(404, "Not Found", "text/plain");
+    });
+    // The copy an earlier run fetched would stand in for the built-in one.
+    QFile::remove(ts::xyzCatalogueCachePath());
+    qputenv("TS_XYZ_CATALOGUE_URL",
+            server.url(QStringLiteral("/catalogue.json")).toString().toUtf8());
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::AddXyzDialog dialog(std::make_shared<ts::NetworkClient>(settings),
+                            nullptr);
+    qputenv("TS_XYZ_CATALOGUE_URL", QByteArray());
+    // Built in until the current one arrives.
+    QVERIFY(dialog.catalogue().size() >= 4);
+    QSignalSpy catalogueUpdated(&dialog, &ts::AddXyzDialog::catalogueUpdated);
+    QVERIFY(catalogueUpdated.wait(5000));
+    QCOMPARE(dialog.catalogue().size(), std::size_t{1});
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("xyzAddButton"));
+    QLineEdit* address =
+        dialog.findChild<QLineEdit*>(QStringLiteral("xyzTemplateEdit"));
+    QLineEdit* subdomains =
+        dialog.findChild<QLineEdit*>(QStringLiteral("xyzSubdomainsEdit"));
+    QLineEdit* name =
+        dialog.findChild<QLineEdit*>(QStringLiteral("xyzNameEdit"));
+    QCheckBox* tms = dialog.findChild<QCheckBox*>(QStringLiteral("xyzTmsBox"));
+    QSpinBox* maximumZoom =
+        dialog.findChild<QSpinBox*>(QStringLiteral("xyzMaximumZoomBox"));
+    QLabel* about = dialog.findChild<QLabel*>(QStringLiteral("xyzAboutLabel"));
+    if (add == nullptr || address == nullptr || subdomains == nullptr ||
+        name == nullptr || tms == nullptr || maximumZoom == nullptr ||
+        about == nullptr) {
+      QFAIL("widgets missing");
+    }
+    QVERIFY(!add->isEnabled());
+
+    QVERIFY(dialog.chooseService(0));
+    QCOMPARE(name->text(), QStringLiteral("Mock tiles"));
+    QCOMPARE(subdomains->text(), QStringLiteral("a, b"));
+    QCOMPARE(maximumZoom->value(), 12);
+    QVERIFY(about->text().contains(QStringLiteral("Circles and lines")));
+    QVERIFY(about->text().contains(QStringLiteral("offline")));
+    QVERIFY(add->isEnabled());
+
+    // {s} without subdomains, then a variable it doesn't know.
+    subdomains->clear();
+    QVERIFY(!add->isEnabled());
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("{s}")),
+             qPrintable(dialog.statusText()));
+    address->setText(QStringLiteral(
+        "https://tiles.example.invalid/{z}/{x}/{y}.png?k={key}"));
+    QVERIFY(!add->isEnabled());
+    QVERIFY(dialog.statusText().contains(QStringLiteral("{key}")));
+    address->setText(
+        QStringLiteral("https://tiles.example.invalid/{z}/{x}/{y}.jpg"));
+    QVERIFY(add->isEnabled());
+    QVERIFY(dialog.statusText().isEmpty());
+    tms->setChecked(true);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      dialog.show();
+      dialog.grab().save(
+          QDir(shots).filePath(QStringLiteral("add-xyz-dialog.png")));
+    }
+    add->click();
+    const std::optional<ts::LayerDefinition>& definition =
+        dialog.layerDefinition();
+    if (!definition) {
+      QFAIL("no layer definition");
+    }
+    QCOMPARE(definition->type, ts::LayerType::Imagery);
+    QCOMPARE(definition->name, QStringLiteral("Mock tiles"));
+    QString error;
+    const std::optional<ts::XyzSource> source =
+        ts::XyzSource::fromJson(definition->source, &error);
+    if (!source) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(source->tms);
+    QVERIFY(source->subdomains.isEmpty());
+    QCOMPARE(source->maximumZoom, 12);
+    QCOMPARE(source->format, QStringLiteral("image/jpeg"));
+    QCOMPARE(source->attribution, QStringLiteral("Mock Mapping Agency"));
+    QCOMPARE(source->service.host(), QStringLiteral("tiles.example.invalid"));
   }
 
   void addWmsDialogErrors()
@@ -2117,6 +2266,420 @@ private slots:
       globe->grabFramebuffer().save(
           QDir(shots).filePath(QStringLiteral("wms-layer.png")));
     }
+  }
+
+  void wmsTimeSlider()
+  {
+    // A WMS layer with TIME: the dialog makes it follow the clock; the
+    // time slider appears; each slider position asks GetMap for its own
+    // TIME (and the play button steps through them); a fixed time stays.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    behaviour->timeLayer = true;
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    window.registry().setWmsNetwork(network, wms);
+
+    ts::AddWmsDialog dialog(network, nullptr);
+    QSignalSpy loaded(&dialog, &ts::AddWmsDialog::capabilitiesLoaded);
+    dialog.connectTo(server.url(QStringLiteral("/wms")).toString());
+    QVERIFY(loaded.wait(5000));
+    QVERIFY(dialog.selectLayer(QStringLiteral("clouds")));
+    QVERIFY(dialog.timeModeBox() != nullptr);
+    QVERIFY(dialog.timeModeBox()->isVisibleTo(&dialog));
+    QCOMPARE(dialog.timeModeBox()->mode(), ts::LayerTime::Mode::Clock);
+    const std::optional<ts::LayerTime> chosen = dialog.chosenTime();
+    if (!chosen) {
+      QFAIL("chosen is missing");
+    }
+    QCOMPARE(chosen->extent, QStringLiteral("2026-11-01/2026-11-05/P1D"));
+    QComboBox* values =
+        dialog.findChild<QComboBox*>(QStringLiteral("wmsTimeValueBox"));
+    if (values == nullptr) {
+      QFAIL("values is missing");
+    }
+    QVERIFY(!values->isEnabled());
+    // A layer without TIME hides the choice.
+    QVERIFY(dialog.selectLayer(QStringLiteral("pattern")));
+    QVERIFY(!dialog.timeModeBox()->isVisibleTo(&dialog));
+    QVERIFY(!dialog.chosenTime().has_value());
+    QVERIFY(dialog.selectLayer(QStringLiteral("clouds")));
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("wmsAddButton"));
+    if (add == nullptr) {
+      QFAIL("add is missing");
+    }
+    QVERIFY(add->isEnabled());
+    add->click();
+    const std::optional<ts::LayerDefinition> added = dialog.layerDefinition();
+    if (!added) {
+      QFAIL("no layer definition");
+    }
+    const ts::LayerDefinition& definition = *added;
+    QVERIFY(definition.source.contains(QStringLiteral("time")));
+
+    // Before the layer: no slider.
+    QVERIFY(!window.timeBar()->isVisible());
+    window.clock()->setTime(
+        ts::parseIsoTime(QStringLiteral("2026-11-03T12:00Z"), QDateTime())
+            .value_or(QDateTime()));
+    window.layerModel()->addLayer(definition);
+    QVERIFY(window.timeBar()->isVisible());
+    QCOMPARE(window.timeBar()->extent().count(), int64_t{5});
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-03"));
+    QSlider* slider = window.timeBar()->slider();
+    QCOMPARE(slider->maximum(), 4);
+    QCOMPARE(slider->value(), 2);
+
+    const std::function<QStringList()> requestedTimes = [&server]() {
+      QStringList times;
+      for (const ts::test::MockHttpRequest& request : server.requests()) {
+        const QUrlQuery query(request.url);
+        if (query.queryItemValue(QStringLiteral("REQUEST")) ==
+            QLatin1String("GetMap")) {
+          const QString time = query.queryItemValue(QStringLiteral("TIME"));
+          if (!times.contains(time)) {
+            times.append(time);
+          }
+        }
+      }
+      return times;
+    };
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QVERIFY(QTest::qWaitFor(
+          [&]() {
+            return requestedTimes().contains(QStringLiteral("2026-11-03"));
+          },
+          10000));
+    }
+    // Each slider position: its day, in the clock and in GetMap.
+    for (int32_t position = 0; position <= slider->maximum(); ++position) {
+      slider->setValue(position);
+      const QString day = QStringLiteral("2026-11-0%1").arg(position + 1);
+      QCOMPARE(window.timeBar()->timeText(), day);
+      QCOMPARE(window.clock()->time(),
+               ts::parseIsoTime(day, QDateTime()).value_or(QDateTime()));
+      if (globe != nullptr) {
+        QVERIFY2(QTest::qWaitFor(
+                     [&]() { return requestedTimes().contains(day); }, 10000),
+                 qPrintable(requestedTimes().join(QLatin1Char(' '))));
+      }
+    }
+    // Every request asked for one of the layer's days (none for "now").
+    for (const QString& time : requestedTimes()) {
+      QVERIFY2(time.startsWith(QLatin1String("2026-11-0")), qPrintable(time));
+    }
+    // Back and forward; playing stops at the last day.
+    QVERIFY(window.timeBar()->stepBack());
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-04"));
+    QVERIFY(window.timeBar()->stepForward());
+    QVERIFY(!window.timeBar()->stepForward());
+    window.timeBar()->setStepIntervalMs(20);
+    window.timeBar()->play();
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-01"));
+    QVERIFY(window.timeBar()->isPlaying());
+    QVERIFY(QTest::qWaitFor([&]() { return !window.timeBar()->isPlaying(); },
+                            5000));
+    QCOMPARE(window.timeBar()->timeText(), QStringLiteral("2026-11-05"));
+
+    // The layer's Time menu fixes it at a day; the clock no longer moves it.
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    QMenu* menu = window.findChild<ts::LayerTreeDock*>()->timeMenu(layer);
+    if (!menu) {
+      QFAIL("menu is missing");
+    }
+    QAction* second = nullptr;
+    for (QAction* action : menu->actions()) {
+      if (action->text() == QLatin1String("2026-11-02")) {
+        second = action;
+      }
+    }
+    if (!second) {
+      QFAIL("second is missing");
+    }
+    second->trigger();
+    const std::optional<ts::LayerTime> fixed = ts::LayerTime::fromSource(
+        window.layerModel()->layerDefinition(layer).source);
+    if (!fixed) {
+      QFAIL("fixed is missing");
+    }
+    QCOMPARE(fixed->mode, ts::LayerTime::Mode::Fixed);
+    QCOMPARE(fixed->valueAt(window.clock()->time()),
+             QStringLiteral("2026-11-02"));
+    QVERIFY(!window.timeBar()->slider()->isEnabled());
+
+    // Saved in the project.
+    QTemporaryDir projects;
+    const QString path = projects.filePath(QStringLiteral("time.terrasoar"));
+    QString error;
+    QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+    ts::MainWindow reopened;
+    QVERIFY2(reopened.openProject(path, &error), qPrintable(error));
+    QCOMPARE(reopened.clock()->time(), window.clock()->time());
+  }
+
+  void addWfsDialogAndLayer()
+  {
+    // The dialog against the mock WFS: the current catalogue arrives, the
+    // feature types are listed, Add makes a vector layer in the chosen
+    // colour; on the globe near the grid its features are asked for by
+    // tile, drawn, and listed by What Is Here where clicked.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    ts::test::MockHttpServer server;
+    const QUrl address = server.url(QStringLiteral("/wfs"));
+    const ts::test::MockHttpServer::Handler wfs =
+        ts::test::mockWfsHandler(behaviour, address);
+    server.setHandler([wfs, address](const ts::test::MockHttpRequest& request) {
+      if (request.url.path() == QLatin1String("/catalogue.json")) {
+        return ts::test::mockResponse(
+            200,
+            "{\"format\": \"terrasoar-wfs-catalogue\", \"version\": 1, "
+            "\"services\": [{\"title\": \"Mock features\", \"url\": \"" +
+                address.toString().toUtf8() +
+                "\", \"description\": \"A grid\", \"attribution\": "
+                "\"Mock Survey Office\", \"terms\": "
+                "\"https://example.invalid/terms\"}]}",
+            "application/json");
+      }
+      return wfs(request);
+    });
+    QFile::remove(ts::wfsCatalogueCachePath());
+    qputenv("TS_WFS_CATALOGUE_URL",
+            server.url(QStringLiteral("/catalogue.json")).toString().toUtf8());
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    ts::AddWfsDialog dialog(network, nullptr);
+    qputenv("TS_WFS_CATALOGUE_URL", QByteArray());
+    QVERIFY(dialog.catalogue().size() >= 3); // built in
+    QSignalSpy catalogueUpdated(&dialog, &ts::AddWfsDialog::catalogueUpdated);
+    QVERIFY(catalogueUpdated.wait(5000));
+    QCOMPARE(dialog.catalogue().size(), std::size_t{1});
+    QSignalSpy loaded(&dialog, &ts::AddWfsDialog::capabilitiesLoaded);
+    dialog.connectTo(address.toString());
+    QVERIFY(loaded.wait(5000));
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("3 feature type")),
+             qPrintable(dialog.statusText()));
+    QVERIFY(!dialog.selectFeatureType(QStringLiteral("test:nothing")));
+    QVERIFY(dialog.selectFeatureType(QStringLiteral("test:areas")));
+    QVERIFY2(
+        dialog.detailsText().contains(QStringLiteral("Mock Survey Office")),
+        qPrintable(dialog.detailsText()));
+    QVERIFY(dialog.detailsText().contains(QStringLiteral("application/json")));
+    dialog.setColour(QColor(10, 200, 30));
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("wfsAddButton"));
+    if (add == nullptr) {
+      QFAIL("add is missing");
+    }
+    QVERIFY(add->isEnabled());
+    add->click();
+    const std::optional<ts::LayerDefinition> added = dialog.layerDefinition();
+    if (!added) {
+      QFAIL("no layer definition");
+    }
+    const ts::LayerDefinition& definition = *added;
+    QCOMPARE(definition.type, ts::LayerType::Vector);
+    QCOMPARE(definition.source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("wfs"));
+    const ts::VectorStyle style = ts::VectorStyle::fromJson(definition.style);
+    QCOMPARE(style.outline, QColor(10, 200, 30));
+    QCOMPARE(style.fill.alpha(), 64);
+
+    // In the window.
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::WmsProviderSettings web;
+    web.cacheDirectory = cache.path();
+    window.registry().setWmsNetwork(network, web);
+    window.layerModel()->addLayer(definition);
+    QVERIFY(window.stateReport()
+                .value(QStringLiteral("attributions"))
+                .toArray()
+                .contains(QStringLiteral("Mock Survey Office")));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QCOMPARE(globe->vectorLayerCount(), 3);
+    // Whole globe: the layer's minimum level isn't reached, nothing asked.
+    QTest::qWait(300);
+    QVERIFY(ts::test::mockWfsRequests(server).empty());
+    globe->setPose(ts::CameraPose{-5.0, -5.0, 1.5e6, 0.0, 0.0});
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !ts::test::mockWfsRequests(server).empty(); }, 10000));
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    for (const ts::test::MockWfsRequest& request :
+         ts::test::mockWfsRequests(server)) {
+      QCOMPARE(request.type, QStringLiteral("test:areas"));
+    }
+    // What Is Here: the square under the point, from the features loaded.
+    QCOMPARE(window.identifyAt(ts::LonLat{-5.5, -5.5}, 0.002), 1);
+    ts::FeatureInfoWindow* results = window.featureInfoWindow();
+    if (!results) {
+      QFAIL("results is missing");
+    }
+    const QString text = results->resultsText();
+    QVERIFY2(text.contains(QStringLiteral("cell -6 -6")), qPrintable(text));
+    QVERIFY2(text.startsWith(QStringLiteral("Grid areas")), qPrintable(text));
+    // Beside the square: nothing to show.
+    QCOMPARE(window.identifyAt(ts::LonLat{-5.9, -5.9}, 0.002), 0);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      globe->grabFramebuffer().save(
+          QDir(shots).filePath(QStringLiteral("wfs-layer.png")));
+      dialog.grab().save(
+          QDir(shots).filePath(QStringLiteral("add-wfs-dialog.png")));
+    }
+  }
+
+  void wmsWhatIsHere()
+  {
+    // A click on the globe reports the point; asking a queryable WMS layer
+    // there sends GetFeatureInfo for that point (the mock answers with
+    // the point it was asked about) and lists the answer; layers that
+    // can't be asked aren't; the action turns it off.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    behaviour->featureInfo = true;
+    ts::test::MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    window.registry().setWmsNetwork(network, wms);
+    QString error;
+    const std::optional<ts::WmsCapabilities> capabilities =
+        ts::parseWmsCapabilities(ts::test::mockWmsCapabilities(
+                                     QStringLiteral("1.3.0"),
+                                     server.url(QStringLiteral("/wms")),
+                                     QStringLiteral("EPSG:4326"), false, true),
+                                 &error);
+    if (!capabilities) {
+      QFAIL(qPrintable(error));
+    }
+    // No layer to ask: nothing happens.
+    QCOMPARE(window.identifyAt(ts::LonLat{-2.0, 51.0}, 0.01), 0);
+    QVERIFY(window.featureInfoWindow() == nullptr);
+    for (const QString& name :
+         {QStringLiteral("background"), QStringLiteral("pattern")}) {
+      const std::optional<ts::WmsSource> source = ts::wmsSourceFor(
+          *capabilities, {name}, {QString()}, QString(), &error);
+      if (!source) {
+        QFAIL(qPrintable(error));
+      }
+      QCOMPARE(source->featureInfoUrl.isEmpty(),
+               name == QLatin1String("background"));
+      ts::LayerDefinition definition;
+      definition.id = QStringLiteral("wms:") + name;
+      definition.type = ts::LayerType::Imagery;
+      definition.name = source->title;
+      definition.source = source->toJson();
+      window.layerModel()->addLayer(definition);
+    }
+    for (const QString& format :
+         {QStringLiteral("application/json"), QStringLiteral("text/html"),
+          QStringLiteral("text/plain")}) {
+      // Asked about (-2.3, 51.4) at about 0.01° a pixel.
+      QJsonObject source =
+          window.layerModel()
+              ->layerDefinition(window.layerModel()->index(0, 0))
+              .source;
+      QJsonObject info = source.value(QStringLiteral("featureInfo")).toObject();
+      info.insert(QStringLiteral("format"), format);
+      source.insert(QStringLiteral("featureInfo"), info);
+      ts::LayerDefinition changed = window.layerModel()->layerDefinition(
+          window.layerModel()->index(0, 0));
+      changed.source = source;
+      window.layerModel()->setLayerDefinition(window.layerModel()->index(0, 0),
+                                              changed);
+      QCOMPARE(window.identifyAt(ts::LonLat{-2.3, 51.4}, 0.01), 1);
+      ts::FeatureInfoWindow* results = window.featureInfoWindow();
+      if (results == nullptr) {
+        QFAIL("results is missing");
+      }
+      QVERIFY(results->isVisible());
+      QSignalSpy finished(results, &ts::FeatureInfoWindow::allAnswered);
+      QVERIFY(results->pendingCount() == 0 || finished.wait(5000));
+      const QString text = results->resultsText();
+      QVERIFY2(text.startsWith(QLatin1String("Test pattern")),
+               qPrintable(text));
+      // The point asked about, to the pixel of the tile it was asked in.
+      static const QRegularExpression lon(QStringLiteral("lon: (-?[0-9.]+)"));
+      static const QRegularExpression lat(QStringLiteral("lat: (-?[0-9.]+)"));
+      const double answeredLon = lon.match(text).captured(1).toDouble();
+      const double answeredLat = lat.match(text).captured(1).toDouble();
+      QVERIFY2(std::abs(answeredLon + 2.3) < 0.02 &&
+                   std::abs(answeredLat - 51.4) < 0.02,
+               qPrintable(format + QLatin1Char('\n') + text));
+      QVERIFY(!text.contains(QLatin1String("Opaque background")));
+    }
+    // GetFeatureInfo asked for the queryable layer only.
+    int32_t infoRequests = 0;
+    for (const ts::test::MockHttpRequest& request : server.requests()) {
+      const QUrlQuery query(request.url);
+      if (query.queryItemValue(QStringLiteral("REQUEST")) ==
+          QLatin1String("GetFeatureInfo")) {
+        ++infoRequests;
+        QCOMPARE(query.queryItemValue(QStringLiteral("QUERY_LAYERS")),
+                 QStringLiteral("pattern"));
+      }
+    }
+    QCOMPARE(infoRequests, 3);
+
+    // Turned off: nothing is asked.
+    QAction* action =
+        window.findChild<QAction*>(QStringLiteral("featureInfoAction"));
+    if (action == nullptr) {
+      QFAIL("action is missing");
+    }
+    QVERIFY(action->isChecked());
+    action->setChecked(false);
+    QCOMPARE(window.identifyAt(ts::LonLat{-2.3, 51.4}, 0.01), 0);
+    action->setChecked(true);
+
+    // A click (not a drag) on the globe is reported once, with the point.
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      return;
+    }
+    QSignalSpy clicked(globe, &ts::GlobeView::pointClicked);
+    const QPoint middle = globe->rect().center();
+    QTest::mouseClick(globe, Qt::LeftButton, Qt::NoModifier, middle);
+    QVERIFY(clicked.wait(3000));
+    QCOMPARE(clicked.count(), 1);
+    QVERIFY(clicked.at(0).at(1).toDouble() > 0.0);
+    // A drag is not a click.
+    QTest::mousePress(globe, Qt::LeftButton, Qt::NoModifier, middle);
+    QMouseEvent move(QEvent::MouseMove, QPointF(middle + QPoint(40, 0)),
+                     QPointF(globe->mapToGlobal(middle + QPoint(40, 0))),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(globe, &move);
+    QTest::mouseRelease(globe, Qt::LeftButton, Qt::NoModifier,
+                        middle + QPoint(40, 0));
+    QTest::qWait(QGuiApplication::styleHints()->mouseDoubleClickInterval() +
+                 200);
+    QCOMPARE(clicked.count(), 1);
   }
 
   void offlineRegionEndToEnd()
