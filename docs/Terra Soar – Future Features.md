@@ -432,6 +432,12 @@ Goal: satellites shown where they are, where they have been and where they are g
 
 **Decisions (2026-11-17)**: SGP4/SDP4 is Terra Soar's own code, written from the published reference (Spacetrack Report #3 as revised by Vallado et al., 2006), not a linked library. This keeps the licence GPL-2.0-or-later. The code has a full test suite of its own (see Regression tests).
 
+**Status (2026-11-20):** delivered (15a to 15e on one branch, one pull request): element sets and SGP4/SDP4 (15a), tracks, passes, the orbit worker and CelesTrak (15b), the running clock (15c), tracks and markers drawn by the GPU (15d), and satellite layers in the program (15e). Design: `docs/design/satellites.md`; for users: `docs/user/satellites.md`. Differences from the plan below:
+- Tracks are drawn in the Earth-fixed frame, so in space they lie above the ground track (the inertial orbit would leave it).
+- With more than 20 satellites shown, only the selected one draws its tracks unless the layer's properties say all (a whole constellation's tracks hide the globe).
+- Passes are found above the layer's footprint elevation (10° by default).
+- The clock runs in real time from the start, but ticks only while satellites are shown, so a window with nothing moving stays idle; choosing a time on the time slider pauses it.
+
 **Deliverables**
 
 - **TLE sources:**

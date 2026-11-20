@@ -68,6 +68,7 @@
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
 #include "balloonwindow.h"
+#include "clockwidget.h"
 #include "elevationprofiledialog.h"
 #include "featureinfowindow.h"
 #include "globeview.h"
@@ -82,6 +83,7 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "projectionsettingsdialog.h"
+#include "satellitelayers.h"
 #include "timebar.h"
 #include "ts/base/buildinfo.h"
 #include "ts/deps/dependencies.h"
@@ -123,6 +125,28 @@ constexpr int32_t kmlViewSettleMs = 300;
 
 /** How many NetworkLinks may sit inside each other. */
 constexpr int32_t kmlMostLinkDepth = 8;
+
+/** Returns true if a layer of the tree @p nodes has satellites from CelesTrak.
+ */
+bool usesCelestrak(const QJsonArray& nodes)
+{
+  // NOLINTNEXTLINE(modernize-loop-convert): the same on Qt 5 and Qt 6
+  for (int32_t i = 0; i < static_cast<int32_t>(nodes.size()); ++i) {
+    const QJsonObject node = nodes.at(i).toObject();
+    const QJsonObject source = node.value(QStringLiteral("definition"))
+                                   .toObject()
+                                   .value(QStringLiteral("source"))
+                                   .toObject();
+    if ((source.value(QStringLiteral("kind")).toString() ==
+             QLatin1String("satellites") &&
+         source.value(QStringLiteral("origin")).toString() ==
+             QLatin1String("celestrak")) ||
+        usesCelestrak(node.value(QStringLiteral("children")).toArray())) {
+      return true;
+    }
+  }
+  return false;
+}
 
 } // namespace
 
@@ -322,6 +346,7 @@ MainWindow::MainWindow(QWidget* parent)
   connect(m_packs.get(), &PackManager::progressChanged, this, showDownloads);
   m_downloadLabel->hide();
 
+  createSatellites();
   createActions();
   createMenus();
   createKmlEditing();
@@ -917,6 +942,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_addXyzAction);
   m_fileMenu->addAction(m_openKmlAction);
   m_fileMenu->addAction(m_addWfsAction);
+  m_fileMenu->addAction(m_addSatellitesAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
@@ -938,6 +964,19 @@ void MainWindow::createMenus()
   m_viewMenu->addAction(m_scaleBarAction);
   m_viewMenu->addAction(m_attributionsAction);
   m_viewMenu->addAction(m_timeBar->toggleViewAction());
+  m_clockMenu = m_viewMenu->addMenu(QString());
+  m_clockMenu->setObjectName(QStringLiteral("clockMenu"));
+  m_clockMenu->addAction(m_clockWidget->playAction());
+  m_clockMenu->addAction(m_clockWidget->realTimeAction());
+  m_clockMenu->addSeparator();
+  m_clockMenu->addAction(m_clockWidget->fasterAction());
+  m_clockMenu->addAction(m_clockWidget->slowerAction());
+  m_clockMenu->addSeparator();
+  m_clockMenu->addAction(m_clockWidget->stepForwardAction());
+  m_clockMenu->addAction(m_clockWidget->stepBackAction());
+  m_clockMenu->addAction(m_clockWidget->jumpAction());
+  // The shortcuts work anywhere in the window.
+  addActions(m_clockMenu->actions());
   m_viewMenu->addAction(m_featureInfoAction);
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
@@ -968,6 +1007,11 @@ void MainWindow::retranslateUi()
     retranslateKmlEditing();
   }
   m_viewMenu->setTitle(tr("&View"));
+  m_clockMenu->setTitle(tr("&Clock"));
+  m_addSatellitesAction->setText(tr("Add &Satellites…"));
+  m_addSatellitesAction->setStatusTip(
+      tr("Add satellites from CelesTrak, a TLE or OMM file, or TLEs pasted "
+         "in"));
   m_helpMenu->setTitle(tr("&Help"));
   m_quitAction->setText(tr("&Quit"));
   m_quitAction->setStatusTip(tr("Close the program"));
@@ -1135,6 +1179,9 @@ void MainWindow::showPointerPosition(bool onGlobe, double latDeg, double lonDeg)
   m_pointerOnGlobe = onGlobe;
   m_pointerLatDeg = latDeg;
   m_pointerLonDeg = lonDeg;
+  if (m_satellitePointerTimer != nullptr) {
+    m_satellitePointerTimer->start();
+  }
   const QLocale locale;
   if (onGlobe) {
     QString text = tr("%1  %2").arg(formatLatitude(latDeg, locale),
@@ -1171,6 +1218,9 @@ void MainWindow::refreshLayers()
   updateTimeBar(tree);
   // Layers with times draw the clock's.
   const LayerStack stack = stackAtTime(tree, m_clock->time());
+  if (m_satellites != nullptr) {
+    refreshSatelliteLayers(stack);
+  }
   if (!m_globeView) {
     // No OpenGL view: nothing is drawn, but layers that can't be opened are
     // still marked in the dock.
@@ -1327,6 +1377,11 @@ bool MainWindow::openFile(const QString& path, QString* errorString)
   if (path.endsWith(QLatin1String(".kml"), Qt::CaseInsensitive) ||
       path.endsWith(QLatin1String(".kmz"), Qt::CaseInsensitive)) {
     return openKml(path, errorString);
+  }
+  const QString suffix = QFileInfo(path).suffix().toLower();
+  if (suffix == QLatin1String("tle") || suffix == QLatin1String("3le") ||
+      suffix == QLatin1String("2le") || suffix == QLatin1String("txt")) {
+    return addSatelliteFile(path, errorString);
   }
   return openProject(path, errorString);
 }
@@ -1732,6 +1787,8 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   }
   const std::vector<QAction*> fly = flyThereActions(id, parent);
   actions.insert(actions.end(), fly.begin(), fly.end());
+  const std::vector<QAction*> satellites = satelliteNodeActions(id, parent);
+  actions.insert(actions.end(), satellites.begin(), satellites.end());
   if (m_kmlNodes.count(id) != 0 && kmlKeyOf(id).isEmpty()) {
     QAction* edit = new QAction(tr("Edit This Document"), parent);
     edit->setObjectName(QStringLiteral("editKmlNodeAction"));
@@ -2046,7 +2103,10 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
     const QString path = url.toLocalFile().toLower();
     return path.endsWith(QLatin1String(".kml")) ||
            path.endsWith(QLatin1String(".kmz")) ||
-           path.endsWith(QLatin1String(".terrasoar"));
+           path.endsWith(QLatin1String(".terrasoar")) ||
+           path.endsWith(QLatin1String(".tle")) ||
+           path.endsWith(QLatin1String(".3le")) ||
+           path.endsWith(QLatin1String(".2le"));
   });
   if (any) {
     event->acceptProposedAction();
@@ -2524,8 +2584,18 @@ bool MainWindow::openProject(const QString& path, QString* errorString)
                              false);
     m_globeView->setPose(project->camera);
   }
-  if (project->time.isValid()) {
-    m_clock->setTime(project->time);
+  if (project->clock && project->clock->realTime) {
+    m_clock->setRealTime();
+  } else {
+    if (project->time.isValid()) {
+      m_clock->setTime(project->time);
+    }
+    if (project->clock) {
+      m_clock->setRate(project->clock->rate);
+      if (project->clock->running) {
+        m_clock->play();
+      }
+    }
   }
   m_projectPath = path;
   return true;
@@ -2543,6 +2613,8 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
         m_globeView->mapProjection()->parameterValues();
   }
   project.time = m_clock->time();
+  project.clock =
+      ClockState{m_clock->isRealTime(), m_clock->isRunning(), m_clock->rate()};
   // KML documents: their files (or text); their entries are made again
   // from them when the project opens.
   bool cancelled = false;
@@ -2645,6 +2717,18 @@ std::vector<AboutDataRow> MainWindow::aboutData() const
       rows.push_back(row);
     }
   }
+  // Online sources in use: CelesTrak, when a layer has satellites from it.
+  if (!usesCelestrak(m_layers->toJson())) {
+    return rows;
+  }
+  AboutDataRow celestrak;
+  celestrak.pack = tr("Online");
+  celestrak.name = tr("Satellite orbital elements");
+  celestrak.source = tr("CelesTrak (celestrak.org), from the US Space "
+                        "Force's catalogue");
+  celestrak.licence = tr("Free to use, with credit to CelesTrak");
+  celestrak.attribution = QStringLiteral("Orbital elements: CelesTrak");
+  rows.push_back(celestrak);
   return rows;
 }
 

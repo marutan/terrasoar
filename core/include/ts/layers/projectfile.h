@@ -41,6 +41,23 @@ namespace ts
 
 class LayerTreeModel;
 
+/** How the program clock ran when a project was saved (`view.clock`). */
+struct ClockState {
+  /** It followed real time: opened, it runs in real time from then. */
+  bool realTime = false;
+  /** It was running (at rate from time). */
+  bool running = false;
+  /** Its rate: seconds of the clock per second. */
+  double rate = 1.0;
+
+  /** Equality. */
+  bool operator==(ClockState other) const
+  {
+    return realTime == other.realTime && running == other.running &&
+           rate == other.rate;
+  }
+};
+
 /** The content of a project file. */
 struct Project {
   /** Where the camera was. */
@@ -60,6 +77,12 @@ struct Project {
    * member of `view`, written as ISO 8601.
    */
   QDateTime time;
+  /**
+   * How the clock ran (an optional member of `view`, `{"realTime": false,
+   * "running": true, "rate": 60}`); nothing in projects saved before it
+   * ran, which open paused at time.
+   */
+  std::optional<ClockState> clock;
   /** The layer tree (LayerTreeModel::toJson()). */
   QJsonArray layers;
   /**

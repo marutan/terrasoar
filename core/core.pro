@@ -78,6 +78,15 @@ HEADERS += \
     include/ts/maths/splitdouble.h \
     include/ts/maths/vec3.h \
     include/ts/maths/vec4.h \
+    include/ts/orbits/earthframes.h \
+    include/ts/orbits/elementsource.h \
+    include/ts/orbits/orbitalelements.h \
+    include/ts/orbits/orbitcomputer.h \
+    include/ts/orbits/satellitedraws.h \
+    include/ts/orbits/satellitelayer.h \
+    include/ts/orbits/satellitepasses.h \
+    include/ts/orbits/satellitetrack.h \
+    include/ts/orbits/sgp4.h \
     include/ts/perf/frametimestats.h \
     include/ts/network/cachedtilefetcher.h \
     include/ts/network/httpcache.h \
@@ -186,6 +195,15 @@ SOURCES += \
     src/layers/layertreemodel.cpp \
     src/layers/projectfile.cpp \
     src/maths/mat4.cpp \
+    src/orbits/earthframes.cpp \
+    src/orbits/elementsource.cpp \
+    src/orbits/orbitalelements.cpp \
+    src/orbits/orbitcomputer.cpp \
+    src/orbits/satellitedraws.cpp \
+    src/orbits/satellitelayer.cpp \
+    src/orbits/satellitepasses.cpp \
+    src/orbits/satellitetrack.cpp \
+    src/orbits/sgp4.cpp \
     src/perf/frametimestats.cpp \
     src/network/cachedtilefetcher.cpp \
     src/network/httpcache.cpp \

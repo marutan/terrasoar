@@ -64,6 +64,10 @@ namespace ts
 {
 
 class BalloonWindow;
+class ClockWidget;
+class SatelliteInfoWindow;
+class SatelliteLayers;
+class SatelliteListDialog;
 class IconCache;
 class KmlLinks;
 struct KmlViewParameters;
@@ -379,6 +383,43 @@ public:
   /** Returns the time slider (for tests). */
   TimeBar* timeBar() const { return m_timeBar; }
 
+  /** Returns the clock in the status bar. */
+  ClockWidget* clockWidget() const { return m_clockWidget; }
+
+  /** Returns the satellites of the layer tree. */
+  SatelliteLayers* satellites() const { return m_satellites; }
+
+  /** Opens the Add Satellites dialog and adds what the user chooses. */
+  void addSatellites();
+
+  /**
+   * Adds the satellite layer @p definition, visible, at the top of the
+   * layer tree; returns its node id.
+   */
+  QString addSatelliteLayer(const LayerDefinition& definition);
+
+  /**
+   * Adds the TLE or OMM file @p path as a satellite layer; false (with
+   * @p errorString) if it has no element sets.
+   */
+  bool addSatelliteFile(const QString& path, QString* errorString);
+
+  /**
+   * Shows the list of the satellites of layer @p nodeId (not modal) and
+   * returns it; null if it isn't a satellite layer.
+   */
+  SatelliteListDialog* showSatelliteList(const QString& nodeId);
+
+  /** Selects satellite @p catalogueNumber of layer @p nodeId, its details
+   * shown. */
+  void selectSatellite(const QString& nodeId, int32_t catalogueNumber);
+
+  /** Downloads (or reads) layer @p nodeId's element sets again. */
+  void refreshSatellites(const QString& nodeId);
+
+  /** Returns the satellite details window, or null before the first. */
+  SatelliteInfoWindow* satelliteInfoWindow() const { return m_satelliteInfo; }
+
   /**
    * Asks the visible WMS layers that can be queried what they have at
    * @p point (GetFeatureInfo, at the scale of @p degreesPerPixel) and shows
@@ -466,6 +507,16 @@ private:
   void refreshLayers();
   void watchLayerStatus(const LayerStack& stack);
   void clockMoved();
+  void createSatellites();
+  void refreshSatelliteLayers(const LayerStack& stack);
+  void satellitesDrawn();
+  void satelliteSetLoaded(const QJsonObject& source);
+  void satelliteMarkerClicked(int32_t index);
+  void updateSatelliteInfo();
+  void satellitePointerSettled();
+  std::vector<QAction*> satelliteNodeActions(const QString& id,
+                                             QObject* parent);
+  void showSatelliteProperties(const QString& nodeId);
   void openKmlDialog();
   void addKmlFeature(const KmlDocument& document, const KmlFeature& container,
                      const QString& featurePath, const QModelIndex& parent,
@@ -631,6 +682,16 @@ private:
   std::shared_ptr<QTimer> m_statusRelay;
   ProgramClock* m_clock = nullptr;
   TimeBar* m_timeBar = nullptr;
+  ClockWidget* m_clockWidget = nullptr;
+  QMenu* m_clockMenu = nullptr;
+  SatelliteLayers* m_satellites = nullptr;
+  SatelliteInfoWindow* m_satelliteInfo = nullptr;
+  QPointer<SatelliteListDialog> m_satelliteList;
+  QAction* m_addSatellitesAction = nullptr;
+  /** Waits for the pointer to stop before finding passes under it. */
+  QTimer* m_satellitePointerTimer = nullptr;
+  /** Old elements already pointed out, by source. */
+  std::set<QString> m_oldSatelliteNotes;
   /** The imagery sources last drawn, as drawn at the clock's time. */
   QJsonArray m_drawnImagery;
   /** True once the time slider was shown for a layer with times. */

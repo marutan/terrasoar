@@ -18,6 +18,7 @@
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <atomic>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -68,6 +69,7 @@
 #include <QtTest>
 
 #include "aboutdialog.h"
+#include "addsatellitesdialog.h"
 #include "addwebterraindialog.h"
 #include "addwfsdialog.h"
 #include "addwmsdialog.h"
@@ -75,6 +77,7 @@
 #include "addxyzdialog.h"
 #include "appsettings.h"
 #include "balloonwindow.h"
+#include "clockwidget.h"
 #include "elevationprofiledialog.h"
 #include "featureinfowindow.h"
 #include "fixturepack.h"
@@ -96,6 +99,9 @@
 #include "packmanager.h"
 #include "packmanagerdialog.h"
 #include "projectionsettingsdialog.h"
+#include "satelliteinfowindow.h"
+#include "satellitelayers.h"
+#include "satellitelistdialog.h"
 #include "timebar.h"
 #include "timemodebox.h"
 #include "ts/globe/layerstackdraws.h"
@@ -107,6 +113,8 @@
 #include "ts/network/networkclient.h"
 #include "ts/network/regiontilesource.h"
 #include "ts/network/tilediskcache.h"
+#include "ts/orbits/elementsource.h"
+#include "ts/orbits/satellitelayer.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/regions/offlineregionstore.h"
@@ -3915,6 +3923,386 @@ private slots:
                             .arg(globe->framesRendered() - frames)
                             .arg(allowed)
                             .arg(witness.report())));
+  }
+
+  void satellitesFromFile()
+  {
+    // A TLE file opened as a layer: its satellites drawn as markers with
+    // their names, moving with the clock, which ticks while they show;
+    // the selected one's tracks; the list of them, filtered and shown.
+    const QString path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/stations.tle");
+    ts::MainWindow window;
+    QVERIFY(!window.clock()->isTicking());
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    QCOMPARE(layer.data().toString(), QStringLiteral("stations"));
+    const QString nodeId =
+        layer.data(ts::LayerTreeModel::NodeIdRole).toString();
+    ts::SatelliteLayers* satellites = window.satellites();
+    QVERIFY(QTest::qWaitFor([&]() { return satellites->drawn().size() == 13; },
+                            10000));
+    QVERIFY(window.clock()->isTicking());
+    QCOMPARE(satellites->markers().size(), std::size_t{13});
+    // 13 satellites: more than 20 would hide the tracks of all but one.
+    QVERIFY(satellites->lines().size() >= 26);
+    QVERIFY(std::any_of(satellites->labels().begin(),
+                        satellites->labels().end(),
+                        [](const ts::BillboardDraw& label) {
+                          return label.label == QLatin1String("ISS (ZARYA)");
+                        }));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QCOMPARE(globe->markers().size(), std::size_t{13});
+      QCOMPARE(globe->satelliteLabels().size(), std::size_t{13});
+    }
+    // The clock moves them.
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 20), QTime(5, 0), QTimeZone::utc()));
+    QVERIFY(QTest::qWaitFor([&]() { return !satellites->isBusy(); }, 10000));
+    const ts::Vec3 before = satellites->drawn().front().state.positionEcefM;
+    window.clock()->step(60.0);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return !satellites->isBusy() &&
+                 ts::distance(satellites->drawn().front().state.positionEcefM,
+                              before) > 100e3;
+        },
+        10000));
+    // Paused, nothing moves with it, so it doesn't tick.
+    QVERIFY(!window.clock()->isRunning());
+
+    // The list: 13, filtered by name and number, Show Only These.
+    ts::SatelliteListDialog* list = window.showSatelliteList(nodeId);
+    if (list == nullptr) {
+      QFAIL("no satellite list");
+    }
+    QCOMPARE(list->rows(), 13);
+    list->setFilter(QStringLiteral("iss"));
+    QVERIFY(list->visibleRows() >= 2);
+    list->setFilter(QStringLiteral("25544"));
+    QCOMPARE(list->visibleRows(), 1);
+    list->showOnlyFiltered();
+    QVERIFY(QTest::qWaitFor([&]() { return satellites->drawn().size() == 1; },
+                            10000));
+    const ts::SatelliteStyle style = ts::SatelliteStyle::fromJson(
+        window.layerModel()->layerDefinition(layer).style);
+    QVERIFY(style.isShown(25544));
+    QVERIFY(!style.isShown(48274));
+    QVERIFY(list->setShown(48274, true));
+    QVERIFY(QTest::qWaitFor([&]() { return satellites->drawn().size() == 2; },
+                            10000));
+    list->setAllShown(true);
+    QVERIFY(QTest::qWaitFor([&]() { return satellites->drawn().size() == 13; },
+                            10000));
+    // Hidden with the layer: nothing drawn, no ticking.
+    window.layerModel()->setData(layer, Qt::Unchecked, Qt::CheckStateRole);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return satellites->drawn().empty(); }, 10000));
+    QVERIFY(!window.clock()->isTicking());
+    // A file that isn't element sets is refused.
+    QTemporaryDir dir;
+    const QString junk = dir.filePath(QStringLiteral("junk.tle"));
+    QFile file(junk);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("not an element set\n");
+    file.close();
+    QVERIFY(!window.openFile(junk, &error));
+    QVERIFY(!error.isEmpty());
+  }
+
+  void satelliteDetailsAndTracks()
+  {
+    // Selecting a satellite (clicking its marker): its details, its
+    // tracks drawn whatever the count; the footprint when asked for.
+    ts::MainWindow window;
+    ts::SatelliteSource source;
+    source.origin = ts::SatelliteSource::Origin::File;
+    source.path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/gps-ops.tle");
+    ts::LayerDefinition definition = ts::AddSatellitesDialog::definitionFor(
+        source.toJson(), QStringLiteral("GPS"));
+    const QString nodeId = window.addSatelliteLayer(definition);
+    ts::SatelliteLayers* satellites = window.satellites();
+    QVERIFY(QTest::qWaitFor([&]() { return satellites->drawn().size() > 20; },
+                            10000));
+    // More than 20 shown: no tracks until one is selected.
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 20), QTime(6, 0), QTimeZone::utc()));
+    QVERIFY(QTest::qWaitFor([&]() { return !satellites->isBusy(); }, 10000));
+    QVERIFY(satellites->lines().empty());
+    const int32_t number =
+        satellites->drawn().front().sgp4->elements().catalogueNumber;
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr && globe->viewMode() == ts::ViewMode::Globe) {
+      // Its marker clicked, where the view shows it.
+      QVERIFY(QTest::qWaitFor([&]() { return globe->markers().size() > 20; },
+                              10000));
+      globe->setPose(ts::CameraPose{0.0, 0.0, 6.0e7, 0.0, 0.0});
+      QCoreApplication::processEvents();
+      int32_t shown = -1;
+      std::optional<QPointF> at;
+      for (std::size_t i = 0; i < globe->markers().size() && !at; ++i) {
+        at = globe->markerOnScreen(globe->markers()[i]);
+        shown = static_cast<int32_t>(i);
+      }
+      if (!at) {
+        QFAIL("no marker on screen");
+      }
+      QCOMPARE(globe->markerAt(*at), shown);
+      QSignalSpy clicked(globe, &ts::GlobeView::markerClicked);
+      QTest::mouseClick(globe, Qt::LeftButton, Qt::NoModifier, at->toPoint());
+      QVERIFY(clicked.wait(3000));
+      QVERIFY(QTest::qWaitFor(
+          [&]() { return satellites->selectedSatellite() >= 0; }, 3000));
+    }
+    window.selectSatellite(nodeId, number);
+    ts::SatelliteInfoWindow* info = window.satelliteInfoWindow();
+    if (info == nullptr) {
+      QFAIL("no details window");
+    }
+    QVERIFY(info->isVisible());
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return !satellites->isBusy() && info->catalogueNumber() == number;
+        },
+        10000));
+    QVERIFY(satellites->lines().size() == 2);
+    const QString text = info->text();
+    QVERIFY2(text.contains(QString::number(number)), qPrintable(text));
+    QVERIFY(text.contains(QLatin1String("km/s")));
+    QVERIFY(text.contains(QLatin1String("Point at the ground")));
+    // A place on the ground: its next pass (GPS rises everywhere daily).
+    info->setObserver(ts::Geodetic{51.5, 0.0, 0.0});
+    QVERIFY(info->pass().has_value());
+    QVERIFY2(info->text().contains(QLatin1String("Rises")) ||
+                 info->text().contains(QLatin1String("Always")),
+             qPrintable(info->text()));
+    // Footprints of the selected one; ground tracks.
+    const QModelIndex index = window.layerModel()->indexOfId(nodeId);
+    ts::SatelliteStyle style = ts::SatelliteStyle::fromJson(
+        window.layerModel()->layerDefinition(index).style);
+    style.footprints = ts::FootprintMode::Selected;
+    style.groundTrack = true;
+    definition = window.layerModel()->layerDefinition(index);
+    definition.style = style.toJson();
+    window.layerModel()->setLayerDefinition(index, definition);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return !satellites->isBusy() && satellites->lines().size() == 5;
+        },
+        10000));
+    QVERIFY(std::any_of(satellites->lines().begin(), satellites->lines().end(),
+                        [](const ts::SpaceLine& line) { return line.closed; }));
+    // Old elements: years later, all are marked.
+    window.clock()->setTime(
+        QDateTime(QDate(2030, 1, 1), QTime(0, 0), QTimeZone::utc()));
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return !satellites->isBusy() && !satellites->drawn().empty() &&
+                 satellites->drawn().front().old;
+        },
+        10000));
+    QVERIFY(info->text().contains(QLatin1String("Older than")));
+    // Deselecting: no tracks again.
+    window.selectSatellite(QString(), -1);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !satellites->isBusy() && satellites->lines().empty(); },
+        10000));
+    QVERIFY(!info->isVisible());
+  }
+
+  void satellitesFromCelestrak()
+  {
+    // A CelesTrak group from a mock server: downloaded once, kept, used
+    // again without asking; refreshed on request; offline the kept one.
+    const QByteArray body = [] {
+      QFile file(
+          QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/stations.json"));
+      return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }();
+    std::atomic<bool> down{false};
+    ts::test::MockHttpServer server(
+        [&body, &down](const ts::test::MockHttpRequest&) {
+          ts::test::MockHttpResponse response;
+          if (down.load()) {
+            response.status = 503;
+            return response;
+          }
+          response.headers = {{"Content-Type", "application/json"}};
+          response.body = body;
+          return response;
+        });
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    settings.attempts = 1;
+    QTemporaryDir cache;
+    ts::WmsProviderSettings wms;
+    wms.cacheDirectory = cache.path();
+    ts::MainWindow window;
+    window.registry().setWmsNetwork(
+        std::make_shared<ts::NetworkClient>(settings), wms);
+    // The dialog's choice, at the mock's address.
+    qputenv("TS_CELESTRAK_URL",
+            server.url(QStringLiteral("/NORAD/elements/gp.php"))
+                .toString()
+                .toUtf8());
+    ts::AddSatellitesDialog dialog(&window);
+    dialog.chooseGroup(QStringLiteral("stations"));
+    dialog.accept();
+    qputenv("TS_CELESTRAK_URL", QByteArray());
+    const std::optional<ts::LayerDefinition>& chosen = dialog.layerDefinition();
+    if (!chosen) {
+      QFAIL(qPrintable(dialog.message()));
+    }
+    QCOMPARE(chosen->name, QStringLiteral("Space stations"));
+    const std::optional<ts::SatelliteSource> source =
+        ts::SatelliteSource::fromJson(chosen->source);
+    if (!source) {
+      QFAIL("not a satellite source");
+    }
+    QCOMPARE(source->group, QStringLiteral("stations"));
+    QCOMPARE(source->url.host(), QStringLiteral("127.0.0.1"));
+    const QString nodeId = window.addSatelliteLayer(*chosen);
+    ts::SatelliteLayers* satellites = window.satellites();
+    QVERIFY(QTest::qWaitFor([&]() { return satellites->drawn().size() == 17; },
+                            10000));
+    QCOMPARE(server.requestCount(), 1);
+    QVERIFY(server.requests().front().url.query().contains(
+        QLatin1String("GROUP=stations")));
+    // Credited while shown, and in the About window.
+    if (globeOf(window) != nullptr) {
+      QVERIFY(globeOf(window)->attributions().contains(
+          QStringLiteral("Orbital elements: CelesTrak")));
+    }
+    const std::vector<ts::AboutDataRow> about = window.aboutData();
+    QVERIFY(std::any_of(
+        about.begin(), about.end(), [](const ts::AboutDataRow& row) {
+          return row.attribution.contains(QLatin1String("CelesTrak"));
+        }));
+    // Refresh: asked again at once.
+    window.refreshSatellites(nodeId);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return server.requestCount() == 2; }, 10000));
+    QVERIFY(QTest::qWaitFor([&]() { return !satellites->isBusy(); }, 10000));
+    // The server failing: the kept download, the layer marked offline.
+    down = true;
+    window.refreshSatellites(nodeId);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          const std::shared_ptr<const ts::SatelliteSet> set =
+              satellites->set(chosen->source);
+          return set && set->origin == ts::ElementOrigin::StaleCache;
+        },
+        10000));
+    QCOMPARE(satellites->set(chosen->source)->satellites.size(),
+             std::size_t{17});
+    const QModelIndex index = window.layerModel()->indexOfId(nodeId);
+    QCOMPARE(index.data(ts::LayerTreeModel::StatusRole).toInt(),
+             static_cast<int32_t>(ts::ProviderStatus::State::Offline));
+  }
+
+  void addSatellitesDialog()
+  {
+    // Text pasted in: read before the dialog closes; nonsense refused.
+    ts::AddSatellitesDialog dialog(nullptr);
+    dialog.chooseText(QStringLiteral("nonsense"));
+    dialog.accept();
+    QVERIFY(!dialog.layerDefinition());
+    QVERIFY(!dialog.message().isEmpty());
+    QFile file(QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/stations.tle"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QStringList lines =
+        QString::fromLatin1(file.readAll()).split(QLatin1Char('\n'));
+    dialog.chooseText(lines.mid(0, 3).join(QLatin1Char('\n')));
+    dialog.accept();
+    const std::optional<ts::LayerDefinition>& one = dialog.layerDefinition();
+    if (!one) {
+      QFAIL(qPrintable(dialog.message()));
+    }
+    // One satellite: the layer takes its name.
+    QCOMPARE(one->name, QStringLiteral("ISS (ZARYA)"));
+    QCOMPARE(one->type, ts::LayerType::Vector);
+    ts::AddSatellitesDialog files(nullptr);
+    files.chooseFile(QStringLiteral("/nowhere/at/all.tle"));
+    files.accept();
+    QVERIFY(!files.layerDefinition());
+    QVERIFY(!files.message().isEmpty());
+    ts::AddSatellitesDialog groups(nullptr);
+    groups.accept();
+    QVERIFY(!groups.layerDefinition());
+  }
+
+  void clockWidgetAndProjects()
+  {
+    // The status bar's clock: real time at first; play, pause, steps,
+    // speeds; saved in projects with the satellite layers.
+    ts::MainWindow window;
+    ts::ClockWidget* widget = window.clockWidget();
+    if (widget == nullptr) {
+      QFAIL("no clock widget");
+    }
+    ts::ProgramClock* clock = window.clock();
+    QVERIFY(clock->isRealTime());
+    QCOMPARE(widget->rateText(), QStringLiteral("Real time"));
+    QVERIFY(widget->timeText().endsWith(QLatin1String(" UTC")));
+    widget->playAction()->trigger();
+    QVERIFY(!clock->isRunning());
+    const QDateTime paused = clock->time();
+    widget->setStepSeconds(3600.0);
+    widget->stepForwardAction()->trigger();
+    QCOMPARE(clock->time(), paused.addSecs(3600));
+    QCOMPARE(widget->timeText(),
+             clock->time().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")) +
+                 QStringLiteral(" UTC"));
+    widget->stepBackAction()->trigger();
+    QCOMPARE(clock->time(), paused);
+    widget->fasterAction()->trigger();
+    QCOMPARE(clock->rate(), 2.0);
+    QCOMPARE(widget->rateText(), ts::ClockWidget::rateLabel(2.0));
+    widget->slowerAction()->trigger();
+    widget->slowerAction()->trigger();
+    QCOMPARE(clock->rate(), 0.5);
+    clock->setRate(3600.0);
+    widget->playAction()->trigger();
+    QVERIFY(clock->isRunning());
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return clock->time() > paused.addSecs(60); }, 5000));
+    // In View > Clock.
+    QMenu* menu = window.findChild<QMenu*>(QStringLiteral("clockMenu"));
+    if (menu == nullptr) {
+      QFAIL("no clock menu");
+    }
+    QVERIFY(menu->actions().contains(widget->jumpAction()));
+
+    // Saved with a satellite layer; reopened running at the rate.
+    ts::SatelliteSource source;
+    source.origin = ts::SatelliteSource::Origin::Text;
+    QFile file(QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/stations.tle"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    source.text = QString::fromLatin1(file.readAll());
+    window.addSatelliteLayer(ts::AddSatellitesDialog::definitionFor(
+        source.toJson(), QStringLiteral("Pasted")));
+    QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("sat.terrasoar"));
+    QString error;
+    QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+    ts::MainWindow reopened;
+    QVERIFY2(reopened.openProject(path, &error), qPrintable(error));
+    QVERIFY(reopened.clock()->isRunning());
+    QCOMPARE(reopened.clock()->rate(), 3600.0);
+    QVERIFY(!reopened.clock()->isRealTime());
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return reopened.satellites()->drawn().size() == 13; }, 10000));
+    // Saved in real time: reopened in real time.
+    clock->setRealTime();
+    QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+    ts::MainWindow realTime;
+    QVERIFY2(realTime.openProject(path, &error), qPrintable(error));
+    realTime.clock()->setTime(paused);
+    QVERIFY2(realTime.openProject(path, &error), qPrintable(error));
+    QVERIFY(realTime.clock()->isRealTime());
   }
 };
 

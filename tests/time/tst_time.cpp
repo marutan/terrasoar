@@ -380,6 +380,80 @@ private slots:
     QCOMPARE(clock.time().offsetFromUtc(), 0);
   }
 
+  void programClockRuns()
+  {
+    // Real time at first; setting a time pauses there; play runs on at
+    // the rate; ticks only while ticking is on.
+    ts::ProgramClock clock;
+    QVERIFY(clock.isRunning());
+    QVERIFY(clock.isRealTime());
+    QCOMPARE(clock.rate(), 1.0);
+    QVERIFY(std::abs(clock.time().msecsTo(QDateTime::currentDateTimeUtc())) <
+            1000);
+    QSignalSpy changed(&clock, &ts::ProgramClock::timeChanged);
+    QSignalSpy running(&clock, &ts::ProgramClock::runningChanged);
+    // Not ticking: running, but no signals however long.
+    QTest::qWait(250);
+    QCOMPARE(changed.count(), 0);
+    const QDateTime start = utc("2026-01-01T00:00Z");
+    clock.setTime(start);
+    QVERIFY(!clock.isRunning());
+    QVERIFY(!clock.isRealTime());
+    QCOMPARE(running.count(), 1);
+    QCOMPARE(changed.count(), 1);
+    QTest::qWait(100);
+    QCOMPARE(clock.time(), start);
+    // An hour a second, ticking every 20 ms.
+    clock.setRate(3600.0);
+    clock.setTickIntervalMs(20);
+    clock.setTicking(true);
+    clock.play();
+    QVERIFY(clock.isRunning());
+    QVERIFY(QTest::qWaitFor([&]() { return changed.count() >= 6; }, 5000));
+    const qint64 movedS = start.secsTo(clock.time());
+    QVERIFY2(movedS > 100 && movedS < qint64{3600} * 3,
+             qPrintable(QString::number(movedS)));
+    // Each tick's time moves on.
+    QVERIFY(changed.last().at(0).toDateTime() >
+            changed.at(1).at(0).toDateTime());
+    // Paused: it stays, and no more ticks.
+    clock.pause();
+    const QDateTime paused = clock.time();
+    const int32_t ticks = static_cast<int32_t>(changed.count());
+    QTest::qWait(100);
+    QCOMPARE(clock.time(), paused);
+    QVERIFY(changed.count() <= ticks + 1);
+    // Steps move and keep it paused.
+    clock.step(-60.0);
+    QCOMPARE(clock.time(), paused.addSecs(-60));
+    QVERIFY(!clock.isRunning());
+    // Backwards.
+    clock.setRate(-86400.0);
+    clock.play();
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return clock.time() < paused.addSecs(-3600); }, 5000));
+    clock.pause();
+    // Faster and slower step through the list; zero isn't a rate.
+    clock.setRate(1.0);
+    QCOMPARE(clock.fasterRate(), 2.0);
+    QCOMPARE(clock.slowerRate(), 0.5);
+    clock.setRate(0.0);
+    QCOMPARE(clock.rate(), 1.0);
+    clock.setRate(ts::ProgramClock::rates().back());
+    QCOMPARE(clock.fasterRate(), clock.rate());
+    clock.setRate(ts::ProgramClock::rates().front());
+    QCOMPARE(clock.slowerRate(), clock.rate());
+    // Back to real time.
+    clock.setRealTime();
+    QVERIFY(clock.isRealTime());
+    QVERIFY(clock.isRunning());
+    QCOMPARE(clock.rate(), 1.0);
+    QVERIFY(std::abs(clock.time().msecsTo(QDateTime::currentDateTimeUtc())) <
+            1000);
+    clock.setTicking(false);
+    QVERIFY(!clock.isTicking());
+  }
+
   void concurrentOwnInstances()
   {
     // TimeExtent and LayerTime are reentrant.

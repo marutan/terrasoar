@@ -40,8 +40,10 @@ HEADERS += \
     $$PWD/src/addwfsdialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
+    $$PWD/src/addsatellitesdialog.h \
     $$PWD/src/addxyzdialog.h \
     $$PWD/src/balloonwindow.h \
+    $$PWD/src/clockwidget.h \
     $$PWD/src/elevationprofiledialog.h \
     $$PWD/src/featureinfowindow.h \
     $$PWD/src/globeview.h \
@@ -52,6 +54,10 @@ HEADERS += \
     $$PWD/src/packmanager.h \
     $$PWD/src/packmanagerdialog.h \
     $$PWD/src/offlineregionsdialog.h \
+    $$PWD/src/satelliteinfowindow.h \
+    $$PWD/src/satellitelayers.h \
+    $$PWD/src/satellitelistdialog.h \
+    $$PWD/src/satellitepropertiesdialog.h \
     $$PWD/src/startupmeasurement.h \
     $$PWD/src/timebar.h \
     $$PWD/src/timemodebox.h \
@@ -72,19 +78,26 @@ SOURCES += \
     $$PWD/src/addwfsdialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
+    $$PWD/src/addsatellitesdialog.cpp \
     $$PWD/src/addxyzdialog.cpp \
     $$PWD/src/balloonwindow.cpp \
+    $$PWD/src/clockwidget.cpp \
     $$PWD/src/elevationprofiledialog.cpp \
     $$PWD/src/featureinfowindow.cpp \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \
     $$PWD/src/mainwindowkml.cpp \
+    $$PWD/src/mainwindowsatellites.cpp \
     $$PWD/src/newregiondialog.cpp \
     $$PWD/src/offlineregionmanager.cpp \
     $$PWD/src/packmanager.cpp \
     $$PWD/src/packmanagerdialog.cpp \
     $$PWD/src/offlineregionsdialog.cpp \
+    $$PWD/src/satelliteinfowindow.cpp \
+    $$PWD/src/satellitelayers.cpp \
+    $$PWD/src/satellitelistdialog.cpp \
+    $$PWD/src/satellitepropertiesdialog.cpp \
     $$PWD/src/startupmeasurement.cpp \
     $$PWD/src/timebar.cpp \
     $$PWD/src/timemodebox.cpp \

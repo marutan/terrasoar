@@ -26,6 +26,8 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <map>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <unordered_set>
@@ -33,6 +35,8 @@
 
 #include <QColor>
 #include <QDir>
+#include <QElapsedTimer>
+#include <QFile>
 #include <QImage>
 #include <QNetworkProxy>
 #include <QTemporaryDir>
@@ -56,6 +60,11 @@
 #include "ts/layers/layertreemodel.h"
 #include "ts/network/networkclient.h"
 #include "ts/network/tilediskcache.h"
+#include "ts/orbits/orbitalelements.h"
+#include "ts/orbits/orbitcomputer.h"
+#include "ts/orbits/satellitedraws.h"
+#include "ts/orbits/satellitetrack.h"
+#include "ts/orbits/sgp4.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/gdalimageryprovider.h"
@@ -341,6 +350,90 @@ const ts::Projection* projectionFromSpec(const QString& spec)
         values.at(static_cast<int32_t>(i)).toDouble();
   }
   return ts::projectionWith(idAndValues.front(), chosen);
+}
+
+/** The first element set of @p name in tests/orbits/data. */
+ts::OrbitalElements orbitFixture(const char* name)
+{
+  QFile file(QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/") +
+             QLatin1String(name));
+  if (!file.open(QIODevice::ReadOnly)) {
+    return ts::OrbitalElements();
+  }
+  const ts::ElementSetList list = ts::parseElementSets(file.readAll());
+  return list.elements.empty() ? ts::OrbitalElements() : list.elements.front();
+}
+
+/** Pixels within 40 of @p color in every channel. */
+int32_t countColor(const QImage& image, const QColor& color)
+{
+  const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+  int32_t count = 0;
+  for (int32_t y = 0; y < rgba.height(); ++y) {
+    for (int32_t x = 0; x < rgba.width(); ++x) {
+      const QColor p = rgba.pixelColor(x, y);
+      count += std::abs(p.red() - color.red()) < 40 &&
+                       std::abs(p.green() - color.green()) < 40 &&
+                       std::abs(p.blue() - color.blue()) < 40
+                   ? 1
+                   : 0;
+    }
+  }
+  return count;
+}
+
+/** A straight line between two points, @p count steps, at @p heightM. */
+// From, then to, as named.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+ts::SpaceLine lineBetween(ts::LonLat from, ts::LonLat to, double heightM,
+                          int32_t count)
+{
+  ts::SpaceLine line;
+  line.rgba = {255, 0, 255, 255};
+  line.widthPx = 3.0F;
+  for (int32_t i = 0; i <= count; ++i) {
+    const double f = static_cast<double>(i) / count;
+    double dLon = to.lonDeg - from.lonDeg;
+    dLon -= 360.0 * std::round(dLon / 360.0);
+    ts::SpaceLinePoint p;
+    p.lonDeg = ts::normaliseLonDeg(from.lonDeg + f * dLon);
+    p.latDeg = from.latDeg + f * (to.latDeg - from.latDeg);
+    p.positionEcef =
+        ts::geodeticToEcef(ts::Geodetic{p.latDeg, p.lonDeg, heightM});
+    line.points.push_back(p);
+  }
+  return line;
+}
+
+/** The ISS and a GPS satellite with their tracks, as the program draws them. */
+void satelliteScene(std::vector<ts::GlobeMarker>& markers,
+                    std::vector<ts::SpaceLine>& lines)
+{
+  const std::shared_ptr<const ts::Sgp4> iss =
+      std::make_shared<const ts::Sgp4>(orbitFixture("stations.tle"));
+  const std::shared_ptr<const ts::Sgp4> gps =
+      std::make_shared<const ts::Sgp4>(orbitFixture("gps-ops.tle"));
+  ts::JulianDate time = iss->elements().epoch;
+  time.fraction += 30.0 / 1440.0;
+  ts::OrbitRequest request;
+  request.time = time;
+  request.tasks.push_back(
+      ts::OrbitTask{iss, true, iss->periodMinutes(), iss->periodMinutes()});
+  request.tasks.push_back(ts::OrbitTask{gps, true, 0.5 * gps->periodMinutes(),
+                                        0.5 * gps->periodMinutes()});
+  std::map<const ts::Sgp4*, std::unique_ptr<ts::TrackSampler>> samplers;
+  const ts::OrbitResult result = ts::OrbitComputer::compute(request, samplers);
+  const std::array<std::array<std::uint8_t, 4>, 2> colours{
+      {{255, 204, 0, 255}, {60, 220, 255, 255}}};
+  for (std::size_t i = 0; i < result.states.size(); ++i) {
+    ts::TrackLook look;
+    look.rgba = colours.at(i);
+    look.periodMinutes = request.tasks[i].sgp4->periodMinutes();
+    lines.push_back(ts::pastTrackLine(result.tracks[i], look));
+    lines.push_back(ts::futureTrackLine(result.tracks[i], look));
+    markers.push_back(
+        ts::satelliteMarker(result.states[i], colours.at(i), 5.0));
+  }
 }
 } // namespace
 
@@ -2379,6 +2472,264 @@ private slots:
     }
     m_gl->makeCurrent();
     m_renderer->setImageryProvider(nullptr);
+  }
+
+  void satelliteGolden_data()
+  {
+    QTest::addColumn<QString>("projection");
+    QTest::addColumn<double>("morph");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<bool>("gpsInView");
+    // The ISS and a GPS satellite half an hour after the ISS's epoch, with
+    // their past and future tracks: in space on the globe (from far enough
+    // out to see GPS's orbit), as ground tracks on the maps.
+    QTest::newRow("satellites-globe")
+        << QString() << 0.0 << 20.0 << 60.0 << 6.5e7 << true;
+    QTest::newRow("satellites-globe-near")
+        << QString() << 0.0 << 30.0 << 100.0 << 1.2e7 << false;
+    QTest::newRow("satellites-mercator")
+        << QStringLiteral("mercator") << 1.0 << 0.0 << 0.0 << 4.5e7 << true;
+    QTest::newRow("satellites-miller")
+        << QStringLiteral("miller") << 1.0 << 0.0 << 150.0 << 2.4e7 << false;
+  }
+
+  void satelliteGolden()
+  {
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(QString, projection);
+    QFETCH(double, morph);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(bool, gpsInView);
+    std::vector<ts::GlobeMarker> markers;
+    std::vector<ts::SpaceLine> lines;
+    satelliteScene(markers, lines);
+    QCOMPARE(markers.size(), std::size_t{2});
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    if (!projection.isEmpty()) {
+      const ts::Projection* chosen = projectionFromSpec(projection);
+      if (chosen == nullptr) {
+        QFAIL("unknown projection");
+      }
+      camera.setMapProjection(chosen);
+      camera.setMorph(morph);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setStyle(ts::GlobeStyle());
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setVectorLayers({});
+    m_renderer->setSpaceLines(lines);
+    // The map's surface is tiles: wait for them.
+    QImage image;
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          image = render(camera, markers);
+          return !m_renderer->isBusy();
+        },
+        60000));
+    image = render(camera, markers);
+    const int32_t segments = m_renderer->spaceSegmentsDrawn();
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    QVERIFY(segments > 200);
+    // The tracks' colours are on screen.
+    QVERIFY(countColor(image, QColor(255, 204, 0)) > 50);
+    QVERIFY(!gpsInView || countColor(image, QColor(60, 220, 255)) > 50);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void spaceLinesHiddenByGlobe()
+  {
+    // Seen from over (0°, 0°): a line in orbit over the near side shows, one
+    // over the far side is hidden by the Earth, and one high above the
+    // Earth's edge (GPS height) shows past it.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{0.0, 0.0, 3.0e7, 0.0, 0.0});
+    const QColor magenta(255, 0, 255);
+    const std::function<int32_t(const ts::SpaceLine&)> pixels =
+        [&](const ts::SpaceLine& line) {
+          m_gl->makeCurrent();
+          m_renderer->setSpaceLines({line});
+          const QImage image = render(camera);
+          m_gl->makeCurrent();
+          m_renderer->setSpaceLines({});
+          return countColor(image, magenta);
+        };
+    const int32_t nearSide =
+        pixels(lineBetween({-20.0, -10.0}, {20.0, 10.0}, 500e3, 20));
+    const int32_t farSide =
+        pixels(lineBetween({160.0, -10.0}, {-160.0, 10.0}, 500e3, 20));
+    const int32_t pastTheEdge =
+        pixels(lineBetween({100.0, -10.0}, {120.0, 10.0}, 20000e3, 20));
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("near %d, far %d, past the edge %d", nearSide, farSide, pastTheEdge);
+    QVERIFY(nearSide > 50);
+    QCOMPARE(farSide, 0);
+    QVERIFY(pastTheEdge > 20);
+  }
+
+  void markersInSpace()
+  {
+    // Satellite markers: one at the ISS's height in front of the Earth,
+    // one high up beside its edge (18° from the view's centre, the Earth
+    // filling 10°) and farther than the horizon (the far plane), both
+    // drawn; one at GPS height behind the Earth, hidden.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{0.0, 0.0, 3.0e7, 0.0, 0.0});
+    const QColor magenta(255, 0, 255);
+    const std::function<int32_t(const ts::Geodetic&)> pixels =
+        [&](const ts::Geodetic& at) {
+          ts::GlobeMarker marker;
+          marker.positionEcef = ts::geodeticToEcef(at);
+          marker.rgba = {255, 0, 255, 255};
+          marker.radiusPx = 6.0;
+          return countColor(render(camera, {marker}), magenta);
+        };
+    const int32_t front = pixels(ts::Geodetic{10.0, 10.0, 420e3});
+    const int32_t beside = pixels(ts::Geodetic{0.0, 123.7, 11650e3});
+    const int32_t behind = pixels(ts::Geodetic{0.0, 180.0, 20200e3});
+    render(camera);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("front %d, beside %d, behind %d", front, beside, behind);
+    QVERIFY(front > 40);
+    QVERIFY(beside > 40);
+    QCOMPARE(behind, 0);
+  }
+
+  void spaceLinesSplitOnMap()
+  {
+    // On a map centred at 0°, a ground track across the antimeridian is
+    // drawn to the map's edges on both sides, not as a streak across it.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    // Far enough out to see the whole width of the world.
+    ts::Camera camera = makeCamera(ts::CameraPose{0.0, 0.0, 4.5e7, 0.0, 0.0});
+    camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+    camera.setMorph(1.0);
+    ts::SpaceLine line = lineBetween({170.0, 10.0}, {-170.0, -10.0}, 0.0, 1);
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({line});
+    const QImage image =
+        render(camera).convertToFormat(QImage::Format_RGBA8888);
+    const int32_t segments = m_renderer->spaceSegmentsDrawn();
+    // Globe only: not on the map.
+    line.globeOnly = true;
+    m_renderer->setSpaceLines({line});
+    render(camera);
+    const int32_t globeOnly = m_renderer->spaceSegmentsDrawn();
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    QCOMPARE(segments, 2);
+    QCOMPARE(globeOnly, 0);
+    // Magenta at the edges, none in the middle half.
+    int32_t middle = 0;
+    int32_t edges = 0;
+    for (int32_t y = 0; y < image.height(); ++y) {
+      for (int32_t x = 0; x < image.width(); ++x) {
+        const QColor p = image.pixelColor(x, y);
+        if (p.red() > 200 && p.green() < 60 && p.blue() > 200) {
+          (x > image.width() / 4 && x < 3 * image.width() / 4 ? middle
+                                                              : edges) += 1;
+        }
+      }
+    }
+    qInfo("edges %d, middle %d", edges, middle);
+    QCOMPARE(middle, 0);
+    QVERIFY(edges > 0);
+  }
+
+  void satellitesHoldFrameRate()
+  {
+    // A whole constellation: 6000 satellites (72 planes at 53°, 550 km),
+    // ten of them with their tracks. Their positions in well under a
+    // second off the GUI thread, and frames on the globe and the map
+    // within the software budget (10 frames a second).
+    TS_TEST_REQUIRE_GL(*m_gl);
+    ts::OrbitalElements base = orbitFixture("stations.tle");
+    base.name.clear();
+    base.inclinationDeg = 53.0;
+    base.eccentricity = 0.0001;
+    base.meanMotionRevPerDay = 15.06;
+    base.bstar = 0.0001;
+    ts::OrbitRequest request;
+    request.time = base.epoch;
+    constexpr int32_t planes = 72;
+    constexpr int32_t perPlane = 84;
+    for (int32_t p = 0; p < planes; ++p) {
+      for (int32_t k = 0; k < perPlane; ++k) {
+        ts::OrbitalElements e = base;
+        e.catalogueNumber = 100000 + p * perPlane + k;
+        e.raanDeg = 360.0 * p / planes;
+        e.meanAnomalyDeg = std::fmod(360.0 * k / perPlane + 5.0 * p, 360.0);
+        const bool track = p * perPlane + k < 10;
+        const std::shared_ptr<const ts::Sgp4> sgp4 =
+            std::make_shared<const ts::Sgp4>(e);
+        request.tasks.push_back(ts::OrbitTask{
+            sgp4, track, sgp4->periodMinutes(), sgp4->periodMinutes()});
+      }
+    }
+    QCOMPARE(request.tasks.size(), std::size_t{6048});
+    std::map<const ts::Sgp4*, std::unique_ptr<ts::TrackSampler>> samplers;
+    ts::OrbitResult result = ts::OrbitComputer::compute(request, samplers);
+    // A tick later (the clock moving): the tracks' points are kept.
+    request.time.fraction += 1.0 / 86400.0;
+    result = ts::OrbitComputer::compute(request, samplers);
+    qInfo("6048 positions and 10 tracks: %.1f ms", result.computeMs);
+    QVERIFY(result.computeMs < 1000.0);
+    std::vector<ts::GlobeMarker> markers;
+    std::vector<ts::SpaceLine> lines;
+    for (std::size_t i = 0; i < result.states.size(); ++i) {
+      QVERIFY(result.states[i].ok());
+      markers.push_back(
+          ts::satelliteMarker(result.states[i], {255, 204, 0, 255}, 3.5));
+      if (request.tasks[i].track) {
+        ts::TrackLook look;
+        lines.push_back(ts::pastTrackLine(result.tracks[i], look));
+        lines.push_back(ts::futureTrackLine(result.tracks[i], look));
+      }
+    }
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines(lines);
+    for (const double morph : {0.0, 1.0}) {
+      ts::Camera camera =
+          makeCamera(ts::CameraPose{20.0, 10.0, 2.0e7, 0.0, 0.0});
+      camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+      camera.setMorph(morph);
+      render(camera, markers);
+      std::vector<double> timesS;
+      for (int32_t frame = 0; frame < 20; ++frame) {
+        // The markers move every frame, as the clock runs.
+        m_renderer->setMarkers(markers);
+        m_renderer->setSpaceLines(lines);
+        QElapsedTimer one;
+        one.start();
+        render(camera, markers);
+        timesS.push_back(static_cast<double>(one.nsecsElapsed()) * 1e-9);
+      }
+      std::sort(timesS.begin(), timesS.end());
+      const double quartileS = timesS.at(timesS.size() / 4);
+      qInfo("%s: fastest quarter within %.1f ms, slowest %.1f ms",
+            morph > 0.0 ? "map" : "globe", quartileS * 1000.0,
+            timesS.back() * 1000.0);
+      QVERIFY2(quartileS < 0.1, qPrintable(QString::number(quartileS)));
+    }
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({});
+    m_renderer->setMarkers({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
   }
 
   void benchmarkFrame()

@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <optional>
 #include <unordered_set>
+#include <utility>
 
 #include <QFocusEvent>
 #include <QFontDatabase>
@@ -46,11 +47,13 @@
 #include <QWheelEvent>
 
 #include "ts/camera/scalebar.h"
+#include "ts/geo/ellipsoid.h"
 #include "ts/geo/geodetic.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/globerenderer.h"
 #include "ts/globe/tilerenderer.h"
 #include "ts/kml/kmloverlays.h"
+#include "ts/maths/ray.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/tileprovider.h"
 #include "ts/render/glrenderdevice.h"
@@ -426,7 +429,47 @@ void GlobeView::initializeGL()
   m_globe->setElevationProvider(m_elevationDraw.provider);
   m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
   m_globe->setHillshade(m_elevationDraw.hillshade ? 1.0 : 0.0);
+  m_globe->setMarkers(m_markers);
+  m_globe->setSpaceLines(m_spaceLines);
   updateSurfaceHeight();
+}
+
+void GlobeView::setMarkers(std::vector<GlobeMarker> markers)
+{
+  m_markers = std::move(markers);
+  if (m_globe) {
+    m_globe->setMarkers(m_markers);
+  }
+  update();
+}
+
+void GlobeView::setSpaceLines(std::vector<SpaceLine> lines)
+{
+  m_spaceLines = std::move(lines);
+  if (m_globe) {
+    m_globe->setSpaceLines(m_spaceLines);
+  }
+  update();
+}
+
+int32_t GlobeView::spaceSegmentsDrawn() const
+{
+  return m_globe ? m_globe->spaceSegmentsDrawn() : 0;
+}
+
+bool GlobeView::hiddenByEarth(const Vec3& pointEcef) const
+{
+  // Is the Earth between the eye and the point? (Points high above the
+  // far side can still be seen past its edge.)
+  const Vec3 eye = m_controller.camera().eyeEcef();
+  const Vec3 towards = pointEcef - eye;
+  const double distanceM = length(towards);
+  if (distanceM <= 0.0) {
+    return false;
+  }
+  const std::optional<double> hit =
+      intersectEllipsoid(Ray{eye, towards / distanceM});
+  return hit && *hit < distanceM - 1.0;
 }
 
 void GlobeView::releaseGl()
@@ -648,8 +691,58 @@ void GlobeView::mouseReleaseEvent(QMouseEvent* event)
   event->accept();
 }
 
+std::optional<QPointF>
+GlobeView::markerOnScreen(const GlobeMarker& marker) const
+{
+  const Camera& camera = m_controller.camera();
+  if (camera.morph() > 0.0) {
+    // On the map: at the point below it.
+    const Geodetic below = ecefToGeodetic(marker.positionEcef);
+    const std::optional<ScreenPoint> screen =
+        camera.projectGeodetic(below.latDeg, below.lonDeg);
+    return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
+                  : std::nullopt;
+  }
+  if (hiddenByEarth(marker.positionEcef)) {
+    return std::nullopt;
+  }
+  const std::optional<ScreenPoint> screen = camera.project(marker.positionEcef);
+  return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
+                : std::nullopt;
+}
+
+int32_t GlobeView::markerAt(QPointF positionPx) const
+{
+  int32_t best = -1;
+  double bestPx = 0.0;
+  for (std::size_t i = 0; i < m_markers.size(); ++i) {
+    const std::optional<QPointF> at = markerOnScreen(m_markers[i]);
+    if (!at) {
+      continue;
+    }
+    const double reachPx = m_markers[i].radiusPx + 4.0;
+    const double distance = QLineF(*at, positionPx).length();
+    if (distance <= reachPx && (best < 0 || distance < bestPx)) {
+      best = static_cast<int32_t>(i);
+      bestPx = distance;
+    }
+  }
+  return best;
+}
+
+void GlobeView::setSatelliteLabels(std::vector<BillboardDraw> labels)
+{
+  m_satelliteLabels = std::move(labels);
+  update();
+}
+
 void GlobeView::reportClick()
 {
+  const int32_t marker = markerAt(m_clickPx);
+  if (marker >= 0) {
+    emit markerClicked(marker);
+    return;
+  }
   const std::optional<LonLat> point = pickLonLat(m_clickPx);
   if (!point) {
     return;
@@ -1372,10 +1465,18 @@ GlobeView::billboardOnScreen(const BillboardDraw& billboard)
   }
   const Vec3 ecef = overlayEcef(billboard.latDeg, billboard.lonDeg,
                                 billboard.heightM, billboard.height);
-  // Behind the globe: the ellipsoid faces away from the eye there.
-  const Vec3 normal = surfaceNormalEcef(billboard.latDeg, billboard.lonDeg);
-  if (dot(normal, camera.eyeEcef() - ecef) <= 0.0) {
-    return std::nullopt;
+  if (billboard.height == OverlayHeight::Absolute &&
+      billboard.heightM > 100e3) {
+    // High up (a satellite): hidden only where the Earth is in the way.
+    if (hiddenByEarth(ecef)) {
+      return std::nullopt;
+    }
+  } else {
+    // Behind the globe: the ellipsoid faces away from the eye there.
+    const Vec3 normal = surfaceNormalEcef(billboard.latDeg, billboard.lonDeg);
+    if (dot(normal, camera.eyeEcef() - ecef) <= 0.0) {
+      return std::nullopt;
+    }
   }
   const std::optional<ScreenPoint> screen = camera.project(ecef);
   return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
@@ -1386,7 +1487,7 @@ void GlobeView::drawBillboards()
 {
   m_billboardsDrawn = 0;
   m_labelsDrawn = 0;
-  if (m_billboards.empty()) {
+  if (m_billboards.empty() && m_satelliteLabels.empty()) {
     return;
   }
   constexpr double cellPx = 6.0;
@@ -1403,7 +1504,17 @@ void GlobeView::drawBillboards()
   std::vector<QRectF> labels;
   const QRectF visible =
       QRectF(rect()).adjusted(-marginPx, -marginPx, marginPx, marginPx);
+  // Satellites' labels first: KML icons can't then crowd them out.
+  std::vector<const BillboardDraw*> all;
+  all.reserve(m_satelliteLabels.size() + m_billboards.size());
+  for (const BillboardDraw& billboard : m_satelliteLabels) {
+    all.push_back(&billboard);
+  }
   for (const BillboardDraw& billboard : m_billboards) {
+    all.push_back(&billboard);
+  }
+  for (const BillboardDraw* drawn : all) {
+    const BillboardDraw& billboard = *drawn;
     const std::optional<QPointF> at = billboardOnScreen(billboard);
     if (!at || !visible.contains(*at)) {
       continue;

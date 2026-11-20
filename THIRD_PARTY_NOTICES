@@ -121,6 +121,18 @@ widened by about 5 km and simplified
   Source: https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2
   Source file: ne_10m_admin_0_countries.geojson
 
+Online data sources
+-------------------
+
+These are downloaded when asked for, and kept in the cache; none is
+distributed with the program.
+
+CelesTrak (https://celestrak.org): current orbital elements of
+  satellites, by group and by catalogue number (File > Add Satellites),
+  from the US Space Force's catalogue (space-track.org). CelesTrak's data
+  may be used freely; it asks to be credited. Attribution: "Orbital
+  elements: CelesTrak"
+
 Downloadable data packs
 -----------------------
 
@@ -172,6 +184,13 @@ OSTN15 developer pack), BSD 2-Clause licence as OSTN15 itself; and
 tests/data/kml/gdal/, KML test files from GDAL's autotest suite (MIT
 licence), among them Google's "KML Samples" from the KML documentation
 (Google, CC BY 4.0).
+
+tests/orbits/data/: SGP4-VER.TLE and tcppver.out, the verification test
+set and reference output of D. A. Vallado, P. Crawford, R. Hujsak and
+T. S. Kelso, "Revisiting Spacetrack Report #3" (AIAA 2006-6753), as
+redistributed by python-sgp4 2.27 (Copyright (c) 2012-2016 Brandon Rhodes,
+MIT licence); and stations.tle, stations.json and gps-ops.tle, CelesTrak
+element sets of 2026-11-20 (free to use, credit CelesTrak).
 
 tests/data/kml/schema/, schemas for checking the KML Terra Soar writes:
 ogckml22.xsd and atom-author-link.xsd, the OGC KML 2.2 schema (Copyright
