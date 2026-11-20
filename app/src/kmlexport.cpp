@@ -48,6 +48,7 @@ double wrapped(double lonDeg)
 std::vector<KmlCoordinate> closedRing(const std::vector<LonLat>& ring)
 {
   std::vector<KmlCoordinate> coordinates;
+  coordinates.reserve(ring.size() + 1);
   for (const LonLat& point : ring) {
     coordinates.push_back(
         KmlCoordinate{wrapped(point.lonDeg), point.latDeg, 0.0});

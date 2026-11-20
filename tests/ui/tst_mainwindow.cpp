@@ -3020,12 +3020,14 @@ private slots:
     file.write("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
                "<name>Large</name>");
     for (int32_t i = 0; i < 100000; ++i) {
+      const int32_t column = i % 3600;
+      const int32_t row = i / 3600;
       file.write(QStringLiteral("<Placemark><name>P%1</name><Point>"
                                 "<coordinates>%2,%3</coordinates></Point>"
                                 "</Placemark>")
                      .arg(i)
-                     .arg(-180.0 + (i % 3600) * 0.1, 0, 'f', 1)
-                     .arg(-60.0 + (i / 3600) * 0.1, 0, 'f', 1)
+                     .arg(-180.0 + 0.1 * column, 0, 'f', 1)
+                     .arg(-60.0 + 0.1 * row, 0, 'f', 1)
                      .toUtf8());
     }
     file.write("</Document></kml>");

@@ -454,6 +454,10 @@ private:
   void openKmlProjectEntries(const QJsonArray& entries);
   QJsonArray kmlProjectLayers(const QJsonArray& entries) const;
   void syncKmlEntry(const QModelIndex& index);
+  std::optional<KmlDocument> kmlToPaste() const;
+  std::shared_ptr<const KmlDocument>
+  kmlProjectDocument(const QJsonObject& entry, QString* path);
+  void fillKmlEntry(const QModelIndex& node, const KmlDocument& document);
   QJsonObject withKmlRevision(QJsonObject source) const;
   void retranslateUi();
   void showAbout();

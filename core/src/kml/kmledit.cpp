@@ -78,7 +78,7 @@ std::vector<Ring> ringsOf(KmlFeature& placemark)
 }
 
 /** How many vertices a ring has, its repeated closing point not counted. */
-int32_t distinct(const Ring& ring)
+int32_t distinct(Ring ring)
 {
   const std::vector<KmlCoordinate>& c = *ring.coordinates;
   const int32_t n = static_cast<int32_t>(c.size());
@@ -128,6 +128,8 @@ std::vector<KmlCoordinate> overlayCorners(const KmlFeature& overlay)
           KmlCoordinate{box.west, box.north, 0.0}};
 }
 
+// Longitude, then latitude, as everywhere in the program.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool moveOverlayCorner(KmlFeature& overlay, int32_t index, double lonDeg,
                        double latDeg)
 {
@@ -370,6 +372,8 @@ bool kmlMoveVertex(KmlFeature& placemark, int32_t ring, int32_t index,
   return true;
 }
 
+// The ring, then the vertex in it (as KmlHandle).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool kmlInsertVertex(KmlFeature& placemark, int32_t ring, int32_t index,
                      double lonDeg, double latDeg)
 {
@@ -387,6 +391,8 @@ bool kmlInsertVertex(KmlFeature& placemark, int32_t ring, int32_t index,
   return true;
 }
 
+// The ring, then the vertex in it (as KmlHandle).
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool kmlDeleteVertex(KmlFeature& placemark, int32_t ring, int32_t index)
 {
   const std::optional<Ring> found = ringAt(placemark, ring);
@@ -406,6 +412,8 @@ bool kmlDeleteVertex(KmlFeature& placemark, int32_t ring, int32_t index)
   return true;
 }
 
+// Longitude, then latitude, as everywhere in the program.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void kmlTranslate(KmlFeature& placemark, double dLonDeg, double dLatDeg)
 {
   for (const Ring& ring : ringsOf(placemark)) {
@@ -432,11 +440,14 @@ int32_t kmlStyleUsers(const KmlDocument& document, const QString& id)
   return countUsers(document.root, QLatin1Char('#') + id);
 }
 
-KmlEditDocument::KmlEditDocument(KmlDocument document, const QString& key,
-                                 const QString& filePath)
-    : m_document(std::move(document)), m_key(key), m_filePath(filePath)
+// The key drawing knows it by, then its file.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+KmlEditDocument::KmlEditDocument(KmlDocument document, QString key,
+                                 QString filePath)
+    : m_document(std::move(document)), m_key(std::move(key)),
+      m_filePath(std::move(filePath))
 {
-  m_document.path = key;
+  m_document.path = m_key;
   publish();
 }
 

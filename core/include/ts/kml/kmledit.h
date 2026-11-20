@@ -155,8 +155,7 @@ public:
    * Edits @p document, known to drawing as @p key (its path is set to it);
    * @p filePath is where it is saved (empty for a new document).
    */
-  KmlEditDocument(KmlDocument document, const QString& key,
-                  const QString& filePath);
+  KmlEditDocument(KmlDocument document, QString key, QString filePath);
 
   /** Returns the document as it is now. */
   const KmlDocument& document() const { return m_document; }

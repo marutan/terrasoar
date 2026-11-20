@@ -377,8 +377,9 @@ bool LayerTreeDock::eventFilter(QObject* watched, QEvent* event)
 {
   if (watched == m_view->viewport() &&
       event->type() == QEvent::MouseButtonDblClick && m_doubleClick) {
-    const QMouseEvent* mouse = static_cast<QMouseEvent*>(event);
-    const QModelIndex index = m_view->indexAt(mouse->pos());
+    const QMouseEvent* mouse = dynamic_cast<QMouseEvent*>(event);
+    const QModelIndex index =
+        mouse != nullptr ? m_view->indexAt(mouse->pos()) : QModelIndex();
     if (index.isValid() && m_doubleClick(index)) {
       return true; // done: not renamed
     }

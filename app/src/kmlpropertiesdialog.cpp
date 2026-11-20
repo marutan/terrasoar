@@ -93,6 +93,8 @@ void setGeometryHeight(KmlGeometry& geometry, KmlAltitudeMode mode,
   }
 }
 
+// Lowest, highest, then step, as QDoubleSpinBox's own setters.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 QDoubleSpinBox* spin(QWidget* parent, double low, double high, double step,
                      int32_t decimals)
 {

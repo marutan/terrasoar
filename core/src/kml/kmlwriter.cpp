@@ -42,9 +42,20 @@ namespace ts
 namespace
 {
 
-const QString kmlNamespace = QStringLiteral("http://www.opengis.net/kml/2.2");
-const QString gxNamespace = QStringLiteral("http://www.google.com/kml/ext/2.2");
-const QString atomNamespace = QStringLiteral("http://www.w3.org/2005/Atom");
+QString kmlNamespace()
+{
+  return QStringLiteral("http://www.opengis.net/kml/2.2");
+}
+
+QString gxNamespace()
+{
+  return QStringLiteral("http://www.google.com/kml/ext/2.2");
+}
+
+QString atomNamespace()
+{
+  return QStringLiteral("http://www.w3.org/2005/Atom");
+}
 
 /** A rank for repeated or later elements: the children come last. */
 constexpr int32_t childrenRank = 1000;
@@ -189,6 +200,15 @@ QString viewRefreshModeName(KmlLink::ViewRefreshMode mode)
   return QString();
 }
 
+QString simpleGeometryName(KmlGeometry::Kind kind)
+{
+  if (kind == KmlGeometry::Kind::Point) {
+    return QStringLiteral("Point");
+  }
+  return kind == KmlGeometry::Kind::LineString ? QStringLiteral("LineString")
+                                               : QStringLiteral("LinearRing");
+}
+
 /** Writes elements, knowing whether gx: is declared where they go. */
 class Builder
 {
@@ -200,7 +220,7 @@ public:
   {
     return m_gxDeclared ? QStringLiteral("<gx:%1>").arg(name)
                         : QStringLiteral("<gx:%1 xmlns:gx=\"%2\">")
-                              .arg(name, gxNamespace);
+                              .arg(name, gxNamespace());
   }
 
   QString altitudeMode(KmlAltitudeMode mode) const
@@ -253,10 +273,7 @@ public:
     case KmlGeometry::Kind::Point:
     case KmlGeometry::Kind::LineString:
     case KmlGeometry::Kind::LinearRing:
-      name = g.kind == KmlGeometry::Kind::Point ? QStringLiteral("Point")
-             : g.kind == KmlGeometry::Kind::LineString
-                 ? QStringLiteral("LineString")
-                 : QStringLiteral("LinearRing");
+      name = simpleGeometryName(g.kind);
       inner = geometryCommon(g, d);
       append(
           inner, d,
@@ -295,7 +312,7 @@ public:
     return QStringLiteral("<%1>%2%3</%1>").arg(name, inner, newline(d));
   }
 
-  QString style(const KmlStyle& s, int32_t d) const
+  static QString style(const KmlStyle& s, int32_t d)
   {
     QString inner;
     if (s.icon) {
@@ -389,8 +406,10 @@ public:
     return QStringLiteral("<Style%1>%2%3</Style>").arg(id, inner, newline(d));
   }
 
-  QString pair(const QString& key, const QString& url,
-               const std::optional<KmlStyle>& inlineStyle, int32_t d) const
+  // The pair's key, then the style's address.
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  static QString pair(const QString& key, const QString& url,
+                      const std::optional<KmlStyle>& inlineStyle, int32_t d)
   {
     const QString value = inlineStyle
                               ? style(*inlineStyle, d + 1)
@@ -400,7 +419,7 @@ public:
              newline(d + 1) + value, newline(d));
   }
 
-  QString styleMap(const KmlStyleMap& m, int32_t d) const
+  static QString styleMap(const KmlStyleMap& m, int32_t d)
   {
     const QString id = m.id.isEmpty()
                            ? QString()
@@ -518,7 +537,7 @@ public:
                   int32_t d) const;
 
 private:
-  QString styleElement(const KmlFeature& f, int32_t ordinal, int32_t d) const
+  static QString styleElement(const KmlFeature& f, int32_t ordinal, int32_t d)
   {
     const std::size_t at = static_cast<std::size_t>(ordinal);
     if (f.kind == KmlFeature::Kind::Document) {
@@ -527,7 +546,8 @@ private:
     return ordinal == 0 && f.style ? style(*f.style, d) : QString();
   }
 
-  QString styleMapElement(const KmlFeature& f, int32_t ordinal, int32_t d) const
+  static QString styleMapElement(const KmlFeature& f, int32_t ordinal,
+                                 int32_t d)
   {
     const std::size_t at = static_cast<std::size_t>(ordinal);
     if (f.kind == KmlFeature::Kind::Document) {
@@ -536,6 +556,9 @@ private:
     return ordinal == 0 && f.styleMap ? styleMap(*f.styleMap, d) : QString();
   }
 
+  // The slot writers share one signature for the table in element(), so
+  // some are members that need nothing of the builder.
+  // NOLINTBEGIN(readability-convert-member-functions-to-static)
   QString nameElement(const KmlFeature& f, int32_t /*d*/) const
   {
     return f.name.isEmpty() ? QString()
@@ -705,14 +728,10 @@ private:
   {
     return f.link ? link(*f.link, d) : QString();
   }
+  // NOLINTEND(readability-convert-member-functions-to-static)
 
   bool m_gxDeclared = true;
 };
-
-bool isContainer(KmlFeature::Kind kind)
-{
-  return kind == KmlFeature::Kind::Document || kind == KmlFeature::Kind::Folder;
-}
 
 /** The slots a feature of @p kind has, in KML 2.2's order. */
 const QStringList& slotsOf(KmlFeature::Kind kind)
@@ -868,7 +887,7 @@ public:
   }
 
 private:
-  QString startTag(const KmlFeature& f) const
+  static QString startTag(const KmlFeature& f)
   {
     return f.id.isEmpty() ? QStringLiteral("<%1>").arg(kindName(f.kind))
                           : QStringLiteral("<%1 id=\"%2\">")
@@ -948,10 +967,10 @@ private:
 class KeptFeature
 {
 public:
-  KeptFeature(const Writer& writer, const KmlFeature& f, int32_t d)
-      : m_writer(writer), m_f(f), m_d(d), m_source(*f.source)
+  KeptFeature(const Writer* writer, const KmlFeature& f, int32_t d)
+      : m_writer(writer), m_f(&f), m_d(d), m_source(f.source.get())
   {
-    for (const KmlSourcePart& part : m_source.parts) {
+    for (const KmlSourcePart& part : m_source->parts) {
       if (part.kind == KmlSourcePart::Kind::Known) {
         m_done.emplace(part.slot, part.ordinal);
       }
@@ -960,25 +979,25 @@ public:
 
   QString write()
   {
-    const QString start = m_writer.slice(m_source.begin, m_source.startEnd);
+    const QString start = m_writer->slice(m_source->begin, m_source->startEnd);
     const bool rawTags =
-        m_f.id == m_source.id && !start.endsWith(QLatin1String("/>"));
-    m_out = rawTags ? start : m_writer.startTag(m_f);
-    m_previous = m_source.startEnd;
+        m_f->id == m_source->id && !start.endsWith(QLatin1String("/>"));
+    m_out = rawTags ? start : Writer::startTag(*m_f);
+    m_previous = m_source->startEnd;
     std::size_t childParts = 0;
-    for (const KmlSourcePart& part : m_source.parts) {
+    for (const KmlSourcePart& part : m_source->parts) {
       childParts += part.kind == KmlSourcePart::Kind::Child ? 1 : 0;
     }
     std::size_t childPart = 0;
-    for (const KmlSourcePart& part : m_source.parts) {
-      const QString gap = m_writer.slice(m_previous, part.begin);
+    for (const KmlSourcePart& part : m_source->parts) {
+      const QString gap = m_writer->slice(m_previous, part.begin);
       m_previous = part.end;
       switch (part.kind) {
       case KmlSourcePart::Kind::Child:
         child(gap, ++childPart == childParts);
         break;
       case KmlSourcePart::Kind::Unknown:
-        m_out += gap + m_writer.slice(part.begin, part.end);
+        m_out += gap + m_writer->slice(part.begin, part.end);
         break;
       case KmlSourcePart::Kind::Known:
         known(part, gap);
@@ -987,31 +1006,32 @@ public:
     }
     addNew(childrenRank);
     if (childParts == 0) {
-      for (const KmlFeature& extra : m_f.children) {
-        m_out += newline(m_d + 1) + m_writer.feature(extra, m_d + 1);
+      for (const KmlFeature& extra : m_f->children) {
+        m_out += newline(m_d + 1) + m_writer->feature(extra, m_d + 1);
       }
     }
     if (rawTags) {
-      return m_out + m_writer.slice(m_previous, m_source.end);
+      return m_out + m_writer->slice(m_previous, m_source->end);
     }
     return m_out + newline(m_d) +
-           QStringLiteral("</%1>").arg(kindName(m_f.kind));
+           QStringLiteral("</%1>").arg(kindName(m_f->kind));
   }
 
 private:
   /** Elements the source didn't have, ranked below @p belowRank. */
   void addNew(int32_t belowRank)
   {
-    for (const QString& slot : slotsOf(m_f.kind)) {
-      if (rankOf(m_f.kind, slot) >= belowRank) {
+    for (const QString& slot : slotsOf(m_f->kind)) {
+      if (rankOf(m_f->kind, slot) >= belowRank) {
         break;
       }
-      for (int32_t i = 0; i < countOf(m_f, slot); ++i) {
+      for (int32_t i = 0; i < countOf(*m_f, slot); ++i) {
         if (m_done.count({slot, i}) != 0 ||
             !m_written.emplace(slot, i).second) {
           continue;
         }
-        const QString element = m_writer.m_build.element(m_f, slot, i, m_d + 1);
+        const QString element =
+            m_writer->m_build.element(*m_f, slot, i, m_d + 1);
         if (!element.isEmpty()) {
           m_out += newline(m_d + 1) + element;
         }
@@ -1021,14 +1041,14 @@ private:
 
   void known(const KmlSourcePart& part, const QString& gap)
   {
-    addNew(rankOf(m_f.kind, part.slot));
+    addNew(rankOf(m_f->kind, part.slot));
     const QString now =
-        m_writer.m_build.element(m_f, part.slot, part.ordinal, 0);
+        m_writer->m_build.element(*m_f, part.slot, part.ordinal, 0);
     if (kmlTextHash(now) == part.hash) {
-      m_out += gap + m_writer.slice(part.begin, part.end);
+      m_out += gap + m_writer->slice(part.begin, part.end);
     } else if (!now.isEmpty()) {
-      m_out +=
-          gap + m_writer.m_build.element(m_f, part.slot, part.ordinal, m_d + 1);
+      m_out += gap + m_writer->m_build.element(*m_f, part.slot, part.ordinal,
+                                               m_d + 1);
     }
   }
 
@@ -1039,23 +1059,23 @@ private:
   void child(const QString& gap, bool last)
   {
     addNew(childrenRank);
-    const std::vector<KmlFeature>& children = m_f.children;
+    const std::vector<KmlFeature>& children = m_f->children;
     if (m_child < children.size()) {
-      m_out += gap + m_writer.feature(children[m_child++], m_d + 1);
+      m_out += gap + m_writer->feature(children[m_child++], m_d + 1);
     }
     if (!last) {
       return;
     }
     const QString between = gap.trimmed().isEmpty() ? gap : newline(m_d + 1);
     while (m_child < children.size()) {
-      m_out += between + m_writer.feature(children[m_child++], m_d + 1);
+      m_out += between + m_writer->feature(children[m_child++], m_d + 1);
     }
   }
 
-  const Writer& m_writer;
-  const KmlFeature& m_f;
+  const Writer* m_writer;
+  const KmlFeature* m_f;
   int32_t m_d = 0;
-  const KmlSource& m_source;
+  const KmlSource* m_source;
   QString m_out;
   int64_t m_previous = 0;
   std::size_t m_child = 0;
@@ -1065,7 +1085,7 @@ private:
 
 QString Writer::keptFeature(const KmlFeature& f, int32_t d) const
 {
-  return KeptFeature(*this, f, d).write();
+  return KeptFeature(this, f, d).write();
 }
 
 /** Every style and overlay picture address of @p f and inside it. */
@@ -1181,7 +1201,7 @@ QByteArray writeKml(const KmlDocument& document)
   }
   Writer writer(document, true);
   out += QStringLiteral("<kml xmlns=\"%1\" xmlns:gx=\"%2\" xmlns:atom=\"%3\">")
-             .arg(kmlNamespace, gxNamespace, atomNamespace);
+             .arg(kmlNamespace(), gxNamespace(), atomNamespace());
   for (const QString& element : document.unknownTopLevel) {
     out += newline(1) + element;
   }
@@ -1306,6 +1326,81 @@ bool writeKmlFile(const KmlDocument& document, const QString& path,
   return true;
 }
 
+namespace
+{
+
+/** The ids of the shared styles and style maps @p feature uses. */
+std::set<QString> usedStyleIds(const KmlFeature& feature,
+                               const std::vector<KmlStyleMap>& maps)
+{
+  std::set<QString> ids;
+  collectStyleUrls(feature, ids);
+  // A style map's own styles too.
+  for (const KmlStyleMap& map : maps) {
+    if (ids.count(map.id) == 0) {
+      continue;
+    }
+    for (const QString& url : {map.normalUrl, map.highlightUrl}) {
+      if (url.startsWith(QLatin1Char('#'))) {
+        ids.insert(url.mid(1));
+      }
+    }
+  }
+  return ids;
+}
+
+/**
+ * Adds to @p into the shared styles and maps of @p document that
+ * @p feature uses and doesn't hold itself.
+ */
+void addUsedStyles(const KmlDocument& document, const KmlFeature& feature,
+                   KmlFeature& into)
+{
+  std::vector<KmlStyle> styles;
+  std::vector<KmlStyleMap> maps;
+  collectShared(document.root, styles, maps);
+  const std::set<QString> ids = usedStyleIds(feature, maps);
+  std::set<QString> own;
+  for (const KmlStyle& style : feature.styles) {
+    own.insert(style.id);
+  }
+  for (const KmlStyleMap& map : feature.styleMaps) {
+    own.insert(map.id);
+  }
+  for (const KmlStyle& style : styles) {
+    if (ids.count(style.id) != 0 && own.insert(style.id).second) {
+      into.styles.push_back(style);
+    }
+  }
+  for (const KmlStyleMap& map : maps) {
+    if (ids.count(map.id) != 0 && own.insert(map.id).second) {
+      into.styleMaps.push_back(map);
+    }
+  }
+}
+
+/** The feature at @p path of @p document; null if none. */
+const KmlFeature* featureAtPath(const KmlDocument& document,
+                                const QString& path)
+{
+  const KmlFeature* feature = &document.root;
+  if (path.isEmpty()) {
+    return feature;
+  }
+  for (const QString& part : path.split(QLatin1Char('.'))) {
+    bool ok = false;
+    const int32_t index = part.toInt(&ok);
+    if (!ok || index < 0 ||
+        static_cast<std::size_t>(index) >= feature->children.size()) {
+      return nullptr;
+    }
+    feature = &feature->children.at(static_cast<std::size_t>(index));
+  }
+  return feature;
+}
+
+} // namespace
+
 KmlDocument kmlExtract(const KmlDocument& document, const QString& featurePath)
 {
   KmlDocument extracted;
@@ -1315,55 +1410,13 @@ KmlDocument kmlExtract(const KmlDocument& document, const QString& featurePath)
   extracted.webBase = document.webBase;
   extracted.sourceText = document.sourceText;
   extracted.root.kind = KmlFeature::Kind::Document;
-  const KmlFeature* feature = nullptr;
-  if (featurePath.isEmpty()) {
-    feature = &document.root;
-  } else {
-    feature = &document.root;
-    for (const QString& part : featurePath.split(QLatin1Char('.'))) {
-      bool ok = false;
-      const int32_t index = part.toInt(&ok);
-      if (!ok || index < 0 ||
-          static_cast<std::size_t>(index) >= feature->children.size()) {
-        return extracted;
-      }
-      feature = &feature->children.at(static_cast<std::size_t>(index));
-    }
+  const KmlFeature* feature = featureAtPath(document, featurePath);
+  if (feature == nullptr) {
+    return extracted;
   }
   extracted.root.name = feature->name;
   KmlFeature copy = *feature;
-  // The shared styles it uses (the copy keeps those it holds itself).
-  std::set<QString> ids;
-  collectStyleUrls(copy, ids);
-  std::vector<KmlStyle> styles;
-  std::vector<KmlStyleMap> maps;
-  collectShared(document.root, styles, maps);
-  for (const KmlStyleMap& map : maps) {
-    if (ids.count(map.id) != 0) {
-      for (const QString& url : {map.normalUrl, map.highlightUrl}) {
-        if (url.startsWith(QLatin1Char('#'))) {
-          ids.insert(url.mid(1));
-        }
-      }
-    }
-  }
-  std::set<QString> own;
-  for (const KmlStyle& style : copy.styles) {
-    own.insert(style.id);
-  }
-  for (const KmlStyleMap& map : copy.styleMaps) {
-    own.insert(map.id);
-  }
-  for (const KmlStyle& style : styles) {
-    if (ids.count(style.id) != 0 && own.insert(style.id).second) {
-      extracted.root.styles.push_back(style);
-    }
-  }
-  for (const KmlStyleMap& map : maps) {
-    if (ids.count(map.id) != 0 && own.insert(map.id).second) {
-      extracted.root.styleMaps.push_back(map);
-    }
-  }
+  addUsedStyles(document, copy, extracted.root);
   if (copy.kind == KmlFeature::Kind::Document) {
     copy.kind = KmlFeature::Kind::Folder; // a Document inside: as a folder
     copy.source.reset();

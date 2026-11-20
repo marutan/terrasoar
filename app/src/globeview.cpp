@@ -21,6 +21,7 @@
 #include "globeview.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <optional>
@@ -1149,18 +1150,20 @@ bool addWalls(const RaisedShapeDraw& shape, const Projected& tops,
     if (!tops[i] || !tops[j] || !feet[i] || !feet[j]) {
       continue;
     }
+    const std::array<ScreenPoint, 4> corners{
+        tops[i].value_or(ScreenPoint{}), tops[j].value_or(ScreenPoint{}),
+        feet[j].value_or(ScreenPoint{}), feet[i].value_or(ScreenPoint{})};
     QPainterPath quad;
-    quad.moveTo(tops[i]->xPx, tops[i]->yPx);
-    quad.lineTo(tops[j]->xPx, tops[j]->yPx);
-    quad.lineTo(feet[j]->xPx, feet[j]->yPx);
-    quad.lineTo(feet[i]->xPx, feet[i]->yPx);
+    quad.moveTo(corners[0].xPx, corners[0].yPx);
+    double depth = corners[0].depthM / 4.0;
+    for (std::size_t k = 1; k < corners.size(); ++k) {
+      quad.lineTo(corners.at(k).xPx, corners.at(k).yPx);
+      depth += corners.at(k).depthM / 4.0;
+    }
     quad.closeSubpath();
     if (!visible.intersects(quad.boundingRect())) {
       continue;
     }
-    const double depth = (tops[i]->depthM + tops[j]->depthM + feet[i]->depthM +
-                          feet[j]->depthM) /
-                         4.0;
     pieces.push_back(
         OverlayPiece{depth, quad, QBrush(shape.fill), QPen(Qt::NoPen)});
     any = true;
@@ -1247,7 +1250,7 @@ QRectF drawBillboardIcon(QPainter& painter, const BillboardDraw& billboard,
  * Draws a billboard's label beside its icon, with a halo, unless it would
  * cover one of @p labels; returns true if drawn.
  */
-bool drawBillboardLabel(QPainter& painter, QFont font,
+bool drawBillboardLabel(QPainter& painter, const QFont& font,
                         const BillboardDraw& billboard, QPointF at,
                         const QRectF& iconRect, std::vector<QRectF>& labels)
 {

@@ -90,7 +90,7 @@ private:
   QWidget* makeTime();
   QWidget* makeData();
   void chooseColor(QPushButton* button, QColor* color);
-  void showColor(QPushButton* button, const QColor& color);
+  static void showColor(QPushButton* button, const QColor& color);
   void loadStyle(const KmlStyle& style);
   KmlStyle editedStyle() const;
   void styleChosen();

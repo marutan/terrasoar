@@ -62,7 +62,7 @@ struct KmlReadOptions {
  */
 std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
                                     QString* errorString,
-                                    const KmlReadOptions& options = {});
+                                    KmlReadOptions options = {});
 
 /**
  * Reads a .kml file, or a .kmz archive (its doc.kml, else the first .kml
@@ -73,7 +73,7 @@ std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
  */
 std::optional<KmlDocument> readKmlFile(const QString& path,
                                        QString* errorString,
-                                       const KmlReadOptions& options = {});
+                                       KmlReadOptions options = {});
 
 /**
  * Returns where @p href points for @p document: unchanged if it is a web

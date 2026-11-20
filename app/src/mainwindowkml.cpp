@@ -70,12 +70,15 @@ enum KmlDrawing : int32_t {
   DrawingOverlay
 };
 
-const QString kmlMimeType =
-    QStringLiteral("application/vnd.google-earth.kml+xml");
+QString kmlMimeType()
+{
+  return QStringLiteral("application/vnd.google-earth.kml+xml");
+}
 
 std::vector<KmlCoordinate> closedRing(const std::vector<LonLat>& corners)
 {
   std::vector<KmlCoordinate> ring;
+  ring.reserve(corners.size() + 1);
   for (const LonLat& corner : corners) {
     ring.push_back(KmlCoordinate{corner.lonDeg, corner.latDeg, 0.0});
   }
@@ -106,6 +109,38 @@ KmlStyle drawnStyle()
   poly.color = fill;
   style.poly = poly;
   return style;
+}
+
+/**
+ * Moves every placemark of the container at @p path into the container at
+ * @p folder (a Places entry dragged there); false if none moved.
+ */
+// The container moved from, then the one moved to.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool movePlacemarks(KmlDocument& document, const QString& path,
+                    const QString& folder)
+{
+  bool moved = false;
+  for (;;) {
+    const KmlFeature* container = kmlFeatureAt(document, path);
+    if (container == nullptr) {
+      return moved;
+    }
+    const std::vector<KmlFeature>& children = container->children;
+    const std::vector<KmlFeature>::const_iterator placemark = std::find_if(
+        children.begin(), children.end(), [](const KmlFeature& child) {
+          return child.kind == KmlFeature::Kind::Placemark;
+        });
+    if (placemark == children.end()) {
+      return moved;
+    }
+    const QString at =
+        kmlChildPath(path, static_cast<int32_t>(placemark - children.begin()));
+    if (kmlMoveFeature(document, at, folder, -1).isEmpty()) {
+      return moved;
+    }
+    moved = true;
+  }
 }
 
 QAction* newAction(QObject* parent, const char* name)
@@ -333,7 +368,7 @@ QString MainWindow::kmlKeyOf(const QString& nodeId) const
 
 QString MainWindow::activeKmlDocument() const
 {
-  const QString selected = kmlKeyOf(
+  QString selected = kmlKeyOf(
       m_layers->data(m_layerDock->currentIndex(), LayerTreeModel::NodeIdRole)
           .toString());
   if (!selected.isEmpty()) {
@@ -417,7 +452,7 @@ QString MainWindow::editKmlDocument(const QString& nodeId)
   if (rootId.isEmpty()) {
     return QString();
   }
-  const QString path = m_kmlRoots.at(rootId);
+  QString path = m_kmlRoots.at(rootId);
   if (m_kmlEdits.count(path) != 0) {
     return path;
   }
@@ -518,12 +553,12 @@ std::optional<QString> MainWindow::selectedKmlFeature() const
 void MainWindow::showKmlHandles()
 {
   m_kmlHandles.clear();
-  const KmlEditDocument* document =
-      m_kmlSelection ? kmlEditDocument(m_kmlSelection->first) : nullptr;
+  const std::pair<QString, QString> selection =
+      m_kmlSelection.value_or(std::pair<QString, QString>());
+  const KmlEditDocument* document = kmlEditDocument(selection.first);
   const KmlFeature* feature =
-      document != nullptr
-          ? kmlFeatureAt(document->document(), m_kmlSelection->second)
-          : nullptr;
+      document != nullptr ? kmlFeatureAt(document->document(), selection.second)
+                          : nullptr;
   if (feature != nullptr) {
     m_kmlHandles = kmlHandles(*feature);
   }
@@ -531,6 +566,7 @@ void MainWindow::showKmlHandles()
     return;
   }
   std::vector<EditHandleDraw> draws;
+  draws.reserve(m_kmlHandles.size());
   for (const KmlHandle& handle : m_kmlHandles) {
     draws.push_back(
         EditHandleDraw{LonLat{handle.lonDeg, handle.latDeg}, handle.middle});
@@ -660,6 +696,8 @@ bool MainWindow::addKmlFolder()
   return addKmlFeatureToActive(tr("Add Folder"), folder);
 }
 
+// The document's key, then the feature's path in it.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool MainWindow::setKmlFeature(const QString& key, const QString& path,
                                const KmlFeature& feature,
                                const std::optional<KmlStyle>& shared)
@@ -716,17 +754,18 @@ bool MainWindow::redoKml()
 
 bool MainWindow::copyKml()
 {
-  const KmlEditDocument* document =
-      m_kmlSelection ? kmlEditDocument(m_kmlSelection->first) : nullptr;
+  const std::pair<QString, QString> selection =
+      m_kmlSelection.value_or(std::pair<QString, QString>());
+  const KmlEditDocument* document = kmlEditDocument(selection.first);
   if (document == nullptr) {
     return false;
   }
   // The feature with the shared styles it uses; on the clipboard as KML
   // too, for other programs.
-  m_kmlClipboard = kmlExtract(*document->shared(), m_kmlSelection->second);
+  m_kmlClipboard = kmlExtract(*document->shared(), selection.second);
   QMimeData* mime = new QMimeData;
   const QByteArray kml = writeKml(*m_kmlClipboard);
-  mime->setData(kmlMimeType, kml);
+  mime->setData(kmlMimeType(), kml);
   mime->setText(QString::fromUtf8(kml));
   QApplication::clipboard()->setMimeData(mime);
   updateKmlActions();
@@ -759,50 +798,68 @@ bool MainWindow::deleteKml()
   return done;
 }
 
+std::optional<KmlDocument> MainWindow::kmlToPaste() const
+{
+  // What was copied here, else KML on the clipboard from elsewhere.
+  if (m_kmlClipboard) {
+    return m_kmlClipboard;
+  }
+  const QMimeData* mime = QApplication::clipboard()->mimeData();
+  if (mime == nullptr) {
+    return std::nullopt;
+  }
+  const QByteArray kml = mime->hasFormat(kmlMimeType())
+                             ? mime->data(kmlMimeType())
+                             : mime->text().toUtf8();
+  QString error;
+  return parseKml(kml, QString(), &error);
+}
+
+namespace
+{
+
+/** Adds the shared styles and maps of @p from that @p into hasn't. */
+void addMissingStyles(KmlDocument& into, const KmlDocument& from)
+{
+  if (into.root.kind != KmlFeature::Kind::Document) {
+    return;
+  }
+  for (const KmlStyle& style : from.root.styles) {
+    if (into.findStyle(style.id) == nullptr) {
+      into.root.styles.push_back(style);
+    }
+  }
+  for (const KmlStyleMap& map : from.root.styleMaps) {
+    if (into.findStyleMap(map.id) == nullptr) {
+      into.root.styleMaps.push_back(map);
+    }
+  }
+}
+
+} // namespace
+
 bool MainWindow::pasteKml()
 {
   const QString key = activeKmlDocument();
   KmlEditDocument* document = kmlEditDocument(key);
-  if (document == nullptr) {
+  const std::optional<KmlDocument> copied = kmlToPaste();
+  if (document == nullptr || !copied) {
     return false;
   }
-  // What was copied here, else KML on the clipboard from elsewhere.
-  std::optional<KmlDocument> copied = m_kmlClipboard;
-  const QMimeData* mime = QApplication::clipboard()->mimeData();
-  if (!copied && mime != nullptr) {
-    const QByteArray kml = mime->hasFormat(kmlMimeType)
-                               ? mime->data(kmlMimeType)
-                               : mime->text().toUtf8();
-    QString error;
-    copied = parseKml(kml, QString(), &error);
-  }
-  if (!copied) {
-    return false;
-  }
+  const KmlDocument& from = *copied;
   const QString folder = kmlTargetFolder(key);
+  const std::vector<KmlFeature> features =
+      isContainer(&from.root) ? from.root.children
+                              : std::vector<KmlFeature>{from.root};
   QString first;
   const bool done = document->edit(tr("Paste"), [&](KmlDocument& changed) {
-    std::vector<KmlFeature> features =
-        isContainer(&copied->root) ? copied->root.children
-                                   : std::vector<KmlFeature>{copied->root};
-    for (KmlFeature& feature : features) {
+    for (const KmlFeature& feature : features) {
       const QString added =
           kmlInsertFeature(changed, folder, kmlWithoutSource(feature));
       first = first.isEmpty() ? added : first;
     }
     // The shared styles they use, if the document hasn't them.
-    if (changed.root.kind == KmlFeature::Kind::Document) {
-      for (const KmlStyle& style : copied->root.styles) {
-        if (changed.findStyle(style.id) == nullptr) {
-          changed.root.styles.push_back(style);
-        }
-      }
-      for (const KmlStyleMap& map : copied->root.styleMaps) {
-        if (changed.findStyleMap(map.id) == nullptr) {
-          changed.root.styleMaps.push_back(map);
-        }
-      }
-    }
+    addMissingStyles(changed, from);
     return !first.isEmpty();
   });
   if (done) {
@@ -812,6 +869,8 @@ bool MainWindow::pasteKml()
   return done;
 }
 
+// The document's key, then the file to save it to.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 bool MainWindow::saveKmlDocument(const QString& key, const QString& path)
 {
   KmlEditDocument* document = kmlEditDocument(key);
@@ -1088,29 +1147,8 @@ void MainWindow::kmlNodesMoved()
     }
     const QString folder = parent->second.second;
     document->edit(tr("Move"), [&](KmlDocument& changed) {
-      if (!places) {
-        return !kmlMoveFeature(changed, path, folder, -1).isEmpty();
-      }
-      // A Places entry: every placemark of its folder.
-      bool moved = false;
-      for (;;) {
-        const KmlFeature* container = kmlFeatureAt(changed, path);
-        const std::vector<KmlFeature>& children = container->children;
-        const std::vector<KmlFeature>::const_iterator placemark = std::find_if(
-            children.begin(), children.end(), [](const KmlFeature& child) {
-              return child.kind == KmlFeature::Kind::Placemark;
-            });
-        if (placemark == children.end() ||
-            kmlMoveFeature(
-                changed,
-                kmlChildPath(
-                    path, static_cast<int32_t>(placemark - children.begin())),
-                folder, -1)
-                .isEmpty()) {
-          return moved;
-        }
-        moved = true;
-      }
+      return places ? movePlacemarks(changed, path, folder)
+                    : !kmlMoveFeature(changed, path, folder, -1).isEmpty();
     });
     break; // one move at a time
   }
@@ -1175,6 +1213,64 @@ QJsonArray MainWindow::kmlProjectEntries(bool* cancelled)
   return entries;
 }
 
+std::shared_ptr<const KmlDocument>
+MainWindow::kmlProjectDocument(const QJsonObject& entry, QString* path)
+{
+  // A file shown as it is, or a document being edited: from its file, or
+  // from the text the project kept (its changes).
+  const QString file = entry.contains(QStringLiteral("path"))
+                           ? entry.value(QStringLiteral("path")).toString()
+                           : entry.value(QStringLiteral("file")).toString();
+  const bool text = entry.contains(QStringLiteral("text"));
+  QString error;
+  *path = file;
+  if (!entry.value(QStringLiteral("editable")).toBool() && !text) {
+    std::shared_ptr<const KmlDocument> document =
+        sharedKmlDocument(file, &error);
+    if (!document) {
+      statusBar()->showMessage(error, 10000);
+    }
+    return document;
+  }
+  KmlReadOptions options;
+  options.keepSource = true;
+  std::optional<KmlDocument> read =
+      text ? parseKml(entry.value(QStringLiteral("text")).toString().toUtf8(),
+                      file.isEmpty() ? QString()
+                                     : QFileInfo(file).absolutePath(),
+                      &error, options)
+           : readKmlFile(file, &error, options);
+  if (!read) {
+    statusBar()->showMessage(error, 10000);
+    return nullptr;
+  }
+  *path = QStringLiteral("kmledit:") +
+          QUuid::createUuid().toString(QUuid::WithoutBraces);
+  std::unique_ptr<KmlEditDocument>& edited = m_kmlEdits[*path];
+  edited = std::make_unique<KmlEditDocument>(*read, *path, file);
+  // Changes kept in the project are changes to the file.
+  if (text && !file.isEmpty()) {
+    edited->adjust([](KmlDocument&) {});
+  }
+  return edited->shared();
+}
+
+void MainWindow::fillKmlEntry(const QModelIndex& node,
+                              const KmlDocument& document)
+{
+  m_refreshingKml = true;
+  while (m_layers->rowCount(node) > 0) {
+    m_layers->removeNode(
+        m_layers->index(m_layers->rowCount(node) - 1, 0, node));
+  }
+  if (isContainer(&document.root)) {
+    addKmlChildren(document, document.root, QString(), node);
+  } else if (document.root.kind == KmlFeature::Kind::Placemark) {
+    addKmlPlaces(document, QString(), node, 0, false);
+  }
+  m_refreshingKml = false;
+}
+
 void MainWindow::openKmlProjectEntries(const QJsonArray& entries)
 {
   // NOLINTNEXTLINE(modernize-loop-convert)
@@ -1182,56 +1278,15 @@ void MainWindow::openKmlProjectEntries(const QJsonArray& entries)
     const QJsonObject entry = entries.at(i).toObject();
     const QString id = entry.value(QStringLiteral("node")).toString();
     const QModelIndex node = m_layers->indexOfId(id);
-    if (!node.isValid()) {
-      continue;
-    }
-    const bool editable = entry.value(QStringLiteral("editable")).toBool();
-    const QString file = entry.contains(QStringLiteral("path"))
-                             ? entry.value(QStringLiteral("path")).toString()
-                             : entry.value(QStringLiteral("file")).toString();
-    QString error;
-    std::shared_ptr<const KmlDocument> document;
-    QString path = file;
-    if (editable || entry.contains(QStringLiteral("text"))) {
-      KmlReadOptions options;
-      options.keepSource = true;
-      std::optional<KmlDocument> read =
-          entry.contains(QStringLiteral("text"))
-              ? parseKml(
-                    entry.value(QStringLiteral("text")).toString().toUtf8(),
-                    file.isEmpty() ? QString() : QFileInfo(file).absolutePath(),
-                    &error, options)
-              : readKmlFile(file, &error, options);
-      if (read) {
-        path = QStringLiteral("kmledit:") +
-               QUuid::createUuid().toString(QUuid::WithoutBraces);
-        m_kmlEdits[path] = std::make_unique<KmlEditDocument>(*read, path, file);
-        // Changes kept in the project are changes to the file.
-        if (entry.contains(QStringLiteral("text")) && !file.isEmpty()) {
-          m_kmlEdits[path]->adjust([](KmlDocument&) {});
-        }
-        document = m_kmlEdits[path]->shared();
-      }
-    } else {
-      document = sharedKmlDocument(file, &error);
-    }
+    QString path;
+    const std::shared_ptr<const KmlDocument> document =
+        node.isValid() ? kmlProjectDocument(entry, &path) : nullptr;
     if (!document) {
-      statusBar()->showMessage(error, 10000);
       continue;
     }
     m_kmlRoots[id] = path;
     m_kmlNodes[id] = {path, QString()};
-    m_refreshingKml = true;
-    while (m_layers->rowCount(node) > 0) {
-      m_layers->removeNode(
-          m_layers->index(m_layers->rowCount(node) - 1, 0, node));
-    }
-    if (isContainer(&document->root)) {
-      addKmlChildren(*document, document->root, QString(), node);
-    } else if (document->root.kind == KmlFeature::Kind::Placemark) {
-      addKmlPlaces(*document, QString(), node, 0, false);
-    }
-    m_refreshingKml = false;
+    fillKmlEntry(node, *document);
   }
   updateKmlActions();
 }

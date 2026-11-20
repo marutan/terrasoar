@@ -752,7 +752,6 @@ private slots:
   void billboards()
   {
     // A point's icon, tint, scale, heading, hot spot and label.
-    QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
         shared(QStringLiteral("everything.kml"));
     ts::KmlFeatureProvider shapes(document, QStringLiteral("0"));
@@ -817,7 +816,6 @@ private slots:
   void heights()
   {
     // Shapes above the ground: drawn over the view, not in the tiles.
-    QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
         shared(QStringLiteral("heights.kml"));
     ts::KmlFeatureProvider provider(document, QString());
@@ -1085,7 +1083,6 @@ private slots:
     QVERIFY(!ts::kmlNarrowTime(std::nullopt, std::nullopt));
 
     // everything.kml's "Times and places": a stamp and a span.
-    QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
         shared(QStringLiteral("everything.kml"));
     const QString times = QStringLiteral("1");
@@ -1132,7 +1129,6 @@ private slots:
 
   void tracks()
   {
-    QString error;
     const std::shared_ptr<const ts::KmlDocument> document =
         shared(QStringLiteral("everything.kml"));
     const ts::KmlFeature* track =
@@ -1272,7 +1268,6 @@ private slots:
     // A fetched copy's base is remembered for it.
     ts::setKmlWebBase(fixture(QStringLiteral("links.kml")),
                       QStringLiteral("https://example.invalid/links.kml"));
-    QString error;
     const std::shared_ptr<const ts::KmlDocument> copy =
         shared(QStringLiteral("links.kml"));
     QCOMPARE(copy->webBase,
@@ -1282,7 +1277,6 @@ private slots:
   void hiddenChildren()
   {
     // A checkHideChildren folder's layer: everything inside.
-    QString error;
     const std::shared_ptr<const ts::KmlDocument> links =
         shared(QStringLiteral("everything.kml"));
     // everything.kml's root, deep: all placemarks of every folder.
@@ -1351,6 +1345,9 @@ private slots:
       QFAIL("no point");
     }
     point->name = QStringLiteral("Renamed & moved");
+    if (!point->geometry) {
+      QFAIL("no geometry");
+    }
     point->geometry->coordinates.front().lonDeg = -1.5;
     const QString written = QString::fromUtf8(ts::writeKml(*document));
     QString expected = original;
@@ -1396,7 +1393,11 @@ private slots:
              QStringLiteral("Added"));
     QVERIFY(find(third->root, QStringLiteral("Stamped")) == nullptr);
     // A changed style is written anew, its id kept.
-    document->root.styles.front().line->color = QColor(1, 2, 3);
+    std::optional<ts::KmlLineStyle>& line = document->root.styles.front().line;
+    if (!line) {
+      QFAIL("no line style");
+    }
+    line->color = QColor(1, 2, 3);
     const QString styled = QString::fromUtf8(ts::writeKml(*document));
     QVERIFY(styled.contains(QLatin1String("<color>ff030201</color>")));
     QVERIFY(styled.contains(QLatin1String("<Style id=\"red\">")));
@@ -1566,6 +1567,7 @@ private slots:
     QCOMPARE(shapes.root.children.size(), std::size_t{1});
     QCOMPARE(shapes.root.children.front().name, QStringLiteral("Shapes"));
     std::vector<QString> ids;
+    ids.reserve(shapes.root.styles.size());
     for (const ts::KmlStyle& style : shapes.root.styles) {
       ids.push_back(style.id);
     }
@@ -1919,10 +1921,12 @@ private slots:
         "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
         "<Style id=\"s\"><IconStyle><color>ff00ff00</color></IconStyle>"
         "<LineStyle><width>2</width></LineStyle></Style>");
-    xml.reserve(placemarks * 230);
+    xml.reserve(static_cast<qsizetype>(placemarks) * 230);
     for (int32_t i = 0; i < placemarks; ++i) {
-      const double lon = -180.0 + (i % 3600) * 0.1;
-      const double lat = -60.0 + (i / 3600) * 0.1;
+      const int32_t column = i % 3600;
+      const int32_t row = i / 3600;
+      const double lon = -180.0 + 0.1 * column;
+      const double lat = -60.0 + 0.1 * row;
       xml += QStringLiteral(
                  "<Placemark><name>Place %1</name><styleUrl>#s</styleUrl>"
                  "<ExtendedData><Data name=\"n\"><value>%1</value></Data>"

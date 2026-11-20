@@ -1004,7 +1004,7 @@ bool readKmlElement(QXmlStreamReader& stream, Reader& reader,
 
 std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
                                     QString* errorString,
-                                    const KmlReadOptions& options)
+                                    KmlReadOptions options)
 {
   // Kept text is read as text, so positions in it are the reader's.
   std::optional<QString> text;
@@ -1069,9 +1069,8 @@ std::optional<KmlDocument> parseKml(const QByteArray& xml, const QString& base,
   return document;
 }
 
-std::optional<KmlDocument> readKmlFile(const QString& path,
-                                       QString* errorString,
-                                       const KmlReadOptions& options)
+std::optional<KmlDocument>
+readKmlFile(const QString& path, QString* errorString, KmlReadOptions options)
 {
   QFile file(path);
   if (!file.open(QIODevice::ReadOnly)) {
