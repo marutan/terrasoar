@@ -27,6 +27,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
+#include <QClipboard>
 #include <QComboBox>
 #include <QDir>
 #include <QDirIterator>
@@ -44,6 +45,7 @@
 #include <QMetaEnum>
 #include <QMouseEvent>
 #include <QNetworkProxy>
+#include <QPlainTextEdit>
 #include <QPointer>
 #include <QPushButton>
 #include <QRegularExpression>
@@ -56,6 +58,7 @@
 #include <QStyleHints>
 #include <QTabWidget>
 #include <QTemporaryDir>
+#include <QTextBrowser>
 #include <QTimeZone>
 #include <QTimer>
 #include <QTreeView>
@@ -79,6 +82,7 @@
 #include "helpwindow.h"
 #include "kmlexport.h"
 #include "kmllinks.h"
+#include "kmlpropertiesdialog.h"
 #include "layertreedock.h"
 #include "mainwindow.h"
 #include "mockhttpserver.h"
@@ -96,6 +100,7 @@
 #include "timemodebox.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
+#include "ts/kml/kmledit.h"
 #include "ts/kml/kmlreader.h"
 #include "ts/kml/kmlwriter.h"
 #include "ts/layers/layertreemodel.h"
@@ -445,6 +450,26 @@ bool helpKeyOpens(QDialog* dialog, const QString& target)
  * UI tests for the main window: opens and closes cleanly, and every string
  * is translatable and fits (checked with the pseudo-locale).
  */
+namespace
+{
+
+/** The feature named @p name in @p feature; null if none. */
+const ts::KmlFeature* find(const ts::KmlFeature& feature, const QString& name)
+{
+  if (feature.name == name) {
+    return &feature;
+  }
+  for (const ts::KmlFeature& child : feature.children) {
+    const ts::KmlFeature* found = find(child, name);
+    if (found != nullptr) {
+      return found;
+    }
+  }
+  return nullptr;
+}
+
+} // namespace
+
 class TestMainWindow : public QObject
 {
   Q_OBJECT
@@ -3022,6 +3047,294 @@ private slots:
     ts::GlobeView* view = window.findChild<ts::GlobeView*>();
     QVERIFY(view != nullptr);
     QTRY_COMPARE(view->billboards().size(), std::size_t{100000});
+  }
+
+  void kmlEditing()
+  {
+    // A document of one's own: drawn elements, dragged points, undo and
+    // redo, properties, the clipboard, saving and projects.
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* view = window.findChild<ts::GlobeView*>();
+    QVERIFY(view != nullptr);
+    ts::LayerTreeModel* model = window.layerModel();
+    const QString key = window.newKmlDocument();
+    QVERIFY(!key.isEmpty());
+    QCOMPARE(model->data(model->index(0, 0)).toString(),
+             QStringLiteral("Untitled"));
+    ts::KmlEditDocument* document = window.kmlEditDocument(key);
+    QVERIFY(document != nullptr);
+    // A placemark: selected, its handle shown, drawn.
+    QVERIFY(window.addKmlPlacemark(ts::LonLat{1.0, 2.0}));
+    QCOMPARE(window.selectedKmlFeature().value_or(QString()),
+             QStringLiteral("0"));
+    QCOMPARE(view->editHandles().size(), std::size_t{1});
+    QTRY_VERIFY(!view->billboards().empty());
+    // Dragging its handle moves it.
+    view->dragHandle(0, ts::LonLat{3.0, 4.0});
+    QCOMPARE(document->document()
+                 .root.children.front()
+                 .geometry.value_or(ts::KmlGeometry{})
+                 .coordinates.front()
+                 .lonDeg,
+             3.0);
+    // A path: dragging the middle of an edge adds a point; undo, redo.
+    QVERIFY(window.addKmlPath({ts::LonLat{0.0, 0.0}, ts::LonLat{2.0, 0.0}}));
+    QCOMPARE(view->editHandles().size(), std::size_t{3});
+    const std::function<std::size_t()> pathPoints = [document]() {
+      return document->document()
+          .root.children.at(1)
+          .geometry.value_or(ts::KmlGeometry{})
+          .coordinates.size();
+    };
+    view->dragHandle(2, ts::LonLat{1.0, 1.0});
+    QCOMPARE(pathPoints(), std::size_t{3});
+    QVERIFY(window.undoKml());
+    QCOMPARE(pathPoints(), std::size_t{2});
+    QVERIFY(window.redoKml());
+    QCOMPARE(pathPoints(), std::size_t{3});
+    // Right-clicking a point deletes it; a path keeps two.
+    emit view->handleDeleteRequested(1);
+    QCOMPARE(pathPoints(), std::size_t{2});
+    emit view->handleDeleteRequested(1);
+    QCOMPARE(pathPoints(), std::size_t{2});
+    // A polygon with a hole.
+    QVERIFY(
+        window.addKmlPolygon({ts::LonLat{10.0, 10.0}, ts::LonLat{14.0, 10.0},
+                              ts::LonLat{14.0, 14.0}}));
+    QVERIFY(window.addKmlHole({ts::LonLat{12.5, 10.5}, ts::LonLat{13.5, 10.5},
+                               ts::LonLat{13.5, 11.5}}));
+    QCOMPARE(document->document()
+                 .root.children.at(2)
+                 .geometry.value_or(ts::KmlGeometry{})
+                 .inner.size(),
+             std::size_t{1});
+
+    // A folder; with it selected in the tree, new elements go in it.
+    QVERIFY(window.addKmlFolder());
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    const QModelIndex root = model->index(0, 0);
+    QModelIndex folder;
+    for (int32_t i = 0; i < model->rowCount(root); ++i) {
+      if (model->data(model->index(i, 0, root)).toString() ==
+          QLatin1String("Folder")) {
+        folder = model->index(i, 0, root);
+      }
+    }
+    QVERIFY(folder.isValid());
+    dock->setCurrentIndex(folder);
+    QVERIFY(window.addKmlPlacemark(ts::LonLat{5.0, 5.0}));
+    QCOMPARE(window.selectedKmlFeature().value_or(QString()),
+             QStringLiteral("3.0"));
+    // A ground overlay over a rectangle.
+    QVERIFY(window.addKmlGroundOverlay(
+        QStringLiteral(TS_TEST_DATA_DIR "/kml/images/overlay.png"),
+        ts::RegionGeometry::rectangle(20.0, 0.0, 30.0, 5.0)));
+    // Properties: a name, a time, data.
+    ts::KmlFeature changed = document->document().root.children.front();
+    changed.name = QStringLiteral("Home");
+    changed.extendedData = {{QStringLiteral("rooms"), QStringLiteral("5")}};
+    QVERIFY(
+        window.setKmlFeature(key, QStringLiteral("0"), changed, std::nullopt));
+    QCOMPARE(document->document().root.children.front().name,
+             QStringLiteral("Home"));
+    QAction* undo = window.findChild<QAction*>(QStringLiteral("kmlUndoAction"));
+    QVERIFY(undo != nullptr);
+    QVERIFY(window.kmlMenu()->actions().contains(undo));
+    QCOMPARE(undo->text(), QStringLiteral("&Undo Change Properties"));
+    // Copy and paste: a second Home; cut takes it away again.
+    window.selectKmlFeature(key, QStringLiteral("0"));
+    dock->setCurrentIndex(root);
+    QVERIFY(window.copyKml());
+    QVERIFY(window.pasteKml());
+    std::size_t homes = 0;
+    for (const ts::KmlFeature& feature : document->document().root.children) {
+      homes += feature.name == QLatin1String("Home") ? 1 : 0;
+    }
+    QCOMPARE(homes, std::size_t{2});
+    QVERIFY(window.cutKml());
+    QVERIFY(window.deleteKml() == false); // nothing selected now
+    QVERIFY(QApplication::clipboard()->text().contains(QLatin1String("Home")));
+    // Saved: the file has it all; nothing unsaved.
+    QTemporaryDir folderOnDisk;
+    const QString saved = folderOnDisk.filePath(QStringLiteral("mine.kmz"));
+    QVERIFY(window.saveKmlDocument(key, saved));
+    QVERIFY(!document->isModified());
+    QString error;
+    const std::optional<ts::KmlDocument> read = ts::readKmlFile(saved, &error);
+    QVERIFY2(read.has_value(), qPrintable(error));
+    const ts::KmlDocument& back = read.value_or(ts::KmlDocument{});
+    QVERIFY(find(back.root, QStringLiteral("Home")) != nullptr);
+    QVERIFY(
+        ts::readKmlResource(back, QStringLiteral("files/overlay.png"), &error)
+            .size() > 0);
+    // A project keeps it (with a change not yet saved: in the project).
+    QVERIFY(window.addKmlFolder());
+    const QString project =
+        folderOnDisk.filePath(QStringLiteral("p.terrasoar"));
+    // Asked whether to save the file first: no, the project keeps it.
+    bool asked = false;
+    QTimer::singleShot(0, &window, [&asked]() {
+      for (QWidget* widget : QApplication::topLevelWidgets()) {
+        if (QMessageBox* box = qobject_cast<QMessageBox*>(widget)) {
+          asked = true;
+          box->button(QMessageBox::No)->click();
+        }
+      }
+    });
+    QVERIFY2(window.saveProject(project, &error), qPrintable(error));
+    QVERIFY(asked);
+    ts::MainWindow again;
+    QVERIFY2(again.openProject(project, &error), qPrintable(error));
+    const QModelIndex reopened = again.layerModel()->index(0, 0);
+    QCOMPARE(again.layerModel()->data(reopened).toString(),
+             QStringLiteral("Untitled"));
+    QVERIFY(again.layerModel()->rowCount(reopened) >= 4);
+    const QString reopenedKey = again.activeKmlDocument();
+    QVERIFY(!reopenedKey.isEmpty());
+    ts::KmlEditDocument* restored = again.kmlEditDocument(reopenedKey);
+    QVERIFY(restored != nullptr);
+    QCOMPARE(restored->filePath(), saved);
+    QVERIFY(restored->isModified());
+    QCOMPARE(restored->document().root.children.back().name,
+             QStringLiteral("Folder"));
+  }
+
+  void kmlPropertiesDialog()
+  {
+    // The dialog's fields become the element's properties; a shared style
+    // is edited for all that use it.
+    QString error;
+    const std::optional<ts::KmlDocument> document = ts::readKmlFile(
+        QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"), &error);
+    QVERIFY2(document.has_value(), qPrintable(error));
+    const ts::KmlDocument& kml = document.value_or(ts::KmlDocument{});
+    const ts::KmlFeature* line = find(kml.root, QStringLiteral("A line"));
+    QVERIFY(line != nullptr);
+    ts::KmlView here;
+    here.latDeg = 12.0;
+    ts::KmlPropertiesDialog dialog(
+        *line, kml, [here]() { return here; }, nullptr);
+    dialog.findChild<QLineEdit*>(QStringLiteral("kmlName"))
+        ->setText(QStringLiteral("Renamed"));
+    dialog.findChild<QPlainTextEdit*>(QStringLiteral("kmlDescription"))
+        ->setPlainText(QStringLiteral("<b>bold</b>"));
+    QVERIFY(dialog.findChild<QTextBrowser*>(QStringLiteral("kmlPreview"))
+                ->toHtml()
+                .contains(QLatin1String("bold")));
+    dialog.findChild<QPushButton*>(QStringLiteral("kmlSetView"))->click();
+    dialog.findChild<QComboBox*>(QStringLiteral("kmlAltitudeMode"))
+        ->setCurrentIndex(2);
+    dialog.findChild<QDoubleSpinBox*>(QStringLiteral("kmlAltitude"))
+        ->setValue(500.0);
+    dialog.findChild<QCheckBox*>(QStringLiteral("kmlExtrude"))
+        ->setChecked(true);
+    dialog.findChild<QComboBox*>(QStringLiteral("kmlTimeKind"))
+        ->setCurrentIndex(1);
+    dialog.findChild<QPushButton*>(QStringLiteral("kmlAddField"))->click();
+    // Its own style: a wider line.
+    dialog.findChild<QDoubleSpinBox*>(QStringLiteral("kmlLineWidth"))
+        ->setValue(7.0);
+    const ts::KmlFeature edited = dialog.feature();
+    QCOMPARE(edited.name, QStringLiteral("Renamed"));
+    QCOMPARE(edited.description, QStringLiteral("<b>bold</b>"));
+    QCOMPARE(edited.view.value_or(ts::KmlView{}).latDeg, 12.0);
+    const ts::KmlGeometry geometry =
+        edited.geometry.value_or(ts::KmlGeometry{});
+    QCOMPARE(geometry.altitudeMode, ts::KmlAltitudeMode::Absolute);
+    QVERIFY(geometry.extrude);
+    QCOMPARE(geometry.coordinates.back().altM, 500.0);
+    QVERIFY(edited.time.has_value());
+    QCOMPARE(edited.extendedData.size(), std::size_t{1});
+    QCOMPARE(edited.style.value_or(ts::KmlStyle{})
+                 .line.value_or(ts::KmlLineStyle{})
+                 .width,
+             7.0);
+    QVERIFY(edited.styleUrl.isEmpty());
+    QVERIFY(!dialog.sharedStyle());
+    // A shared style instead: the element points at it; the style changes.
+    QComboBox* style =
+        dialog.findChild<QComboBox*>(QStringLiteral("kmlStyleChoice"));
+    const int32_t red = style->findData(QStringLiteral("red"));
+    QVERIFY(red > 0);
+    style->setCurrentIndex(red);
+    dialog.findChild<QDoubleSpinBox*>(QStringLiteral("kmlLineWidth"))
+        ->setValue(9.0);
+    QCOMPARE(dialog.feature().styleUrl, QStringLiteral("#red"));
+    QVERIFY(!dialog.feature().style.has_value());
+    const ts::KmlStyle shared = dialog.sharedStyle().value_or(ts::KmlStyle{});
+    QCOMPARE(shared.id, QStringLiteral("red"));
+    QCOMPARE(shared.line.value_or(ts::KmlLineStyle{}).width, 9.0);
+    // Its icon is kept.
+    QCOMPARE(shared.icon.value_or(ts::KmlIconStyle{}).href,
+             QStringLiteral("icons/pin.png"));
+  }
+
+  void kmlEditingFiles()
+  {
+    // A file made editable: an edit changes only what it touches; a folder
+    // dragged into another moves in the document.
+    QTemporaryDir folder;
+    const QString path = folder.filePath(QStringLiteral("everything.kml"));
+    QVERIFY(QFile::copy(QStringLiteral(TS_TEST_DATA_DIR "/kml/everything.kml"),
+                        path));
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QString rootId =
+        model->data(model->index(0, 0), ts::LayerTreeModel::NodeIdRole)
+            .toString();
+    // Its menu offers editing; then it is editable.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    QMenu* menu = dock->contextMenu(model->index(0, 0));
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(QStringLiteral(
+                                   "editKmlNodeAction")) != nullptr);
+    const QString key = window.editKmlDocument(rootId);
+    QVERIFY(!key.isEmpty());
+    ts::KmlEditDocument* document = window.kmlEditDocument(key);
+    QCOMPARE(document->filePath(), path);
+    QCOMPARE(window.editKmlDocument(
+                 model->data(model->index(0, 0), ts::LayerTreeModel::NodeIdRole)
+                     .toString()),
+             key);
+    ts::KmlFeature point =
+        document->document().root.children.front().children.front();
+    point.name = QStringLiteral("Renamed");
+    QVERIFY(
+        window.setKmlFeature(key, QStringLiteral("0.0"), point, std::nullopt));
+    QVERIFY(window.saveKmlDocument(key, path));
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString written = QString::fromUtf8(file.readAll());
+    QVERIFY(written.contains(QLatin1String("<name>Renamed</name>")));
+    QVERIFY(written.contains(QLatin1String("atom:author")));
+    QVERIFY(written.contains(QLatin1String("<PhotoOverlay>")));
+    // Shapes dragged into Times and places.
+    const QModelIndex root = model->index(0, 0);
+    QModelIndex shapes;
+    QModelIndex times;
+    for (int32_t i = 0; i < model->rowCount(root); ++i) {
+      const QString name = model->data(model->index(i, 0, root)).toString();
+      if (name == QLatin1String("Shapes")) {
+        shapes = model->index(i, 0, root);
+      } else if (name == QLatin1String("Times and places")) {
+        times = model->index(i, 0, root);
+      }
+    }
+    QVERIFY(shapes.isValid() && times.isValid());
+    QVERIFY(model->moveNode(shapes, times, 0));
+    QTRY_COMPARE(document->document().root.children.front().name,
+                 QStringLiteral("Times and places"));
+    const ts::KmlFeature& moved =
+        document->document().root.children.front().children.back();
+    QCOMPARE(moved.name, QStringLiteral("Shapes"));
+    QVERIFY(window.undoKml());
+    QCOMPARE(document->document().root.children.front().name,
+             QStringLiteral("Shapes"));
   }
 
   void wmsWhatIsHere()

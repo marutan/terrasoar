@@ -44,6 +44,7 @@
 #include <QString>
 
 #include "ts/camera/camera.h"
+#include "ts/kml/kmledit.h"
 #include "ts/layers/layerdefinition.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/tileprovider.h"
@@ -74,8 +75,6 @@ struct AboutDataRow;
 class CountryAreas;
 struct BillboardDraw;
 class GlobeView;
-struct KmlDocument;
-struct KmlFeature;
 class ImageryProvider;
 class LayerTreeDock;
 class LayerTreeModel;
@@ -157,6 +156,91 @@ public:
    */
   std::optional<KmlDocument> kmlNodeDocument(const QString& nodeId,
                                              QString* errorString) const;
+
+  /**
+   * Starts a new KML document to draw in, at the top of the layer tree;
+   * returns its key (KmlEditDocument::key()).
+   */
+  QString newKmlDocument();
+
+  /**
+   * Makes the KML document holding the layer tree's entry @p nodeId
+   * editable (read again with its text kept); returns its key, empty if
+   * it isn't KML or can't be read. One already editable keeps its key.
+   */
+  QString editKmlDocument(const QString& nodeId);
+
+  /** Returns the document being edited with @p key, or null. */
+  KmlEditDocument* kmlEditDocument(const QString& key) const;
+
+  /**
+   * Returns the key of the document edits go to: the selected entry's, or
+   * the last one edited; empty if none.
+   */
+  QString activeKmlDocument() const;
+
+  /**
+   * Selects the feature at @p path of the document @p key (its handles
+   * drawn to drag); an empty @p key selects nothing.
+   */
+  void selectKmlFeature(const QString& key, const QString& path);
+
+  /** Returns the path of the selected feature; nothing if none. */
+  std::optional<QString> selectedKmlFeature() const;
+
+  /** Adds a placemark at @p at to the active document (as drawing does). */
+  bool addKmlPlacemark(LonLat at);
+
+  /** Adds a path through @p points to the active document. */
+  bool addKmlPath(const std::vector<LonLat>& points);
+
+  /** Adds a polygon with the corners @p corners to the active document. */
+  bool addKmlPolygon(const std::vector<LonLat>& corners);
+
+  /** Adds a hole with the corners @p corners to the selected polygon. */
+  bool addKmlHole(const std::vector<LonLat>& corners);
+
+  /** Adds the picture @p image over @p area to the active document. */
+  bool addKmlGroundOverlay(const QString& image, const RegionGeometry& area);
+
+  /** Adds a folder to the active document. */
+  bool addKmlFolder();
+
+  /**
+   * Gives the feature at @p path of document @p key the properties
+   * @p feature, and the shared style @p shared its values (as the
+   * Properties dialog does).
+   */
+  bool setKmlFeature(const QString& key, const QString& path,
+                     const KmlFeature& feature,
+                     const std::optional<KmlStyle>& shared);
+
+  /** Undoes the active document's last change. */
+  bool undoKml();
+
+  /** Redoes the active document's last undone change. */
+  bool redoKml();
+
+  /** Copies the selected feature (and to the clipboard as KML). */
+  bool copyKml();
+
+  /** Copies and deletes the selected feature. */
+  bool cutKml();
+
+  /** Pastes what was copied into the active document. */
+  bool pasteKml();
+
+  /** Deletes the selected feature. */
+  bool deleteKml();
+
+  /**
+   * Saves the document @p key to @p path (KML or KMZ), noting it saved
+   * there; false (with a message box) if it can't be.
+   */
+  bool saveKmlDocument(const QString& key, const QString& path);
+
+  /** Returns the KML menu. */
+  QMenu* kmlMenu() const { return m_kmlMenu; }
 
   /** Returns the KML nodes out of their Regions' sight (for tests). */
   QStringList kmlHiddenNodes() const
@@ -349,6 +433,28 @@ private:
   QModelIndex topmostElevationLayer() const;
   void syncTerrainActions();
   void createMenus();
+  void createKmlEditing();
+  void retranslateKmlEditing();
+  void updateKmlActions();
+  void refreshKmlDocument(const QString& key);
+  QString kmlKeyOf(const QString& nodeId) const;
+  QString kmlTargetFolder(const QString& key) const;
+  bool addKmlFeatureToActive(const QString& description, KmlFeature feature);
+  bool kmlClicked(LonLat point, double degreesPerPixel);
+  void startKmlDrawing(int32_t kind);
+  void kmlLineDrawn(const std::vector<LonLat>& points);
+  void kmlRegionDrawn(const RegionGeometry& region);
+  void kmlHandleMoved(int32_t index, LonLat to);
+  void kmlHandleDeleted(int32_t index);
+  void showKmlHandles();
+  void showKmlProperties();
+  bool saveKmlActive(bool as);
+  void kmlNodesMoved();
+  QJsonArray kmlProjectEntries(bool* cancelled);
+  void openKmlProjectEntries(const QJsonArray& entries);
+  QJsonArray kmlProjectLayers(const QJsonArray& entries) const;
+  void syncKmlEntry(const QModelIndex& index);
+  QJsonObject withKmlRevision(QJsonObject source) const;
   void retranslateUi();
   void showAbout();
   void showPointerPosition(bool onGlobe, double latDeg, double lonDeg);
@@ -447,6 +553,40 @@ private:
   QAction* m_addWfsAction = nullptr;
   QAction* m_openKmlAction = nullptr;
   BalloonWindow* m_balloon = nullptr;
+  /** The KML documents being edited, by key. */
+  std::map<QString, std::unique_ptr<KmlEditDocument>> m_kmlEdits;
+  /** Each KML document's entry in the layer tree: node id → path. */
+  std::map<QString, QString> m_kmlRoots;
+  /** The document edited last (its key). */
+  QString m_kmlActive;
+  /** The selected feature: document key and path. */
+  std::optional<std::pair<QString, QString>> m_kmlSelection;
+  /** The handles shown for it. */
+  std::vector<KmlHandle> m_kmlHandles;
+  /** What is being drawn for KML (KmlDrawing in mainwindowkml.cpp). */
+  int32_t m_kmlDrawing = 0;
+  /** The picture of the ground overlay being drawn. */
+  QString m_kmlOverlayImage;
+  /** What was copied: a document holding it and the styles it uses. */
+  std::optional<KmlDocument> m_kmlClipboard;
+  QMenu* m_kmlMenu = nullptr;
+  QAction* m_newKmlAction = nullptr;
+  QAction* m_editKmlAction = nullptr;
+  QAction* m_addPlacemarkAction = nullptr;
+  QAction* m_addPathAction = nullptr;
+  QAction* m_addPolygonAction = nullptr;
+  QAction* m_addHoleAction = nullptr;
+  QAction* m_addOverlayAction = nullptr;
+  QAction* m_addFolderAction = nullptr;
+  QAction* m_kmlPropertiesAction = nullptr;
+  QAction* m_kmlCutAction = nullptr;
+  QAction* m_kmlCopyAction = nullptr;
+  QAction* m_kmlPasteAction = nullptr;
+  QAction* m_kmlDeleteAction = nullptr;
+  QAction* m_kmlUndoAction = nullptr;
+  QAction* m_kmlRedoAction = nullptr;
+  QAction* m_kmlSaveAction = nullptr;
+  QAction* m_kmlSaveAsAction = nullptr;
   IconCache* m_icons = nullptr;
   KmlLinks* m_kmlLinks = nullptr;
   /** Waits for the view to stop before checking KML Regions. */

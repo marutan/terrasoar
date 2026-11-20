@@ -95,13 +95,65 @@ all of it. To rename it, select it and press F2.
 - In **Offline Regions**, **Export as KML…** saves the selected region's
   area.
 
+## Drawing and editing
+
+**KML → New KML Document** starts a document of your own at the top of
+the Layers panel. To change a file you opened, select it and choose
+**KML → Edit This Document** (or right-click it).
+
+Then, from the **KML** menu:
+
+- **Add Placemark**: click where it goes.
+- **Add Path**: click each point; double-click (or press Enter) to
+  finish.
+- **Add Polygon**: click each corner; double-click to finish. **Add Hole
+  to Polygon** draws a hole in the selected polygon the same way.
+- **Add Ground Overlay…**: choose a picture, then drag the rectangle it
+  covers.
+- **Add Folder**. New things go into the folder selected in the Layers
+  panel.
+
+Click a place, path or area of a document you are editing to select it:
+its points show as small squares.
+
+- Drag a square to move that point (a placemark moves with its point).
+- Drag one of the small dots between two points to add a point there.
+- Right-click a square to delete that point.
+- Drag a ground overlay's corners to stretch it.
+
+**KML → Properties…** (Alt+Enter) changes the selected thing's name,
+description (in HTML, with its balloon shown as it will look), the view
+Fly There goes to (**Set from the View**), its style (icon, colours,
+line width, fill, label size: for it alone, or a **shared** style, which
+changes everything that uses it), its height (on the ground, above the
+ground or above sea level, with walls down to the ground if you like),
+when it shows (always, from a moment on, or during a period) and its own
+data fields.
+
+**Cut**, **Copy**, **Paste** and **Delete** work on the selected thing;
+you can also paste KML copied in Google Earth. Drag folders in the
+Layers panel to move them into other folders. **Undo** and **Redo**
+(Ctrl+Z, Ctrl+Shift+Z) take back any change.
+
+**KML → Save KML Document** saves it to its file (or asks where, for a
+new one); **Save KML Document As…** saves a copy, as KML or as a KMZ with
+its pictures. What Terra Soar doesn't change in a file you edit stays as
+it was.
+
+### In projects
+
+A project remembers the KML files you opened and the documents you
+edit. If a document you edit has unsaved changes when you save the
+project, you are asked whether to save them to its file first; if not,
+the project keeps them. A document you never saved is kept in the
+project.
+
 ## Things to know
 
 - Elements Terra Soar doesn't show yet are skipped; the status bar says
   how many.
 - A file that isn't valid KML is refused with the line and column where
   it goes wrong.
-- Creating and editing your own KML comes later in this phase.
 - Not shown: photo overlays, 3D models, tours, and sounds.
 - Paths and areas in the air, and icons, are drawn over the view: a
   hill in front of them doesn't hide them.

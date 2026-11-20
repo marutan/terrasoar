@@ -232,6 +232,13 @@ std::map<QString, QString>& webBases()
 
 } // namespace
 
+void registerKmlDocument(const QString& path,
+                         const std::shared_ptr<const KmlDocument>& document)
+{
+  const std::lock_guard<std::mutex> lock(documentsMutex());
+  documents()[path] = document;
+}
+
 void setKmlWebBase(const QString& path, const QString& url)
 {
   const std::lock_guard<std::mutex> lock(documentsMutex());

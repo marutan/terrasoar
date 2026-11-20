@@ -34,6 +34,7 @@ HEADERS += \
     $$PWD/src/iconcache.h \
     $$PWD/src/kmlexport.h \
     $$PWD/src/kmllinks.h \
+    $$PWD/src/kmlpropertiesdialog.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/projectionsettingsdialog.h \
     $$PWD/src/addwfsdialog.h \
@@ -65,6 +66,7 @@ SOURCES += \
     $$PWD/src/iconcache.cpp \
     $$PWD/src/kmlexport.cpp \
     $$PWD/src/kmllinks.cpp \
+    $$PWD/src/kmlpropertiesdialog.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/projectionsettingsdialog.cpp \
     $$PWD/src/addwfsdialog.cpp \
@@ -77,6 +79,7 @@ SOURCES += \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \
+    $$PWD/src/mainwindowkml.cpp \
     $$PWD/src/newregiondialog.cpp \
     $$PWD/src/offlineregionmanager.cpp \
     $$PWD/src/packmanager.cpp \

@@ -56,6 +56,13 @@ std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
 void setKmlWebBase(const QString& path, const QString& url);
 
 /**
+ * Makes sharedKmlDocument(@p path) give @p document while anything holds
+ * it (a document being edited, by its key).
+ */
+void registerKmlDocument(const QString& path,
+                         const std::shared_ptr<const KmlDocument>& document);
+
+/**
  * Returns the container (Document or Folder) at @p containerPath in
  * @p document: child indices from the root separated by dots ("" for the
  * root, "0.2" for the root's first child's third); null if there is none.

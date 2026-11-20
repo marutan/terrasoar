@@ -325,6 +325,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   createActions();
   createMenus();
+  createKmlEditing();
   retranslateUi();
 
   resize(1024, 768);
@@ -964,6 +965,9 @@ void MainWindow::retranslateUi()
 {
   setWindowTitle(programName());
   m_fileMenu->setTitle(tr("&File"));
+  if (m_kmlMenu != nullptr) {
+    retranslateKmlEditing();
+  }
   m_viewMenu->setTitle(tr("&View"));
   m_helpMenu->setTitle(tr("&Help"));
   m_quitAction->setText(tr("&Quit"));
@@ -1244,7 +1248,9 @@ MainWindow::kmlBoundaries(const QJsonObject& source) const
       source.value(QStringLiteral("path")).toString() + QLatin1Char('|') +
       source.value(QStringLiteral("container")).toString() + QLatin1Char('|') +
       (source.value(QStringLiteral("deep")).toBool() ? QStringLiteral("deep")
-                                                     : QString());
+                                                     : QString()) +
+      QLatin1Char('|') +
+      QString::number(source.value(QStringLiteral("rev")).toDouble());
   const std::map<QString, std::vector<QDateTime>>::const_iterator found =
       m_kmlBoundaries.find(key);
   if (found != m_kmlBoundaries.end()) {
@@ -1349,6 +1355,9 @@ bool MainWindow::openKml(const QString& path, QString* errorString)
     return false;
   }
   addKmlFeature(*document, document->root, QString(), QModelIndex(), 0);
+  m_kmlRoots[m_layers->data(m_layers->index(0, 0), LayerTreeModel::NodeIdRole)
+                 .toString()] = absolute;
+  updateKmlActions();
   if (!document->skipped.isEmpty()) {
     statusBar()->showMessage(
         tr("%1: %n element(s) Terra Soar doesn't show were skipped.", nullptr,
@@ -1501,7 +1510,8 @@ void MainWindow::addKmlPlaces(const KmlDocument& document,
   definition.origin = LayerOrigin::User;
   definition.type = LayerType::Vector;
   definition.name = tr("Places");
-  definition.source = kmlLayerSource(document.path, featurePath, deep);
+  definition.source =
+      withKmlRevision(kmlLayerSource(document.path, featurePath, deep));
   VectorStyle style;
   style.fill = QColor(255, 255, 255);
   style.outline = QColor(255, 255, 255);
@@ -1652,6 +1662,7 @@ void MainWindow::updateKmlRegions()
 
 void MainWindow::kmlCheckChanged(const QModelIndex& topLeft)
 {
+  syncKmlEntry(topLeft);
   // A radio folder's child switched on: its siblings off.
   if (m_refreshingKml || !topLeft.isValid() ||
       m_layers->data(topLeft, Qt::CheckStateRole).toInt() != Qt::Checked) {
@@ -1687,13 +1698,15 @@ void MainWindow::addKmlOverlay(const KmlDocument& document,
     definition.type = LayerType::Imagery;
     definition.name =
         overlay.name.isEmpty() ? tr("Ground overlay") : overlay.name;
-    definition.source = kmlOverlaySource(document.path, featurePath);
+    definition.source =
+        withKmlRevision(kmlOverlaySource(document.path, featurePath));
   } else {
     // A picture on the screen: drawn by the view, from its own layer.
     definition.type = LayerType::Vector;
     definition.name =
         overlay.name.isEmpty() ? tr("Screen overlay") : overlay.name;
-    definition.source = kmlLayerSource(document.path, featurePath);
+    definition.source =
+        withKmlRevision(kmlLayerSource(document.path, featurePath));
     VectorStyle style;
     definition.style = style.toJson();
   }
@@ -1720,6 +1733,13 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   }
   const std::vector<QAction*> fly = flyThereActions(id, parent);
   actions.insert(actions.end(), fly.begin(), fly.end());
+  if (m_kmlNodes.count(id) != 0 && kmlKeyOf(id).isEmpty()) {
+    QAction* edit = new QAction(tr("Edit This Document"), parent);
+    edit->setObjectName(QStringLiteral("editKmlNodeAction"));
+    connect(edit, &QAction::triggered, this,
+            [this, id]() { editKmlDocument(id); });
+    actions.push_back(edit);
+  }
   if (m_kmlNodes.count(id) != 0) {
     QAction* save = new QAction(tr("Save As KML or KMZ…"), parent);
     save->setObjectName(QStringLiteral("saveKmlAction"));
@@ -2052,6 +2072,10 @@ void MainWindow::dropEvent(QDropEvent* event)
 
 int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
 {
+  // KML being drawn or edited takes the click first.
+  if (kmlClicked(point, degreesPerPixel)) {
+    return 1;
+  }
   if (!m_featureInfoAction->isChecked()) {
     return 0;
   }
@@ -2319,6 +2343,9 @@ ElevationProfileDialog* MainWindow::showElevationProfile()
 
 void MainWindow::profileLine(const std::vector<LonLat>& points)
 {
+  if (m_kmlDrawing != 0) {
+    return; // a KML path, not a profile
+  }
   if (m_globeView == nullptr || points.size() < 2) {
     return;
   }
@@ -2476,9 +2503,20 @@ NewRegionDialog* MainWindow::newOfflineRegion()
 bool MainWindow::openProject(const QString& path, QString* errorString)
 {
   const std::optional<Project> project = loadProject(path, errorString);
-  if (!project || !m_layers->fromJson(project->layers, errorString)) {
+  if (!project) {
     return false;
   }
+  // The KML of the project before is gone with its entries.
+  m_kmlEdits.clear();
+  m_kmlRoots.clear();
+  m_kmlNodes.clear();
+  m_kmlRadio.clear();
+  m_kmlSelection.reset();
+  showKmlHandles();
+  if (!m_layers->fromJson(project->layers, errorString)) {
+    return false;
+  }
+  openKmlProjectEntries(project->kml);
   if (m_globeView) {
     // An unknown projection (a newer program's) keeps the current one.
     m_globeView->setMapProjection(
@@ -2506,7 +2544,17 @@ bool MainWindow::saveProject(const QString& path, QString* errorString)
         m_globeView->mapProjection()->parameterValues();
   }
   project.time = m_clock->time();
-  project.layers = m_layers->toJson();
+  // KML documents: their files (or text); their entries are made again
+  // from them when the project opens.
+  bool cancelled = false;
+  project.kml = kmlProjectEntries(&cancelled);
+  if (cancelled) {
+    if (errorString != nullptr) {
+      *errorString = tr("The project wasn't saved.");
+    }
+    return false;
+  }
+  project.layers = kmlProjectLayers(project.kml);
   if (!ts::saveProject(path, project, errorString)) {
     return false;
   }

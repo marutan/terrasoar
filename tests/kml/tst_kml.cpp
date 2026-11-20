@@ -43,6 +43,7 @@
 
 #include "ts/kml/kmlactivity.h"
 #include "ts/kml/kmldocument.h"
+#include "ts/kml/kmledit.h"
 #include "ts/kml/kmlfeatureprovider.h"
 #include "ts/kml/kmloverlays.h"
 #include "ts/kml/kmlpresentation.h"
@@ -1708,6 +1709,205 @@ private slots:
                    resolver.resolve(*polygon).line.has_value(),
                qPrintable(name));
     }
+  }
+
+  void editStructure()
+  {
+    ts::KmlDocument document = read(QStringLiteral("everything.kml"));
+    QCOMPARE(ts::kmlChildPath(QString(), 2), QStringLiteral("2"));
+    QCOMPARE(ts::kmlChildPath(QStringLiteral("1"), 0), QStringLiteral("1.0"));
+    QCOMPARE(ts::kmlParentPath(QStringLiteral("1.2")), QStringLiteral("1"));
+    QCOMPARE(ts::kmlParentPath(QStringLiteral("1")), QString());
+    QCOMPARE(ts::kmlRowOf(QStringLiteral("1.2")), 2);
+    QCOMPARE(ts::kmlRowOf(QString()), -1);
+    QCOMPARE(ts::kmlFeatureAt(document, QStringLiteral("0"))->name,
+             QStringLiteral("Shapes"));
+    QVERIFY(ts::kmlFeatureAt(document, QStringLiteral("0.99")) == nullptr);
+    // Insert a folder at the top, a placemark into it.
+    ts::KmlFeature folder;
+    folder.kind = ts::KmlFeature::Kind::Folder;
+    folder.name = QStringLiteral("New");
+    QCOMPARE(ts::kmlInsertFeature(document, QString(), folder, 0),
+             QStringLiteral("0"));
+    ts::KmlFeature placemark;
+    placemark.name = QStringLiteral("Inside");
+    QCOMPARE(ts::kmlInsertFeature(document, QStringLiteral("0"), placemark),
+             QStringLiteral("0.0"));
+    // Not into a placemark.
+    QVERIFY(ts::kmlInsertFeature(document, QStringLiteral("0.0"), placemark)
+                .isEmpty());
+    // Move Shapes (now 1) into New (0), after its placemark.
+    QCOMPARE(ts::kmlMoveFeature(document, QStringLiteral("1"),
+                                QStringLiteral("0"), -1),
+             QStringLiteral("0.1"));
+    QCOMPARE(ts::kmlFeatureAt(document, QStringLiteral("0.1"))->name,
+             QStringLiteral("Shapes"));
+    // A later sibling's path moves up: Times and places was 2, now 1.
+    QCOMPARE(ts::kmlFeatureAt(document, QStringLiteral("1"))->name,
+             QStringLiteral("Times and places"));
+    // Moving New (0) into Times and places (1): Times is then 0.
+    QCOMPARE(ts::kmlMoveFeature(document, QStringLiteral("0"),
+                                QStringLiteral("1"), 0),
+             QStringLiteral("0.0"));
+    QCOMPARE(ts::kmlFeatureAt(document, QStringLiteral("0.0"))->name,
+             QStringLiteral("New"));
+    // Not into itself.
+    QVERIFY(ts::kmlMoveFeature(document, QStringLiteral("0"),
+                               QStringLiteral("0.0"), 0)
+                .isEmpty());
+    // Take one out.
+    const std::optional<ts::KmlFeature> taken =
+        ts::kmlTakeFeature(document, QStringLiteral("0.0"));
+    QVERIFY(taken.has_value());
+    QCOMPARE(taken.value_or(ts::KmlFeature{}).name, QStringLiteral("New"));
+    QVERIFY(!ts::kmlTakeFeature(document, QString()));
+    QCOMPARE(ts::kmlStyleUsers(read(QStringLiteral("everything.kml")),
+                               QStringLiteral("redOrBlue")),
+             1);
+  }
+
+  void editGeometry()
+  {
+    ts::KmlFeature polygon;
+    ts::KmlGeometry area;
+    area.kind = ts::KmlGeometry::Kind::Polygon;
+    area.coordinates = {
+        ts::KmlCoordinate{0.0, 0.0, 10.0}, ts::KmlCoordinate{1.0, 0.0, 30.0},
+        ts::KmlCoordinate{1.0, 1.0, 10.0}, ts::KmlCoordinate{0.0, 0.0, 10.0}};
+    polygon.geometry = area;
+    // Three corners and three middles (the closing point once).
+    const std::vector<ts::KmlHandle> handles = ts::kmlHandles(polygon);
+    QCOMPARE(handles.size(), std::size_t{6});
+    QCOMPARE(std::count_if(handles.begin(), handles.end(),
+                           [](const ts::KmlHandle& h) { return h.middle; }),
+             3);
+    // Moving the first corner moves the closing point with it.
+    QVERIFY(ts::kmlMoveVertex(polygon, 0, 0, -1.0, -1.0));
+    const std::vector<ts::KmlCoordinate>& ring = polygon.geometry->coordinates;
+    QCOMPARE(ring.front().lonDeg, -1.0);
+    QCOMPARE(ring.back().lonDeg, -1.0);
+    QCOMPARE(ring.front().altM, 10.0);
+    QVERIFY(!ts::kmlMoveVertex(polygon, 0, 3, 0.0, 0.0));
+    QVERIFY(!ts::kmlMoveVertex(polygon, 1, 0, 0.0, 0.0));
+    // A vertex in the middle of an edge, its height between.
+    QVERIFY(ts::kmlInsertVertex(polygon, 0, 1, 0.0, -0.5));
+    QCOMPARE(ring.size(), std::size_t{5});
+    QCOMPARE(ring.at(1).altM, 20.0);
+    // Deleting: down to three corners, then refused.
+    QVERIFY(ts::kmlDeleteVertex(polygon, 0, 1));
+    QVERIFY(!ts::kmlDeleteVertex(polygon, 0, 1));
+    // A line keeps two points; a point can't lose its one.
+    ts::KmlFeature line;
+    ts::KmlGeometry path;
+    path.kind = ts::KmlGeometry::Kind::LineString;
+    path.coordinates = {ts::KmlCoordinate{0.0, 0.0, 0.0},
+                        ts::KmlCoordinate{1.0, 0.0, 0.0},
+                        ts::KmlCoordinate{2.0, 0.0, 0.0}};
+    line.geometry = path;
+    QCOMPARE(ts::kmlHandles(line).size(), std::size_t{5});
+    QVERIFY(ts::kmlDeleteVertex(line, 0, 0));
+    QVERIFY(!ts::kmlDeleteVertex(line, 0, 0));
+    ts::KmlFeature point;
+    ts::KmlGeometry at;
+    at.coordinates = {ts::KmlCoordinate{5.0, 6.0, 7.0}};
+    point.geometry = at;
+    QCOMPARE(ts::kmlHandles(point).size(), std::size_t{1});
+    QVERIFY(!ts::kmlDeleteVertex(point, 0, 0));
+    QVERIFY(!ts::kmlInsertVertex(point, 0, 0, 1.0, 1.0));
+    // Moving the whole of it.
+    ts::kmlTranslate(point, 1.0, -2.0);
+    QCOMPARE(point.geometry->coordinates.front().lonDeg, 6.0);
+    QCOMPARE(point.geometry->coordinates.front().latDeg, 4.0);
+    // A ground overlay's box: its corners stretch it.
+    ts::KmlFeature overlay;
+    overlay.kind = ts::KmlFeature::Kind::GroundOverlay;
+    ts::KmlLatLonBox box;
+    box.north = 10.0;
+    box.south = 0.0;
+    box.east = 20.0;
+    box.west = 0.0;
+    overlay.latLonBox = box;
+    QCOMPARE(ts::kmlHandles(overlay).size(), std::size_t{4});
+    QVERIFY(ts::kmlMoveVertex(overlay, 0, 2, 25.0, 12.0));
+    QCOMPARE(overlay.latLonBox->east, 25.0);
+    QCOMPARE(overlay.latLonBox->north, 12.0);
+    QCOMPARE(overlay.latLonBox->west, 0.0);
+  }
+
+  void editUndo()
+  {
+    ts::KmlDocument made;
+    made.root.kind = ts::KmlFeature::Kind::Document;
+    made.root.name = QStringLiteral("Mine");
+    ts::KmlEditDocument document(made, QStringLiteral("kmledit:test"),
+                                 QString());
+    QCOMPARE(document.document().path, QStringLiteral("kmledit:test"));
+    // Drawing finds it by its key.
+    QString error;
+    QCOMPARE(ts::sharedKmlDocument(QStringLiteral("kmledit:test"), &error),
+             document.shared());
+    QVERIFY(!document.isModified());
+    QVERIFY(!document.canUndo());
+    ts::KmlFeature placemark;
+    placemark.name = QStringLiteral("One");
+    QVERIFY(document.edit(QStringLiteral("Add"), [&](ts::KmlDocument& d) {
+      return !ts::kmlInsertFeature(d, QString(), placemark).isEmpty();
+    }));
+    QVERIFY(document.isModified());
+    QCOMPARE(document.undoText(), QStringLiteral("Add"));
+    QCOMPARE(document.shared()->root.children.size(), std::size_t{1});
+    const int64_t added = document.revision();
+    // A change that does nothing is no step.
+    QVERIFY(!document.edit(QStringLiteral("Nothing"), [](ts::KmlDocument& d) {
+      d.root.name = QStringLiteral("changed");
+      return false;
+    }));
+    QCOMPARE(document.document().root.name, QStringLiteral("Mine"));
+    QVERIFY(document.edit(QStringLiteral("Rename"), [](ts::KmlDocument& d) {
+      d.root.children.front().name = QStringLiteral("Two");
+      return true;
+    }));
+    QVERIFY(document.undo());
+    QCOMPARE(document.document().root.children.front().name,
+             QStringLiteral("One"));
+    QCOMPARE(document.revision(), added);
+    QCOMPARE(document.redoText(), QStringLiteral("Rename"));
+    QVERIFY(document.undo());
+    QVERIFY(document.document().root.children.empty());
+    QVERIFY(!document.isModified());
+    QVERIFY(!document.undo());
+    QVERIFY(document.redo());
+    QVERIFY(document.redo());
+    QCOMPARE(document.document().root.children.front().name,
+             QStringLiteral("Two"));
+    QVERIFY(!document.redo());
+    document.setSaved(QStringLiteral("/tmp/x.kml"));
+    QVERIFY(!document.isModified());
+    QCOMPARE(document.filePath(), QStringLiteral("/tmp/x.kml"));
+    // A new change after undoing drops the redo.
+    QVERIFY(document.undo());
+    QVERIFY(document.isModified());
+    QVERIFY(document.edit(QStringLiteral("Other"), [](ts::KmlDocument& d) {
+      d.root.name = QStringLiteral("Other");
+      return true;
+    }));
+    QVERIFY(!document.canRedo());
+    // Adjustments keep through undo.
+    document.adjust([](ts::KmlDocument& d) { d.root.visibility = false; });
+    QVERIFY(document.undo());
+    QVERIFY(!document.document().root.visibility);
+    // At most so many steps.
+    for (std::size_t i = 0; i < ts::KmlEditDocument::mostUndo + 5; ++i) {
+      document.edit(QStringLiteral("Step"), [](ts::KmlDocument& d) {
+        d.root.open = !d.root.open;
+        return true;
+      });
+    }
+    std::size_t undone = 0;
+    while (document.undo()) {
+      ++undone;
+    }
+    QCOMPARE(undone, ts::KmlEditDocument::mostUndo);
   }
 
   void largeFile()

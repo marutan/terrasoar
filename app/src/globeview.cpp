@@ -469,6 +469,7 @@ void GlobeView::paintGL()
 
   drawRaisedShapes();
   drawBillboards();
+  drawEditHandles();
   drawScreenOverlays();
   drawAttributions();
   drawScaleBar();
@@ -522,6 +523,20 @@ void GlobeView::mousePressEvent(QMouseEvent* event)
 {
   setFocus(Qt::MouseFocusReason);
   const QPointF position = eventPosition(event);
+  // An edit handle: dragged, or (a vertex, right button) deleted.
+  const int32_t handle =
+      m_drawing == RegionDrawing::None ? handleAt(position) : -1;
+  if (handle >= 0 && event->button() == Qt::LeftButton) {
+    m_dragHandle = handle;
+    event->accept();
+    return;
+  }
+  if (handle >= 0 && event->button() == Qt::RightButton &&
+      !m_editHandles[static_cast<std::size_t>(handle)].middle) {
+    emit handleDeleteRequested(handle);
+    event->accept();
+    return;
+  }
   if (m_drawing != RegionDrawing::None && event->button() == Qt::LeftButton &&
       (event->modifiers() & Qt::ControlModifier) == 0) {
     const std::optional<LonLat> point = pickLonLat(position);
@@ -556,6 +571,15 @@ void GlobeView::mouseMoveEvent(QMouseEvent* event)
 {
   m_pointerInside = true;
   m_pointerPx = eventPosition(event);
+  if (m_dragHandle >= 0) {
+    const std::optional<LonLat> point = pickLonLat(m_pointerPx);
+    if (point) {
+      m_editHandles[static_cast<std::size_t>(m_dragHandle)].at = *point;
+      update();
+    }
+    event->accept();
+    return;
+  }
   if (m_clickPressPx &&
       QLineF(*m_clickPressPx, m_pointerPx).length() > clickSlopPx) {
     m_clickPressPx.reset(); // a drag, not a click
@@ -574,6 +598,14 @@ void GlobeView::mouseMoveEvent(QMouseEvent* event)
 
 void GlobeView::mouseReleaseEvent(QMouseEvent* event)
 {
+  if (m_dragHandle >= 0 && event->button() == Qt::LeftButton) {
+    const int32_t handle = m_dragHandle;
+    m_dragHandle = -1;
+    emit handleMoved(handle,
+                     m_editHandles[static_cast<std::size_t>(handle)].at);
+    event->accept();
+    return;
+  }
   if (m_drawing == RegionDrawing::Rectangle && m_drawingDrag &&
       event->button() == Qt::LeftButton) {
     m_drawingDrag = false;
@@ -968,6 +1000,88 @@ Vec3 GlobeView::overlayEcef(double latDeg, double lonDeg, double heightM,
     h += groundHeightM(latDeg, lonDeg);
   }
   return geodeticToEcef(Geodetic{latDeg, lonDeg, h});
+}
+
+void GlobeView::setEditHandles(std::vector<EditHandleDraw> handles)
+{
+  m_editHandles = std::move(handles);
+  m_dragHandle = -1;
+  update();
+}
+
+void GlobeView::dragHandle(int32_t index, LonLat to)
+{
+  if (index < 0 || static_cast<std::size_t>(index) >= m_editHandles.size()) {
+    return;
+  }
+  m_editHandles[static_cast<std::size_t>(index)].at = to;
+  emit handleMoved(index, to);
+}
+
+std::optional<QPointF> GlobeView::groundOnScreen(LonLat point)
+{
+  const Camera& camera = m_controller.camera();
+  if (camera.morph() > 0.0) {
+    const std::optional<ScreenPoint> screen =
+        camera.projectGeodetic(point.latDeg, point.lonDeg);
+    return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
+                  : std::nullopt;
+  }
+  const Vec3 ecef =
+      overlayEcef(point.latDeg, point.lonDeg, 0.0, OverlayHeight::Ground);
+  if (dot(surfaceNormalEcef(point.latDeg, point.lonDeg),
+          camera.eyeEcef() - ecef) <= 0.0) {
+    return std::nullopt;
+  }
+  const std::optional<ScreenPoint> screen = camera.project(ecef);
+  return screen ? std::optional<QPointF>(QPointF(screen->xPx, screen->yPx))
+                : std::nullopt;
+}
+
+int32_t GlobeView::handleAt(QPointF positionPx)
+{
+  constexpr double reachPx = 8.0;
+  int32_t best = -1;
+  double bestPx = reachPx;
+  for (std::size_t i = 0; i < m_editHandles.size(); ++i) {
+    const std::optional<QPointF> at = groundOnScreen(m_editHandles[i].at);
+    if (!at) {
+      continue;
+    }
+    const double distance = QLineF(*at, positionPx).length();
+    // Vertices before middles at the same distance.
+    if (distance < bestPx ||
+        (distance <= bestPx && best >= 0 && !m_editHandles[i].middle &&
+         m_editHandles[static_cast<std::size_t>(best)].middle)) {
+      best = static_cast<int32_t>(i);
+      bestPx = distance;
+    }
+  }
+  return best;
+}
+
+void GlobeView::drawEditHandles()
+{
+  if (m_editHandles.empty()) {
+    return;
+  }
+  QPainter painter(this);
+  painter.setRenderHint(QPainter::Antialiasing, true);
+  for (const EditHandleDraw& handle : m_editHandles) {
+    const std::optional<QPointF> at = groundOnScreen(handle.at);
+    if (!at) {
+      continue;
+    }
+    if (handle.middle) {
+      painter.setPen(QPen(QColor(0, 0, 0, 160), 1.0));
+      painter.setBrush(QColor(255, 255, 255, 140));
+      painter.drawEllipse(*at, 3.5, 3.5);
+    } else {
+      painter.setPen(QPen(QColor(0, 0, 0), 1.5));
+      painter.setBrush(QColor(255, 255, 255));
+      painter.drawRect(QRectF(at->x() - 4.5, at->y() - 4.5, 9.0, 9.0));
+    }
+  }
 }
 
 void GlobeView::setScreenOverlays(std::vector<ScreenOverlayDraw> overlays)

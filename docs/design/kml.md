@@ -354,6 +354,85 @@ entry, else that folder), Save as KML… in the elevation profile window
 (the line, along the ground) and Export as KML… in Offline Regions (the
 area, its first ring the outside and the others holes).
 
+## Editing
+
+**The model.** `ts/kml/kmledit.h`: features are addressed by their path
+(child indices from the root, as everywhere in this page);
+`kmlInsertFeature()`, `kmlTakeFeature()` and `kmlMoveFeature()` change
+the tree (a move into the feature itself is refused, and a path made
+stale by taking the feature out is corrected). A placemark's geometry is
+edited through its *handles* (`kmlHandles()`): each vertex of each of its
+lines and rings in turn (a polygon's outer ring, then its holes; a
+MultiGeometry's members), a ring's repeated closing point once, and the
+middle of each edge. `kmlMoveVertex()` keeps a vertex's height (and a
+ring's first and last point together), `kmlInsertVertex()` puts a vertex
+before another with the height between its neighbours',
+`kmlDeleteVertex()` refuses to leave a line fewer than 2 points or a ring
+fewer than 3; points and tracks only move. A ground overlay's handles are
+its corners: a gx:LatLonQuad's move freely, a LatLonBox's move their two
+edges.
+
+**`ts::KmlEditDocument`** holds a document being edited, under a *key*
+(`kmledit:<uuid>`, also its path) by which `registerKmlDocument()` makes
+`sharedKmlDocument()` find it: each change publishes an unchanging copy,
+so drawing never sees a change half made. Every `edit()` keeps the whole
+document before it as an undo step (snapshots, simple and safe: a
+document being edited is small; at most 100 steps), with a description
+for the Undo and Redo menu items; `adjust()` changes it without a step
+(switching a folder on or off), in every step too. A revision number
+changes with every change, undo and redo; `isModified()` compares it
+with the one saved.
+
+**In the window** (`mainwindowkml.cpp`):
+
+- *KML → New KML Document* makes an empty Document; *Edit This Document*
+  (or the entry's menu) reads an opened file again with its text kept
+  and puts the editable copy in its place in the layer tree. The
+  document edits go to (the *active* one) is the selected entry's, else
+  the last edited; new elements go in the selected folder (or the
+  selected element's).
+- *Add Placemark* takes the next click; *Add Path* and *Add Polygon*
+  use the view's line and polygon drawing (shared with elevation
+  profiles and offline regions, each taking only drawings it asked for);
+  *Add Hole to Polygon* draws a ring into the selected polygon; *Add
+  Ground Overlay* asks for a picture and takes a dragged rectangle. Drawn
+  paths and areas are tessellated, in the program's yellow.
+- Clicking an element of a document being edited (instead of its
+  balloon) selects it: `GlobeView` draws its handles (squares at
+  vertices, dots at middles), dragging one emits `handleMoved()` (a
+  middle dragged adds a vertex), right-clicking a vertex
+  `handleDeleteRequested()`.
+- *Properties…* (Alt+Return, `KmlPropertiesDialog`): name, description
+  with its balloon as it will look, the view (from the camera), style
+  (its own, or one of the document's shared styles, which then changes
+  for every element using it), height (altitude mode, one height for
+  all its points, extrude), time (always, a stamp or a span) and
+  extended data.
+- *Cut*, *Copy*, *Paste*, *Delete*: copying keeps the element with the
+  shared styles it uses (`kmlExtract()`) and puts it on the clipboard as
+  KML too; pasting adds them, written anew (`kmlWithoutSource()`), and
+  the styles the document hasn't; KML copied in another program pastes
+  too.
+- Dragging an entry into another folder of the same document in the
+  layer tree moves the feature (a Places entry moves all the folder's
+  placemarks); ticking and renaming entries change the document. After
+  each change the document's entries are made again from it, their
+  layer sources carrying the revision (`"rev"`) so their providers and
+  tiles are made again.
+- *Undo*, *Redo* (Ctrl+Z, Ctrl+Shift+Z), *Save KML Document* and *Save
+  KML Document As…* (KML or KMZ) work on the active document.
+
+## Projects
+
+A project lists its KML documents (`kml`, [layer-model.md](layer-model.md#project-files)):
+each by the id of its entry in the layer tree and its file, or its text
+for a document never saved. On saving, an edited document linked to a
+file with unsaved changes asks: save them to the file, or keep them in
+the project (its text, with the file it belongs to; opened again, it is
+still modified). The entries inside a document's entry aren't saved;
+opening the project makes them again from the file or text, so links,
+lists and regions work as when the file was opened.
+
 ## Tests
 
 `tests/kml`: every element of `everything.kml` (structure, geometries,
@@ -379,7 +458,10 @@ picking order), the registry, view poses and balloon HTML; writing: every fixtur
 edits written as the only changes, new documents (read back the same and
 valid against the OGC KML 2.2 schema with `xmllint`, `tests/data/kml/schema`),
 KMZ archives with their files, GDAL reading what is written with the same
-shapes, a folder extracted with its styles. `tests/ui`: a
+shapes, a folder extracted with its styles; editing: paths, inserting,
+taking and moving features, handles, moving, adding and deleting
+vertices, ground overlay corners, undo and redo with their limits.
+`tests/ui`: a
 KML opened into the layer tree, a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
 is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,
@@ -389,3 +471,11 @@ files (one waiting for its Region, then hidden again), Refresh, a radio
 folder and a checkHideChildren folder (`links.kml`); a web link through a
 mock server (the view and client in its query, a failure); placemarks
 showing with the clock and a track's marker moving.
+
+Editing in the window (`tests/ui`): a new document with a placemark,
+path, polygon with a hole, folder and ground overlay; handles dragged,
+middles turning into vertices, vertices deleted; undo and redo;
+properties and the Properties dialog (its own and a shared style);
+copy, paste, cut and the clipboard; saving a KMZ; a project keeping an
+unsaved change; a file made editable, edited and saved (only the edit
+changed); a folder dragged into another.

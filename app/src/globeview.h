@@ -133,6 +133,17 @@ struct RaisedShapeDraw {
   QColor fill;
 };
 
+/**
+ * A point of a shape being edited (KML): a vertex to drag, or the middle
+ * of an edge, which becomes a vertex when dragged.
+ */
+struct EditHandleDraw {
+  /** Where it is. */
+  LonLat at;
+  /** True for the middle of an edge. */
+  bool middle = false;
+};
+
 /** A picture fixed to the screen over the view (a KML ScreenOverlay). */
 struct ScreenOverlayDraw {
   /** The picture, already tinted. */
@@ -302,6 +313,22 @@ public:
    */
   void setRaisedShapes(std::vector<RaisedShapeDraw> shapes);
 
+  /**
+   * Sets the handles of the shape being edited (none to stop): drawn on
+   * the ground; left-dragging one moves it (handleMoved() when let go),
+   * right-clicking a vertex asks for it to go (handleDeleteRequested()).
+   */
+  void setEditHandles(std::vector<EditHandleDraw> handles);
+
+  /** Returns the handles set. */
+  const std::vector<EditHandleDraw>& editHandles() const
+  {
+    return m_editHandles;
+  }
+
+  /** Drags handle @p index to @p to as the user would (for tests). */
+  void dragHandle(int32_t index, LonLat to);
+
   /** Sets the pictures fixed to the screen, drawn in order (KML). */
   void setScreenOverlays(std::vector<ScreenOverlayDraw> overlays);
 
@@ -430,6 +457,12 @@ signals:
    */
   void pointClicked(ts::LonLat point, double degreesPerPixel);
 
+  /** The user dragged edit handle @p index to @p to (setEditHandles()). */
+  void handleMoved(int32_t index, ts::LonLat to);
+
+  /** The user right-clicked vertex handle @p index: to delete it. */
+  void handleDeleteRequested(int32_t index);
+
   /** The user cancelled drawing a region, or it was cancelled. */
   void regionDrawingCancelled();
 
@@ -474,6 +507,9 @@ private:
                    std::vector<std::optional<ScreenPoint>>& feet);
   std::optional<QPointF> billboardOnScreen(const BillboardDraw& billboard);
   void drawScreenOverlays();
+  void drawEditHandles();
+  int32_t handleAt(QPointF positionPx);
+  std::optional<QPointF> groundOnScreen(LonLat point);
   double groundHeightM(double latDeg, double lonDeg);
   Vec3 overlayEcef(double latDeg, double lonDeg, double heightM,
                    OverlayHeight height);
@@ -535,6 +571,9 @@ private:
   std::vector<BillboardDraw> m_billboards;
   std::vector<RaisedShapeDraw> m_raised;
   std::vector<ScreenOverlayDraw> m_screens;
+  std::vector<EditHandleDraw> m_editHandles;
+  /** The handle being dragged, -1 for none. */
+  int32_t m_dragHandle = -1;
   int32_t m_raisedDrawn = 0;
   int32_t m_billboardsDrawn = 0;
   int32_t m_labelsDrawn = 0;

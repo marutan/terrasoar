@@ -356,6 +356,16 @@ void LayerTreeDock::setDoubleClickAction(
   m_doubleClick = std::move(action);
 }
 
+QModelIndex LayerTreeDock::currentIndex() const
+{
+  return m_view->currentIndex();
+}
+
+void LayerTreeDock::setCurrentIndex(const QModelIndex& index)
+{
+  m_view->setCurrentIndex(index);
+}
+
 void LayerTreeDock::doubleClick(const QModelIndex& index)
 {
   if (!m_doubleClick || !m_doubleClick(index)) {

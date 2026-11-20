@@ -102,6 +102,12 @@ public:
    */
   void setDoubleClickAction(std::function<bool(const QModelIndex&)> action);
 
+  /** Returns the entry selected, or an invalid index. */
+  QModelIndex currentIndex() const;
+
+  /** Selects @p index. */
+  void setCurrentIndex(const QModelIndex& index);
+
   /** Double-clicks @p index as the user would (for tests). */
   void doubleClick(const QModelIndex& index);
 
