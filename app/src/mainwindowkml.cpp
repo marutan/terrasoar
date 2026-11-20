@@ -724,11 +724,11 @@ bool MainWindow::copyKml()
   // The feature with the shared styles it uses; on the clipboard as KML
   // too, for other programs.
   m_kmlClipboard = kmlExtract(*document->shared(), m_kmlSelection->second);
-  QMimeData* data = new QMimeData;
+  QMimeData* mime = new QMimeData;
   const QByteArray kml = writeKml(*m_kmlClipboard);
-  data->setData(kmlMimeType, kml);
-  data->setText(QString::fromUtf8(kml));
-  QApplication::clipboard()->setMimeData(data);
+  mime->setData(kmlMimeType, kml);
+  mime->setText(QString::fromUtf8(kml));
+  QApplication::clipboard()->setMimeData(mime);
   updateKmlActions();
   return true;
 }
@@ -768,11 +768,11 @@ bool MainWindow::pasteKml()
   }
   // What was copied here, else KML on the clipboard from elsewhere.
   std::optional<KmlDocument> copied = m_kmlClipboard;
-  const QMimeData* data = QApplication::clipboard()->mimeData();
-  if (!copied && data != nullptr) {
-    const QByteArray kml = data->hasFormat(kmlMimeType)
-                               ? data->data(kmlMimeType)
-                               : data->text().toUtf8();
+  const QMimeData* mime = QApplication::clipboard()->mimeData();
+  if (!copied && mime != nullptr) {
+    const QByteArray kml = mime->hasFormat(kmlMimeType)
+                               ? mime->data(kmlMimeType)
+                               : mime->text().toUtf8();
     QString error;
     copied = parseKml(kml, QString(), &error);
   }

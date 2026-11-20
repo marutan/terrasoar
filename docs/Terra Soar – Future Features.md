@@ -261,7 +261,10 @@ Goal: the common web map services beyond WMS.
 
 ## Phase 16 – KML
 
-**Status (2026-11-20):** next, after Phase 12, ahead of Phases 13 to 15; being delivered in parts 16a-1 to 16b-2 on one branch, with one pull request for the whole phase.
+**Status (2026-11-20):** delivered (16a-1 to 16b-2 on one branch, one pull request). Design: `docs/design/kml.md`; for users: `docs/user/kml.md`. Differences from the plan below:
+- Shapes above the ground, icons and labels are drawn over the frame, so terrain in front of them doesn't hide them; a Region on a single placemark inside a Places layer is not used (containers', overlays' and links' are).
+- The reading fixtures are Google's KML Samples, GDAL's test files and files written by GDAL's KML and LIBKML drivers (which QGIS uses); the OGC specification's own examples are not included.
+- Display is tested by what is drawn (counts, placement, hiding) and checked by eye, not by golden images.
 
 Goal: Terra Soar reads KML and KMZ as faithfully as the programs people make them in, and can create, edit and export KML of its own. Phase 16a (import and display) is useful alone. Phase 16b (authoring and export) builds on it.
 

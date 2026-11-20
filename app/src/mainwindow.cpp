@@ -247,10 +247,9 @@ MainWindow::MainWindow(QWidget* parent)
   m_layerDock->setTimeLookup([this](const QJsonObject& source) {
     return m_registry->basePackTime(source);
   });
-  m_layerDock->setNodeActions(
-      [this](const QModelIndex& index, QObject* parent) {
-        return nodeActions(index, parent);
-      });
+  m_layerDock->setNodeActions([this](const QModelIndex& index, QObject* owner) {
+    return nodeActions(index, owner);
+  });
   // Double-clicking a KML entry flies there, as in Google Earth.
   m_layerDock->setDoubleClickAction([this](const QModelIndex& index) {
     const std::optional<CameraPose> pose = kmlNodePose(

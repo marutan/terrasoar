@@ -3151,7 +3151,7 @@ private slots:
     QVERIFY(window.pasteKml());
     std::size_t homes = 0;
     for (const ts::KmlFeature& feature : document->document().root.children) {
-      homes += feature.name == QLatin1String("Home") ? 1 : 0;
+      homes += feature.name == QLatin1String("Home") ? 1U : 0U;
     }
     QCOMPARE(homes, std::size_t{2});
     QVERIFY(window.cutKml());
