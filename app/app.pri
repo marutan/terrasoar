@@ -33,6 +33,7 @@ HEADERS += \
     $$PWD/src/helpwindow.h \
     $$PWD/src/addwebterraindialog.h \
     $$PWD/src/projectionsettingsdialog.h \
+    $$PWD/src/addwfsdialog.h \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
     $$PWD/src/addxyzdialog.h \
@@ -59,6 +60,7 @@ SOURCES += \
     $$PWD/src/helpwindow.cpp \
     $$PWD/src/addwebterraindialog.cpp \
     $$PWD/src/projectionsettingsdialog.cpp \
+    $$PWD/src/addwfsdialog.cpp \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
     $$PWD/src/addxyzdialog.cpp \

@@ -27,6 +27,8 @@
         <file alias="wmts-catalogue.json">../data/wmts-catalogue.json</file>
         <!-- The XYZ catalogue built into the program (see data/xyz-catalogue.json). -->
         <file alias="xyz-catalogue.json">../data/xyz-catalogue.json</file>
+        <!-- The WFS catalogue built into the program (see data/wfs-catalogue.json). -->
+        <file alias="wfs-catalogue.json">../data/wfs-catalogue.json</file>
     </qresource>
     <!-- The window icon, rendered from packaging/icons/terrasoar.svg. -->
     <qresource prefix="/icons">

@@ -45,6 +45,8 @@
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/tilekey.h"
+#include "ts/wfs/wfsfeatureprovider.h"
+#include "ts/wfs/wfssource.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "ts/wmts/wmtsimageryprovider.h"
@@ -378,6 +380,29 @@ std::shared_ptr<FeatureProvider>
 ProviderRegistry::features(const QJsonObject& source, QString* errorString)
 {
   const std::lock_guard<std::mutex> lock(m_mutex);
+  if (source.value(QStringLiteral("kind")).toString() == QLatin1String("wfs")) {
+    const QString key = canonical(source);
+    const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
+        found = m_features.find(key);
+    if (found != m_features.end()) {
+      std::shared_ptr<FeatureProvider> live = found->second.lock();
+      if (live) {
+        return live;
+      }
+    }
+    const std::optional<WfsSource> wfs =
+        WfsSource::fromJson(source, errorString);
+    if (!wfs) {
+      return nullptr;
+    }
+    // The network client and cache settings of WMS: one limit on
+    // concurrent requests, one cache directory.
+    std::shared_ptr<WfsFeatureProvider> provider =
+        std::make_shared<WfsFeatureProvider>(*wfs, networkLocked(),
+                                             *m_wmsSettings);
+    m_features[key] = provider;
+    return provider;
+  }
   if (!isBasePackSource(source)) {
     if (errorString) {
       *errorString =
@@ -704,8 +729,8 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
 {
   const QString kind = source.value(QStringLiteral("kind")).toString();
   if (kind == QLatin1String("wms") || kind == QLatin1String("wmts") ||
-      kind == QLatin1String("xyz") || kind == QLatin1String("web") ||
-      kind == QLatin1String("file")) {
+      kind == QLatin1String("xyz") || kind == QLatin1String("wfs") ||
+      kind == QLatin1String("web") || kind == QLatin1String("file")) {
     return source.value(QStringLiteral("attribution")).toString();
   }
   const std::lock_guard<std::mutex> lock(m_mutex);

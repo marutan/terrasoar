@@ -56,6 +56,7 @@
 
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
+#include "addwfsdialog.h"
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
@@ -220,6 +221,8 @@ MainWindow::MainWindow(QWidget* parent)
           [this]() { addWmtsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addXyzLayerRequested, this,
           [this]() { addXyzLayer(); });
+  connect(m_layerDock, &LayerTreeDock::addWfsLayerRequested, this,
+          [this]() { addWfsLayer(); });
   connect(m_layerDock, &LayerTreeDock::addImageryFileRequested, this,
           [this]() { addImageryFile(); });
   connect(m_layerDock, &LayerTreeDock::addElevationFileRequested, this,
@@ -559,6 +562,10 @@ void MainWindow::createActions()
   m_featureInfoAction->setObjectName(QStringLiteral("featureInfoAction"));
   m_featureInfoAction->setCheckable(true);
   m_featureInfoAction->setChecked(true);
+  m_addWfsAction = new QAction(this);
+  m_addWfsAction->setObjectName(QStringLiteral("addWfsAction"));
+  connect(m_addWfsAction, &QAction::triggered, this,
+          [this]() { addWfsLayer(); });
   m_addXyzAction = new QAction(this);
   m_addXyzAction->setObjectName(QStringLiteral("addXyzAction"));
   connect(m_addXyzAction, &QAction::triggered, this,
@@ -839,6 +846,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_addWmsAction);
   m_fileMenu->addAction(m_addWmtsAction);
   m_fileMenu->addAction(m_addXyzAction);
+  m_fileMenu->addAction(m_addWfsAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
@@ -957,14 +965,18 @@ void MainWindow::retranslateUi()
   m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
   m_addWmtsAction->setStatusTip(
       tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
+  m_addWfsAction->setText(tr("Add W&FS Layer…"));
+  m_addWfsAction->setStatusTip(
+      tr("Add features (points, lines and areas) from a web feature service "
+         "(WFS) to the layer tree"));
   m_addXyzAction->setText(tr("Add &XYZ Tile Layer…"));
   m_addXyzAction->setStatusTip(
       tr("Add a layer from an XYZ or TMS tile service, such as "
          "OpenStreetMap, to the layer tree"));
   m_offlineRegionsAction->setText(tr("Offline &Regions…"));
   m_offlineRegionsAction->setStatusTip(
-      tr("Keep areas of WMS, WMTS and XYZ layers on this computer for use "
-         "without a network"));
+      tr("Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for "
+         "use without a network"));
   m_dataPacksAction->setText(tr("&Data Packs…"));
   m_dataPacksAction->setStatusTip(
       tr("Install more detailed imagery and shorelines, or remove them"));
@@ -1155,7 +1167,8 @@ int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
   if (!m_featureInfoAction->isChecked()) {
     return 0;
   }
-  // The visible WMS layers that can be asked, topmost first, as drawn now.
+  // The visible WMS layers that can be asked, topmost first, as drawn now;
+  // then the WFS layers, whose features are here already.
   const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
   std::vector<FeatureInfoQuery> queries;
   for (std::size_t i = stack.imagery.size(); i-- > 0;) {
@@ -1184,16 +1197,36 @@ int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
           FeatureInfoQuery{definition.name, url, source->infoFormat});
     }
   }
-  if (queries.empty()) {
+  // Vector layers whose features are at hand (WFS), topmost first: within
+  // a few pixels of the click.
+  std::vector<FeatureInfoLocal> local;
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wfs")) {
+      continue;
+    }
+    const std::shared_ptr<FeatureProvider> provider =
+        m_registry->features(definition.source, nullptr);
+    if (!provider) {
+      continue;
+    }
+    const std::vector<Feature> found = provider->featuresAt(
+        GeoPoint{point.latDeg, point.lonDeg}, 4.0 * degreesPerPixel);
+    if (!found.empty()) {
+      local.push_back(FeatureInfoLocal{definition.name, found});
+    }
+  }
+  if (queries.empty() && local.empty()) {
     return 0;
   }
   if (m_featureInfoWindow == nullptr) {
     m_featureInfoWindow = new FeatureInfoWindow(m_registry->network(), this);
   }
-  m_featureInfoWindow->query(point, queries);
+  m_featureInfoWindow->query(point, queries, local);
   m_featureInfoWindow->show();
   m_featureInfoWindow->raise();
-  return static_cast<int32_t>(queries.size());
+  return static_cast<int32_t>(queries.size() + local.size());
 }
 
 void MainWindow::updateTimeBar(const LayerStack& stack)
@@ -1295,6 +1328,21 @@ void MainWindow::addWmsLayer(const QString& address)
 void MainWindow::addWmtsLayer(const QString& address)
 {
   AddWmtsDialog dialog(m_registry->network(), this);
+  if (!address.isEmpty()) {
+    dialog.connectTo(address);
+  }
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+  const std::optional<LayerDefinition>& definition = dialog.layerDefinition();
+  if (definition) {
+    m_layerDock->addLayer(*definition);
+  }
+}
+
+void MainWindow::addWfsLayer(const QString& address)
+{
+  AddWfsDialog dialog(m_registry->network(), this);
   if (!address.isEmpty()) {
     dialog.connectTo(address);
   }
@@ -1470,12 +1518,26 @@ NewRegionDialog* MainWindow::newOfflineRegion()
       layers.push_back(RegionLayerChoice{definition.name, definition.source});
     }
   }
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    if (definition.source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("wfs")) {
+      continue;
+    }
+    const bool seen = std::any_of(layers.begin(), layers.end(),
+                                  [&](const RegionLayerChoice& layer) {
+                                    return layer.source == definition.source;
+                                  });
+    if (!seen) {
+      layers.push_back(RegionLayerChoice{definition.name, definition.source});
+    }
+  }
   if (layers.empty()) {
     QMessageBox::information(
         this, tr("New Offline Region"),
-        tr("Only layers from WMS, WMTS and XYZ tile servers can be kept for "
-           "offline use. Add one first (File → Add WMS Layer…, Add WMTS "
-           "Layer… or Add XYZ Tile Layer…)."));
+        tr("Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept "
+           "for offline use. Add one first (File → Add WMS Layer…, Add WMTS "
+           "Layer…, Add XYZ Tile Layer… or Add WFS Layer…)."));
     return nullptr;
   }
   if (!m_countries && !m_countriesFile.isEmpty()) {

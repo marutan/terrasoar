@@ -217,6 +217,92 @@
         </message>
     </context>
     <context>
+        <name>ts::AddWfsDialog</name>
+        <message>
+            <source>Add WFS Layer</source>
+            <translation>Add WFS Layer</translation>
+        </message>
+        <message>
+            <source>&amp;Service (choose one or type its address):</source>
+            <translation>&amp;Service (choose one or type its address):</translation>
+        </message>
+        <message>
+            <source>&amp;Connect</source>
+            <translation>&amp;Connect</translation>
+        </message>
+        <message>
+            <source>&amp;Feature types:</source>
+            <translation>&amp;Feature types:</translation>
+        </message>
+        <message>
+            <source>C&amp;olour:</source>
+            <translation>C&amp;olour:</translation>
+        </message>
+        <message>
+            <source>The colour the features are drawn in</source>
+            <translation>The colour the features are drawn in</translation>
+        </message>
+        <message>
+            <source>&amp;Add</source>
+            <translation>&amp;Add</translation>
+        </message>
+        <message>
+            <source>https://example.org/wfs</source>
+            <translation>https://example.org/wfs</translation>
+        </message>
+        <message>
+            <source>Connect to see the feature types the server offers.</source>
+            <translation>Connect to see the feature types the server offers.</translation>
+        </message>
+        <message>
+            <source>Credit: %1</source>
+            <translation>Credit: %1</translation>
+        </message>
+        <message>
+            <source>Terms of use</source>
+            <translation>Terms of use</translation>
+        </message>
+        <message>
+            <source>Enter the address of a WFS, starting with http:// or https://.</source>
+            <translation>Enter the address of a WFS, starting with http:// or https://.</translation>
+        </message>
+        <message>
+            <source>Connecting to %1…</source>
+            <translation>Connecting to %1…</translation>
+        </message>
+        <message>
+            <source>Can't reach %1: %2</source>
+            <translation>Can't reach %1: %2</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1: %n feature type(s).</source>
+            <translation>
+                <numerusform>%1: %n feature type.</numerusform>
+                <numerusform>%1: %n feature types.</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>Features come as %1, %2 at a time.</source>
+            <translation>Features come as %1, %2 at a time.</translation>
+        </message>
+        <message>
+            <source>the server's GML</source>
+            <translation>the server's GML</translation>
+        </message>
+        <message>
+            <source>They show when the view is about %1 across or less.</source>
+            <translation>They show when the view is about %1 across or less.</translation>
+        </message>
+        <message>
+            <source>The server's terms: %1</source>
+            <translation>The server's terms: %1</translation>
+        </message>
+        <message>
+            <source>Colour of the Features</source>
+            <translation>Colour of the Features</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::AddWmsDialog</name>
         <message>
             <source>Add WMS Layer</source>
@@ -1025,6 +1111,10 @@
             <source>The clock's month, any year</source>
             <translation>The clock's month, any year</translation>
         </message>
+        <message>
+            <source>WFS Layer…</source>
+            <translation>WFS Layer…</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -1360,14 +1450,6 @@
             <translation>Add a layer from an XYZ or TMS tile service, such as OpenStreetMap, to the layer tree</translation>
         </message>
         <message>
-            <source>Keep areas of WMS, WMTS and XYZ layers on this computer for use without a network</source>
-            <translation>Keep areas of WMS, WMTS and XYZ layers on this computer for use without a network</translation>
-        </message>
-        <message>
-            <source>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer… or Add XYZ Tile Layer…).</source>
-            <translation>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer… or Add XYZ Tile Layer…).</translation>
-        </message>
-        <message>
             <source>&amp;Time Slider</source>
             <translation>&amp;Time Slider</translation>
         </message>
@@ -1382,6 +1464,22 @@
         <message>
             <source>Clicking the globe or the map asks WMS layers what they show there</source>
             <translation>Clicking the globe or the map asks WMS layers what they show there</translation>
+        </message>
+        <message>
+            <source>Add W&amp;FS Layer…</source>
+            <translation>Add W&amp;FS Layer…</translation>
+        </message>
+        <message>
+            <source>Add features (points, lines and areas) from a web feature service (WFS) to the layer tree</source>
+            <translation>Add features (points, lines and areas) from a web feature service (WFS) to the layer tree</translation>
+        </message>
+        <message>
+            <source>Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for use without a network</source>
+            <translation>Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for use without a network</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</source>
+            <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</translation>
         </message>
     </context>
     <context>
@@ -1532,8 +1630,8 @@
             <translation>Downloading “%1”: %2 %</translation>
         </message>
         <message>
-            <source>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use.</source>
-            <translation>Only layers from WMS, WMTS and XYZ tile servers can be kept for offline use.</translation>
+            <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use.</source>
+            <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use.</translation>
         </message>
     </context>
     <context>
@@ -2273,6 +2371,83 @@
         </message>
     </context>
     <context>
+        <name>ts::WfsCapabilities</name>
+        <message>
+            <source>The address gave a web page, not a WFS. Check the service's address.</source>
+            <translation>The address gave a web page, not a WFS. Check the service's address.</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't XML.</source>
+            <translation>The server's answer isn't XML.</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>This is a map service (WMS or WMTS), not a WFS: add it with Add WMS Layer or Add WMTS Layer.</source>
+            <translation>This is a map service (WMS or WMTS), not a WFS: add it with Add WMS Layer or Add WMTS Layer.</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't a WFS capabilities document.</source>
+            <translation>The server's answer isn't a WFS capabilities document.</translation>
+        </message>
+        <message>
+            <source>The capabilities document is damaged: %1</source>
+            <translation>The capabilities document is damaged: %1</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WfsFeatureProvider</name>
+        <message>
+            <source>The server answered %1.</source>
+            <translation>The server answered %1.</translation>
+        </message>
+        <message>
+            <source>The server sent something that isn't features.</source>
+            <translation>The server sent something that isn't features.</translation>
+        </message>
+        <message>
+            <source>Not all features are shown here: zoom in to see them all.</source>
+            <translation>Not all features are shown here: zoom in to see them all.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::WfsSource</name>
+        <message>
+            <source>The server's answer isn't valid GeoJSON: %1</source>
+            <translation>The server's answer isn't valid GeoJSON: %1</translation>
+        </message>
+        <message>
+            <source>The server's answer isn't GML or GeoJSON.</source>
+            <translation>The server's answer isn't GML or GeoJSON.</translation>
+        </message>
+        <message>
+            <source>The server's answer is damaged: %1</source>
+            <translation>The server's answer is damaged: %1</translation>
+        </message>
+        <message>
+            <source>The server reported an error: %1</source>
+            <translation>The server reported an error: %1</translation>
+        </message>
+        <message>
+            <source>The WFS layer has no valid address or feature type.</source>
+            <translation>The WFS layer has no valid address or feature type.</translation>
+        </message>
+        <message>
+            <source>The server has no feature type %1.</source>
+            <translation>The server has no feature type %1.</translation>
+        </message>
+        <message>
+            <source>The server gives no address for GetFeature.</source>
+            <translation>The server gives no address for GetFeature.</translation>
+        </message>
+        <message>
+            <source>The server offers no format Terra Soar reads (GeoJSON or GML).</source>
+            <translation>The server offers no format Terra Soar reads (GeoJSON or GML).</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::WmsCapabilities</name>
         <message>
             <source>The capabilities document is empty.</source>
@@ -2320,6 +2495,14 @@
         <message>
             <source>The WMTS catalogue is of a newer format than this program reads.</source>
             <translation>The WMTS catalogue is of a newer format than this program reads.</translation>
+        </message>
+        <message>
+            <source>This is not a WFS catalogue.</source>
+            <translation>This is not a WFS catalogue.</translation>
+        </message>
+        <message>
+            <source>The WFS catalogue is of a newer format than this program reads.</source>
+            <translation>The WFS catalogue is of a newer format than this program reads.</translation>
         </message>
     </context>
     <context>

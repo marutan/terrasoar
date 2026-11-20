@@ -80,7 +80,9 @@ for sources `{"kind": "wms", …}`; see [wms.md](wms.md) and
 [network-and-cache.md](network-and-cache.md). `ts::WmtsImageryProvider`
 (`{"kind": "wmts", …}`, [wmts.md](wmts.md)) and `ts::XyzImageryProvider`
 (`{"kind": "xyz", …}`, [xyz.md](xyz.md)) share that client, cache and
-offline handling.
+offline handling. `ts::WfsFeatureProvider` (`{"kind": "wfs", …}`,
+[wfs.md](wfs.md)) is a feature provider that does the same for vector
+features.
 
 ## File providers
 

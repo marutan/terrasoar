@@ -33,7 +33,9 @@
 #include <QString>
 #include <QUrl>
 
+#include "ts/providers/tileprovider.h"
 #include "ts/regions/regiongeometry.h"
+#include "ts/wms/wmsfeatureinfo.h"
 
 class QEvent;
 class QLabel;
@@ -56,6 +58,14 @@ struct FeatureInfoQuery {
   QUrl url;
   /** The INFO_FORMAT asked for (used when the answer doesn't say). */
   QString format;
+};
+
+/** A layer whose features are at hand (WFS): what it has at the point. */
+struct FeatureInfoLocal {
+  /** The layer's name in the Layers panel. */
+  QString layerName;
+  /** Its features under the point. */
+  std::vector<Feature> features;
 };
 
 /**
@@ -87,7 +97,8 @@ public:
   ~FeatureInfoWindow() override;
 
   /** Asks each of @p queries about @p point, replacing earlier results. */
-  void query(LonLat point, const std::vector<FeatureInfoQuery>& queries);
+  void query(LonLat point, const std::vector<FeatureInfoQuery>& queries,
+             const std::vector<FeatureInfoLocal>& local = {});
 
   /** Returns how many answers are still awaited. */
   int32_t pendingCount() const;
@@ -116,6 +127,7 @@ private:
   void retranslateUi();
   void poll();
   void answered(const Pending& pending);
+  void showInfo(QTreeWidgetItem* item, const WmsFeatureInfo& info);
 
   std::shared_ptr<NetworkClient> m_network;
   QLabel* m_placeLabel = nullptr;

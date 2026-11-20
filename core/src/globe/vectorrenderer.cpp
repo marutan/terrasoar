@@ -24,6 +24,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <functional>
 #include <unordered_set>
 #include <utility>
 
@@ -295,6 +296,10 @@ struct VectorRenderer::GpuMesh {
   int32_t fillVertices = 0;
   std::unique_ptr<GpuBuffer> segments;
   int32_t segmentCount = 0;
+  /** The mesh's runs and the features' styles they use. */
+  std::vector<VectorRun> fillRuns;
+  std::vector<VectorRun> segmentRuns;
+  std::vector<FeatureStyle> styles;
   Float4 centreHigh{};
   Float4 centreLow{};
   double centreLonDeg = 0.0;
@@ -517,6 +522,16 @@ VectorRenderer::createGpuMesh(const VectorTileMesh& mesh) const
         mesh.segments.size() * sizeof(VectorSegment), mesh.segments.data());
     gpu->segmentCount =
         gpu->segments ? static_cast<int32_t>(mesh.segments.size()) : 0;
+  }
+  gpu->fillRuns = mesh.fillRuns;
+  gpu->segmentRuns = mesh.segmentRuns;
+  gpu->styles = mesh.styles;
+  // A mesh made without runs: all in the layer's style.
+  if (gpu->fillRuns.empty() && gpu->fillVertices > 0) {
+    gpu->fillRuns.push_back(VectorRun{0, gpu->fillVertices, 0, false});
+  }
+  if (gpu->segmentRuns.empty() && gpu->segmentCount > 0) {
+    gpu->segmentRuns.push_back(VectorRun{0, gpu->segmentCount, 0, false});
   }
   gpu->bytes = mesh.bytes();
   return gpu;
@@ -742,16 +757,50 @@ void VectorRenderer::writeUniforms(const Camera& camera)
         values.projR2 = reference.r2;
         values.projR3 = reference.r3;
       }
-      values.fillColor = premultipliedRgba(draw.style.fill, draw.alpha);
-      values.outlineColor = premultipliedRgba(draw.style.outline, draw.alpha);
-      values.params = {static_cast<float>(draw.style.outlineWidthPx),
-                       static_cast<float>(camera.nearM()),
-                       static_cast<float>(item.mesh->centreLonDeg),
-                       static_cast<float>(item.mesh->centreLatDeg)};
-      staging.resize((block + 1) * m_uniformStride);
-      std::memcpy(staging.data() + block * m_uniformStride, &values,
-                  sizeof(values));
-      ++block;
+      // One block per run: the same place, the run's colours and width.
+      const std::function<void(const VectorRun&)> write =
+          [&](const VectorRun& run) {
+            const FeatureStyle* own =
+                run.style > 0 && static_cast<std::size_t>(run.style) <=
+                                     item.mesh->styles.size()
+                    ? &item.mesh->styles.at(
+                          static_cast<std::size_t>(run.style) - 1)
+                    : nullptr;
+            const QColor fill =
+                own != nullptr && own->fill ? *own->fill : draw.style.fill;
+            QColor outline = own != nullptr && own->outline
+                                 ? *own->outline
+                                 : draw.style.outline;
+            double width = own != nullptr && own->outlineWidthPx
+                               ? *own->outlineWidthPx
+                               : draw.style.outlineWidthPx;
+            if (run.points) {
+              // Dots in the outline's colour (the fill's without one).
+              if (!(own != nullptr && own->outline) &&
+                  !draw.style.hasOutline()) {
+                outline = draw.style.fill;
+              }
+              width = own != nullptr && own->pointSizePx
+                          ? *own->pointSizePx
+                          : draw.style.pointSizePx;
+            }
+            values.fillColor = premultipliedRgba(fill, draw.alpha);
+            values.outlineColor = premultipliedRgba(outline, draw.alpha);
+            values.params = {static_cast<float>(width),
+                             static_cast<float>(camera.nearM()),
+                             static_cast<float>(item.mesh->centreLonDeg),
+                             static_cast<float>(item.mesh->centreLatDeg)};
+            staging.resize((block + 1) * m_uniformStride);
+            std::memcpy(staging.data() + block * m_uniformStride, &values,
+                        sizeof(values));
+            ++block;
+          };
+      for (const VectorRun& run : item.mesh->fillRuns) {
+        write(run);
+      }
+      for (const VectorRun& run : item.mesh->segmentRuns) {
+        write(run);
+      }
     }
   }
   if (staging.empty()) {
@@ -791,37 +840,95 @@ void VectorRenderer::drawLayer(std::size_t index)
   }
   const Source& source = *m_layers[index].first;
   const VectorStyle& style = m_layers[index].second.style;
-  const std::size_t start = m_layerUniformStart[index];
-  if (style.hasFill()) {
-    m_device.setPipeline(m_morph > 0.0 ? *m_fillMapPipeline : *m_fillPipeline);
-    for (std::size_t i = 0; i < source.items.size(); ++i) {
-      const GpuMesh& mesh = *source.items[i].mesh;
-      if (mesh.fillVertices == 0) {
+  // The blocks follow writeUniforms(): per item, its fill runs, then its
+  // segment runs.
+  std::size_t block = m_layerUniformStart[index];
+  std::vector<std::size_t> firstBlock;
+  firstBlock.reserve(source.items.size());
+  for (const DrawItem& item : source.items) {
+    firstBlock.push_back(block);
+    block += item.mesh->fillRuns.size() + item.mesh->segmentRuns.size();
+  }
+  const std::function<bool(const GpuMesh&, const VectorRun&)> fillShows =
+      [&style](const GpuMesh& mesh, const VectorRun& run) {
+        if (run.style > 0 &&
+            static_cast<std::size_t>(run.style) <= mesh.styles.size()) {
+          const FeatureStyle& own =
+              mesh.styles.at(static_cast<std::size_t>(run.style) - 1);
+          if (own.fill) {
+            return own.fill->alpha() > 0;
+          }
+        }
+        return style.hasFill();
+      };
+  const std::function<bool(const GpuMesh&, const VectorRun&)> lineShows =
+      [&style](const GpuMesh& mesh, const VectorRun& run) {
+        const FeatureStyle* own =
+            run.style > 0 &&
+                    static_cast<std::size_t>(run.style) <= mesh.styles.size()
+                ? &mesh.styles.at(static_cast<std::size_t>(run.style) - 1)
+                : nullptr;
+        if (run.points) {
+          const double size = own != nullptr && own->pointSizePx
+                                  ? *own->pointSizePx
+                                  : style.pointSizePx;
+          return size > 0.0 && (style.hasOutline() || style.hasFill() ||
+                                (own != nullptr && own->outline));
+        }
+        if (own != nullptr && (own->outline || own->outlineWidthPx)) {
+          const QColor colour = own->outline ? *own->outline : style.outline;
+          const double width =
+              own->outlineWidthPx ? *own->outlineWidthPx : style.outlineWidthPx;
+          return colour.isValid() && colour.alpha() > 0 && width > 0.0;
+        }
+        return style.hasOutline();
+      };
+  bool fillPipeline = false;
+  for (std::size_t i = 0; i < source.items.size(); ++i) {
+    const GpuMesh& mesh = *source.items[i].mesh;
+    for (std::size_t r = 0; r < mesh.fillRuns.size(); ++r) {
+      const VectorRun& run = mesh.fillRuns[r];
+      if (!fillShows(mesh, run) || !mesh.fill) {
         continue;
+      }
+      if (!fillPipeline) {
+        m_device.setPipeline(m_morph > 0.0 ? *m_fillMapPipeline
+                                           : *m_fillPipeline);
+        fillPipeline = true;
       }
       m_device.setVertexBuffer(0, *mesh.fill, 0);
       m_device.setUniformBuffer(vectorBinding, *m_uniforms,
-                                (start + i) * m_uniformStride,
+                                (firstBlock[i] + r) * m_uniformStride,
                                 sizeof(VectorBlock));
-      m_device.draw(mesh.fillVertices, 0, 1);
+      m_device.draw(run.count, run.first, 1);
       ++m_statistics.drawCalls;
-      m_statistics.triangles += mesh.fillVertices / 3;
+      m_statistics.triangles += run.count / 3;
     }
   }
-  if (style.hasOutline()) {
-    m_device.setPipeline(m_morph > 0.0 ? *m_lineMapPipeline : *m_linePipeline);
-    for (std::size_t i = 0; i < source.items.size(); ++i) {
-      const GpuMesh& mesh = *source.items[i].mesh;
-      if (mesh.segmentCount == 0) {
+  bool linePipeline = false;
+  for (std::size_t i = 0; i < source.items.size(); ++i) {
+    const GpuMesh& mesh = *source.items[i].mesh;
+    for (std::size_t r = 0; r < mesh.segmentRuns.size(); ++r) {
+      const VectorRun& run = mesh.segmentRuns[r];
+      if (!lineShows(mesh, run) || !mesh.segments) {
         continue;
       }
-      m_device.setVertexBuffer(0, *mesh.segments, 0);
+      if (!linePipeline) {
+        m_device.setPipeline(m_morph > 0.0 ? *m_lineMapPipeline
+                                           : *m_linePipeline);
+        linePipeline = true;
+      }
+      // Instanced: the run's segments start at its offset in the buffer.
+      m_device.setVertexBuffer(0, *mesh.segments,
+                               static_cast<std::size_t>(run.first) *
+                                   sizeof(VectorSegment));
       m_device.setUniformBuffer(vectorBinding, *m_uniforms,
-                                (start + i) * m_uniformStride,
+                                (firstBlock[i] + mesh.fillRuns.size() + r) *
+                                    m_uniformStride,
                                 sizeof(VectorBlock));
-      m_device.draw(4, 0, mesh.segmentCount);
+      m_device.draw(4, 0, run.count);
       ++m_statistics.drawCalls;
-      m_statistics.segments += mesh.segmentCount;
+      m_statistics.segments += run.count;
     }
   }
   m_statistics.tilesDrawn += static_cast<int32_t>(source.items.size());

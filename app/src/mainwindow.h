@@ -138,6 +138,12 @@ public:
   void addXyzLayer();
 
   /**
+   * Opens the Add WFS Layer dialog and adds what the user chooses. With
+   * @p address, connects to it at once (tests).
+   */
+  void addWfsLayer(const QString& address = QString());
+
+  /**
    * Asks for a raster file (a GeoTIFF, an RPF A.TOC, …) and adds it as an
    * imagery layer.
    */
@@ -345,6 +351,7 @@ private:
   QAction* m_addWmsAction = nullptr;
   QAction* m_addWmtsAction = nullptr;
   QAction* m_addXyzAction = nullptr;
+  QAction* m_addWfsAction = nullptr;
   QAction* m_featureInfoAction = nullptr;
   FeatureInfoWindow* m_featureInfoWindow = nullptr;
   QAction* m_offlineRegionsAction = nullptr;

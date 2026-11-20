@@ -194,6 +194,9 @@ void LayerTreeDock::rebuildAddLayerMenu()
   wmts->setObjectName(QStringLiteral("addWmtsLayerAction"));
   connect(wmts, &QAction::triggered, this,
           &LayerTreeDock::addWmtsLayerRequested);
+  QAction* wfs = m_addLayerMenu->addAction(tr("WFS Layer…"));
+  wfs->setObjectName(QStringLiteral("addWfsLayerAction"));
+  connect(wfs, &QAction::triggered, this, &LayerTreeDock::addWfsLayerRequested);
   QAction* xyz = m_addLayerMenu->addAction(tr("XYZ Tile Layer…"));
   xyz->setObjectName(QStringLiteral("addXyzLayerAction"));
   connect(xyz, &QAction::triggered, this, &LayerTreeDock::addXyzLayerRequested);

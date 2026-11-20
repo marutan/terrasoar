@@ -110,6 +110,30 @@ the graticule among them (below). They don't use the depth test:
 | Land | base pack `shoreline` | Fill `#c8b98f`; no outline. With Blue Marble hidden, land over the ocean-coloured globe |
 | Graticule | generated | Outline `#dfe6f0` at 70 %, 1 px |
 
+## Per-feature styles
+
+Features may carry their own style (`ts::FeatureStyle`: fill, outline,
+outline width, point size, each optional), from style rules or their
+data ([wfs.md](wfs.md#per-feature-styles)). The mesher keeps each style's
+triangles, lines and points apart and joins them into **runs**
+(`VectorTileMesh::fillRuns`, `segmentRuns`, `styles`): style 0 is the
+layer's, others index the mesh's styles. The vertex format is unchanged;
+the renderer writes one uniform block per run (the same placement, the
+run's colours and width, the layer's where the feature's style leaves
+them unset) and draws each run as a range of the fill buffer or, for
+segments, the instanced buffer bound at the run's offset. A mesh without
+own styles has one run of each kind, so the built-in layers draw exactly
+as before (their golden images are unchanged).
+
+**Points** are segments of no length: the line shader's capsule around
+them is a round dot. Their runs come after the lines, drawn at the
+point size (`VectorStyle::pointSizePx`, 6 px by default, `pointSizePx`
+in a layer's style) in the outline colour, or the fill colour for a
+layer without an outline.
+
+**Picking.** A provider that keeps its features (WFS) answers
+`FeatureProvider::featuresAt()`; others return none.
+
 ## The graticule
 
 The graticule is a layer like the others (`{"kind": "graticule"}`), drawn in

@@ -108,6 +108,30 @@ parseWmsCatalogue(const QByteArray& json, QString* errorString)
 }
 
 std::optional<std::vector<WmsCatalogueEntry>>
+parseWfsCatalogue(const QByteArray& json, QString* errorString)
+{
+  const std::optional<QJsonObject> root =
+      catalogueRoot(json, wfsCatalogueFormatName);
+  if (!root) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+          "ts::WmsCatalogue", "This is not a WFS catalogue.");
+    }
+    return std::nullopt;
+  }
+  if (root->value(QStringLiteral("version")).toInt(0) >
+      wfsCatalogueFormatVersion) {
+    if (errorString) {
+      *errorString = QCoreApplication::translate(
+          "ts::WmsCatalogue",
+          "The WFS catalogue is of a newer format than this program reads.");
+    }
+    return std::nullopt;
+  }
+  return catalogueEntries(*root);
+}
+
+std::optional<std::vector<WmsCatalogueEntry>>
 parseWmtsCatalogue(const QByteArray& json, QString* errorString)
 {
   const std::optional<QJsonObject> root =

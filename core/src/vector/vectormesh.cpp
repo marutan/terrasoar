@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <utility>
 
 #define GEOS_USE_ONLY_R_API
@@ -359,11 +360,41 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
   const double minimumDeg =
       TileKey::sizeDeg(tile.key.level) * d->settings.minimumExtentFraction;
 
+  // Each style's triangles, lines and points apart, joined into runs at
+  // the end: bucket 0 is the layer's style.
+  struct Bucket {
+    std::vector<VectorVertex> triangles;
+    std::vector<VectorSegment> lines;
+    std::vector<VectorSegment> points;
+  };
+  std::vector<Bucket> buckets(1);
   for (const Feature& feature : tile.features) {
     if (cancelled.load()) {
       return std::nullopt;
     }
+    std::size_t style = 0;
+    if (feature.style && !feature.style->isEmpty()) {
+      const std::vector<FeatureStyle>::const_iterator known =
+          std::find(mesh.styles.begin(), mesh.styles.end(), *feature.style);
+      style = static_cast<std::size_t>(known - mesh.styles.begin()) + 1;
+      if (known == mesh.styles.end()) {
+        mesh.styles.push_back(*feature.style);
+        buckets.emplace_back();
+      }
+    }
+    Bucket& bucket = buckets.at(style);
     if (feature.type == Feature::Type::Points) {
+      // A dot: a segment of no length, drawn as a round cap.
+      for (const std::vector<GeoPoint>& part : feature.parts) {
+        for (const GeoPoint& point : part) {
+          if (point.lonDeg >= rect.west && point.lonDeg <= rect.east &&
+              point.latDeg >= rect.south && point.latDeg <= rect.north) {
+            const VectorVertex v =
+                Private::vertex(point.lonDeg, point.latDeg, centre);
+            bucket.points.push_back(VectorSegment{v, v});
+          }
+        }
+      }
       continue;
     }
     const bool rings = feature.type == Feature::Type::Polygon;
@@ -381,7 +412,7 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
       const GeomPtr polygon = d->polygon(denseParts);
       if (polygon && GEOSisEmpty_r(d->context(), polygon.get()) == 0 &&
           !d->cut(polygon.get(), rect, cellDeg, centre, cancelled,
-                  &mesh.triangles)) {
+                  &bucket.triangles)) {
         return std::nullopt;
       }
     }
@@ -391,10 +422,41 @@ VectorMesher::build(const FeatureTile& tile, const std::atomic<bool>& cancelled)
         const GeoPoint a = (*part)[i];
         const GeoPoint b = (*part)[i + 1];
         if (!rings || !onTileEdge(a, b, rect)) {
-          Private::addSegments(a, b, segmentDeg, centre, &mesh.segments);
+          Private::addSegments(a, b, segmentDeg, centre, &bucket.lines);
         }
       }
     }
+  }
+  const std::function<void(std::vector<VectorRun>&, std::size_t, std::size_t,
+                           int32_t, bool)>
+      addRun = [](std::vector<VectorRun>& runs, std::size_t before,
+                  std::size_t after, int32_t style, bool points) {
+        if (after > before) {
+          runs.push_back(VectorRun{static_cast<int32_t>(before),
+                                   static_cast<int32_t>(after - before), style,
+                                   points});
+        }
+      };
+  for (std::size_t s = 0; s < buckets.size(); ++s) {
+    Bucket& bucket = buckets.at(s);
+    const std::size_t triangles = mesh.triangles.size();
+    mesh.triangles.insert(mesh.triangles.end(), bucket.triangles.begin(),
+                          bucket.triangles.end());
+    addRun(mesh.fillRuns, triangles, mesh.triangles.size(),
+           static_cast<int32_t>(s), false);
+    const std::size_t lines = mesh.segments.size();
+    mesh.segments.insert(mesh.segments.end(), bucket.lines.begin(),
+                         bucket.lines.end());
+    addRun(mesh.segmentRuns, lines, mesh.segments.size(),
+           static_cast<int32_t>(s), false);
+  }
+  for (std::size_t s = 0; s < buckets.size(); ++s) {
+    Bucket& bucket = buckets.at(s);
+    const std::size_t points = mesh.segments.size();
+    mesh.segments.insert(mesh.segments.end(), bucket.points.begin(),
+                         bucket.points.end());
+    addRun(mesh.segmentRuns, points, mesh.segments.size(),
+           static_cast<int32_t>(s), true);
   }
   return mesh;
 }

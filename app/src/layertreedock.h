@@ -113,6 +113,9 @@ signals:
   /** The user asked to add a WMTS layer (the window opens the dialog). */
   void addWmtsLayerRequested();
 
+  /** The user asked to add a WFS layer (the window opens the dialog). */
+  void addWfsLayerRequested();
+
   /** The user asked to add an XYZ tile layer (the window opens the dialog). */
   void addXyzLayerRequested();
 

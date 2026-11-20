@@ -112,6 +112,7 @@ HEADERS += \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
     include/ts/tiling/tileselector.h \
+    include/ts/vector/stylerules.h \
     include/ts/vector/vectormesh.h \
     include/ts/vector/vectorstyle.h \
     include/ts/vector/vectortileloader.h \
@@ -123,6 +124,9 @@ HEADERS += \
     include/ts/time/layertime.h \
     include/ts/time/programclock.h \
     include/ts/time/timeextent.h \
+    include/ts/wfs/wfscapabilities.h \
+    include/ts/wfs/wfsfeatureprovider.h \
+    include/ts/wfs/wfssource.h \
     include/ts/wmts/wmtscapabilities.h \
     include/ts/wmts/wmtscrs.h \
     include/ts/wmts/wmtsimageryprovider.h \
@@ -207,6 +211,7 @@ SOURCES += \
     src/tiling/tileloader.cpp \
     src/tiling/tilemesh.cpp \
     src/tiling/tileselector.cpp \
+    src/vector/stylerules.cpp \
     src/vector/vectormesh.cpp \
     src/vector/vectorstyle.cpp \
     src/vector/vectortileloader.cpp \
@@ -218,6 +223,9 @@ SOURCES += \
     src/time/layertime.cpp \
     src/time/programclock.cpp \
     src/time/timeextent.cpp \
+    src/wfs/wfscapabilities.cpp \
+    src/wfs/wfsfeatureprovider.cpp \
+    src/wfs/wfssource.cpp \
     src/wmts/wmtscapabilities.cpp \
     src/wmts/wmtscrs.cpp \
     src/wmts/wmtsimageryprovider.cpp \

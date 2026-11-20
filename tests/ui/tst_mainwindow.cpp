@@ -65,6 +65,7 @@
 
 #include "aboutdialog.h"
 #include "addwebterraindialog.h"
+#include "addwfsdialog.h"
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
@@ -78,6 +79,7 @@
 #include "mainwindow.h"
 #include "mockhttpserver.h"
 #include "mockpacks.h"
+#include "mockwfs.h"
 #include "mockwms.h"
 #include "mockwmts.h"
 #include "newregiondialog.h"
@@ -99,6 +101,7 @@
 #include "ts/time/layertime.h"
 #include "ts/time/programclock.h"
 #include "ts/time/timeextent.h"
+#include "ts/vector/vectorstyle.h"
 #include "ts/wms/wmscapabilities.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
@@ -452,6 +455,7 @@ private slots:
     QStandardPaths::setTestModeEnabled(true);
     qputenv("TS_WMS_CATALOGUE_URL", QByteArray());
     qputenv("TS_XYZ_CATALOGUE_URL", QByteArray());
+    qputenv("TS_WFS_CATALOGUE_URL", QByteArray());
     // No offline regions left over from an earlier run.
     QFile::remove(
         QDir(QStandardPaths::writableLocation(QStandardPaths::CacheLocation))
@@ -632,8 +636,11 @@ private slots:
     ts::AddWebTerrainDialog terrain(nullptr);
     ts::FeatureInfoWindow featureInfo(
         std::make_shared<ts::NetworkClient>(settings), nullptr);
+    ts::AddWfsDialog wfsDialog(std::make_shared<ts::NetworkClient>(settings),
+                               nullptr);
     const std::vector<std::pair<QDialog*, QString>> dialogs{
         {&featureInfo, ts::FeatureInfoWindow::helpTarget()},
+        {&wfsDialog, ts::AddWfsDialog::helpTarget()},
         {&wms, ts::AddWmsDialog::helpTarget()},
         {&wmts, ts::AddWmtsDialog::helpTarget()},
         {&xyz, ts::AddXyzDialog::helpTarget()},
@@ -2386,6 +2393,117 @@ private slots:
     ts::MainWindow reopened;
     QVERIFY2(reopened.openProject(path, &error), qPrintable(error));
     QCOMPARE(reopened.clock()->time(), window.clock()->time());
+  }
+
+  void addWfsDialogAndLayer()
+  {
+    // The dialog against the mock WFS: the current catalogue arrives, the
+    // feature types are listed, Add makes a vector layer in the chosen
+    // colour; on the globe near the grid its features are asked for by
+    // tile, drawn, and listed by What Is Here where clicked.
+    std::shared_ptr<ts::test::MockWmsBehaviour> behaviour =
+        std::make_shared<ts::test::MockWmsBehaviour>();
+    ts::test::MockHttpServer server;
+    const QUrl address = server.url(QStringLiteral("/wfs"));
+    const ts::test::MockHttpServer::Handler wfs =
+        ts::test::mockWfsHandler(behaviour, address);
+    server.setHandler([wfs, address](const ts::test::MockHttpRequest& request) {
+      if (request.url.path() == QLatin1String("/catalogue.json")) {
+        return ts::test::mockResponse(
+            200,
+            "{\"format\": \"terrasoar-wfs-catalogue\", \"version\": 1, "
+            "\"services\": [{\"title\": \"Mock features\", \"url\": \"" +
+                address.toString().toUtf8() +
+                "\", \"description\": \"A grid\", \"attribution\": "
+                "\"Mock Survey Office\", \"terms\": "
+                "\"https://example.invalid/terms\"}]}",
+            "application/json");
+      }
+      return wfs(request);
+    });
+    QFile::remove(ts::wfsCatalogueCachePath());
+    qputenv("TS_WFS_CATALOGUE_URL",
+            server.url(QStringLiteral("/catalogue.json")).toString().toUtf8());
+    ts::NetworkSettings settings;
+    settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(settings);
+    ts::AddWfsDialog dialog(network, nullptr);
+    qputenv("TS_WFS_CATALOGUE_URL", QByteArray());
+    QVERIFY(dialog.catalogue().size() >= 3); // built in
+    QSignalSpy catalogueUpdated(&dialog, &ts::AddWfsDialog::catalogueUpdated);
+    QVERIFY(catalogueUpdated.wait(5000));
+    QCOMPARE(dialog.catalogue().size(), std::size_t{1});
+    QSignalSpy loaded(&dialog, &ts::AddWfsDialog::capabilitiesLoaded);
+    dialog.connectTo(address.toString());
+    QVERIFY(loaded.wait(5000));
+    QVERIFY2(dialog.statusText().contains(QStringLiteral("3 feature type")),
+             qPrintable(dialog.statusText()));
+    QVERIFY(!dialog.selectFeatureType(QStringLiteral("test:nothing")));
+    QVERIFY(dialog.selectFeatureType(QStringLiteral("test:areas")));
+    QVERIFY2(
+        dialog.detailsText().contains(QStringLiteral("Mock Survey Office")),
+        qPrintable(dialog.detailsText()));
+    QVERIFY(dialog.detailsText().contains(QStringLiteral("application/json")));
+    dialog.setColour(QColor(10, 200, 30));
+    QPushButton* add =
+        dialog.findChild<QPushButton*>(QStringLiteral("wfsAddButton"));
+    QVERIFY(add != nullptr && add->isEnabled());
+    add->click();
+    QVERIFY(dialog.layerDefinition().has_value());
+    const ts::LayerDefinition definition = *dialog.layerDefinition();
+    QCOMPARE(definition.type, ts::LayerType::Vector);
+    QCOMPARE(definition.source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("wfs"));
+    const ts::VectorStyle style = ts::VectorStyle::fromJson(definition.style);
+    QCOMPARE(style.outline, QColor(10, 200, 30));
+    QCOMPARE(style.fill.alpha(), 64);
+
+    // In the window.
+    QTemporaryDir cache;
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::WmsProviderSettings web;
+    web.cacheDirectory = cache.path();
+    window.registry().setWmsNetwork(network, web);
+    window.layerModel()->addLayer(definition);
+    QVERIFY(window.stateReport()
+                .value(QStringLiteral("attributions"))
+                .toArray()
+                .contains(QStringLiteral("Mock Survey Office")));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QCOMPARE(globe->vectorLayerCount(), 3);
+    // Whole globe: the layer's minimum level isn't reached, nothing asked.
+    QTest::qWait(300);
+    QVERIFY(ts::test::mockWfsRequests(server).empty());
+    globe->setPose(ts::CameraPose{-5.0, -5.0, 1.5e6, 0.0, 0.0});
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return !ts::test::mockWfsRequests(server).empty(); }, 10000));
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    for (const ts::test::MockWfsRequest& request :
+         ts::test::mockWfsRequests(server)) {
+      QCOMPARE(request.type, QStringLiteral("test:areas"));
+    }
+    // What Is Here: the square under the point, from the features loaded.
+    QCOMPARE(window.identifyAt(ts::LonLat{-5.5, -5.5}, 0.002), 1);
+    ts::FeatureInfoWindow* results = window.featureInfoWindow();
+    QVERIFY(results != nullptr);
+    const QString text = results->resultsText();
+    QVERIFY2(text.contains(QStringLiteral("cell -6 -6")), qPrintable(text));
+    QVERIFY2(text.startsWith(QStringLiteral("Grid areas")), qPrintable(text));
+    // Beside the square: nothing to show.
+    QCOMPARE(window.identifyAt(ts::LonLat{-5.9, -5.9}, 0.002), 0);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      globe->grabFramebuffer().save(
+          QDir(shots).filePath(QStringLiteral("wfs-layer.png")));
+      dialog.grab().save(
+          QDir(shots).filePath(QStringLiteral("add-wfs-dialog.png")));
+    }
   }
 
   void wmsWhatIsHere()

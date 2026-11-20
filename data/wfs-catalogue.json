@@ -1,0 +1,27 @@
+{
+    "format": "terrasoar-wfs-catalogue",
+    "version": 1,
+    "services": [
+        {
+            "title": "PDOK: administrative boundaries (Netherlands)",
+            "url": "https://service.pdok.nl/kadaster/bestuurlijkegebieden/wfs/v1_0",
+            "description": "The boundaries of the Dutch municipalities, provinces and the country from the Kadaster, with their names and codes. CC0.",
+            "attribution": "Kadaster / PDOK",
+            "terms": "https://www.pdok.nl/copyright"
+        },
+        {
+            "title": "EMODnet Bathymetry: contours and sea names",
+            "url": "https://ows.emodnet-bathymetry.eu/wfs",
+            "description": "Depth contours, survey areas and the names of seas from the European Marine Observation and Data Network. CC BY 4.0. Not for navigation.",
+            "attribution": "EMODnet Bathymetry Consortium",
+            "terms": "https://emodnet.ec.europa.eu/en/terms-use-emodnet-online-services-data-and-data-products"
+        },
+        {
+            "title": "MSC GeoMet: weather observations (Canada)",
+            "url": "https://geo.weather.gc.ca/geomet",
+            "description": "Weather observations, air quality and forecast outlines from Environment and Climate Change Canada's Meteorological Service of Canada. Open Government Licence – Canada.",
+            "attribution": "Environment and Climate Change Canada",
+            "terms": "https://eccc-msc.github.io/open-data/licence/readme_en/"
+        }
+    ]
+}

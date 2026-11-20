@@ -250,6 +250,7 @@ private slots:
                                  QStringLiteral("adding-wms-layers.md"),
                                  QStringLiteral("adding-wmts-layers.md"),
                                  QStringLiteral("adding-xyz-layers.md"),
+                                 QStringLiteral("adding-wfs-layers.md"),
                                  QStringLiteral("terrain.md"),
                                  QStringLiteral("offline-use.md")}));
     QCOMPARE(pages.front().title, QStringLiteral("Terra Soar user guide"));

@@ -32,6 +32,7 @@
 #include <optional>
 #include <vector>
 
+#include <QColor>
 #include <QImage>
 #include <QString>
 #include <QVariantMap>
@@ -259,6 +260,37 @@ struct GeoPoint {
 };
 
 /**
+ * A feature's own style, overriding its layer's (VectorStyle) where set:
+ * from style rules or the data itself. See docs/design/vector-rendering.md.
+ *
+ * @reentrant
+ */
+struct FeatureStyle {
+  /** Polygon fill. */
+  std::optional<QColor> fill;
+  /** Polygon rings, line strings and points. */
+  std::optional<QColor> outline;
+  /** Outline width in logical pixels. */
+  std::optional<double> outlineWidthPx;
+  /** Diameter of a point in logical pixels. */
+  std::optional<double> pointSizePx;
+
+  /** Returns true if it sets nothing. */
+  bool isEmpty() const
+  {
+    return !fill && !outline && !outlineWidthPx && !pointSizePx;
+  }
+
+  /** Returns true if both set the same. */
+  bool operator==(const FeatureStyle& other) const
+  {
+    return fill == other.fill && outline == other.outline &&
+           outlineWidthPx == other.outlineWidthPx &&
+           pointSizePx == other.pointSizePx;
+  }
+};
+
+/**
  * One vector feature: a point set, line string or polygon with its
  * attributes.
  *
@@ -280,6 +312,10 @@ struct Feature {
   std::vector<std::vector<GeoPoint>> parts;
   /** Attribute values by field name. */
   QVariantMap attributes;
+  /** Its identifier in its source, if it has one (a WFS feature's id). */
+  QString id;
+  /** Its own style, if any (overrides the layer's where set). */
+  std::optional<FeatureStyle> style;
 };
 
 /** The features of one tile at one level of detail. */
@@ -316,6 +352,20 @@ public:
    * stores coarser tiles. Keys with the same stored tile share one load.
    */
   virtual TileKey storedKey(TileKey key) const { return key; }
+
+  /**
+   * Returns the features loaded so far that lie under @p point: polygons
+   * containing it, lines and points within @p toleranceDeg (degrees of
+   * latitude; longitude scaled by the latitude). For picking: a source
+   * that keeps no features after meshing returns none (the default).
+   */
+  virtual std::vector<Feature> featuresAt(const GeoPoint& point,
+                                          double toleranceDeg) const
+  {
+    (void)point;
+    (void)toleranceDeg;
+    return {};
+  }
 };
 
 } // namespace ts

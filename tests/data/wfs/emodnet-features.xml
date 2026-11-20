@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><wfs:FeatureCollection xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:world="http://world.n4m5.eu" xmlns:wfs="http://www.opengis.net/wfs/2.0" xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" numberMatched="7" numberReturned="2" timeStamp="2026-11-20T02:09:18.034Z" xsi:schemaLocation="http://www.opengis.net/wfs/2.0 http://ows.emodnet-bathymetry.eu/schemas/wfs/2.0/wfs.xsd http://world.n4m5.eu http://ows.emodnet-bathymetry.eu/wfs?service=WFS&amp;version=2.0.0&amp;request=DescribeFeatureType&amp;typeName=world%3Asea_names http://www.opengis.net/gml/3.2 http://ows.emodnet-bathymetry.eu/schemas/gml/3.2.1/gml.xsd">
+  <wfs:boundedBy>
+    <gml:Envelope srsDimension="2" srsName="urn:ogc:def:crs:EPSG::4326">
+      <gml:lowerCorner>52.9078 2.3312</gml:lowerCorner>
+      <gml:upperCorner>53.1823 5.2357</gml:upperCorner>
+    </gml:Envelope>
+  </wfs:boundedBy>
+  <wfs:member>
+    <world:sea_names gml:id="sea_names.36">
+      <gml:name>North Sea</gml:name>
+      <gml:boundedBy>
+        <gml:Envelope srsName="urn:ogc:def:crs:EPSG::4326" srsDimension="2">
+          <gml:lowerCorner>52.9078 2.3312</gml:lowerCorner>
+          <gml:upperCorner>52.9078 3.6177</gml:upperCorner>
+        </gml:Envelope>
+      </gml:boundedBy>
+      <world:the_geom>
+        <gml:MultiCurve srsName="urn:ogc:def:crs:EPSG::4326" srsDimension="2" gml:id="sea_names.36.the_geom">
+          <gml:curveMember>
+            <gml:LineString gml:id="sea_names.36.the_geom.1">
+              <gml:posList>52.9078 2.3312 52.9078 3.6177</gml:posList>
+            </gml:LineString>
+          </gml:curveMember>
+        </gml:MultiCurve>
+      </world:the_geom>
+      <world:level>3</world:level>
+    </world:sea_names>
+  </wfs:member>
+  <wfs:member>
+    <world:sea_names gml:id="sea_names.38">
+      <gml:name>Waddenzee</gml:name>
+      <gml:boundedBy>
+        <gml:Envelope srsName="urn:ogc:def:crs:EPSG::4326" srsDimension="2">
+          <gml:lowerCorner>53.0415 4.9897</gml:lowerCorner>
+          <gml:upperCorner>53.1823 5.2357</gml:upperCorner>
+        </gml:Envelope>
+      </gml:boundedBy>
+      <world:the_geom>
+        <gml:MultiCurve srsName="urn:ogc:def:crs:EPSG::4326" srsDimension="2" gml:id="sea_names.38.the_geom">
+          <gml:curveMember>
+            <gml:LineString gml:id="sea_names.38.the_geom.1">
+              <gml:posList>53.0415 4.9897 53.1823 5.2357</gml:posList>
+            </gml:LineString>
+          </gml:curveMember>
+        </gml:MultiCurve>
+      </world:the_geom>
+      <world:level>3</world:level>
+    </world:sea_names>
+  </wfs:member>
+</wfs:FeatureCollection>

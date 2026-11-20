@@ -113,7 +113,8 @@ void FeatureInfoWindow::retranslateUi()
 }
 
 void FeatureInfoWindow::query(LonLat point,
-                              const std::vector<FeatureInfoQuery>& queries)
+                              const std::vector<FeatureInfoQuery>& queries,
+                              const std::vector<FeatureInfoLocal>& local)
 {
   for (const Pending& pending : m_pending) {
     pending.ticket->cancel();
@@ -133,6 +134,22 @@ void FeatureInfoWindow::query(LonLat point,
     pending.format = query.format;
     pending.ticket = m_network->start(HttpRequest{query.url, {}});
     m_pending.push_back(pending);
+  }
+  for (const FeatureInfoLocal& layer : local) {
+    QTreeWidgetItem* item = new QTreeWidgetItem(m_tree);
+    item->setText(0, layer.layerName);
+    item->setExpanded(true);
+    WmsFeatureInfo info;
+    for (const Feature& feature : layer.features) {
+      FeatureInfoFeature listed;
+      listed.id = feature.id;
+      for (QVariantMap::const_iterator it = feature.attributes.begin();
+           it != feature.attributes.end(); ++it) {
+        listed.attributes.emplace_back(it.key(), it.value().toString());
+      }
+      info.features.push_back(listed);
+    }
+    showInfo(item, info);
   }
   if (!m_pending.empty()) {
     m_pollTimer->start();
@@ -182,16 +199,22 @@ void FeatureInfoWindow::answered(const Pending& pending)
     item->setText(1, error);
     return;
   }
-  if (info->isEmpty()) {
+  showInfo(item, *info);
+}
+
+void FeatureInfoWindow::showInfo(QTreeWidgetItem* item,
+                                 const WmsFeatureInfo& info)
+{
+  if (info.isEmpty()) {
     item->setText(1, tr("Nothing here"));
     return;
   }
-  item->setText(1, info->features.empty()
+  item->setText(1, info.features.empty()
                        ? QString()
                        : tr("%n feature(s)", nullptr,
-                            static_cast<int32_t>(info->features.size())));
+                            static_cast<int32_t>(info.features.size())));
   int32_t number = 0;
-  for (const FeatureInfoFeature& feature : info->features) {
+  for (const FeatureInfoFeature& feature : info.features) {
     ++number;
     QTreeWidgetItem* featureItem = new QTreeWidgetItem(item);
     featureItem->setText(0, feature.id.isEmpty() ? tr("Feature %1").arg(number)
@@ -205,7 +228,7 @@ void FeatureInfoWindow::answered(const Pending& pending)
     }
     featureItem->setExpanded(true);
   }
-  const QStringList lines = info->text.split(QLatin1Char('\n'));
+  const QStringList lines = info.text.split(QLatin1Char('\n'));
   for (int32_t i = 0; i < lines.size() && i < mostTextLines; ++i) {
     if (!lines.at(i).trimmed().isEmpty()) {
       QTreeWidgetItem* row = new QTreeWidgetItem(item);
