@@ -237,7 +237,7 @@ protected:
     case QEvent::TouchBegin:
     case QEvent::TouchUpdate:
     case QEvent::TouchEnd:
-      touch(static_cast<QTouchEvent*>(event));
+      touch(dynamic_cast<QTouchEvent*>(event));
       return true;
     case QEvent::TouchCancel:
       setPressed(false);
@@ -273,6 +273,9 @@ protected:
   /** One finger's touch as the mouse's left button. */
   void touch(QTouchEvent* event)
   {
+    if (event == nullptr) {
+      return;
+    }
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     if (event->points().isEmpty()) {
       return;

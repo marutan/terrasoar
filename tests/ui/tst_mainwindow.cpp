@@ -1639,13 +1639,27 @@ private slots:
     const std::unique_ptr<QPointingDevice> touchDevice(
         QTest::createTouchDevice());
     QPointingDevice* touch = touchDevice.get();
-#else
-    QTouchDevice* touch = QTest::createTouchDevice();
 #endif
     QWidget* zoomIn = control("navigationZoomIn");
     const QPoint middle = zoomIn->rect().center();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     QTest::touchEvent(zoomIn, touch).press(0, middle, zoomIn);
     QTest::touchEvent(zoomIn, touch).release(0, middle, zoomIn);
+#else
+    // Qt 5 on Windows doesn't deliver QTest's touch to widgets: the events
+    // go straight to the control, which takes touch itself.
+    QTouchDevice* touch = QTest::createTouchDevice();
+    for (const Qt::TouchPointState state :
+         {Qt::TouchPointPressed, Qt::TouchPointReleased}) {
+      QTouchEvent::TouchPoint point(0);
+      point.setPos(QPointF(middle));
+      point.setState(state);
+      QTouchEvent event(state == Qt::TouchPointPressed ? QEvent::TouchBegin
+                                                       : QEvent::TouchEnd,
+                        touch, Qt::NoModifier, state, {point});
+      QCoreApplication::sendEvent(zoomIn, &event);
+    }
+#endif
     settle();
     QVERIFY(std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6);
     // The keyboard: Enter on a focused control.
