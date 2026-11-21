@@ -1141,6 +1141,25 @@
         </message>
     </context>
     <context>
+        <name>ts::AisFeeds</name>
+        <message>
+            <source>Fintraffic Digitraffic (Finland, the Baltic)</source>
+            <translation>Fintraffic Digitraffic (Finland, the Baltic)</translation>
+        </message>
+        <message>
+            <source>The Baltic Sea and Finnish waters, from Finland's coastal AIS stations.</source>
+            <translation>The Baltic Sea and Finnish waters, from Finland's coastal AIS stations.</translation>
+        </message>
+        <message>
+            <source>Norwegian Coastal Administration (Kystverket)</source>
+            <translation>Norwegian Coastal Administration (Kystverket)</translation>
+        </message>
+        <message>
+            <source>Norwegian waters, from Kystverket's AIS network.</source>
+            <translation>Norwegian waters, from Kystverket's AIS network.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::AisReader</name>
         <message>
             <source>Not an AIS sentence.</source>

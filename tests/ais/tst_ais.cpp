@@ -28,13 +28,24 @@
 #include <map>
 
 #include <QFile>
+#include <QNetworkProxy>
+#include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QTemporaryDir>
+#include <QUdpSocket>
 #include <QtTest>
 
+#include "mockhttpserver.h"
+
+#include "ts/ais/aisfeed.h"
 #include "ts/ais/aismessage.h"
 #include "ts/ais/aisreaders.h"
 #include "ts/ais/vesseldraws.h"
+#include "ts/ais/vessellayer.h"
 #include "ts/ais/vesseltracks.h"
 #include "ts/geo/geodetic.h"
+#include "ts/network/networkclient.h"
 #include "ts/tracks/movingtrack.h"
 
 namespace
@@ -200,6 +211,15 @@ private slots:
   void symbols();
   void hulls();
   void courseVectors();
+  void layerJson();
+  void styleFilters();
+  void receiverTcp();
+  void receiverUdp();
+  void recordingReadsBack();
+  void digitrafficReading();
+  void digitrafficFeed();
+  void digitrafficBacksOff();
+  void digitrafficLive();
 };
 
 void TestAis::sentences()
@@ -1068,6 +1088,384 @@ void TestAis::courseVectors()
   // Not moving: nothing.
   at.speedMS = 0.0F;
   QVERIFY(ts::courseVector(at, 6.0, 0.0, {}).points.empty());
+}
+
+void TestAis::layerJson()
+{
+  ts::VesselSource file;
+  file.path = QStringLiteral("/data/day.nmea");
+  file.format = ts::AisFormat::Nmea;
+  file.startTimeS = 1.7e9;
+  const std::optional<ts::VesselSource> fileBack =
+      ts::VesselSource::fromJson(file.toJson());
+  QVERIFY(fileBack);
+  QCOMPARE(got(fileBack).path, file.path);
+  QCOMPARE(got(fileBack).format, ts::AisFormat::Nmea);
+  QCOMPARE(got(fileBack).startTimeS, 1.7e9);
+  ts::VesselSource udp;
+  udp.origin = ts::VesselSource::Origin::Receiver;
+  udp.udp = true;
+  udp.port = 10110;
+  udp.recordPath = QStringLiteral("/tmp/r.nmea");
+  const std::optional<ts::VesselSource> udpBack =
+      ts::VesselSource::fromJson(udp.toJson());
+  QVERIFY(udpBack && got(udpBack).udp);
+  QCOMPARE(got(udpBack).recordPath, udp.recordPath);
+  ts::VesselSource feed;
+  feed.origin = ts::VesselSource::Origin::Feed;
+  feed.feed = QStringLiteral("digitraffic");
+  const QJsonObject feedJson = feed.toJson();
+  QCOMPARE(feedJson.value(QStringLiteral("attribution")).toString(),
+           QStringLiteral("Fintraffic / digitraffic.fi"));
+  QCOMPARE(got(ts::VesselSource::fromJson(feedJson)).feedUrl(),
+           QUrl(QStringLiteral("https://meri.digitraffic.fi")));
+  QVERIFY(ts::VesselSource::isVessels(feedJson));
+  // Unknown feeds and TCP without a host are refused.
+  QJsonObject unknown = feedJson;
+  unknown.insert(QStringLiteral("feed"), QStringLiteral("nowhere"));
+  QVERIFY(!ts::VesselSource::fromJson(unknown));
+  ts::VesselSource tcp;
+  tcp.origin = ts::VesselSource::Origin::Receiver;
+  QVERIFY(!ts::VesselSource::fromJson(tcp.toJson()));
+  QCOMPARE(ts::aisFeedCatalogue().size(), std::size_t{2});
+  QCOMPARE(got(ts::aisFeedEntry(QStringLiteral("kystverket"))).licence,
+           QStringLiteral("NLOD"));
+
+  ts::VesselStyle style;
+  style.colourByType = false;
+  style.courseVectorMinutes = 6.0;
+  style.trailColouring = ts::VesselColouring::Speed;
+  style.typeGroups = {ts::ShipTypeGroup::Cargo, ts::ShipTypeGroup::Tanker};
+  style.statuses = {ts::AisNavStatus::Moored};
+  style.minimumSpeedKn = 1.0;
+  style.area = ts::LatLonBox{50.0, -2.0, 51.0, -1.0};
+  style.hidden = {235000001U};
+  style.trails[235000002U] = ts::TrailSettings{ts::TrailMode::All, 0.0};
+  QVERIFY(ts::VesselStyle::fromJson(style.toJson()) == style);
+  QVERIFY(ts::VesselStyle::fromJson(QJsonObject()) == ts::VesselStyle());
+}
+
+void TestAis::styleFilters()
+{
+  ts::VesselStyle style;
+  ts::VesselInfo cargo;
+  cargo.name = QStringLiteral("TSO CARGO ONE");
+  cargo.shipType = 70;
+  ts::TrackSample at;
+  at.latDeg = 50.5;
+  at.lonDeg = -1.5;
+  at.speedMS = static_cast<float>(12.0 * 1852.0 / 3600.0);
+  QVERIFY(style.shows(235000001U, cargo, at));
+  style.nameFilter = QStringLiteral("cargo");
+  QVERIFY(style.shows(235000001U, cargo, at));
+  style.nameFilter = QStringLiteral("2350");
+  QVERIFY(style.shows(235000001U, cargo, at));
+  style.nameFilter = QStringLiteral("tug");
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  style.nameFilter.clear();
+  style.typeGroups = {ts::ShipTypeGroup::Tanker};
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  style.typeGroups.insert(ts::ShipTypeGroup::Cargo);
+  QVERIFY(style.shows(235000001U, cargo, at));
+  style.statuses = {ts::AisNavStatus::Moored};
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  style.statuses.clear();
+  style.minimumSpeedKn = 15.0;
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  style.minimumSpeedKn.reset();
+  style.maximumSpeedKn = 10.0;
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  style.maximumSpeedKn.reset();
+  style.area = ts::LatLonBox{40.0, 0.0, 41.0, 1.0};
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  style.area.reset();
+  style.hidden.insert(235000001U);
+  QVERIFY(!style.shows(235000001U, cargo, at));
+  // Aids to navigation and base stations are their own group.
+  ts::VesselInfo buoy;
+  buoy.kind = ts::AisStationKind::AidToNavigation;
+  QCOMPARE(ts::VesselStyle::groupOf(buoy), ts::ShipTypeGroup::Navigation);
+}
+
+void TestAis::receiverTcp()
+{
+  // AIS-catcher-like NMEA over TCP, in pieces; dropped and back.
+  QTcpServer server;
+  QVERIFY(server.listen(QHostAddress::LocalHost));
+  ts::VesselSource source;
+  source.origin = ts::VesselSource::Origin::Receiver;
+  source.host = QStringLiteral("127.0.0.1");
+  source.port = server.serverPort();
+  ts::AisFeed feed(source, nullptr, nullptr);
+  feed.start();
+  QVERIFY(server.waitForNewConnection(5000));
+  QTcpSocket* first = server.nextPendingConnection();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::AisFeed::State::Connected; }, 5000));
+  const QByteArray log = readData("harbour-tagged.nmea").left(6000);
+  first->write(log.left(3000));
+  first->flush();
+  QTest::qWait(50);
+  first->write(log.mid(3000));
+  first->flush();
+  std::vector<ts::VesselReport> reports;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        for (const ts::VesselReport& r : feed.takeReports()) {
+          reports.push_back(r);
+        }
+        return reports.size() >= 40;
+      },
+      5000));
+  // Their tag blocks' times, not the arrival.
+  QVERIFY(reports.front().timeS < fixtureStartS + 600.0);
+  first->disconnectFromHost();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::AisFeed::State::Reconnecting; },
+      5000));
+  QVERIFY(
+      QTest::qWaitFor([&]() { return server.hasPendingConnections(); }, 5000));
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::AisFeed::State::Connected; }, 5000));
+  QCOMPARE(feed.connections(), 2);
+  feed.stop();
+}
+
+void TestAis::receiverUdp()
+{
+  // rtl-ais-like NMEA datagrams on a port; untagged, timed on arrival.
+  QUdpSocket probe;
+  QVERIFY(probe.bind(QHostAddress::LocalHost, 0));
+  const uint16_t port = probe.localPort();
+  probe.close();
+  ts::VesselSource source;
+  source.origin = ts::VesselSource::Origin::Receiver;
+  source.udp = true;
+  source.port = port;
+  ts::AisFeed feed(source, nullptr, nullptr);
+  feed.start();
+  QCOMPARE(feed.state(), ts::AisFeed::State::Connected);
+  QUdpSocket sender;
+  const double before =
+      static_cast<double>(QDateTime::currentMSecsSinceEpoch()) / 1000.0 - 1.0;
+  std::vector<ts::VesselReport> reports;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        sender.writeDatagram(
+            "!AIVDM,1,1,,B,15M67FC000G?ufbE`FepT@3n00Sa,0*5C\n",
+            QHostAddress::LocalHost, port);
+        for (const ts::VesselReport& r : feed.takeReports()) {
+          reports.push_back(r);
+        }
+        return !reports.empty();
+      },
+      5000));
+  QCOMPARE(reports.front().mmsi, 366053209U);
+  QVERIFY(reports.front().timeS >= before);
+  feed.stop();
+}
+
+void TestAis::recordingReadsBack()
+{
+  // Untagged sentences recorded with tag blocks of their arrival: the
+  // recording reads back timed.
+  QTemporaryDir dir;
+  QTcpServer server;
+  QVERIFY(server.listen(QHostAddress::LocalHost));
+  ts::VesselSource source;
+  source.origin = ts::VesselSource::Origin::Receiver;
+  source.host = QStringLiteral("127.0.0.1");
+  source.port = server.serverPort();
+  source.recordPath = dir.filePath(QStringLiteral("session.nmea"));
+  ts::AisFeed feed(source, nullptr, nullptr);
+  feed.start();
+  QVERIFY(server.waitForNewConnection(5000));
+  QTcpSocket* client = server.nextPendingConnection();
+  const QByteArray untimed = readData("harbour-untimed.nmea");
+  client->write(untimed);
+  client->flush();
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        feed.takeReports();
+        return feed.messages() >= untimed.count('\n');
+      },
+      5000));
+  feed.stop();
+  ts::AisReadResult result;
+  ts::VesselTrackBuilder builder;
+  result = ts::readAisFile(
+      source.recordPath, ts::AisFormat::Unknown, ts::AisReadOptions(),
+      [&builder](const ts::VesselReport& r) { builder.add(r); });
+  QCOMPARE(result.format, ts::AisFormat::Nmea);
+  QVERIFY(!result.untimed);
+  QCOMPARE(result.records, untimed.count('\n'));
+  QVERIFY(!builder.finish().empty());
+}
+
+void TestAis::digitrafficReading()
+{
+  // Digitraffic's shapes: GeoJSON locations ("not available" values left
+  // out) and the vessels' metadata (draught in decimetres, ETA packed).
+  const QByteArray locations =
+      R"({"type":"FeatureCollection","dataUpdatedTime":"2026-11-21T04:54:21Z",)"
+      R"("features":[{"mmsi":230000001,"type":"Feature","geometry":{"type":)"
+      R"("Point","coordinates":[24.95,60.15]},"properties":{"mmsi":230000001,)"
+      R"("sog":12.3,"cog":45.6,"navStat":0,"rot":-128,"posAcc":true,"raim":)"
+      R"(false,"heading":511,"timestamp":57,"timestampExternal":1795170658164}},)"
+      R"({"mmsi":230000002,"type":"Feature","geometry":{"type":"Point",)"
+      R"("coordinates":[25.0,60.2]},"properties":{"mmsi":230000002,"sog":102.3,)"
+      R"("cog":360.0,"navStat":5,"rot":12,"heading":90,"timestamp":1,)"
+      R"("timestampExternal":1795170659000}}]})";
+  const std::optional<std::vector<ts::VesselReport>> l =
+      ts::readDigitrafficLocations(locations);
+  QVERIFY(l);
+  QCOMPARE(got(l).size(), std::size_t{2});
+  const ts::VesselReport a = got(l).at(0);
+  QCOMPARE(a.mmsi, 230000001U);
+  QCOMPARE(a.timeS, 1795170658.164);
+  QCOMPARE(got(a.latDeg), 60.15);
+  QCOMPARE(got(a.lonDeg), 24.95);
+  QCOMPARE(got(a.speedKn), 12.3);
+  QVERIFY(!a.headingDeg);
+  QVERIFY(!a.turnDegMin);
+  const ts::VesselReport b = got(l).at(1);
+  QVERIFY(!b.speedKn);
+  QVERIFY(!b.courseDeg);
+  QCOMPARE(got(b.headingDeg), 90.0);
+  QCOMPARE(got(b.status), ts::AisNavStatus::Moored);
+  QVERIFY(got(b.turnDegMin) > 0.0);
+  const QByteArray vessels =
+      R"([{"callSign":"J5BM2","destination":"ES LPA","draught":137,"eta":)"
+      R"(788928,"imo":9386251,"mmsi":630001340,"name":"PACIFIC GUARDIAN",)"
+      R"("posType":1,"referencePointA":198,"referencePointB":27,)"
+      R"("referencePointC":10,"referencePointD":22,"shipType":70,)"
+      R"("timestamp":1795152281063}])";
+  const std::optional<std::vector<ts::VesselReport>> v =
+      ts::readDigitrafficVessels(vessels);
+  QVERIFY(v);
+  const ts::VesselReport m = got(v).front();
+  QCOMPARE(got(m.name), QStringLiteral("PACIFIC GUARDIAN"));
+  QCOMPARE(got(m.callsign), QStringLiteral("J5BM2"));
+  QCOMPARE(got(m.imo), 9386251U);
+  QCOMPARE(got(m.shipType), 70);
+  QCOMPARE(got(m.draughtM), 13.7);
+  QCOMPARE(got(m.destination), QStringLiteral("ES LPA"));
+  QCOMPARE(got(m.eta).month, 12);
+  QCOMPARE(got(m.eta).day, 1);
+  QCOMPARE(got(m.eta).hour, 7);
+  QCOMPARE(got(m.dimensions).toBow, 198);
+  QCOMPARE(got(m.dimensions).toStarboard, 22);
+  QVERIFY(!ts::readDigitrafficLocations("[]"));
+  QVERIFY(!ts::readDigitrafficVessels("{}"));
+}
+
+void TestAis::digitrafficFeed()
+{
+  // Against a mock: metadata first, then locations, later ones only
+  // those changed since the last (from=), each with the user header.
+  ts::test::MockHttpServer server([](const ts::test::MockHttpRequest& r) {
+    ts::test::MockHttpResponse response;
+    if (r.url.path().endsWith(QLatin1String("/vessels"))) {
+      response.body = R"([{"mmsi":230000001,"name":"MOCK ONE","shipType":)"
+                      R"(60,"timestamp":1795170650000}])";
+    } else {
+      response.body =
+          R"({"type":"FeatureCollection","features":[{"mmsi":230000001,)"
+          R"("geometry":{"coordinates":[24.95,60.15]},"properties":{"mmsi":)"
+          R"(230000001,"sog":5,"cog":10,"heading":12,"timestampExternal":)"
+          R"(1795170658164}}]})";
+    }
+    return response;
+  });
+  ts::NetworkSettings settings;
+  settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+  std::shared_ptr<ts::NetworkClient> network =
+      std::make_shared<ts::NetworkClient>(settings);
+  ts::VesselSource source;
+  source.origin = ts::VesselSource::Origin::Feed;
+  source.feed = QStringLiteral("digitraffic");
+  source.url = server.url(QStringLiteral("/digitraffic/"));
+  ts::AisFeed feed(source, network, nullptr);
+  feed.start();
+  std::vector<ts::VesselReport> reports;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        for (const ts::VesselReport& r : feed.takeReports()) {
+          reports.push_back(r);
+        }
+        return reports.size() >= 2;
+      },
+      10000));
+  QCOMPARE(feed.state(), ts::AisFeed::State::Connected);
+  QCOMPARE(got(reports.at(0).name), QStringLiteral("MOCK ONE"));
+  QVERIFY(reports.at(1).hasPosition());
+  const std::vector<ts::test::MockHttpRequest> requests = server.requests();
+  QVERIFY(requests.size() >= 2);
+  QCOMPARE(requests.at(0).url.path(),
+           QStringLiteral("/digitraffic/api/ais/v1/vessels"));
+  QCOMPARE(requests.at(1).url.path(),
+           QStringLiteral("/digitraffic/api/ais/v1/locations"));
+  QVERIFY(requests.at(1).header("digitraffic-user").startsWith("TerraSoar/"));
+  feed.stop();
+}
+
+void TestAis::digitrafficBacksOff()
+{
+  // A 429 answer: the wait doubles from the poll interval, and the feed
+  // says it is reconnecting.
+  ts::test::MockHttpServer server([](const ts::test::MockHttpRequest&) {
+    ts::test::MockHttpResponse response;
+    response.status = 429;
+    return response;
+  });
+  ts::NetworkSettings settings;
+  settings.proxy = QNetworkProxy(QNetworkProxy::NoProxy);
+  settings.attempts = 1;
+  std::shared_ptr<ts::NetworkClient> network =
+      std::make_shared<ts::NetworkClient>(settings);
+  ts::VesselSource source;
+  source.origin = ts::VesselSource::Origin::Feed;
+  source.feed = QStringLiteral("digitraffic");
+  source.url = server.url(QStringLiteral("/"));
+  ts::AisFeed feed(source, network, nullptr);
+  feed.start();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::AisFeed::State::Reconnecting; },
+      10000));
+  QVERIFY(feed.retryDelayMs() >= 30000);
+  QVERIFY(feed.errorString().contains(QLatin1String("429")) ||
+          !feed.errorString().isEmpty());
+  feed.stop();
+}
+
+void TestAis::digitrafficLive()
+{
+  // Only when asked for: TS_AIS_LIVE_DIGITRAFFIC=1. Not in CI.
+  if (qEnvironmentVariableIntValue("TS_AIS_LIVE_DIGITRAFFIC") == 0) {
+    QSKIP("Set TS_AIS_LIVE_DIGITRAFFIC=1 to read Digitraffic live.");
+  }
+  std::shared_ptr<ts::NetworkClient> network =
+      std::make_shared<ts::NetworkClient>();
+  ts::VesselSource source;
+  source.origin = ts::VesselSource::Origin::Feed;
+  source.feed = QStringLiteral("digitraffic");
+  ts::AisFeed feed(source, network, nullptr);
+  feed.start();
+  int64_t positions = 0;
+  int64_t named = 0;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        for (const ts::VesselReport& r : feed.takeReports()) {
+          positions += r.hasPosition() ? 1 : 0;
+          named += r.name ? 1 : 0;
+        }
+        return positions > 0 && named > 0;
+      },
+      60000));
+  qInfo("%s", qPrintable(QStringLiteral("%1 positions, %2 vessels named")
+                             .arg(positions)
+                             .arg(named)));
+  feed.stop();
 }
 
 QTEST_GUILESS_MAIN(TestAis)
