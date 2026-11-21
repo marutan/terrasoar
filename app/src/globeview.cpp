@@ -316,6 +316,12 @@ VectorStatistics GlobeView::vectorStatistics() const
   return m_globe ? m_globe->vectorStatistics() : VectorStatistics();
 }
 
+std::vector<TileKey>
+GlobeView::drawnVectorTiles(const FeatureProvider* provider) const
+{
+  return m_globe ? m_globe->drawnVectorTiles(provider) : std::vector<TileKey>();
+}
+
 bool GlobeView::isGroupCompositingAvailable() const
 {
   return !m_deviceInfo.softwareRenderer;

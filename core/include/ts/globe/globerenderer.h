@@ -310,6 +310,9 @@ public:
   /** Returns what the vector renderer did in the last frame. */
   VectorStatistics vectorStatistics() const;
 
+  /** See VectorRenderer::drawnTiles(). */
+  std::vector<TileKey> drawnVectorTiles(const FeatureProvider* provider) const;
+
   /**
    * Sets the terrain's source (null for none); see
    * TileRenderer::setElevationProvider(). Only after initialise().

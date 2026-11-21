@@ -36,6 +36,7 @@
 #include <QTextStream>
 
 #include "packbuilder.h"
+#include "vpf/vpfcoverage.h"
 
 namespace
 {
@@ -45,6 +46,98 @@ void print(const QString& line)
   QTextStream out(stdout);
   out << line << '\n';
   out.flush();
+}
+
+namespace vpf = ts::packager::vpf;
+
+/** Prints each feature class of @p coverage with what was read. */
+void printClasses(vpf::Coverage& coverage)
+{
+  QString error;
+  for (const vpf::FeatureClass& featureClass : coverage.featureClasses()) {
+    std::vector<vpf::Feature> features;
+    vpf::ReadStats stats;
+    if (!coverage.readFeatures(featureClass, &features, &stats, &error)) {
+      print(QStringLiteral("      %1: %2").arg(featureClass.name, error));
+      continue;
+    }
+    int64_t vertices = 0;
+    for (const vpf::Feature& feature : features) {
+      for (const std::vector<vpf::Coordinate>& part : feature.parts) {
+        vertices += static_cast<int64_t>(part.size());
+      }
+    }
+    print(
+        QStringLiteral("      %1 (%2 via %3): %4 features, %5 vertices, "
+                       "%6 skipped")
+            .arg(featureClass.name, featureClass.table, featureClass.primitive)
+            .arg(stats.features)
+            .arg(vertices)
+            .arg(stats.skipped));
+    for (const QString& problem : stats.problems) {
+      print(QStringLiteral("        ") + problem);
+    }
+  }
+}
+
+/** Prints library @p info's coverages (only @p only, if not empty). */
+void printLibrary(const vpf::Database& database, const vpf::LibraryInfo& info,
+                  const QString& only)
+{
+  QString error;
+  const std::optional<vpf::Library> library =
+      vpf::Library::open(database, info.name, &error);
+  if (!library) {
+    print(QStringLiteral("  library %1: %2").arg(info.name, error));
+    return;
+  }
+  print(QStringLiteral("  library %1 (%2 tiles), %3 %4 %5 %6")
+            .arg(info.name)
+            .arg(library->tilePaths.size())
+            .arg(info.bounds.xmin)
+            .arg(info.bounds.ymin)
+            .arg(info.bounds.xmax)
+            .arg(info.bounds.ymax));
+  for (const vpf::CoverageInfo& coverageInfo : library->coverages) {
+    if (!only.isEmpty() && coverageInfo.name != only) {
+      continue;
+    }
+    std::optional<vpf::Coverage> coverage =
+        vpf::Coverage::open(*library, coverageInfo.name, &error);
+    if (!coverage) {
+      print(
+          QStringLiteral("    coverage %1: %2").arg(coverageInfo.name, error));
+      continue;
+    }
+    print(QStringLiteral("    coverage %1 (%2, level %3)")
+              .arg(coverageInfo.name, coverageInfo.description)
+              .arg(coverageInfo.level));
+    printClasses(*coverage);
+  }
+}
+
+/**
+ * Prints the libraries, coverages and feature classes of the VPF database
+ * at @p path (only coverage @p only, if not empty), with each class's
+ * features read and skipped.
+ */
+// The database, then the coverage in it.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+int32_t printVpfInfo(const QString& path, const QString& only)
+{
+  QString error;
+  const std::optional<vpf::Database> database =
+      vpf::Database::open(path, &error);
+  if (!database) {
+    print(QStringLiteral("error: ") + error);
+    return 1;
+  }
+  print(QStringLiteral("Database %1: %2")
+            .arg(database->name, database->description));
+  for (const vpf::LibraryInfo& info : database->libraries) {
+    printLibrary(*database, info, only);
+  }
+  return 0;
 }
 
 } // namespace
@@ -82,7 +175,22 @@ int32_t main(int32_t argc, char* argv[])
   parser.addOption(outputOption);
   parser.addOption(reportOption);
   parser.addOption(noVerifyOption);
+  const QCommandLineOption vpfInfoOption(
+      QStringLiteral("vpf-info"),
+      QStringLiteral("List the libraries, coverages and feature classes of "
+                     "a VPF database (a directory, or /vsizip/<zip>/<dir>)."),
+      QStringLiteral("database"));
+  const QCommandLineOption coverageOption(
+      QStringLiteral("coverage"),
+      QStringLiteral("With --vpf-info, only this coverage."),
+      QStringLiteral("name"));
+  parser.addOption(vpfInfoOption);
+  parser.addOption(coverageOption);
   parser.process(application);
+  if (parser.isSet(vpfInfoOption)) {
+    return printVpfInfo(parser.value(vpfInfoOption),
+                        parser.value(coverageOption));
+  }
   if (!parser.isSet(configOption) || !parser.isSet(sourcesOption) ||
       !parser.isSet(outputOption)) {
     print(QStringLiteral("--config, --sources and --output are required."));

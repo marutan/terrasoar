@@ -139,6 +139,27 @@ public:
    */
   void addLayer(const LayerDefinition& definition);
 
+  /** The layers one installed data pack offers (VMAP0's). */
+  struct PackLayers {
+    /** The pack's name, the submenu's title. */
+    QString name;
+    /** Its layers, in order. */
+    std::vector<LayerDefinition> layers;
+  };
+
+  /**
+   * Sets the installed packs' layers, listed in Add Layer under Data
+   * Packs: each pack a submenu of its layers, with All Layers adding them
+   * together as a collection named after the pack.
+   */
+  void setPackLayers(std::vector<PackLayers> packs);
+
+  /**
+   * Adds every layer of @p pack as a collection named after it, where
+   * addLayer() would add one, in the pack's order (first on top).
+   */
+  void addPackCollection(const PackLayers& pack);
+
 signals:
   /** The user asked to add a WMS layer (the window opens the dialog). */
   void addWmsLayerRequested();
@@ -197,6 +218,7 @@ private:
   QCheckBox* m_compositeBox = nullptr;
   QLabel* m_orderNote = nullptr;
   bool m_compositingAvailable = true;
+  std::vector<PackLayers> m_packLayers;
 };
 
 } // namespace ts

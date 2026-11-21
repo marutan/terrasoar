@@ -84,6 +84,7 @@ struct AboutDataRow;
 
 class CountryAreas;
 struct BillboardDraw;
+struct FeatureInfoLocal;
 class GlobeView;
 class ImageryProvider;
 class LayerTreeDock;
@@ -640,8 +641,16 @@ private:
                      int32_t row);
   std::vector<QAction*> nodeActions(const QModelIndex& index, QObject* parent);
   bool showBalloonAt(LonLat point, double degreesPerPixel);
+  std::vector<FeatureInfoLocal> localFeatureInfo(const LayerStack& stack,
+                                                 LonLat point,
+                                                 double degreesPerPixel) const;
   void refreshBillboards(const LayerStack& stack);
   BillboardDraw billboardDraw(const KmlBillboard& billboard);
+  void createPackLayers();
+  void updatePackLayers();
+  void refreshPackLabels();
+  void updatePackLabelTimer(const LayerStack& stack);
+  static bool hasLabelLayers(const LayerStack& stack);
   QImage tintedIcon(const QString& where, const QColor& tint,
                     bool pushpin = true);
   std::shared_ptr<const KmlDocument> readKmlInBackground(const QString& path,
@@ -766,6 +775,10 @@ private:
   KmlLinks* m_kmlLinks = nullptr;
   /** Waits for the view to stop before checking KML Regions. */
   QTimer* m_kmlViewTimer = nullptr;
+  /** Follows the view with the pack layers' labels (Phase 21). */
+  QTimer* m_packLabelTimer = nullptr;
+  /** The pack layers' labels, drawn with the KML billboards. */
+  std::vector<BillboardDraw> m_packLabels;
   std::optional<CameraPose> m_lastKmlPose;
   /** KML layers out of their Regions' sight: left out of the stack. */
   std::set<QString> m_kmlInactive;

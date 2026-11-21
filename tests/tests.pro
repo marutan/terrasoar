@@ -40,6 +40,7 @@ SUBDIRS = \
     layers \
     packs \
     packager \
+    vmap0 \
     vector \
     projection \
     network \

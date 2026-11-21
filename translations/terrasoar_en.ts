@@ -2846,6 +2846,14 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <source>WFS Layer…</source>
             <translation>WFS Layer…</translation>
         </message>
+        <message>
+            <source>Data Packs</source>
+            <translation>Data Packs</translation>
+        </message>
+        <message>
+            <source>All Layers</source>
+            <translation>All Layers</translation>
+        </message>
     </context>
     <context>
         <name>ts::LayerTreeModel</name>
@@ -4619,6 +4627,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Cannot use "%1" as imagery: %2</source>
             <translation>Cannot use "%1" as imagery: %2</translation>
+        </message>
+        <message>
+            <source>"%1" is in no installed data pack. Install its pack from the Data Packs window.</source>
+            <translation>"%1" is in no installed data pack. Install its pack from the Data Packs window.</translation>
         </message>
     </context>
     <context>
