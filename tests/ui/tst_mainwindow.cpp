@@ -1527,6 +1527,12 @@ private slots:
           }
           return c;
         };
+    // Every check waits for its value: on a slow machine the click, the
+    // flight and the frame that shows it can all come late.
+    const std::function<bool(const std::function<bool()>&)> eventually =
+        [](const std::function<bool()>& condition) {
+          return QTest::qWaitFor(condition, 10000);
+        };
     const std::function<void()> settle = [&]() {
       // A click's flight (0.35 s), however slowly the frames come.
       QTest::qWait(50);
@@ -1548,21 +1554,29 @@ private slots:
     // range; Turn Right turns 15°; Tilt Up tilts 10°.
     QTest::mouseClick(control("navigationPanUp"), Qt::LeftButton);
     settle();
-    QVERIFY(camera.pose().targetLatDeg > start.targetLatDeg + 1.0);
+    QVERIFY(eventually([&]() {
+      return camera.pose().targetLatDeg > start.targetLatDeg + 1.0;
+    }));
     QVERIFY(std::abs(camera.pose().targetLonDeg - start.targetLonDeg) < 0.01);
     globe->setPose(start);
     QTest::mouseClick(control("navigationZoomIn"), Qt::LeftButton);
     settle();
-    QVERIFY(std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6);
+    QVERIFY(eventually([&]() {
+      return std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6;
+    }));
     QTest::mouseClick(control("navigationZoomOut"), Qt::LeftButton);
     settle();
-    QVERIFY(std::abs(camera.pose().rangeM / start.rangeM - 1.0) < 1e-6);
+    QVERIFY(eventually([&]() {
+      return std::abs(camera.pose().rangeM / start.rangeM - 1.0) < 1e-6;
+    }));
     QTest::mouseClick(control("navigationTurnRight"), Qt::LeftButton);
     settle();
-    QVERIFY(std::abs(camera.pose().headingDeg - 15.0) < 1e-6);
+    QVERIFY(eventually(
+        [&]() { return std::abs(camera.pose().headingDeg - 15.0) < 1e-6; }));
     QTest::mouseClick(control("navigationTiltUp"), Qt::LeftButton);
     settle();
-    QVERIFY(std::abs(camera.pose().tiltDeg - 10.0) < 1e-6);
+    QVERIFY(eventually(
+        [&]() { return std::abs(camera.pose().tiltDeg - 10.0) < 1e-6; }));
     // The compass's N turns back to north-up.
     {
       // "N" is drawn 0.36 of the compass's width from its centre, turned
@@ -1588,7 +1602,8 @@ private slots:
     sendMouse(compass, QEvent::MouseMove, bottom, Qt::NoButton, Qt::LeftButton);
     sendMouse(compass, QEvent::MouseButtonRelease, bottom, Qt::LeftButton,
               Qt::NoButton);
-    QVERIFY(std::abs(camera.pose().headingDeg - 270.0) < 1.0);
+    QVERIFY(eventually(
+        [&]() { return std::abs(camera.pose().headingDeg - 270.0) < 1.0; }));
     // Holding an arrow keeps moving until released, speeding up.
     globe->setPose(start);
     QWidget* east = control("navigationPanRight");
@@ -1612,8 +1627,8 @@ private slots:
     QTest::mouseClick(slider, Qt::LeftButton, Qt::NoModifier,
                       QPoint(slider->width() / 2, 2));
     settle();
-    QVERIFY(camera.pose().rangeM < 1.0e3);
-    QVERIFY(overlay->state().zoomFraction > 0.95);
+    QVERIFY(eventually([&]() { return camera.pose().rangeM < 1.0e3; }));
+    QVERIFY(eventually([&]() { return overlay->state().zoomFraction > 0.95; }));
     globe->setPose(start);
     QVERIFY(QTest::qWaitFor(
         [&]() { return overlay->state().zoomFraction < 0.6; }, 5000));
@@ -1621,9 +1636,9 @@ private slots:
     QWidget* arc = control("navigationTiltArc");
     QTest::mouseClick(arc, Qt::LeftButton, Qt::NoModifier,
                       QPoint(arc->width() - 2, arc->height() / 4));
-    QVERIFY(camera.pose().tiltDeg > 50.0);
+    QVERIFY(eventually([&]() { return camera.pose().tiltDeg > 50.0; }));
     QTest::mouseDClick(arc, Qt::LeftButton);
-    QCOMPARE(camera.pose().tiltDeg, 0.0);
+    QVERIFY(eventually([&]() { return camera.pose().tiltDeg == 0.0; }));
     // Home: the start view.
     QTest::mouseClick(control("navigationHome"), Qt::LeftButton);
     QVERIFY(QTest::qWaitFor(
@@ -1632,24 +1647,30 @@ private slots:
                           ts::GlobeView::homePose().rangeM) < 1.0;
         },
         6000));
-    // Touch: a tap is a click.
+    // Touch: a tap is a press and a release. The touch events go straight
+    // to the control, which takes touch itself: QTest's touch reaches
+    // widgets unreliably on Windows (as mouse events made of it, or not at
+    // all with Qt 5), and Qt passes touch only to widgets that ask for it.
     globe->setPose(start);
+    QWidget* zoomIn = control("navigationZoomIn");
+    zoomIn->setAttribute(Qt::WA_AcceptTouchEvents, true);
+    const QPoint middle = zoomIn->rect().center();
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     // Qt 6 leaves the device to us (Qt 5 registers it for good).
     const std::unique_ptr<QPointingDevice> touchDevice(
         QTest::createTouchDevice());
-    QPointingDevice* touch = touchDevice.get();
-#endif
-    QWidget* zoomIn = control("navigationZoomIn");
-    const QPoint middle = zoomIn->rect().center();
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    QTest::touchEvent(zoomIn, touch).press(0, middle, zoomIn);
-    QTest::touchEvent(zoomIn, touch).release(0, middle, zoomIn);
+    const QPointF inWindow(zoomIn->mapTo(zoomIn->window(), middle));
+    const QPointF onScreen(zoomIn->mapToGlobal(middle));
+    for (const QEventPoint::State state :
+         {QEventPoint::State::Pressed, QEventPoint::State::Released}) {
+      const QEventPoint point(0, state, inWindow, onScreen);
+      QTouchEvent event(state == QEventPoint::State::Pressed
+                            ? QEvent::TouchBegin
+                            : QEvent::TouchEnd,
+                        touchDevice.get(), Qt::NoModifier, {point});
+      QCoreApplication::sendEvent(zoomIn, &event);
+    }
 #else
-    // Qt 5 on Windows doesn't deliver QTest's touch to widgets: the events
-    // go straight to the control, which takes touch itself (Qt 5 passes
-    // touch only to widgets that ask for it).
-    zoomIn->setAttribute(Qt::WA_AcceptTouchEvents, true);
     QTouchDevice* touch = QTest::createTouchDevice();
     for (const Qt::TouchPointState state :
          {Qt::TouchPointPressed, Qt::TouchPointReleased}) {
@@ -1694,11 +1715,15 @@ private slots:
     globe->setViewMode(ts::ViewMode::Map, false);
     QTest::mouseClick(control("navigationTurnLeft"), Qt::LeftButton);
     settle();
-    QVERIFY2(std::abs(camera.pose().headingDeg - 345.0) < 1e-6,
+    QVERIFY2(eventually([&]() {
+               return std::abs(camera.pose().headingDeg - 345.0) < 1e-6;
+             }),
              qPrintable(QString::number(camera.pose().headingDeg)));
     QTest::mouseClick(arc, Qt::LeftButton, Qt::NoModifier,
                       QPoint(arc->width() - 2, 2));
-    QCOMPARE(camera.pose().tiltDeg, ts::Camera::maximumMapTiltDeg);
+    QVERIFY(eventually([&]() {
+      return camera.pose().tiltDeg == ts::Camera::maximumMapTiltDeg;
+    }));
     QVERIFY(QTest::qWaitFor(
         [&]() {
           return overlay->state().maximumTiltDeg ==
