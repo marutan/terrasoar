@@ -1102,6 +1102,18 @@ private slots:
     QTest::newRow("morph-half-winkel-tripel")
         << QStringLiteral("winkel-tripel") << 0.5 << 20.0 << 10.0 << 2.6e7
         << 0.0 << 0.0;
+    // Phase 20: the map turned, tilted (fading into the haze and the sky
+    // at its far limit), tilted at the limit on a conic, and half way back
+    // to the globe from a turned and tilted map.
+    QTest::newRow("map-turned")
+        << mercator << 1.0 << 40.0 << 30.0 << 4.0e6 << 40.0 << 0.0;
+    QTest::newRow("map-tilted")
+        << mercator << 1.0 << 38.0 << 26.0 << 1.5e6 << 30.0 << 60.0;
+    QTest::newRow("map-tilted-limit-lambert")
+        << lambert << 1.0 << 52.0 << 10.0 << 2.0e6 << 200.0
+        << ts::Camera::maximumMapTiltDeg;
+    QTest::newRow("morph-half-turned-tilted")
+        << mercator << 0.5 << 38.0 << 26.0 << 3.0e6 << 30.0 << 40.0;
   }
 
   void morphGolden()
@@ -2161,6 +2173,52 @@ private slots:
     }
     QVERIFY(ground > image.width() * image.height() / 3);
     QCOMPARE(cracks, 0);
+  }
+
+  void tiltedMapShowsRelief()
+  {
+    // A tilted map with terrain shows it in relief, without cracks between
+    // tiles (no background showing below the sky), and the same map
+    // straight down is flat with its hillshade, as before.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    style.backgroundRgb = {1.0F, 0.0F, 1.0F};
+    m_renderer->setStyle(style);
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>(256));
+    m_renderer->setElevationProvider(std::make_shared<SineElevation>());
+    ts::Camera camera;
+    camera.setViewportSize(imageWidthPx, imageHeightPx);
+    camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+    camera.setMorph(1.0);
+    camera.setPose(ts::CameraPose{20.0, 30.0, 4.0e5, 30.0, 65.0});
+    m_renderer->setTerrain(true, 5.0);
+    const QImage relief = renderSettled(camera);
+    m_renderer->setTerrain(false, 1.0);
+    const QImage flat = renderSettled(camera);
+    m_gl->makeCurrent();
+    m_renderer->setElevationProvider(nullptr);
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setStyle(ts::GlobeStyle());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    const QString output = qEnvironmentVariable("TS_GOLDEN_OUTPUT");
+    if (!output.isEmpty()) {
+      relief.save(QDir(output).filePath(QStringLiteral("map-relief.png")));
+      flat.save(QDir(output).filePath(QStringLiteral("map-relief-off.png")));
+    }
+    int32_t background = 0;
+    int32_t different = 0;
+    for (int32_t y = 0; y < relief.height(); ++y) {
+      for (int32_t x = 0; x < relief.width(); ++x) {
+        const QColor c = relief.pixelColor(x, y);
+        background += c.red() > 240 && c.green() < 15 && c.blue() > 240 ? 1 : 0;
+        different += relief.pixel(x, y) != flat.pixel(x, y) ? 1 : 0;
+      }
+    }
+    QCOMPARE(background, 0);
+    QVERIFY(different > relief.width() * relief.height() / 10);
   }
 
   void terrainOffDrawsTheEllipsoid()

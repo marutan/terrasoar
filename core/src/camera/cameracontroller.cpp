@@ -171,9 +171,17 @@ void CameraController::setViewMode(ViewMode mode, double durationS)
   morph.fromT = m_camera.morph();
   morph.toT = mode == ViewMode::Map ? 1.0 : 0.0;
   morph.from = m_camera.pose();
-  // The pose at the end, limited the way the camera will limit it.
+  // The pose at the end, limited the way the camera will limit it. The
+  // map starts north-up and straight down (it can be turned and tilted
+  // once there); going back to the globe keeps what the map had.
   Camera destination = m_camera;
   destination.setMorph(morph.toT);
+  if (mode == ViewMode::Map) {
+    CameraPose flat = destination.pose();
+    flat.headingDeg = 0.0;
+    flat.tiltDeg = 0.0;
+    destination.setPose(flat);
+  }
   morph.to = destination.pose();
   morph.durationS = durationS * std::abs(morph.toT - morph.fromT);
   m_morph = morph;
@@ -247,7 +255,7 @@ bool CameraController::beginPan(QPointF positionPx, double timeS)
 
 void CameraController::beginRotate(QPointF positionPx)
 {
-  if (m_morph || isOnMap()) {
+  if (m_morph) {
     return;
   }
   stop();
@@ -316,6 +324,20 @@ void CameraController::endDrag(double timeS)
 bool CameraController::placeUnderCursor(const Geodetic& grabbed,
                                         QPointF positionPx)
 {
+  if (isOnMap() && m_camera.isMapTurnedOrTilted()) {
+    // The cursor is a fixed offset from the centre in map coordinates
+    // (moveMapCentre() keeps the map's size), wherever the view looks: the
+    // point of the plane under it.
+    const std::optional<MapPoint> offset =
+        m_camera.mapOffsetAt(positionPx.x(), positionPx.y());
+    if (!offset) {
+      return false;
+    }
+    const MapPoint grabbedMap =
+        m_camera.mapProjection()->forward(grabbed.latDeg, grabbed.lonDeg);
+    moveMapCentre(grabbedMap.xM - offset->xM, grabbedMap.yM - offset->yM);
+    return true;
+  }
   if (isOnMap()) {
     // The cursor is a fixed offset from the centre in map coordinates, so
     // the centre follows directly.
@@ -549,15 +571,25 @@ void CameraController::advanceMotion(double elapsedS)
   if (isOnMap()) {
     // Straight across the map, at a speed proportional to its scale; the
     // map's range (range / plane scale) grows by the same exp(λ t).
+    // Forward is the way the view faces (up the screen on a turned map).
     if (forward != 0.0 || right != 0.0) {
       const MapFrame frame = m_camera.mapFrame();
       const double distanceM = panRangeFractionPerS * rangeIntegral /
                                (frame.planeScale * std::hypot(forward, right));
-      moveMapCentre(frame.centreXM + right * distanceM,
-                    frame.centreYM + forward * distanceM);
+      const double heading = degToRad(pose.headingDeg);
+      const double eastward =
+          right * std::cos(heading) + forward * std::sin(heading);
+      const double northward =
+          forward * std::cos(heading) - right * std::sin(heading);
+      moveMapCentre(frame.centreXM + eastward * distanceM,
+                    frame.centreYM + northward * distanceM);
       pose = m_camera.pose();
     }
     pose.rangeM *= growth;
+    pose.headingDeg +=
+        turnDegPerS * elapsedS * (held(m, TurnRight) - held(m, TurnLeft));
+    pose.tiltDeg +=
+        tiltDegPerS * elapsedS * (held(m, TiltUp) - held(m, TiltDown));
     applyPose(pose);
     return;
   }

@@ -204,6 +204,26 @@ void main()
 }
 )";
 
+// A tilted map's sky: above its far limit, the haze rising into blue.
+// Where the map is drawn (nearer than the far limit) nothing.
+const char* const mapSkyFragmentGlsl = R"(
+in vec3 vRay;
+out vec4 fragColor;
+void main()
+{
+  vec3 d = normalize(vRay);
+  vec3 up = cross(planeEast.xyz, planeNorth.xyz);
+  float heightM = -dot(planeOrigin.xyz, up);
+  float elevation = dot(d, up);
+  if (elevation < 0.0 && heightM / -elevation < planeEast.w) {
+    discard;
+  }
+  vec3 zenith = vec3(0.36, 0.55, 0.80);
+  vec3 color = mix(tsHazeColor, zenith, smoothstep(0.0, 0.45, elevation));
+  fragColor = vec4(color, 1.0);
+}
+)";
+
 // The graticule alone, over whatever is drawn already (no depth test).
 const char* const graticuleFragmentGlsl = R"(
 out vec4 fragColor;
@@ -574,6 +594,8 @@ constexpr double graticuleFadeEndM = 500.0;
 
 struct GlobeRenderer::Resources {
   std::unique_ptr<ShaderProgram> globeShader;
+  std::unique_ptr<ShaderProgram> skyShader;
+  std::unique_ptr<Pipeline> skyPipeline;
   std::unique_ptr<ShaderProgram> graticuleShader;
   std::unique_ptr<Pipeline> graticulePipeline;
   std::unique_ptr<GpuBuffer> graticuleUniforms;
@@ -634,6 +656,14 @@ bool GlobeRenderer::initialise(QString* errorString)
   globe.uniformBlocks = blocks;
   r->globeShader = m_device.createShaderProgram(globe, errorString);
 
+  ShaderDesc sky;
+  sky.label = QStringLiteral("map sky");
+  sky.vertexSource = globe.vertexSource;
+  sky.fragmentSource =
+      QByteArray(frameBlockGlsl) + globeBlockGlsl + mapSkyFragmentGlsl;
+  sky.uniformBlocks = blocks;
+  r->skyShader = m_device.createShaderProgram(sky, errorString);
+
   ShaderDesc graticule;
   graticule.label = QStringLiteral("graticule");
   graticule.vertexSource = globe.vertexSource;
@@ -659,7 +689,7 @@ bool GlobeRenderer::initialise(QString* errorString)
   line.uniformBlocks = {{QByteArrayLiteral("Frame"), frameBinding}};
   r->lineShader = m_device.createShaderProgram(line, errorString);
   if (!r->globeShader || !r->graticuleShader || !r->markerShader ||
-      !r->lineShader) {
+      !r->lineShader || !r->skyShader) {
     return false;
   }
 
@@ -678,6 +708,13 @@ bool GlobeRenderer::initialise(QString* errorString)
   globePipeline.depthCompare = CompareOp::Always;
   globePipeline.blend = BlendMode::PremultipliedAlpha;
   r->globePipeline = m_device.createPipeline(globePipeline);
+
+  PipelineDesc skyPipeline;
+  skyPipeline.shader = r->skyShader.get();
+  skyPipeline.topology = PrimitiveTopology::Triangles;
+  skyPipeline.depthTest = false;
+  skyPipeline.depthWrite = false;
+  r->skyPipeline = m_device.createPipeline(skyPipeline);
 
   PipelineDesc markerPipeline;
   markerPipeline.shader = r->markerShader.get();
@@ -1323,8 +1360,16 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
         static_cast<float>(m_morph), static_cast<float>(map.planeScale),
         static_cast<float>(std::max(projectionIndex(map.projection), 0)),
         static_cast<float>(m_spaceLineTimeS - m_spaceLineOriginS)};
-    frame.planeEast = float4(local.eastEcef, 0.0);
-    frame.planeNorth = float4(local.northEcef, 0.0);
+    // A tilted map: drawn up to its far limit, fading into a haze, with
+    // the terrain in relief.
+    const bool tilted =
+        camera.isMapTurnedOrTilted() && camera.pose().tiltDeg > 0.0;
+    frame.planeEast =
+        float4(local.eastEcef, tilted ? camera.mapFarLimitM() : 0.0);
+    frame.planeNorth = float4(
+        local.northEcef,
+        terrain ? m_morph * Camera::mapReliefForTilt(camera.pose().tiltDeg)
+                : 0.0);
     frame.planeOrigin = float4(camera.targetEcef() - eye, 0.0);
     if (map.projection != nullptr && map.projection->hasOwnDomain()) {
       const std::array<float, 8> domain =
@@ -1389,6 +1434,11 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   // With terrain the ray-cast ellipsoid would cut through it: the tiles
   // are the surface, as on the map.
   const bool onTiles = m_morph > 0.0 || terrain;
+  if (frame.planeEast.at(3) > 0.0F && r.skyPipeline) {
+    // A tilted map: the sky beyond its far limit.
+    m_device.setPipeline(*r.skyPipeline);
+    m_device.draw(3, 0, 1);
+  }
   const bool baseFirst = onTiles && m_style.graticule;
   if (baseFirst) {
     m_tiles->drawBase();

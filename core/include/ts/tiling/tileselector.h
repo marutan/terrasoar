@@ -35,6 +35,8 @@ namespace ts
 {
 
 class Camera;
+struct MapFrame;
+struct TileBounds;
 
 /** Settings of the level-of-detail selection. */
 struct TileSelectionSettings {
@@ -79,6 +81,8 @@ struct TileLoadRequest {
   TileKey key;
   /** Distance from the eye to the tile's bounding sphere, metres. */
   double distanceM = 0.0;
+  /** The tile's screen-space error, pixels: how much it is missed. */
+  double errorPx = 0.0;
 };
 
 /** The result of TileSelector::select(). */
@@ -88,7 +92,10 @@ struct TileSelection {
    * of the globe that has data, without overlapping.
    */
   std::vector<TileKey> render;
-  /** Tiles wanted but not renderable yet, coarsest and nearest first. */
+  /**
+   * Tiles wanted but not renderable yet, the largest screen-space error
+   * first (coarse tiles before their children), then the nearest.
+   */
   std::vector<TileLoadRequest> load;
   /** Tiles looked at during the traversal (for statistics and tests). */
   int32_t visited = 0;
@@ -114,7 +121,13 @@ struct TileSelection {
  * that moment, part of the way between globe and map: it is kept if a
  * sphere bounding it there meets the frustum (ignoring the horizon, since
  * the far side unrolls into view), and its error is that of a texel there.
- * See docs/design/morph.md.
+ * On a turned or tilted map a tile is kept if its rectangle meets the
+ * part of the map's plane in view (Camera::mapFrame()'s footprint, which
+ * ends at the far limit), and on a tilted one its error is a texel seen
+ * from its nearest point's distance, so detail falls off towards the
+ * horizon as on the globe. Looking straight down with north up the map's
+ * selection is as it always was. See docs/design/morph.md and
+ * docs/design/tiling.md.
  *
  * @reentrant
  */
@@ -165,6 +178,10 @@ public:
 
 private:
   struct View;
+
+  double mapGeometryErrorM(const MapFrame& frame, TileKey key) const;
+  static double loadDistanceM(const View& view, TileKey key,
+                              const TileBounds& bounds);
   double screenSpaceErrorPx(const View& view, TileKey key) const;
   bool wantsRefinement(const View& view, TileKey key) const;
   bool refine(const View& view, TileKey key, bool renderable,

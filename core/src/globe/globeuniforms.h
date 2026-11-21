@@ -56,9 +56,16 @@ struct FrameBlock {
    * globe too; see GlobeRenderer::setSpaceLineTime()).
    */
   Float4 morph{};
-  /** Direction of map east on the plane (xyz), ECEF. */
+  /**
+   * Direction of map east on the plane (xyz), ECEF; on a tilted map how
+   * far it is drawn from the eye, metres (w; 0 otherwise: no haze).
+   */
   Float4 planeEast{};
-  /** Direction of map north on the plane (xyz), ECEF. */
+  /**
+   * Direction of map north on the plane (xyz), ECEF; how much of the
+   * terrain's relief the map shows, times the morph factor (w; 0 when
+   * straight down or without terrain). See Camera::mapReliefForTilt().
+   */
   Float4 planeNorth{};
   /** The centre of the map (the camera's target) relative to the eye. */
   Float4 planeOrigin{};
@@ -141,6 +148,31 @@ float tsTerrainHeight(vec3 t)
 {
   return terrain.x * (t.y + (max(t.x - t.y, 0.0) - t.z) * terrain.y);
 }
+
+// On a tilted map with terrain: the vertex raised above the map's plane
+// by its height, as much as the map shows relief (planeNorth.w).
+vec3 tsMapRelief(vec3 position, vec3 t)
+{
+  if (planeNorth.w <= 0.0) {
+    return position;
+  }
+  vec3 up = cross(planeEast.xyz, planeNorth.xyz);
+  return position
+       + up * ((t.y + (max(t.x - t.y, 0.0) - t.z) * terrain.y) * planeNorth.w);
+}
+
+// On a tilted map: how much of a point at distanceM from the eye is lost
+// in the haze towards the far limit (planeEast.w).
+float tsMapHaze(float distanceM)
+{
+  if (planeEast.w <= 0.0) {
+    return 0.0;
+  }
+  return smoothstep(0.55 * planeEast.w, planeEast.w, distanceM);
+}
+
+// The haze's colour.
+const vec3 tsHazeColor = vec3(0.74, 0.80, 0.87);
 
 // The normal of the terrain at a point whose ellipsoid normal is up, from
 // its slopes towards east and north (metres per metre).

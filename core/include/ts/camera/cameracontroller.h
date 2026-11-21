@@ -94,10 +94,12 @@ enum class ViewMode {
  *
  * The view is the globe or the flat map (setViewMode()); changing between
  * them is an animation of the camera's morph factor that keeps the centre
- * of the view in place. On the map the view looks straight down with
- * north up: dragging and keys slide the map (it wraps around in
- * longitude and stops at the projection's latitude limits), zooming works
- * as on the globe, and turning and tilting do nothing. Map motion is
+ * of the view in place. The map starts north-up, looking straight down;
+ * it can be turned and tilted as the globe can (tilt up to
+ * Camera::maximumMapTiltDeg). Dragging and keys slide the map (it wraps
+ * around in longitude and stops at the projection's latitude limits),
+ * the keys along the way the view faces, and zooming works as on the
+ * globe. Map motion is
  * computed in map coordinates, so it too is the same at any frame rate.
  * While the view changes, input other than setViewMode() is ignored. See
  * docs/design/morph.md.
@@ -156,8 +158,8 @@ public:
   bool beginPan(QPointF positionPx, double timeS);
 
   /**
-   * Starts a rotate drag (heading and tilt about the target). Does
-   * nothing on the flat map.
+   * Starts a rotate drag (heading and tilt about the target), on the
+   * globe or the flat map. Does nothing while the view mode changes.
    */
   void beginRotate(QPointF positionPx);
 

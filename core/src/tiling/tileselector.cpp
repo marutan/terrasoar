@@ -262,8 +262,8 @@ std::optional<MapRect> tileMapExtent(const MapFrame& frame, TileKey key)
  * domain (where the curvature is largest: projections curve away from
  * their centre).
  */
-double generalMapGeometryErrorPx(const Camera& camera, const MapFrame& frame,
-                                 TileKey key, int32_t segments)
+double generalMapGeometryErrorM(const MapFrame& frame, TileKey key,
+                                int32_t segments)
 {
   const Projection& projection = *frame.projection;
   const std::optional<GeoRect> part = domainPart(projection, key.bounds());
@@ -301,7 +301,62 @@ double generalMapGeometryErrorPx(const Camera& camera, const MapFrame& frame,
            stray(north, lon, north, east), stray(lat, east, north, east)});
     }
   }
-  return errorM / (2.0 * frame.halfHeightM) * camera.viewportHeightPx();
+  return errorM;
+}
+
+/**
+ * Returns @p key's rectangles on the map of @p frame as offsets from the
+ * centre, map metres: one for each copy of the world near the view (or
+ * the part in the domain, for a map that doesn't repeat). Empty if none of
+ * it is on the map.
+ */
+std::vector<MapRect> tileOffsetRects(const MapFrame& frame, TileKey key)
+{
+  const Projection& projection = *frame.projection;
+  if (!projection.repeats()) {
+    const std::optional<MapRect> extent = tileMapExtent(frame, key);
+    return extent ? std::vector<MapRect>{*extent} : std::vector<MapRect>{};
+  }
+  const GeoRect rect = key.bounds();
+  if (rect.southDeg >= projection.maximumLatDeg() ||
+      rect.northDeg <= projection.minimumLatDeg()) {
+    return {};
+  }
+  const double southM =
+      projection
+          .forward(std::max(rect.southDeg, projection.minimumLatDeg()), 0.0)
+          .yM -
+      frame.centreYM;
+  const double northM =
+      projection
+          .forward(std::min(rect.northDeg, projection.maximumLatDeg()), 0.0)
+          .yM -
+      frame.centreYM;
+  const double middleM =
+      frame
+          .offsetOf(projection.forward(frame.centreLatDeg, rect.centreLonDeg()))
+          .xM;
+  const double halfSpanM = 0.5 * rect.widthDeg() / 360.0 * frame.worldWidthM;
+  std::vector<MapRect> rects;
+  for (const double shift : {0.0, -frame.worldWidthM, frame.worldWidthM}) {
+    rects.push_back(MapRect{middleM + shift - halfSpanM, southM,
+                            middleM + shift + halfSpanM, northM});
+  }
+  return rects;
+}
+
+/** On a turned or tilted map: the distance from the eye to the nearest
+ * of @p key's rectangles in view, metres; nothing if none is in view. */
+std::optional<double> nearestInViewM(const MapFrame& frame, TileKey key)
+{
+  std::optional<double> nearest;
+  for (const MapRect& offsets : tileOffsetRects(frame, key)) {
+    if (frame.rectInView(offsets)) {
+      const double d = frame.distanceToEyeM(offsets);
+      nearest = nearest ? std::min(*nearest, d) : d;
+    }
+  }
+  return nearest;
 }
 
 /** True if @p key's rectangle on the map of @p frame meets the view, taken
@@ -312,6 +367,9 @@ bool rectOnMap(const MapFrame& frame, TileKey key, double halfWidthM,
 {
   if (frame.projection == nullptr) {
     return false;
+  }
+  if (frame.isTurnedOrTilted()) {
+    return nearestInViewM(frame, key).has_value();
   }
   const Projection& projection = *frame.projection;
   if (!projection.repeats()) {
@@ -563,9 +621,18 @@ double TileSelector::screenSpaceErrorPx(const View& view, TileKey key) const
       }
       heightM = std::max(extent->widthM(), extent->heightM());
     }
+    if (view.morph >= 1.0 && camera.pose().tiltDeg > 0.0) {
+      // A tilted map: a texel seen from the tile's nearest point.
+      const double pixelsPerRadian =
+          camera.viewportHeightPx() / (2.0 * camera.tanHalfFovY());
+      const double nearestM = nearestInViewM(view.frame, key)
+                                  .value_or(std::numeric_limits<double>::max());
+      return heightM * view.frame.planeScale / tileSizePx * pixelsPerRadian /
+             std::max(nearestM, 1e-3);
+    }
     if (view.morph >= 1.0) {
       // Looking straight down at the plane every texel of the map is the
-      // same size on screen, wherever it is.
+      // same size on screen, wherever it is (turned or not).
       return heightM / (2.0 * view.frame.halfHeightM) *
              camera.viewportHeightPx() / tileSizePx;
     }
@@ -603,10 +670,24 @@ double TileSelector::screenSpaceErrorPx(const View& view, TileKey key) const
 double TileSelector::mapGeometryErrorPx(const Camera& camera, TileKey key) const
 {
   const MapFrame frame = camera.mapFrame();
+  // Map metres to pixels: at the view's scale looking straight down, or
+  // seen from the tile's nearest point on a tilted map.
+  const double pxPerMapM =
+      camera.pose().tiltDeg > 0.0 && frame.isTurnedOrTilted()
+          ? frame.planeScale * camera.viewportHeightPx() /
+                (2.0 * camera.tanHalfFovY() *
+                 std::max(nearestInViewM(frame, key)
+                              .value_or(std::numeric_limits<double>::max()),
+                          1e-3))
+          : camera.viewportHeightPx() / (2.0 * frame.halfHeightM);
+  return mapGeometryErrorM(frame, key) * pxPerMapM;
+}
+
+double TileSelector::mapGeometryErrorM(const MapFrame& frame, TileKey key) const
+{
   const Projection& projection = *frame.projection;
   if (!projection.isCylindrical()) {
-    return generalMapGeometryErrorPx(camera, frame, key,
-                                     m_settings.meshSegments);
+    return generalMapGeometryErrorM(frame, key, m_settings.meshSegments);
   }
   const GeoRect rect = key.bounds();
   const double southDeg = std::max(rect.southDeg, projection.minimumLatDeg());
@@ -624,8 +705,7 @@ double TileSelector::mapGeometryErrorPx(const Camera& camera, TileKey key) const
   const double innerM = projection.forward(innerDeg, 0.0).yM;
   const double middleM =
       projection.forward(0.5 * (outerDeg + innerDeg), 0.0).yM;
-  const double errorM = std::abs(middleM - 0.5 * (outerM + innerM));
-  return errorM / (2.0 * frame.halfHeightM) * camera.viewportHeightPx();
+  return std::abs(middleM - 0.5 * (outerM + innerM));
 }
 
 TileSelection TileSelector::select(
@@ -638,12 +718,18 @@ TileSelection TileSelector::select(
   for (const TileKey& root : TileKey::roots()) {
     visit(view, root, isRenderable, selection);
   }
+  // The most needed first: coarse tiles before their children (a child's
+  // error is half its parent's), and in a tilted view the near before the
+  // far at the same level; then the nearest.
   std::sort(selection.load.begin(), selection.load.end(),
             [](const TileLoadRequest& a, const TileLoadRequest& b) {
-              if (a.key.level != b.key.level) {
-                return a.key.level < b.key.level;
+              if (a.errorPx != b.errorPx) {
+                return a.errorPx > b.errorPx;
               }
-              return a.distanceM < b.distanceM;
+              if (a.distanceM != b.distanceM) {
+                return a.distanceM < b.distanceM;
+              }
+              return a.key.level < b.key.level;
             });
   return selection;
 }
@@ -669,10 +755,20 @@ void TileSelector::visit(
     selection.render.push_back(key);
   } else {
     selection.load.push_back(TileLoadRequest{
-        key,
-        std::max(distance(bounds.centreEcef, camera.eyeEcef()) - bounds.radiusM,
-                 0.0)});
+        key, loadDistanceM(view, key, bounds), screenSpaceErrorPx(view, key)});
   }
+}
+
+double TileSelector::loadDistanceM(const View& view, TileKey key,
+                                   const TileBounds& bounds)
+{
+  if (view.morph >= 1.0 && view.frame.isTurnedOrTilted()) {
+    // Where the tile is drawn: on the map's plane.
+    return nearestInViewM(view.frame, key).value_or(0.0);
+  }
+  return std::max(distance(bounds.centreEcef, view.camera->eyeEcef()) -
+                      bounds.radiusM,
+                  0.0);
 }
 
 bool TileSelector::wantsRefinement(const View& view, TileKey key) const
@@ -729,8 +825,8 @@ bool TileSelector::refine(
     if (renderable && !isRenderable(child)) {
       // This tile stays meanwhile; fetch the missing children.
       selection.load.push_back(
-          TileLoadRequest{child, distance(tileBounds(child).centreEcef,
-                                          view.camera->eyeEcef())});
+          TileLoadRequest{child, loadDistanceM(view, child, tileBounds(child)),
+                          screenSpaceErrorPx(view, child)});
     } else if (!renderable && isRenderable(child)) {
       // This tile can't be drawn yet: use what is there below it. The
       // others wait until this tile has loaded (coarse first).
