@@ -48,6 +48,9 @@
 #include "mockwms.h"
 #include "mockwmts.h"
 #include "offscreengl.h"
+#include "ts/adsb/adsbreaders.h"
+#include "ts/adsb/aircraftdraws.h"
+#include "ts/adsb/aircrafttracks.h"
 #include "ts/camera/camera.h"
 #include "ts/elevation/heightgrid.h"
 #include "ts/geo/ellipsoid.h"
@@ -72,6 +75,8 @@
 #include "ts/providers/providerregistry.h"
 #include "ts/providers/testproviders.h"
 #include "ts/regions/regiondownload.h"
+#include "ts/tracks/movingtrack.h"
+#include "ts/tracks/trackdraws.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "ts/wmts/wmtscapabilities.h"
@@ -403,6 +408,67 @@ ts::SpaceLine lineBetween(ts::LonLat from, ts::LonLat to, double heightM,
     line.points.push_back(p);
   }
   return line;
+}
+
+/** The made-up flights of tests/adsb's fixtures, as tracks. */
+std::vector<ts::AircraftTrack> aircraftFixture()
+{
+  ts::AircraftTrackBuilder builder;
+  ts::readAdsbFile(
+      QStringLiteral(TS_TEST_DATA_DIR "/../adsb/data/flights-aircraft.jsonl"),
+      ts::AdsbFormat::Unknown, ts::AdsbReadOptions(),
+      [&builder](const ts::AircraftReport& report) { builder.add(report); });
+  return builder.finish();
+}
+
+/** The fixtures' start, 2026-11-20T12:00Z. */
+constexpr double aircraftFixtureStartS = 1795176000.0;
+
+/**
+ * The fixture flights at @p timeS as the program draws them: markers,
+ * drop lines and trails coloured by altitude.
+ */
+void aircraftScene(double timeS, const ts::TrailSettings& trail,
+                   std::vector<ts::GlobeMarker>& markers,
+                   std::vector<ts::SpaceLine>& lines)
+{
+  ts::TrackTiming timing;
+  ts::TrailLook look;
+  look.widthPx = 3.0F;
+  look.colourOf = [](const ts::TrackSample& p) {
+    return ts::altitudeColour(p.heightM);
+  };
+  for (const ts::AircraftTrack& track : aircraftFixture()) {
+    for (ts::SpaceLine& line :
+         ts::trailLines(track.track, timing, trail, look)) {
+      lines.push_back(std::move(line));
+    }
+    const std::optional<ts::TrackSample> at = track.track.at(timeS, timing);
+    if (at) {
+      markers.push_back(ts::aircraftMarker(*at, 0.0, {255, 230, 0, 255}, 9.0));
+      lines.push_back(ts::dropLine(*at, 0.0, {255, 230, 0, 255}));
+    }
+  }
+}
+
+/** Pixels of @p image near @p color in each part of a 2×2 split. */
+std::array<int32_t, 4> quadrantCounts(const QImage& image, const QColor& color)
+{
+  const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+  std::array<int32_t, 4> counts{}; // top-left, top-right, bottom-left, -right
+  for (int32_t y = 0; y < rgba.height(); ++y) {
+    for (int32_t x = 0; x < rgba.width(); ++x) {
+      const QColor p = rgba.pixelColor(x, y);
+      if (std::abs(p.red() - color.red()) < 40 &&
+          std::abs(p.green() - color.green()) < 40 &&
+          std::abs(p.blue() - color.blue()) < 40) {
+        const std::size_t i = (y < rgba.height() / 2 ? 0U : 2U) +
+                              (x < rgba.width() / 2 ? 0U : 1U);
+        counts.at(i) += 1;
+      }
+    }
+  }
+  return counts;
 }
 
 /** The ISS and a GPS satellite with their tracks, as the program draws them. */
@@ -2649,6 +2715,192 @@ private slots:
     qInfo("edges %d, middle %d", edges, middle);
     QCOMPARE(middle, 0);
     QVERIFY(edges > 0);
+  }
+
+  void aircraftMarkersTurn_data()
+  {
+    QTest::addColumn<double>("headingDeg");
+    QTest::newRow("north") << 0.0;
+    QTest::newRow("east") << 90.0;
+    QTest::newRow("south") << 180.0;
+    QTest::newRow("west") << 270.0;
+  }
+
+  void aircraftMarkersTurn()
+  {
+    // An aircraft at the view's centre, seen from above with north up: its
+    // swept wings and tailplane put more of it behind its middle, so most
+    // of it lies on the side it heads away from.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(double, headingDeg);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{45.0, 10.0, 2.0e5, 0.0, 0.0});
+    ts::TrackSample at;
+    at.latDeg = 45.0;
+    at.lonDeg = 10.0;
+    at.heightM = 10000.0;
+    at.trackDeg = static_cast<float>(headingDeg);
+    const ts::GlobeMarker marker =
+        ts::aircraftMarker(at, 0.0, {255, 0, 255, 255}, 40.0);
+    const std::array<int32_t, 4> q =
+        quadrantCounts(render(camera, {marker}), QColor(255, 0, 255));
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    const int32_t top = q[0] + q[1];
+    const int32_t bottom = q[2] + q[3];
+    const int32_t left = q[0] + q[2];
+    const int32_t right = q[1] + q[3];
+    qInfo("top %d bottom %d left %d right %d", top, bottom, left, right);
+    QVERIFY(top + bottom > 400);
+    if (headingDeg == 0.0) {
+      QVERIFY(bottom > top * 1.3);
+    } else if (headingDeg == 90.0) {
+      QVERIFY(left > right * 1.3);
+    } else if (headingDeg == 180.0) {
+      QVERIFY(top > bottom * 1.3);
+    } else {
+      QVERIFY(right > left * 1.3);
+    }
+  }
+
+  void trailsCutByTime()
+  {
+    // A timed line along the equator from 20° W to 20° E, its points' times
+    // 0 to 40 s: with the line time at 20 s and a 10 s span, only 10° W to
+    // 0° is drawn; moving the time moves it, with nothing uploaded.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const ts::Camera camera =
+        makeCamera(ts::CameraPose{0.0, 0.0, 9.0e6, 0.0, 0.0});
+    ts::SpaceLine line = lineBetween({-20.0, 0.0}, {20.0, 0.0}, 10000.0, 40);
+    for (std::size_t i = 0; i < line.points.size(); ++i) {
+      line.points[i].timeS = 1.0e9 + static_cast<double>(i);
+    }
+    line.timed = true;
+    line.shownS = 10.0;
+    const QColor magenta(255, 0, 255);
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLineTime(1.0e9 + 20.0);
+    m_renderer->setSpaceLines({line});
+    const QImage first = render(camera);
+    const int64_t uploads = m_renderer->spaceLineUploads();
+    m_renderer->setSpaceLineTime(1.0e9 + 35.0);
+    const QImage later = render(camera);
+    const int64_t uploadsLater = m_renderer->spaceLineUploads();
+    m_renderer->setSpaceLineTime(1.0e9 - 5.0);
+    const QImage before = render(camera);
+    // All of it.
+    line.shownS = std::numeric_limits<double>::infinity();
+    m_renderer->setSpaceLines({line});
+    m_renderer->setSpaceLineTime(1.0e9 + 40.0);
+    const QImage all = render(camera);
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    QCOMPARE(uploadsLater, uploads);
+    // Columns with magenta: where the line is drawn.
+    const std::function<std::pair<int32_t, int32_t>(const QImage&)> extent =
+        [&magenta](const QImage& image) {
+          const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+          int32_t lo = rgba.width();
+          int32_t hi = -1;
+          for (int32_t y = 0; y < rgba.height(); ++y) {
+            for (int32_t x = 0; x < rgba.width(); ++x) {
+              const QColor p = rgba.pixelColor(x, y);
+              if (std::abs(p.red() - magenta.red()) < 40 && p.green() < 60 &&
+                  std::abs(p.blue() - magenta.blue()) < 40) {
+                lo = std::min(lo, x);
+                hi = std::max(hi, x);
+              }
+            }
+          }
+          return std::make_pair(lo, hi);
+        };
+    const std::pair<int32_t, int32_t> a = extent(first);
+    const std::pair<int32_t, int32_t> b = extent(later);
+    const std::pair<int32_t, int32_t> c = extent(before);
+    const std::pair<int32_t, int32_t> d = extent(all);
+    qInfo("20 s: %d-%d, 35 s: %d-%d, all: %d-%d", a.first, a.second, b.first,
+          b.second, d.first, d.second);
+    const std::optional<ts::ScreenPoint> west =
+        camera.project(ts::geodeticToEcef(ts::Geodetic{0.0, -10.0, 10000.0}));
+    const std::optional<ts::ScreenPoint> centre =
+        camera.project(ts::geodeticToEcef(ts::Geodetic{0.0, 0.0, 10000.0}));
+    const std::optional<ts::ScreenPoint> east =
+        camera.project(ts::geodeticToEcef(ts::Geodetic{0.0, 5.0, 10000.0}));
+    const std::optional<ts::ScreenPoint> east15 =
+        camera.project(ts::geodeticToEcef(ts::Geodetic{0.0, 15.0, 10000.0}));
+    QVERIFY(west && centre && east && east15);
+    // From 10° W to 0° (with the line's half width and caps at the ends).
+    QVERIFY(std::abs(a.first - static_cast<int32_t>(west->xPx)) <= 3);
+    QVERIFY(std::abs(a.second - static_cast<int32_t>(centre->xPx)) <= 3);
+    // From 5° E to 15° E.
+    QVERIFY(std::abs(b.first - static_cast<int32_t>(east->xPx)) <= 3);
+    QVERIFY(std::abs(b.second - static_cast<int32_t>(east15->xPx)) <= 3);
+    // Before the line starts: nothing.
+    QCOMPARE(c.second, -1);
+    // Four times as long (40 s against 10 s).
+    QVERIFY(d.second - d.first > 3 * (a.second - a.first));
+  }
+
+  void aircraftGolden_data()
+  {
+    QTest::addColumn<QString>("mode");
+    QTest::addColumn<bool>("map");
+    // The fixture flights 200 s in, over England and France, tilted to see
+    // their heights; the trails coloured by altitude.
+    QTest::newRow("aircraft-globe-off") << QStringLiteral("off") << false;
+    QTest::newRow("aircraft-globe-span") << QStringLiteral("span") << false;
+    QTest::newRow("aircraft-globe-all") << QStringLiteral("all") << false;
+    QTest::newRow("aircraft-mercator") << QStringLiteral("all") << true;
+  }
+
+  void aircraftGolden()
+  {
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(QString, mode);
+    QFETCH(bool, map);
+    ts::TrailSettings trail;
+    trail.mode = mode == QLatin1String("off")    ? ts::TrailMode::Off
+                 : mode == QLatin1String("span") ? ts::TrailMode::Span
+                                                 : ts::TrailMode::All;
+    trail.spanS = 60.0;
+    std::vector<ts::GlobeMarker> markers;
+    std::vector<ts::SpaceLine> lines;
+    const double timeS = aircraftFixtureStartS + 200.0;
+    aircraftScene(timeS, trail, markers, lines);
+    QCOMPARE(markers.size(), std::size_t{3});
+    ts::Camera camera =
+        map ? makeCamera(ts::CameraPose{49.7, 0.9, 5.0e5, 0.0, 0.0})
+            : makeCamera(ts::CameraPose{49.4, 0.9, 6.0e5, 0.0, 45.0});
+    if (map) {
+      camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+      camera.setMorph(1.0);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setStyle(ts::GlobeStyle());
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setVectorLayers({});
+    m_renderer->setSpaceLineTime(timeS);
+    m_renderer->setSpaceLines(lines);
+    QImage image;
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          image = render(camera, markers);
+          return !m_renderer->isBusy();
+        },
+        60000));
+    image = render(camera, markers);
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    // The markers' yellow is on screen.
+    QVERIFY(countColor(image, QColor(255, 230, 0)) > 60);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
   void satellitesHoldFrameRate()

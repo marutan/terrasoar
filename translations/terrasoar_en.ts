@@ -653,6 +653,73 @@
         </message>
     </context>
     <context>
+        <name>ts::AdsbReader</name>
+        <message>
+            <source>%1 bytes were not Beast frames and were skipped.</source>
+            <translation>%1 bytes were not Beast frames and were skipped.</translation>
+        </message>
+        <message>
+            <source>Not a trace file: no ICAO address or timestamp.</source>
+            <translation>Not a trace file: no ICAO address or timestamp.</translation>
+        </message>
+        <message>
+            <source>A trace point without a time or position.</source>
+            <translation>A trace point without a time or position.</translation>
+        </message>
+        <message>
+            <source>Choose the time, address, latitude and longitude columns.</source>
+            <translation>Choose the time, address, latitude and longitude columns.</translation>
+        </message>
+        <message>
+            <source>Too few columns.</source>
+            <translation>Too few columns.</translation>
+        </message>
+        <message>
+            <source>The time can't be read.</source>
+            <translation>The time can't be read.</translation>
+        </message>
+        <message>
+            <source>The ICAO address can't be read.</source>
+            <translation>The ICAO address can't be read.</translation>
+        </message>
+        <message>
+            <source>The position can't be read.</source>
+            <translation>The position can't be read.</translation>
+        </message>
+        <message>
+            <source>The file's format isn't one Terra Soar reads.</source>
+            <translation>The file's format isn't one Terra Soar reads.</translation>
+        </message>
+        <message>
+            <source>The file has no aircraft data.</source>
+            <translation>The file has no aircraft data.</translation>
+        </message>
+        <message>
+            <source>The compressed data can't be read.</source>
+            <translation>The compressed data can't be read.</translation>
+        </message>
+        <message>
+            <source>Not an SBS line.</source>
+            <translation>Not an SBS line.</translation>
+        </message>
+        <message>
+            <source>An SBS line with too few fields.</source>
+            <translation>An SBS line with too few fields.</translation>
+        </message>
+        <message>
+            <source>The date or time can't be read.</source>
+            <translation>The date or time can't be read.</translation>
+        </message>
+        <message>
+            <source>Not a Mode S message.</source>
+            <translation>Not a Mode S message.</translation>
+        </message>
+        <message>
+            <source>Not an aircraft.json snapshot: no "now" or aircraft.</source>
+            <translation>Not an aircraft.json snapshot: no "now" or aircraft.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BalloonWindow</name>
         <message>
             <source>Placemark</source>

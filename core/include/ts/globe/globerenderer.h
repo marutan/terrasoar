@@ -28,6 +28,7 @@
 #include <array>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -50,8 +51,15 @@ struct ImageryLayerDraw;
 struct TileRendererSettings;
 struct TileStatistics;
 
+/** The shape of a GlobeMarker. */
+enum class MarkerShape : std::uint8_t {
+  Round,    ///< A disc.
+  Aircraft, ///< An aircraft seen from above, nose along its heading.
+};
+
 /**
- * A round marker drawn at a fixed point, with a size in pixels.
+ * A marker drawn at a fixed point, with a size in pixels: a disc, or an
+ * aircraft turned to its heading.
  *
  * @reentrant
  */
@@ -60,8 +68,15 @@ struct GlobeMarker {
   Vec3 positionEcef{};
   /** Colour, 8-bit RGBA, not premultiplied. */
   std::array<std::uint8_t, 4> rgba = {255, 255, 255, 255};
-  /** Radius in logical pixels. */
+  /** Radius in logical pixels (half the aircraft's length or span). */
   double radiusPx = 4.0;
+  /** The shape. */
+  MarkerShape shape = MarkerShape::Round;
+  /**
+   * Aircraft: the heading the nose points along, degrees from true north
+   * (on the ground below it); NaN draws it pointing up the screen.
+   */
+  double headingDeg = std::numeric_limits<double>::quiet_NaN();
 };
 
 /**
@@ -81,6 +96,10 @@ struct SpaceLinePoint {
   float alpha = 1.0F;
   /** Distance along the line for its dashes, in dash lengths. */
   float along = 0.0F;
+  /** Its time (SpaceLine::timed), seconds on the clock's scale. */
+  double timeS = 0.0;
+  /** Its colour (SpaceLine::pointColours), RGBA, not premultiplied. */
+  std::array<std::uint8_t, 4> rgba = {255, 255, 255, 255};
 };
 
 /**
@@ -108,6 +127,17 @@ struct SpaceLine {
   bool closed = false;
   /** Drawn on the globe only (a ground track the map draws anyway). */
   bool globeOnly = false;
+  /** Each point has its own colour (SpaceLinePoint::rgba), else rgba. */
+  bool pointColours = false;
+  /**
+   * Timed (a trail): only the part whose points' times lie within
+   * shownS before the renderer's line time (setSpaceLineTime()) is drawn,
+   * cut where those times fall between points. The cut is made in the
+   * shader, so moving the time rebuilds nothing.
+   */
+  bool timed = false;
+  /** How far back a timed line is shown, seconds (infinity: all of it). */
+  double shownS = std::numeric_limits<double>::infinity();
 };
 
 /** Colours and options for the globe. */
@@ -193,11 +223,31 @@ public:
   /** Replaces the markers. */
   void setMarkers(const std::vector<GlobeMarker>& markers);
 
-  /** Replaces the lines through space (see SpaceLine), drawn under markers. */
-  void setSpaceLines(std::vector<SpaceLine> lines);
+  /** Groups of space lines, uploaded separately (setSpaceLines()). */
+  static constexpr int32_t spaceLineGroups = 4;
+
+  /**
+   * Replaces the lines through space (see SpaceLine) of @p group (0 to
+   * spaceLineGroups − 1), drawn under markers. Each group is uploaded on
+   * its own: changing one (satellites' tracks every tick) leaves the
+   * others (aircraft trails) on the GPU as they are.
+   */
+  void setSpaceLines(std::vector<SpaceLine> lines, int32_t group = 0);
+
+  /**
+   * Sets the time timed space lines are drawn up to (seconds on their
+   * points' scale, see SpaceLine::timed). Cheap: nothing is uploaded.
+   */
+  void setSpaceLineTime(double timeS);
 
   /** Returns how many line segments the last frame drew. */
   int32_t spaceSegmentsDrawn() const;
+
+  /**
+   * Returns how many times the space lines have been placed and uploaded
+   * (for tests: moving the line time doesn't, nor a still view).
+   */
+  int64_t spaceLineUploads() const { return m_spaceLineUploads; }
 
   /**
    * Sets the imagery drawn on the globe from the tile quadtree, or null
@@ -306,9 +356,21 @@ private:
   std::vector<VectorLayerDraw> m_vectorLayers;
   GlobeStyle m_style;
   std::vector<GlobeMarker> m_markers;
-  std::vector<SpaceLine> m_spaceLines;
-  bool m_spaceLinesDirty = true;
+  /** One group of space lines (setSpaceLines()). */
+  struct SpaceLineGroup {
+    std::vector<SpaceLine> lines;
+    bool dirty = true;
+  };
+  std::array<SpaceLineGroup, spaceLineGroups> m_spaceLineGroups;
   bool m_spaceLinesMorphed = false;
+  /** The view the morphed lines were last placed for. */
+  std::array<double, 6> m_spaceLinesView{};
+  const void* m_spaceLinesProjection = nullptr;
+  int64_t m_spaceLineUploads = 0;
+  /** The time timed lines are drawn up to (setSpaceLineTime()). */
+  double m_spaceLineTimeS = 0.0;
+  /** The time their float times count from (chosen at upload). */
+  double m_spaceLineOriginS = 0.0;
   bool m_markersDirty = true;
   bool m_markersMorphed = false;
   double m_morph = 0.0;
