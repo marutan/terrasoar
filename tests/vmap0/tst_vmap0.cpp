@@ -1039,7 +1039,7 @@ private slots:
       table.i32(row);
       table.text(QStringLiteral("ab"), 6);
       table.text(row == 1 ? QStringLiteral("Hello, world") : QString());
-      table.text(QStringLiteral("\xe9t\xe9"), 3);
+      table.text(QString::fromLatin1("\xe9t\xe9"), 3);
       table.i16(-12 * row);
       table.f32(1.5 * row);
       table.f64(-2.25e10 * row);
@@ -1067,7 +1067,7 @@ private slots:
     QCOMPARE(read->text(0, 1), QStringLiteral("ab"));
     QCOMPARE(read->text(0, 2), QStringLiteral("Hello, world"));
     QCOMPARE(read->text(1, 2), QString());
-    QCOMPARE(read->text(0, 3), QStringLiteral("\xe9t\xe9"));
+    QCOMPARE(read->text(0, 3), QString::fromLatin1("\xe9t\xe9"));
     QCOMPARE(read->integer(1, 4), int64_t{-24});
     QCOMPARE(read->row(1).at(5).real, 3.0);
     QCOMPARE(read->row(0).at(6).real, -2.25e10);
