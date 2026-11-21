@@ -123,6 +123,10 @@ signals:
   /** A new result() is there (emitted on the GUI thread). */
   void resultReady();
 
+private slots:
+  /** Emits resultReady() (queued here from the worker thread). */
+  void announceResult();
+
 private:
   void run();
 
