@@ -116,7 +116,9 @@ void MainWindow::satelliteSetLoaded(const QJsonObject& source)
   }
   // Each layer of the source: its status in the tree.
   const QDateTime now = QDateTime::currentDateTimeUtc();
-  for (const SatelliteLayerEntry& layer : m_satellites->layers()) {
+  // A copy: what is done for each may refresh the layers.
+  const std::vector<SatelliteLayerEntry> layers = m_satellites->layers();
+  for (const SatelliteLayerEntry& layer : layers) {
     if (layer.definition.source != source) {
       continue;
     }

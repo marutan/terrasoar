@@ -122,7 +122,10 @@ void MainWindow::aircraftSetChanged(const QJsonObject& source)
     return;
   }
   const QString key = AircraftLayers::keyOf(source);
-  for (const AircraftLayerEntry& layer : m_aircraft->layers()) {
+  // A copy: moving the clock below refreshes the layers, which replaces
+  // the list being walked.
+  const std::vector<AircraftLayerEntry> layers = m_aircraft->layers();
+  for (const AircraftLayerEntry& layer : layers) {
     if (layer.definition.source != source) {
       continue;
     }

@@ -1454,8 +1454,9 @@ void TestAdsb::liveFeed()
       }
     } else {
       pending.append(data);
-      qsizetype end = 0;
-      while ((end = pending.indexOf('\n')) >= 0) {
+      // int32_t: QByteArray takes int on Qt 5.
+      int32_t end = 0;
+      while ((end = static_cast<int32_t>(pending.indexOf('\n'))) >= 0) {
         const std::optional<ts::TimedMessage> m =
             ts::parseRawLine(pending.left(end));
         if (m) {
