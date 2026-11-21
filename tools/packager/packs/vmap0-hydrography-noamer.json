@@ -1,0 +1,405 @@
+{
+  "id": "vmap0-hydrography-noamer",
+  "version": "5.1",
+  "layerGroup": "VMAP0 hydrography",
+  "index": {
+    "name": "VMAP0 hydrography: North America",
+    "description": "Rivers (perennial and intermittent, with names), lakes, land subject to inundation, canals and aqueducts, dams, waterfalls and springs, and coastlines, from NGA's Vector Map Level 0 (1:1,000,000, edition 5, 2000). This pack covers VMAP0's North America library; install the regions you want.",
+    "licence": "Public domain (NGA)"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "vmap0-noamer",
+      "file": "vmap0-noamer.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/noamer.zip",
+      "sha256": "45241a1fb60d97eff7f69f7af836275440cc4dae0d8caeca3684b7d3f5dedd94",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library NOAMER (North America)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": [
+        "../notices/vmap0.txt"
+      ]
+    }
+  ],
+  "vmap0": {
+    "dataset": "vmap0-hydrography",
+    "sources": [
+      "vmap0-noamer"
+    ],
+    "name": "VMAP0 hydrography",
+    "licence": "Public domain (NGA)",
+    "attribution": "Vector Map Level 0 (VMAP0), NGA",
+    "sourceName": "Vector Map Level 0 (VMAP0) edition 5, NGA",
+    "sourceVersion": "5.0",
+    "sourceUrl": "https://geo.lib.umn.edu/gisdata/vmap0/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.08
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.001
+      }
+    ],
+    "classes": [
+      {
+        "coverage": "bnd",
+        "class": "coastl",
+        "table": "coastlines",
+        "minLevel": 2,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "exs",
+            "name": "existence"
+          },
+          {
+            "column": "acc",
+            "name": "accuracy"
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "watrcrsl",
+        "table": "named_rivers",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          },
+          {
+            "column": "hyc",
+            "name": "hydrologic_category"
+          }
+        ],
+        "filters": [
+          {
+            "column": "nam",
+            "values": [
+              "UNK"
+            ],
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "watrcrsl",
+        "table": "rivers",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "hyc",
+            "name": "hydrologic_category"
+          }
+        ],
+        "filters": [
+          {
+            "column": "nam",
+            "values": [
+              "UNK"
+            ]
+          },
+          {
+            "column": "hyc",
+            "values": [
+              "6"
+            ],
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "watrcrsl",
+        "table": "intermittent_rivers",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "hyc",
+            "name": "hydrologic_category"
+          }
+        ],
+        "filters": [
+          {
+            "column": "nam",
+            "values": [
+              "UNK"
+            ]
+          },
+          {
+            "column": "hyc",
+            "values": [
+              "6"
+            ]
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "inwatera",
+        "table": "lakes",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          },
+          {
+            "column": "hyc",
+            "name": "hydrologic_category"
+          }
+        ],
+        "filters": [
+          {
+            "column": "f_code",
+            "values": [
+              "BH000"
+            ]
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "inwatera",
+        "table": "inundation",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          },
+          {
+            "column": "hyc",
+            "name": "hydrologic_category"
+          }
+        ],
+        "filters": [
+          {
+            "column": "f_code",
+            "values": [
+              "BH000"
+            ],
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "aquecanl",
+        "table": "canals",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          },
+          {
+            "column": "exs",
+            "name": "existence"
+          },
+          {
+            "column": "loc",
+            "name": "location"
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "miscl",
+        "table": "dams",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "miscp",
+        "table": "water_points",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "hydro",
+        "class": "dangerp",
+        "table": "hazards",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "lakes",
+        "name": "VMAP0 Lakes",
+        "tables": [
+          "lakes",
+          "inundation"
+        ],
+        "style": {
+          "fill": "#3d8fe0b3",
+          "outline": "#5aa9ffff",
+          "outlineWidthPx": 0.8
+        },
+        "styleRules": [
+          {
+            "attribute": "hydrologic_category",
+            "equals": "Non-Perennial/Intermittent/Fluctuating",
+            "fill": "#3d8fe059"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Land Subject to Inundation",
+            "fill": "#6fb7c440",
+            "outline": "#6fb7c4aa"
+          }
+        ]
+      },
+      {
+        "id": "rivers",
+        "name": "VMAP0 Rivers",
+        "tables": [
+          "named_rivers",
+          "rivers",
+          "intermittent_rivers"
+        ],
+        "style": {
+          "outline": "#5aa9ffff",
+          "outlineWidthPx": 1.0
+        },
+        "styleRules": [
+          {
+            "attribute": "hydrologic_category",
+            "equals": "Non-Perennial/Intermittent/Fluctuating",
+            "outline": "#5aa9ff99",
+            "outlineWidthPx": 0.8
+          },
+          {
+            "attribute": "table",
+            "equals": "named_rivers_2",
+            "outlineWidthPx": 1.4
+          },
+          {
+            "attribute": "table",
+            "equals": "named_rivers_4",
+            "outlineWidthPx": 1.4
+          },
+          {
+            "attribute": "table",
+            "equals": "named_rivers_6",
+            "outlineWidthPx": 1.4
+          }
+        ]
+      },
+      {
+        "id": "coastlines",
+        "name": "VMAP0 Coastlines",
+        "tables": [
+          "coastlines"
+        ],
+        "style": {
+          "outline": "#8fd3ffff",
+          "outlineWidthPx": 1.1
+        }
+      },
+      {
+        "id": "canals",
+        "name": "VMAP0 Canals and Aqueducts",
+        "tables": [
+          "canals",
+          "dams"
+        ],
+        "style": {
+          "outline": "#3fd0d0ff",
+          "outlineWidthPx": 1.0
+        }
+      },
+      {
+        "id": "points",
+        "name": "VMAP0 Waterfalls, Springs and Hazards",
+        "tables": [
+          "water_points",
+          "hazards"
+        ],
+        "style": {
+          "outline": "#9fdcffff",
+          "pointSizePx": 5
+        },
+        "styleRules": [
+          {
+            "attribute": "table",
+            "equals": "hazards_6",
+            "outline": "#ff8a65ff"
+          }
+        ]
+      }
+    ],
+    "libraries": [
+      "noamer"
+    ]
+  }
+}

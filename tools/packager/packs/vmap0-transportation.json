@@ -1,0 +1,459 @@
+{
+  "id": "vmap0-transportation",
+  "version": "5.1",
+  "index": {
+    "name": "VMAP0 transportation",
+    "description": "Roads (by class), railways, trails, ferry routes, bridges and tunnels, and airports with their names, from NGA's Vector Map Level 0 (1:1,000,000, edition 5, 2000).",
+    "licence": "Public domain (NGA)"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "vmap0-noamer",
+      "file": "vmap0-noamer.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/noamer.zip",
+      "sha256": "45241a1fb60d97eff7f69f7af836275440cc4dae0d8caeca3684b7d3f5dedd94",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library NOAMER (North America)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": [
+        "../notices/vmap0.txt"
+      ]
+    },
+    {
+      "id": "vmap0-eurnasia",
+      "file": "vmap0-eurnasia.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/eurnasia.zip",
+      "sha256": "bd2cad4328851023ede844c4e125ca1e0de10c2813c3d0c07ada25023b55e8f0",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library EURNASIA (Europe and North Asia)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    },
+    {
+      "id": "vmap0-soamafr",
+      "file": "vmap0-soamafr.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/soamafr.zip",
+      "sha256": "41367cbb4bbd875a2cd9361cd15a45cc031d4c03c238596c0b1ae4510f69d0fe",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library SOAMAFR (South America, Africa and Antarctica)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    },
+    {
+      "id": "vmap0-sasaus",
+      "file": "vmap0-sasaus.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/sasaus.zip",
+      "sha256": "b1af09093af52aa9d92edd91465f6311f28d94c7ef4d3b9b4e438a2ed337fbef",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library SASAUS (South Asia and Australia)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    }
+  ],
+  "vmap0": {
+    "dataset": "vmap0-transportation",
+    "sources": [
+      "vmap0-noamer",
+      "vmap0-eurnasia",
+      "vmap0-soamafr",
+      "vmap0-sasaus"
+    ],
+    "name": "VMAP0 transportation",
+    "licence": "Public domain (NGA)",
+    "attribution": "Vector Map Level 0 (VMAP0), NGA",
+    "sourceName": "Vector Map Level 0 (VMAP0) edition 5, NGA",
+    "sourceVersion": "5.0",
+    "sourceUrl": "https://geo.lib.umn.edu/gisdata/vmap0/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.08
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.001
+      }
+    ],
+    "classes": [
+      {
+        "coverage": "trans",
+        "class": "roadl",
+        "table": "main_roads",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "rtt",
+            "name": "route_type"
+          },
+          {
+            "column": "med",
+            "name": "median"
+          },
+          {
+            "column": "exs",
+            "name": "existence"
+          },
+          {
+            "column": "acc",
+            "name": "accuracy"
+          }
+        ],
+        "filters": [
+          {
+            "column": "rtt",
+            "values": [
+              "14"
+            ]
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "roadl",
+        "table": "roads",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "rtt",
+            "name": "route_type"
+          },
+          {
+            "column": "med",
+            "name": "median"
+          },
+          {
+            "column": "exs",
+            "name": "existence"
+          },
+          {
+            "column": "acc",
+            "name": "accuracy"
+          }
+        ],
+        "filters": [
+          {
+            "column": "rtt",
+            "values": [
+              "14"
+            ],
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "railrdl",
+        "table": "railways",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "exs",
+            "name": "existence"
+          },
+          {
+            "column": "fco",
+            "name": "tracks"
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "traill",
+        "table": "trails",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "exs",
+            "name": "existence"
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "transtrl",
+        "table": "ferries",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ],
+        "filters": [
+          {
+            "column": "f_code",
+            "values": [
+              "AQ070"
+            ]
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "transtrl",
+        "table": "crossings",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "tuc",
+            "name": "carries"
+          }
+        ],
+        "filters": [
+          {
+            "column": "f_code",
+            "values": [
+              "AQ070"
+            ],
+            "exclude": true
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "transtrc",
+        "table": "crossing_points",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "tuc",
+            "name": "carries"
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "aerofacp",
+        "table": "airports",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          },
+          {
+            "column": "iko",
+            "name": "icao",
+            "kind": "text"
+          },
+          {
+            "column": "na3",
+            "name": "designation",
+            "kind": "text"
+          },
+          {
+            "column": "use",
+            "name": "use"
+          },
+          {
+            "column": "zv3",
+            "name": "elevation_m",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "rryardp",
+        "table": "railway_yards",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "trans",
+        "class": "mistranl",
+        "table": "cableways",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "roads",
+        "name": "VMAP0 Roads",
+        "tables": [
+          "main_roads",
+          "roads"
+        ],
+        "style": {
+          "outline": "#f5d9a6ff",
+          "outlineWidthPx": 1.0
+        },
+        "styleRules": [
+          {
+            "attribute": "route_type",
+            "equals": "Primary Route",
+            "outline": "#f2a33aff",
+            "outlineWidthPx": 1.8
+          },
+          {
+            "attribute": "route_type",
+            "equals": "Secondary Route",
+            "outline": "#f5c46eff",
+            "outlineWidthPx": 1.3
+          }
+        ]
+      },
+      {
+        "id": "railways",
+        "name": "VMAP0 Railways",
+        "tables": [
+          "railways"
+        ],
+        "style": {
+          "outline": "#d6604dff",
+          "outlineWidthPx": 1.2
+        },
+        "styleRules": [
+          {
+            "attribute": "existence",
+            "equals": "Under Construction",
+            "outline": "#d6604d80",
+            "outlineWidthPx": 1.0
+          },
+          {
+            "attribute": "existence",
+            "equals": "Not Usable",
+            "outline": "#a0505080",
+            "outlineWidthPx": 1.0
+          }
+        ]
+      },
+      {
+        "id": "trails",
+        "name": "VMAP0 Trails",
+        "tables": [
+          "trails"
+        ],
+        "style": {
+          "outline": "#cdb48bcc",
+          "outlineWidthPx": 0.8
+        }
+      },
+      {
+        "id": "ferries",
+        "name": "VMAP0 Ferry Routes",
+        "tables": [
+          "ferries"
+        ],
+        "style": {
+          "outline": "#4fc3f7ff",
+          "outlineWidthPx": 1.2
+        }
+      },
+      {
+        "id": "crossings",
+        "name": "VMAP0 Bridges, Tunnels and Fords",
+        "tables": [
+          "crossings",
+          "crossing_points"
+        ],
+        "style": {
+          "outline": "#e0e0e0ff",
+          "outlineWidthPx": 1.6,
+          "pointSizePx": 5
+        }
+      },
+      {
+        "id": "airports",
+        "name": "VMAP0 Airports",
+        "tables": [
+          "airports"
+        ],
+        "style": {
+          "outline": "#ff7ad9ff",
+          "pointSizePx": 7,
+          "labels": "name"
+        },
+        "styleRules": [
+          {
+            "attribute": "use",
+            "equals": "Military",
+            "outline": "#c792eaff"
+          }
+        ]
+      },
+      {
+        "id": "other",
+        "name": "VMAP0 Railway Yards and Cableways",
+        "tables": [
+          "railway_yards",
+          "cableways"
+        ],
+        "style": {
+          "outline": "#bdbdbdff",
+          "outlineWidthPx": 1.0,
+          "pointSizePx": 5
+        }
+      }
+    ]
+  }
+}

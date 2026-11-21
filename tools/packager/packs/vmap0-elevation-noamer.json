@@ -1,0 +1,167 @@
+{
+  "id": "vmap0-elevation-noamer",
+  "version": "5.1",
+  "layerGroup": "VMAP0 elevation",
+  "index": {
+    "name": "VMAP0 elevation: North America",
+    "description": "Contour lines (with their heights in metres), spot heights and depth contours, from NGA's Vector Map Level 0 (1:1,000,000, edition 5, 2000). This pack covers VMAP0's North America library; install the regions you want.",
+    "licence": "Public domain (NGA)"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "vmap0-noamer",
+      "file": "vmap0-noamer.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/noamer.zip",
+      "sha256": "45241a1fb60d97eff7f69f7af836275440cc4dae0d8caeca3684b7d3f5dedd94",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library NOAMER (North America)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": [
+        "../notices/vmap0.txt"
+      ]
+    }
+  ],
+  "vmap0": {
+    "dataset": "vmap0-elevation",
+    "sources": [
+      "vmap0-noamer"
+    ],
+    "name": "VMAP0 elevation",
+    "licence": "Public domain (NGA)",
+    "attribution": "Vector Map Level 0 (VMAP0), NGA",
+    "sourceName": "Vector Map Level 0 (VMAP0) edition 5, NGA",
+    "sourceVersion": "5.0",
+    "sourceUrl": "https://geo.lib.umn.edu/gisdata/vmap0/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.08
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.002
+      }
+    ],
+    "classes": [
+      {
+        "coverage": "elev",
+        "class": "contourl",
+        "table": "contours",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "zv2",
+            "name": "elevation_m",
+            "kind": "number"
+          },
+          {
+            "column": "hqc",
+            "name": "category"
+          }
+        ]
+      },
+      {
+        "coverage": "elev",
+        "class": "elevp",
+        "table": "spot_heights",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "zv2",
+            "name": "elevation_m",
+            "kind": "number"
+          },
+          {
+            "column": "acc",
+            "name": "accuracy"
+          }
+        ]
+      },
+      {
+        "coverage": "bnd",
+        "class": "depthl",
+        "table": "depth_contours",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "crv",
+            "name": "depth_m",
+            "kind": "number"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "contours",
+        "name": "VMAP0 Contours",
+        "tables": [
+          "contours"
+        ],
+        "style": {
+          "outline": "#c8a165b3",
+          "outlineWidthPx": 0.8
+        }
+      },
+      {
+        "id": "heights",
+        "name": "VMAP0 Spot Heights",
+        "tables": [
+          "spot_heights"
+        ],
+        "style": {
+          "outline": "#ffe0b2ff",
+          "pointSizePx": 4,
+          "labels": "elevation_m"
+        }
+      },
+      {
+        "id": "depths",
+        "name": "VMAP0 Depth Contours",
+        "tables": [
+          "depth_contours"
+        ],
+        "style": {
+          "outline": "#80deeab3",
+          "outlineWidthPx": 0.8
+        }
+      }
+    ],
+    "libraries": [
+      "noamer"
+    ]
+  }
+}

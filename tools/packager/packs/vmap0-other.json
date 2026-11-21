@@ -1,0 +1,340 @@
+{
+  "id": "vmap0-other",
+  "version": "5.1",
+  "index": {
+    "name": "VMAP0 ice, ground, industry and utilities",
+    "description": "Ice fields, sea ice and ice shelves, sand and lava fields, mines, quarries and oil fields, plants and storage, pipelines and power lines, from NGA's Vector Map Level 0 (1:1,000,000, edition 5, 2000).",
+    "licence": "Public domain (NGA)"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "vmap0-noamer",
+      "file": "vmap0-noamer.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/noamer.zip",
+      "sha256": "45241a1fb60d97eff7f69f7af836275440cc4dae0d8caeca3684b7d3f5dedd94",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library NOAMER (North America)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": [
+        "../notices/vmap0.txt"
+      ]
+    },
+    {
+      "id": "vmap0-eurnasia",
+      "file": "vmap0-eurnasia.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/eurnasia.zip",
+      "sha256": "bd2cad4328851023ede844c4e125ca1e0de10c2813c3d0c07ada25023b55e8f0",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library EURNASIA (Europe and North Asia)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    },
+    {
+      "id": "vmap0-soamafr",
+      "file": "vmap0-soamafr.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/soamafr.zip",
+      "sha256": "41367cbb4bbd875a2cd9361cd15a45cc031d4c03c238596c0b1ae4510f69d0fe",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library SOAMAFR (South America, Africa and Antarctica)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    },
+    {
+      "id": "vmap0-sasaus",
+      "file": "vmap0-sasaus.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/sasaus.zip",
+      "sha256": "b1af09093af52aa9d92edd91465f6311f28d94c7ef4d3b9b4e438a2ed337fbef",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library SASAUS (South Asia and Australia)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    }
+  ],
+  "vmap0": {
+    "dataset": "vmap0-other",
+    "sources": [
+      "vmap0-noamer",
+      "vmap0-eurnasia",
+      "vmap0-soamafr",
+      "vmap0-sasaus"
+    ],
+    "name": "VMAP0 other themes",
+    "licence": "Public domain (NGA)",
+    "attribution": "Vector Map Level 0 (VMAP0), NGA",
+    "sourceName": "Vector Map Level 0 (VMAP0) edition 5, NGA",
+    "sourceVersion": "5.0",
+    "sourceUrl": "https://geo.lib.umn.edu/gisdata/vmap0/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.08
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.001
+      }
+    ],
+    "classes": [
+      {
+        "coverage": "phys",
+        "class": "landicea",
+        "table": "ice_fields",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "phys",
+        "class": "seaicea",
+        "table": "sea_ice",
+        "minLevel": 2,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          }
+        ]
+      },
+      {
+        "coverage": "phys",
+        "class": "grounda",
+        "table": "ground",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "smc",
+            "name": "material"
+          },
+          {
+            "column": "swc",
+            "name": "wetness"
+          }
+        ]
+      },
+      {
+        "coverage": "ind",
+        "class": "extracta",
+        "table": "extraction_areas",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "ind",
+        "class": "extractp",
+        "table": "extraction_points",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "txt",
+            "name": "note",
+            "kind": "text"
+          }
+        ]
+      },
+      {
+        "coverage": "ind",
+        "class": "misindp",
+        "table": "plants",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "txt",
+            "name": "note",
+            "kind": "text"
+          }
+        ]
+      },
+      {
+        "coverage": "ind",
+        "class": "storagep",
+        "table": "storage",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "txt",
+            "name": "note",
+            "kind": "text"
+          }
+        ]
+      },
+      {
+        "coverage": "util",
+        "class": "pipel",
+        "table": "pipelines",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "loc",
+            "name": "location"
+          }
+        ]
+      },
+      {
+        "coverage": "util",
+        "class": "utill",
+        "table": "power_lines",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "util",
+        "class": "utilp",
+        "table": "utility_points",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "txt",
+            "name": "note",
+            "kind": "text"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "ice",
+        "name": "VMAP0 Ice and Snow",
+        "tables": [
+          "ice_fields",
+          "sea_ice"
+        ],
+        "style": {
+          "fill": "#e3f2fd80",
+          "outline": "#bbdefbcc",
+          "outlineWidthPx": 0.8
+        }
+      },
+      {
+        "id": "ground",
+        "name": "VMAP0 Ground Surface (Sand, Lava)",
+        "tables": [
+          "ground"
+        ],
+        "style": {
+          "fill": "#d7ccc859"
+        },
+        "styleRules": [
+          {
+            "attribute": "material",
+            "equals": "Sand",
+            "fill": "#ffe08259"
+          },
+          {
+            "attribute": "material",
+            "equals": "Lava",
+            "fill": "#8d6e6366"
+          }
+        ]
+      },
+      {
+        "id": "industry",
+        "name": "VMAP0 Industry",
+        "tables": [
+          "extraction_areas",
+          "extraction_points",
+          "plants",
+          "storage"
+        ],
+        "style": {
+          "fill": "#ce93d859",
+          "outline": "#ce93d8ff",
+          "outlineWidthPx": 0.8,
+          "pointSizePx": 4
+        }
+      },
+      {
+        "id": "utilities",
+        "name": "VMAP0 Pipelines and Power Lines",
+        "tables": [
+          "pipelines",
+          "power_lines",
+          "utility_points"
+        ],
+        "style": {
+          "outline": "#f48fb1cc",
+          "outlineWidthPx": 0.9,
+          "pointSizePx": 4
+        },
+        "styleRules": [
+          {
+            "attribute": "table",
+            "equals": "pipelines_6",
+            "outline": "#a1887fcc"
+          }
+        ]
+      }
+    ]
+  }
+}

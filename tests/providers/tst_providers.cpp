@@ -31,6 +31,7 @@
 #include <QBuffer>
 #include <QColor>
 #include <QImage>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -114,6 +115,12 @@ public:
     return float64(lonLat[0]).float64(lonLat[1]);
   }
   /** A line string through @p lonLat pairs. */
+  /** A point. */
+  Wkb& point(double lon, double lat)
+  {
+    return byte(1).uint32(1).float64(lon).float64(lat);
+  }
+
   Wkb& lineString(const std::vector<double>& lonLat)
   {
     byte(1).uint32(2).uint32(static_cast<std::uint32_t>(lonLat.size() / 2));
@@ -497,6 +504,86 @@ private slots:
 
     QVERIFY(!ts::GeoPackageFeatureProvider(dir.filePath(QStringLiteral("x")))
                  .isValid());
+  }
+
+  void geoPackagePointsTextAndOptions()
+  {
+    // Phase 21: point tables, text attributes, NULLs, feature ids; a
+    // provider reading some tables with style rules; picking.
+    const QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("points.gpkg"));
+    {
+      ts::GeoPackageFeatureWriter writer(path, false);
+      ts::FeatureTableSpec towns;
+      towns.name = QStringLiteral("towns_3");
+      towns.geometry = ts::FeatureTableSpec::Geometry::Points;
+      towns.storageLevel = 3;
+      towns.minLevel = 3;
+      towns.attributes = {QStringLiteral("feature_id"),
+                          QStringLiteral("people")};
+      towns.textAttributes = {QStringLiteral("name"), QStringLiteral("kind")};
+      ts::FeatureTableSpec other = towns;
+      other.name = QStringLiteral("other_3");
+      QVERIFY(writer.addTable(towns));
+      QVERIFY(writer.addTable(other));
+      const ts::TileKey tile{3, 9, 1};
+      QVERIFY(
+          writer.putFeature(towns.name, tile, Wkb().point(25.0, 60.0).bytes(),
+                            {std::optional<int64_t>(1), std::nullopt},
+                            {QStringLiteral("Alpha"), QStringLiteral("city")}));
+      QVERIFY(writer.putFeature(
+          towns.name, tile, Wkb().point(26.0, 61.0).bytes(),
+          {std::optional<int64_t>(2), std::optional<int64_t>(40)},
+          {QString(), QStringLiteral("village")}));
+      QVERIFY(writer.putFeature(other.name, tile,
+                                Wkb().point(27.0, 62.0).bytes(),
+                                {std::optional<int64_t>(3), std::nullopt},
+                                {QStringLiteral("Other"), QString()}));
+      QVERIFY2(writer.finish(), qPrintable(writer.errorString()));
+    }
+    ts::GeoPackageFeatureProvider::Options options;
+    options.tables = {QStringLiteral("towns")};
+    options.styleRules = QJsonArray{
+        QJsonObject{{QStringLiteral("attribute"), QStringLiteral("kind")},
+                    {QStringLiteral("equals"), QStringLiteral("city")},
+                    {QStringLiteral("outline"), QStringLiteral("#ff0000ff")}}};
+    ts::GeoPackageFeatureProvider provider(path, options);
+    QVERIFY2(provider.isValid(), qPrintable(provider.errorString()));
+    QCOMPARE(provider.tables().size(), std::size_t{1});
+    QCOMPARE(provider.tables().front().textAttributes.size(), std::size_t{2});
+    const std::optional<ts::FeatureTile> tile =
+        provider.loadFeatures(ts::TileKey{4, 18, 2}, notCancelled);
+    if (!tile) {
+      QFAIL("no tile");
+    }
+    QCOMPARE(tile->key, (ts::TileKey{3, 9, 1}));
+    QCOMPARE(tile->features.size(), std::size_t{2});
+    const ts::Feature& alpha = tile->features.at(0);
+    QCOMPARE(alpha.type, ts::Feature::Type::Points);
+    QCOMPARE(alpha.id, QStringLiteral("1"));
+    QCOMPARE(alpha.attributes.value(QStringLiteral("name")).toString(),
+             QStringLiteral("Alpha"));
+    QVERIFY(!alpha.attributes.contains(QStringLiteral("people")));
+    QVERIFY(alpha.style && alpha.style->outline == QColor(255, 0, 0));
+    const ts::Feature& village = tile->features.at(1);
+    QVERIFY(!village.attributes.contains(QStringLiteral("name")));
+    QCOMPARE(village.attributes.value(QStringLiteral("people")).toLongLong(),
+             qlonglong{40});
+    QVERIFY(!village.style);
+    // Picking and labels come from the tiles loaded.
+    const std::vector<ts::Feature> picked =
+        provider.featuresAt(ts::GeoPoint{60.0, 25.0}, 0.1);
+    QCOMPARE(picked.size(), std::size_t{1});
+    QCOMPARE(picked.front().id, QStringLiteral("1"));
+    QCOMPARE(provider.labelPoints(QStringLiteral("name"), {tile->key}).size(),
+             std::size_t{1});
+    QVERIFY(provider.labelPoints(QStringLiteral("name"), {}).empty());
+    // A file without attributes keeps nothing for picking.
+    const QString plain = dir.filePath(QStringLiteral("plain.gpkg"));
+    QVERIFY(writeFeaturePackage(plain));
+    ts::GeoPackageFeatureProvider shoreline(plain);
+    QVERIFY(shoreline.loadFeatures(ts::TileKey{1, 1, 0}, notCancelled));
+    QVERIFY(shoreline.featuresAt(ts::GeoPoint{15.0, 15.0}, 1.0).empty());
   }
 
   void geoPackageWriterRefusesBadInput()

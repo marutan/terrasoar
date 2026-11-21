@@ -22,8 +22,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <set>
 
 #include <QFileInfo>
 #include <QRegularExpression>
@@ -40,6 +42,7 @@
 #include "ts/deps/dependencies.h"
 #include "ts/deps/sqliteconnection.h"
 #include "ts/tiling/tilekey.h"
+#include "ts/vector/featurepick.h"
 
 namespace ts
 {
@@ -61,9 +64,15 @@ bool isPlainIdentifier(const QString& name)
 
 QString geometryName(FeatureTableSpec::Geometry geometry)
 {
-  return geometry == FeatureTableSpec::Geometry::Lines
-             ? QStringLiteral("lines")     // ts-notr: identifier
-             : QStringLiteral("polygons"); // ts-notr: identifier
+  switch (geometry) {
+  case FeatureTableSpec::Geometry::Lines:
+    return QStringLiteral("lines"); // ts-notr: identifier
+  case FeatureTableSpec::Geometry::Points:
+    return QStringLiteral("points"); // ts-notr: identifier
+  case FeatureTableSpec::Geometry::Polygons:
+    break;
+  }
+  return QStringLiteral("polygons"); // ts-notr: identifier
 }
 
 QString lastGdalError()
@@ -214,8 +223,9 @@ bool readPolygonBody(WkbReader& reader, bool little, std::size_t dimensions,
 bool readGeometry(WkbReader& reader, int32_t depth, std::vector<Feature>* out);
 
 /**
- * Reads the members of a multi line string (@p type 5) or multipolygon
- * (6): one feature with every line, or one feature per polygon.
+ * Reads the members of a multipoint (@p type 4), multi line string (5) or
+ * multipolygon (6): one feature with every point or line, or one feature
+ * per polygon.
  */
 bool readMulti(WkbReader& reader, bool little, WkbType type, int32_t depth,
                std::vector<Feature>* out)
@@ -224,7 +234,7 @@ bool readMulti(WkbReader& reader, bool little, WkbType type, int32_t depth,
   if (!reader.canHold(count, 9)) {
     return false;
   }
-  const std::uint32_t expected = type.base == 5 ? 2U : 3U;
+  const std::uint32_t expected = type.base - 3U;
   std::vector<Feature> members;
   for (std::uint32_t i = 0; i < count; ++i) {
     // Peek at the member's type through a copy of the reader.
@@ -242,7 +252,8 @@ bool readMulti(WkbReader& reader, bool little, WkbType type, int32_t depth,
     return true;
   }
   Feature merged;
-  merged.type = Feature::Type::LineStrings;
+  merged.type =
+      type.base == 4 ? Feature::Type::Points : Feature::Type::LineStrings;
   for (Feature& member : members) {
     for (std::vector<GeoPoint>& part : member.parts) {
       merged.parts.push_back(std::move(part));
@@ -262,6 +273,25 @@ bool readGeometry(WkbReader& reader, int32_t depth, std::vector<Feature>* out)
   }
   Feature feature;
   switch (type.base) {
+  case 1: { // Point
+    feature.type = Feature::Type::Points;
+    if (!reader.canHold(1, 8 * type.dimensions)) {
+      return false;
+    }
+    GeoPoint point;
+    point.lonDeg = reader.float64(little);
+    point.latDeg = reader.float64(little);
+    reader.skip(8 * (type.dimensions - 2));
+    if (!reader.ok()) {
+      return false;
+    }
+    // An empty point is written as NaN coordinates.
+    if (!std::isnan(point.lonDeg) && !std::isnan(point.latDeg)) {
+      feature.parts.push_back({point});
+    }
+    out->push_back(std::move(feature));
+    return true;
+  }
   case 2: { // LineString
     feature.type = Feature::Type::LineStrings;
     std::vector<GeoPoint> line;
@@ -278,6 +308,7 @@ bool readGeometry(WkbReader& reader, int32_t depth, std::vector<Feature>* out)
     }
     out->push_back(std::move(feature));
     return true;
+  case 4: // MultiPoint
   case 5: // MultiLineString
   case 6: // MultiPolygon
     return readMulti(reader, little, type, depth, out);
@@ -327,6 +358,7 @@ struct GeoPackageFeatureWriter::Private {
   GDALDatasetH dataset = nullptr;
   OGRSpatialReferenceH srs = nullptr;
   bool inTransaction = false;
+  bool spatialIndex = true;
   std::vector<std::pair<FeatureTableSpec, OGRLayerH>> tables;
 
   Private() = default;
@@ -358,9 +390,11 @@ struct GeoPackageFeatureWriter::Private {
   }
 };
 
-GeoPackageFeatureWriter::GeoPackageFeatureWriter(const QString& path)
+GeoPackageFeatureWriter::GeoPackageFeatureWriter(const QString& path,
+                                                 bool spatialIndex)
     : d(std::make_unique<Private>())
 {
+  d->spatialIndex = spatialIndex;
   initialiseGdal();
   if (QFileInfo::exists(path)) {
     m_error = QStringLiteral("%1 already exists").arg(path);
@@ -406,14 +440,18 @@ bool GeoPackageFeatureWriter::addTable(const FeatureTableSpec& spec)
   char** options = nullptr;
   options = CSLSetNameValue(options, "GEOMETRY_NAME", "geom");
   options = CSLSetNameValue(options, "FID", "fid");
-  options = CSLSetNameValue(options, "SPATIAL_INDEX", "YES");
+  options =
+      CSLSetNameValue(options, "SPATIAL_INDEX", d->spatialIndex ? "YES" : "NO");
   const QByteArray name = spec.name.toUtf8();
   CPLErrorReset();
-  OGRLayerH layer = GDALDatasetCreateLayer(
-      d->dataset, name.constData(), d->srs,
-      spec.geometry == FeatureTableSpec::Geometry::Lines ? wkbMultiLineString
-                                                         : wkbMultiPolygon,
-      options);
+  OGRwkbGeometryType type = wkbMultiPolygon;
+  if (spec.geometry == FeatureTableSpec::Geometry::Lines) {
+    type = wkbMultiLineString;
+  } else if (spec.geometry == FeatureTableSpec::Geometry::Points) {
+    type = wkbMultiPoint;
+  }
+  OGRLayerH layer = GDALDatasetCreateLayer(d->dataset, name.constData(), d->srs,
+                                           type, options);
   CSLDestroy(options);
   if (layer == nullptr) {
     m_error = lastGdalError();
@@ -429,9 +467,18 @@ bool GeoPackageFeatureWriter::addTable(const FeatureTableSpec& spec)
     }
     columns.push_back(attribute);
   }
-  for (const QString& column : columns) {
-    const QByteArray columnName = column.toUtf8();
-    OGRFieldDefnH field = OGR_Fld_Create(columnName.constData(), OFTInteger64);
+  const std::size_t integerColumns = columns.size();
+  for (const QString& attribute : spec.textAttributes) {
+    if (!isPlainIdentifier(attribute)) {
+      m_error = QStringLiteral("Bad attribute name %1").arg(attribute);
+      return false;
+    }
+    columns.push_back(attribute);
+  }
+  for (std::size_t i = 0; i < columns.size(); ++i) {
+    const QByteArray columnName = columns[i].toUtf8();
+    OGRFieldDefnH field = OGR_Fld_Create(
+        columnName.constData(), i < integerColumns ? OFTInteger64 : OFTString);
     const OGRErr result = OGR_L_CreateField(layer, field, TRUE);
     OGR_Fld_Destroy(field);
     if (result != OGRERR_NONE) {
@@ -447,6 +494,22 @@ bool GeoPackageFeatureWriter::putFeature(const QString& table, TileKey tile,
                                          const QByteArray& wkb,
                                          const std::vector<int64_t>& attributes)
 {
+  std::vector<std::optional<int64_t>> integers(attributes.begin(),
+                                               attributes.end());
+  std::vector<QString> texts;
+  for (const std::pair<FeatureTableSpec, OGRLayerH>& entry : d->tables) {
+    if (entry.first.name == table) {
+      texts.resize(entry.first.textAttributes.size());
+    }
+  }
+  return putFeature(table, tile, wkb, integers, texts);
+}
+
+bool GeoPackageFeatureWriter::putFeature(
+    const QString& table, TileKey tile, const QByteArray& wkb,
+    const std::vector<std::optional<int64_t>>& integers,
+    const std::vector<QString>& texts)
+{
   if (!m_error.isEmpty() || d->dataset == nullptr) {
     return false;
   }
@@ -456,7 +519,8 @@ bool GeoPackageFeatureWriter::putFeature(const QString& table, TileKey tile,
     spec = entry.first.name == table ? &entry.first : spec;
   }
   if (layer == nullptr || spec == nullptr ||
-      attributes.size() != spec->attributes.size()) {
+      integers.size() != spec->attributes.size() ||
+      texts.size() != spec->textAttributes.size()) {
     m_error = QStringLiteral("No table %1 or wrong attributes").arg(table);
     return false;
   }
@@ -473,17 +537,38 @@ bool GeoPackageFeatureWriter::putFeature(const QString& table, TileKey tile,
     m_error = QStringLiteral("Bad WKB for table %1").arg(table);
     return false;
   }
-  geometry = spec->geometry == FeatureTableSpec::Geometry::Lines
-                 ? OGR_G_ForceToMultiLineString(geometry)
-                 : OGR_G_ForceToMultiPolygon(geometry);
+  switch (spec->geometry) {
+  case FeatureTableSpec::Geometry::Lines:
+    geometry = OGR_G_ForceToMultiLineString(geometry);
+    break;
+  case FeatureTableSpec::Geometry::Points:
+    geometry = OGR_G_ForceTo(geometry, wkbMultiPoint, nullptr);
+    break;
+  case FeatureTableSpec::Geometry::Polygons:
+    geometry = OGR_G_ForceToMultiPolygon(geometry);
+    break;
+  }
   OGRFeatureH feature = OGR_F_Create(OGR_L_GetLayerDefn(layer));
   OGR_F_SetGeometryDirectly(feature, geometry);
   OGR_F_SetFieldInteger64(feature, 0, tile.level);
   OGR_F_SetFieldInteger64(feature, 1, tile.x);
   OGR_F_SetFieldInteger64(feature, 2, tile.y);
-  for (std::size_t i = 0; i < attributes.size(); ++i) {
-    OGR_F_SetFieldInteger64(feature, static_cast<int32_t>(i) + 3,
-                            attributes[i]);
+  for (std::size_t i = 0; i < integers.size(); ++i) {
+    const int32_t field = static_cast<int32_t>(i) + 3;
+    if (integers[i]) {
+      OGR_F_SetFieldInteger64(feature, field, *integers[i]);
+    } else {
+      OGR_F_SetFieldNull(feature, field);
+    }
+  }
+  for (std::size_t i = 0; i < texts.size(); ++i) {
+    const int32_t field = static_cast<int32_t>(i + integers.size()) + 3;
+    if (texts[i].isNull()) {
+      OGR_F_SetFieldNull(feature, field);
+    } else {
+      const QByteArray value = texts[i].toUtf8();
+      OGR_F_SetFieldString(feature, field, value.constData());
+    }
   }
   const OGRErr result = OGR_L_CreateFeature(layer, feature);
   OGR_F_Destroy(feature);
@@ -613,11 +698,12 @@ QString geometryColumn(const SqliteConnection& connection, const QString& table)
 }
 
 /**
- * Returns the integer columns of @p table other than fid and tile_*: the
- * attributes (with the geometry column, if its type mentions INT).
+ * Returns the integer columns (or, with @p text, the text columns) of
+ * @p table other than fid and tile_*: the attributes (with the geometry
+ * column, if its type matches).
  */
-std::vector<QString> integerColumns(const SqliteConnection& connection,
-                                    const QString& table)
+std::vector<QString> attributeColumns(const SqliteConnection& connection,
+                                      const QString& table, bool text)
 {
   std::vector<QString> columns;
   sqlite3_stmt* statement = nullptr;
@@ -628,9 +714,12 @@ std::vector<QString> integerColumns(const SqliteConnection& connection,
     while (sqlite3_step(statement) == SQLITE_ROW) {
       const QString name = columnText(statement, 1);
       const QString type = columnText(statement, 2).toUpper();
+      const bool matches = text ? (type.contains(QLatin1String("TEXT")) ||
+                                   type.contains(QLatin1String("CHAR")))
+                                : type.contains(QLatin1String("INT"));
       if (name != QLatin1String("fid") &&
-          !name.startsWith(QLatin1String("tile_")) &&
-          type.contains(QLatin1String("INT")) && isPlainIdentifier(name)) {
+          !name.startsWith(QLatin1String("tile_")) && matches &&
+          isPlainIdentifier(name)) {
         columns.push_back(name);
       }
     }
@@ -661,13 +750,30 @@ bool readRows(sqlite3_stmt* statement, const FeatureTableSpec& spec,
     }
     QVariantMap attributes;
     attributes.insert(QStringLiteral("table"), spec.name);
+    QString id;
     for (std::size_t i = 0; i < spec.attributes.size(); ++i) {
-      attributes.insert(spec.attributes[i],
-                        static_cast<qlonglong>(sqlite3_column_int64(
-                            statement, static_cast<int32_t>(i) + 1)));
+      const int32_t column = static_cast<int32_t>(i) + 1;
+      if (sqlite3_column_type(statement, column) == SQLITE_NULL) {
+        continue;
+      }
+      const qlonglong value =
+          static_cast<qlonglong>(sqlite3_column_int64(statement, column));
+      attributes.insert(spec.attributes[i], value);
+      if (spec.attributes[i] == QLatin1String("feature_id")) {
+        id = QString::number(value);
+      }
+    }
+    for (std::size_t i = 0; i < spec.textAttributes.size(); ++i) {
+      const int32_t column =
+          static_cast<int32_t>(i + spec.attributes.size()) + 1;
+      if (sqlite3_column_type(statement, column) == SQLITE_NULL) {
+        continue;
+      }
+      attributes.insert(spec.textAttributes[i], columnText(statement, column));
     }
     for (Feature& feature : decoded) {
       feature.attributes = attributes;
+      feature.id = id;
       features->push_back(std::move(feature));
     }
   }
@@ -677,7 +783,32 @@ bool readRows(sqlite3_stmt* statement, const FeatureTableSpec& spec,
 } // namespace
 
 GeoPackageFeatureProvider::GeoPackageFeatureProvider(const QString& path)
-    : m_path(QFileInfo(path).absoluteFilePath())
+    : GeoPackageFeatureProvider(path, Options())
+{
+}
+
+namespace
+{
+
+/** Returns true if table @p name is selected by @p wanted (see Options). */
+bool tableWanted(const QString& name, const std::vector<QString>& wanted)
+{
+  if (wanted.empty()) {
+    return true;
+  }
+  static const QRegularExpression suffix(QStringLiteral("_[0-9]+$"));
+  QString base = name;
+  base.remove(suffix);
+  return std::find(wanted.begin(), wanted.end(), name) != wanted.end() ||
+         std::find(wanted.begin(), wanted.end(), base) != wanted.end();
+}
+
+} // namespace
+
+GeoPackageFeatureProvider::GeoPackageFeatureProvider(const QString& path,
+                                                     const Options& options)
+    : m_path(QFileInfo(path).absoluteFilePath()), m_options(options),
+      m_rules(styleRulesFromJson(options.styleRules))
 {
   if (!QFileInfo(m_path).isFile()) {
     m_error = QStringLiteral("%1 does not exist").arg(m_path);
@@ -706,9 +837,13 @@ GeoPackageFeatureProvider::GeoPackageFeatureProvider(const QString& path)
     FeatureTableSpec spec;
     spec.name = columnText(statement, 0);
     const QString geometry = columnText(statement, 1);
-    spec.geometry = geometry == QLatin1String("lines")
-                        ? FeatureTableSpec::Geometry::Lines
-                        : FeatureTableSpec::Geometry::Polygons;
+    if (geometry == QLatin1String("lines")) {
+      spec.geometry = FeatureTableSpec::Geometry::Lines;
+    } else if (geometry == QLatin1String("points")) {
+      spec.geometry = FeatureTableSpec::Geometry::Points;
+    } else {
+      spec.geometry = FeatureTableSpec::Geometry::Polygons;
+    }
     spec.storageLevel = sqlite3_column_int(statement, 2);
     spec.minLevel = sqlite3_column_int(statement, 3);
     spec.maxLevel = sqlite3_column_int(statement, 4);
@@ -719,15 +854,26 @@ GeoPackageFeatureProvider::GeoPackageFeatureProvider(const QString& path)
         spec.storageLevel > TileKey::maximumLevel ||
         spec.minLevel < spec.storageLevel ||
         (geometry != QLatin1String("lines") &&
-         geometry != QLatin1String("polygons"))) {
-      continue; // Not a table we can read; skip it.
+         geometry != QLatin1String("polygons") &&
+         geometry != QLatin1String("points")) ||
+        !tableWanted(spec.name, options.tables)) {
+      continue; // Not a table we can read (or want); skip it.
     }
-    spec.attributes = integerColumns(connection, spec.name);
+    spec.attributes = attributeColumns(connection, spec.name, false);
     spec.attributes.erase(
         std::remove(spec.attributes.begin(), spec.attributes.end(), column),
         spec.attributes.end());
+    spec.textAttributes = attributeColumns(connection, spec.name, true);
+    spec.textAttributes.erase(std::remove(spec.textAttributes.begin(),
+                                          spec.textAttributes.end(), column),
+                              spec.textAttributes.end());
+    m_hasAttributes = m_hasAttributes || !spec.attributes.empty() ||
+                      !spec.textAttributes.empty();
     QString select = QStringLiteral("SELECT \"%1\"").arg(column);
     for (const QString& attribute : spec.attributes) {
+      select += QStringLiteral(", \"%1\"").arg(attribute);
+    }
+    for (const QString& attribute : spec.textAttributes) {
       select += QStringLiteral(", \"%1\"").arg(attribute);
     }
     select += QStringLiteral(" FROM \"%1\" WHERE tile_level = ? AND "
@@ -822,7 +968,94 @@ GeoPackageFeatureProvider::loadFeatures(TileKey key,
       return std::nullopt;
     }
   }
+  if (tile) {
+    if (!m_rules.empty()) {
+      applyStyleRules(tile->features, m_rules);
+    }
+    keep(*tile);
+  }
   return tile;
+}
+
+void GeoPackageFeatureProvider::keep(const FeatureTile& tile)
+{
+  if (!m_hasAttributes || m_options.keptTiles <= 0) {
+    return;
+  }
+  const std::lock_guard<std::mutex> lock(m_keptMutex);
+  for (std::deque<FeatureTile>::iterator it = m_kept.begin();
+       it != m_kept.end(); ++it) {
+    if (it->key == tile.key) {
+      m_kept.erase(it);
+      break;
+    }
+  }
+  m_kept.push_back(tile);
+  while (static_cast<int32_t>(m_kept.size()) > m_options.keptTiles) {
+    m_kept.pop_front();
+  }
+}
+
+std::vector<Feature>
+GeoPackageFeatureProvider::featuresAt(GeoPoint point, double toleranceDeg) const
+{
+  const std::lock_guard<std::mutex> lock(m_keptMutex);
+  std::vector<const FeatureTile*> tiles;
+  for (const FeatureTile& tile : m_kept) {
+    const GeoRect rect = tile.key.bounds();
+    if (point.lonDeg >= rect.westDeg - toleranceDeg &&
+        point.lonDeg <= rect.eastDeg + toleranceDeg &&
+        point.latDeg >= rect.southDeg - toleranceDeg &&
+        point.latDeg <= rect.northDeg + toleranceDeg) {
+      tiles.push_back(&tile);
+    }
+  }
+  // The finest tiles first: their features are the most detailed.
+  std::stable_sort(tiles.begin(), tiles.end(),
+                   [](const FeatureTile* a, const FeatureTile* b) {
+                     return a->key.level > b->key.level;
+                   });
+  std::vector<Feature> found;
+  std::set<QString> seen;
+  for (const FeatureTile* tile : tiles) {
+    for (const Feature& feature : tile->features) {
+      if (!feature.id.isEmpty() && seen.count(feature.id) != 0) {
+        continue;
+      }
+      if (featureUnder(feature, point, toleranceDeg)) {
+        found.push_back(feature);
+        if (!feature.id.isEmpty()) {
+          seen.insert(feature.id);
+        }
+      }
+    }
+  }
+  return found;
+}
+
+std::vector<Feature>
+GeoPackageFeatureProvider::labelPoints(const QString& attribute,
+                                       const std::vector<TileKey>& tiles) const
+{
+  const std::lock_guard<std::mutex> lock(m_keptMutex);
+  std::vector<Feature> points;
+  for (const FeatureTile& tile : m_kept) {
+    if (std::find(tiles.begin(), tiles.end(), tile.key) == tiles.end()) {
+      continue;
+    }
+    for (const Feature& feature : tile.features) {
+      if (feature.type != Feature::Type::Points ||
+          !feature.attributes.contains(attribute)) {
+        continue;
+      }
+      for (const std::vector<GeoPoint>& part : feature.parts) {
+        Feature point = feature;
+        point.parts = {part};
+        points.push_back(std::move(point));
+      }
+    }
+  }
+  return points;
 }
 
 } // namespace ts

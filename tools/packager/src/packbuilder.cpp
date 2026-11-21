@@ -43,6 +43,7 @@
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
 #include "ts/tiling/tilekey.h"
+#include "vpf/vpftable.h"
 
 namespace ts::packager
 {
@@ -279,6 +280,120 @@ std::optional<ImagerySpec> readImagery(const PackConfig& config,
   return spec;
 }
 
+std::vector<QString> strings(const QJsonValue& value)
+{
+  std::vector<QString> result;
+  const QJsonArray array = value.toArray();
+  result.reserve(static_cast<std::size_t>(array.size()));
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < array.size(); ++i) {
+    result.push_back(array.at(i).toString());
+  }
+  return result;
+}
+
+/** Reads one VMAP0 feature class; nothing if it is malformed. */
+std::optional<Vmap0Class> readVmap0Class(const QJsonObject& entry)
+{
+  Vmap0Class cls;
+  cls.coverage = text(entry, "coverage");
+  cls.featureClass = text(entry, "class");
+  cls.table = text(entry, "table");
+  cls.minLevel = integer(entry, "minLevel", 0);
+  cls.maxLevel = integer(entry, "maxLevel", -1);
+  const QJsonArray attributes =
+      entry.value(QStringLiteral("attributes")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < attributes.size(); ++i) {
+    const QJsonObject item = attributes.at(i).toObject();
+    Vmap0Attribute attribute;
+    attribute.column = text(item, "column");
+    attribute.name = text(item, "name");
+    const std::optional<Vmap0Attribute::Kind> kind =
+        vmap0AttributeKind(text(item, "kind"));
+    if (attribute.column.isEmpty() || attribute.name.isEmpty() || !kind) {
+      return std::nullopt;
+    }
+    attribute.kind = *kind;
+    cls.attributes.push_back(attribute);
+  }
+  const QJsonArray filters = entry.value(QStringLiteral("filters")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < filters.size(); ++i) {
+    const QJsonObject item = filters.at(i).toObject();
+    Vmap0Filter filter;
+    filter.column = text(item, "column");
+    filter.values = strings(item.value(QStringLiteral("values")));
+    filter.exclude = item.value(QStringLiteral("exclude")).toBool(false);
+    if (filter.column.isEmpty() || filter.values.empty()) {
+      return std::nullopt;
+    }
+    cls.filters.push_back(filter);
+  }
+  if (cls.coverage.isEmpty() || cls.featureClass.isEmpty() ||
+      cls.table.isEmpty() || cls.minLevel < 0) {
+    return std::nullopt;
+  }
+  return cls;
+}
+
+/** Reads the optional "vmap0" entry into @p config. */
+bool readVmap0(const QJsonObject& json, PackConfig* config,
+               QString* errorString)
+{
+  const QJsonObject entry = json.value(QStringLiteral("vmap0")).toObject();
+  if (entry.isEmpty()) {
+    return true;
+  }
+  Vmap0Spec spec;
+  spec.dataset = text(entry, "dataset");
+  spec.sources = strings(entry.value(QStringLiteral("sources")));
+  spec.name = text(entry, "name");
+  spec.licence = text(entry, "licence");
+  spec.attribution = text(entry, "attribution");
+  spec.sourceName = text(entry, "sourceName");
+  spec.sourceVersion = text(entry, "sourceVersion");
+  spec.sourceUrl = text(entry, "sourceUrl");
+  spec.libraries = strings(entry.value(QStringLiteral("libraries")));
+  spec.layers = entry.value(QStringLiteral("layers")).toArray();
+  const QJsonArray lods = entry.value(QStringLiteral("lods")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < lods.size(); ++i) {
+    const QJsonObject item = lods.at(i).toObject();
+    Vmap0Lod lod;
+    lod.storageLevel = integer(item, "storageLevel", 0);
+    lod.minLevel = integer(item, "minLevel", lod.storageLevel);
+    lod.maxLevel = integer(item, "maxLevel", -1);
+    lod.toleranceDeg = item.value(QStringLiteral("toleranceDeg")).toDouble(0.0);
+    if (lod.storageLevel < 0 || lod.storageLevel > 12 ||
+        lod.minLevel < lod.storageLevel || lod.toleranceDeg < 0.0 ||
+        (lod.maxLevel >= 0 && lod.maxLevel < lod.minLevel)) {
+      return fail(errorString, QStringLiteral("Bad VMAP0 level %1").arg(i));
+    }
+    spec.lods.push_back(lod);
+  }
+  const QJsonArray classes = entry.value(QStringLiteral("classes")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < classes.size(); ++i) {
+    const std::optional<Vmap0Class> cls =
+        readVmap0Class(classes.at(i).toObject());
+    if (!cls) {
+      return fail(errorString, QStringLiteral("Bad VMAP0 class %1").arg(i));
+    }
+    spec.classes.push_back(*cls);
+  }
+  bool sourcesKnown = !spec.sources.empty();
+  for (const QString& source : spec.sources) {
+    sourcesKnown = sourcesKnown && findSource(*config, source) != nullptr;
+  }
+  if (!sourcesKnown || spec.dataset.isEmpty() || spec.lods.empty() ||
+      spec.classes.empty()) {
+    return fail(errorString, QStringLiteral("Bad vmap0 entry"));
+  }
+  config->vmap0 = spec;
+  return true;
+}
+
 } // namespace
 
 std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
@@ -363,8 +478,14 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     config.shoreline = spec;
   }
   if (!readCountries(json, &config, errorString) ||
-      !readElevation(json, &config, errorString)) {
+      !readElevation(json, &config, errorString) ||
+      !readVmap0(json, &config, errorString)) {
     return std::nullopt;
+  }
+  // Regional packs of one theme share one name in Add Layer.
+  config.name = text(json, "layerGroup");
+  if (config.name.isEmpty()) {
+    config.name = text(json.value(QStringLiteral("index")).toObject(), "name");
   }
   if (config.id.isEmpty() || config.sizeLimitBytes <= 0) {
     fail(errorString, QStringLiteral("The pack has no id or size limit"));
@@ -432,6 +553,11 @@ QJsonObject BuildReport::toJson() const
   elevationJson.insert(QStringLiteral("maxQuantizationErrorM"),
                        elevation.maxQuantizationErrorM);
   json.insert(QStringLiteral("elevation"), elevationJson);
+  QJsonArray vmap0Json;
+  for (const Vmap0ClassStats& cls : vmap0) {
+    vmap0Json.append(cls.toJson());
+  }
+  json.insert(QStringLiteral("vmap0"), vmap0Json);
   return json;
 }
 
@@ -451,14 +577,15 @@ public:
   {
     m_manifest.id = config.id;
     m_manifest.version = config.version;
+    m_manifest.name = config.name;
   }
 
   bool run()
   {
     return checkSources() && prepareOutput() && buildImagery() &&
            buildShoreline() && buildCountries() && buildGeoids() &&
-           buildDatumShifts() && buildElevation() && copyNotices() &&
-           writeManifest() && checkBudget();
+           buildDatumShifts() && buildElevation() && buildVmap0() &&
+           copyNotices() && writeManifest() && checkBudget();
   }
 
 private:
@@ -691,6 +818,84 @@ private:
     dataset.name = spec.name;
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
+    return true;
+  }
+
+  bool buildVmap0()
+  {
+    if (!m_config->vmap0) {
+      return true;
+    }
+    const Vmap0Spec& spec = *m_config->vmap0;
+    const QString file = spec.dataset + QStringLiteral(".gpkg");
+    Vmap0Options options;
+    for (const QString& id : spec.sources) {
+      const SourceSpec& source = *findSource(*m_config, id);
+      const QString root = gdalPath(m_sources.filePath(source.file));
+      const QString database = vpf::findEntry(root, QStringLiteral("vmaplv0"));
+      if (database.isEmpty()) {
+        return fail(m_error,
+                    QStringLiteral("%1 has no VMAPLV0 directory").arg(root));
+      }
+      options.databases.push_back(database);
+    }
+    options.libraries = spec.libraries;
+    options.lods = spec.lods;
+    options.classes = spec.classes;
+    options.progress = m_progress;
+    GeoPackageFeatureWriter writer(m_output.filePath(file), false);
+    if (!writer.errorString().isEmpty() ||
+        !ts::packager::buildVmap0(options, &writer, &m_report->vmap0,
+                                  m_error) ||
+        !writer.finish()) {
+      return fail(m_error,
+                  m_error->isEmpty() ? writer.errorString() : *m_error);
+    }
+    // Every feature read is written, left out on purpose, or reported.
+    for (const Vmap0ClassStats& cls : m_report->vmap0) {
+      if (cls.skipped != 0) {
+        return fail(m_error,
+                    QStringLiteral("%1: %2 features without usable geometry")
+                        .arg(cls.table)
+                        .arg(cls.skipped));
+      }
+    }
+    PackDataset dataset;
+    dataset.id = spec.dataset;
+    dataset.kind = PackDataset::Kind::Features;
+    dataset.file = file;
+    dataset.name = spec.name;
+    dataset.licence = spec.licence;
+    dataset.attribution = spec.attribution;
+    dataset.source.name = spec.sourceName;
+    dataset.source.version = spec.sourceVersion;
+    dataset.source.url = spec.sourceUrl;
+    m_manifest.datasets.push_back(dataset);
+    // The pack's layers, on its dataset.
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (int32_t i = 0; i < spec.layers.size(); ++i) {
+      const QJsonObject layer = spec.layers.at(i).toObject();
+      QJsonObject source;
+      source.insert(QStringLiteral("kind"), QStringLiteral("basepack"));
+      source.insert(QStringLiteral("dataset"), spec.dataset);
+      source.insert(QStringLiteral("tables"),
+                    layer.value(QStringLiteral("tables")));
+      if (layer.contains(QStringLiteral("styleRules"))) {
+        source.insert(QStringLiteral("styleRules"),
+                      layer.value(QStringLiteral("styleRules")));
+      }
+      QJsonObject definition;
+      definition.insert(
+          QStringLiteral("id"),
+          QStringLiteral("pack:%1:%2").arg(spec.dataset, text(layer, "id")));
+      definition.insert(QStringLiteral("origin"), QStringLiteral("catalogue"));
+      definition.insert(QStringLiteral("type"), QStringLiteral("vector"));
+      definition.insert(QStringLiteral("name"), text(layer, "name"));
+      definition.insert(QStringLiteral("source"), source);
+      definition.insert(QStringLiteral("style"),
+                        layer.value(QStringLiteral("style")).toObject());
+      m_manifest.layers.append(definition);
+    }
     return true;
   }
 

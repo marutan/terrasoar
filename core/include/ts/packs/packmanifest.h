@@ -31,6 +31,7 @@
 #include <optional>
 #include <vector>
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
 
@@ -211,6 +212,18 @@ public:
   std::vector<PackDataset> datumShifts;
   /** Licence and notice files in the pack, relative paths. */
   std::vector<QString> notices;
+  /**
+   * The pack's name for the user (Add Layer lists its layers under it);
+   * optional (from Phase 21).
+   */
+  QString name;
+  /**
+   * The layers the pack offers in Add Layer, in order: layer definitions
+   * (ts::LayerDefinition's JSON) whose sources name datasets of the pack
+   * (`{"kind": "basepack", "dataset": "<id>", "tables": […]}`). Optional
+   * (from Phase 21); older versions ignore it.
+   */
+  QJsonArray layers;
 };
 
 /**

@@ -139,6 +139,47 @@ the installed one.
 Packs are kept in `~/.local/share/Terra Soar/terrasoar/packs` on Linux
 and `%LOCALAPPDATA%\Terra Soar\terrasoar\packs` on Windows.
 
+### VMAP0 map layers
+
+The **VMAP0** packs bring layers of their own: the world vector map of
+the US National Geospatial-Intelligence Agency, *Vector Map Level 0*, at
+a scale of 1:1,000,000 (edition 5, from 2000). One pack per theme:
+
+| Pack | What you get | Download |
+| --- | --- | --- |
+| VMAP0 boundaries | International boundaries; disputed boundaries in orange, claim lines, de facto boundaries and the date line | 4 MB |
+| VMAP0 hydrography | Rivers (with names), lakes, land that floods, canals, dams, waterfalls and springs, coastlines | 83–134 MB each region |
+| VMAP0 transportation | Roads by class, railways, trails, ferry routes, bridges and tunnels, airports with their names | 109 MB |
+| VMAP0 population | Built-up areas, towns and villages with their names, landmarks | 27 MB |
+| VMAP0 elevation | Contour lines with their heights, spot heights, depth contours | 69–112 MB each region |
+| VMAP0 vegetation | Woodland, cropland, grassland and scrub, marsh, tundra | 85–143 MB each region |
+| VMAP0 ice, ground, industry and utilities | Ice fields and sea ice, sand and lava, mines and oil fields, pipelines and power lines | 66 MB |
+| VMAP0 administrative areas (ESRI) | States and provinces: their boundaries, and their names on click | 77 MB |
+
+Hydrography, elevation and vegetation are large, so each comes as four
+packs, one per region of VMAP0: North America; Europe and North Asia;
+South America, Africa and Antarctica; South Asia and Australia. Install
+the regions you need; their layers show every region you have installed.
+
+An installed VMAP0 pack doesn't change what you see until you add its
+layers: **Add Layer → Data Packs** lists each pack's layers, and **All
+Layers** adds them together as a collection. Each kind of feature
+appears only from a suitable zoom level, so the whole globe isn't
+cluttered: international boundaries always, main roads and lakes from
+continent scale, other roads and towns as you zoom in to a region, and
+small rivers and contours closer still. With software graphics (no GPU),
+turn off the themes you don't need: all of them at once over a busy region
+makes the view slow. Town and airport names, and spot heights, are written beside
+their points. With **What Is Here** on, clicking a feature lists what it
+is and its details in plain words (a road's class, a river's name, a
+boundary's status).
+
+VMAP0 was compiled from charts of the 1970s to 1990s: roads, towns and
+boundaries are as they were then, accurate to about 2 km, and they are
+no statement on any boundary or name. The administrative areas pack is
+licensed by ESRI for internal or non-commercial use only; the others are
+public domain.
+
 ## Limits
 
 - Only WMS, WMTS, XYZ and WFS layers can be kept this way. The built-in layers need no

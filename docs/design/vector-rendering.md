@@ -131,8 +131,14 @@ point size (`VectorStyle::pointSizePx`, 6 px by default, `pointSizePx`
 in a layer's style) in the outline colour, or the fill colour for a
 layer without an outline.
 
-**Picking.** A provider that keeps its features (WFS) answers
-`FeatureProvider::featuresAt()`; others return none.
+**Picking.** A provider that keeps its features (WFS, KML, and pack
+GeoPackages with attributes such as VMAP0's, from the tiles it loaded last)
+answers `FeatureProvider::featuresAt()`; others return none.
+
+**Labels.** `VectorRenderer::drawnTiles()` returns the stored tiles of a
+source drawn in the last frame; the window labels a pack layer's named
+points in them (`FeatureProvider::labelPoints()`, see
+[packs.md](packs.md#pack-layers)).
 
 ## The graticule
 

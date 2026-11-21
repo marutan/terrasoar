@@ -9,6 +9,19 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- NGA's Vector Map Level 0 (VMAP0, 1:1,000,000) as data packs, in File →
+  Data Packs: international boundaries (disputed ones drawn differently),
+  hydrography (rivers, lakes, coastlines, canals), transportation (roads
+  by class, railways, ferries, airports with their names), population
+  (built-up areas, settlements named on the view), elevation (contours,
+  spot heights, depth contours), vegetation, and ice, ground, industry
+  and utilities. Hydrography, elevation and vegetation come as four
+  regional packs each, read together. First-order administrative
+  boundaries and areas, which ESRI owns and licenses for non-commercial
+  use only, are a pack of their own. An installed pack's layers are in
+  Add Layer → Data Packs (one by one, or All Layers as a collection), with
+  default styles and each class shown from its own zoom level; What Is
+  Here shows a feature's class and attributes in plain words.
 - Navigation controls on the view (View → Navigation Controls, shown by
   default; View → Navigation Controls Corner): a compass to turn the view
   and back to north up, arrows to move it (faster the longer they are

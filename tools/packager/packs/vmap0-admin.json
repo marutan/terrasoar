@@ -1,0 +1,198 @@
+{
+  "id": "vmap0-admin",
+  "version": "5.1",
+  "index": {
+    "name": "VMAP0 administrative areas (ESRI)",
+    "description": "First-order administrative boundaries (states, provinces) and named administrative areas from VMAP0 edition 5. These features are ESRI's intellectual property, licensed for internal or non-commercial use only (ESRI Data License Agreement, included).",
+    "licence": "ESRI Data License Agreement (internal or non-commercial use only)"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "vmap0-noamer",
+      "file": "vmap0-noamer.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/noamer.zip",
+      "sha256": "45241a1fb60d97eff7f69f7af836275440cc4dae0d8caeca3684b7d3f5dedd94",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library NOAMER (North America)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": [
+        "../notices/vmap0.txt"
+      ]
+    },
+    {
+      "id": "vmap0-eurnasia",
+      "file": "vmap0-eurnasia.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/eurnasia.zip",
+      "sha256": "bd2cad4328851023ede844c4e125ca1e0de10c2813c3d0c07ada25023b55e8f0",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library EURNASIA (Europe and North Asia)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    },
+    {
+      "id": "vmap0-soamafr",
+      "file": "vmap0-soamafr.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/soamafr.zip",
+      "sha256": "41367cbb4bbd875a2cd9361cd15a45cc031d4c03c238596c0b1ae4510f69d0fe",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library SOAMAFR (South America, Africa and Antarctica)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    },
+    {
+      "id": "vmap0-sasaus",
+      "file": "vmap0-sasaus.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/sasaus.zip",
+      "sha256": "b1af09093af52aa9d92edd91465f6311f28d94c7ef4d3b9b4e438a2ed337fbef",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library SASAUS (South Asia and Australia)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": []
+    }
+  ],
+  "vmap0": {
+    "dataset": "vmap0-admin",
+    "sources": [
+      "vmap0-noamer",
+      "vmap0-eurnasia",
+      "vmap0-soamafr",
+      "vmap0-sasaus"
+    ],
+    "name": "VMAP0 administrative areas",
+    "licence": "ESRI Data License Agreement (internal or non-commercial use only)",
+    "attribution": "Administrative areas: Vector Map Level 0 (VMAP0), NGA; © 1992–2000 ESRI and its licensors",
+    "sourceName": "Vector Map Level 0 (VMAP0) edition 5, NGA",
+    "sourceVersion": "5.0",
+    "sourceUrl": "https://geo.lib.umn.edu/gisdata/vmap0/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.08
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.001
+      }
+    ],
+    "classes": [
+      {
+        "coverage": "bnd",
+        "class": "polbndl",
+        "table": "first_order_boundaries",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "bst",
+            "name": "status"
+          },
+          {
+            "column": "use",
+            "name": "use"
+          },
+          {
+            "column": "acc",
+            "name": "accuracy"
+          }
+        ],
+        "filters": [
+          {
+            "column": "use",
+            "values": [
+              "26"
+            ]
+          }
+        ]
+      },
+      {
+        "coverage": "bnd",
+        "class": "polbnda",
+        "table": "admin_areas",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "nam",
+            "name": "name"
+          },
+          {
+            "column": "na2",
+            "name": "country"
+          },
+          {
+            "column": "na3",
+            "name": "region"
+          }
+        ],
+        "filters": [
+          {
+            "column": "nam",
+            "values": [
+              "UNK"
+            ],
+            "exclude": true
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "boundaries",
+        "name": "VMAP0 First-Order Administrative Boundaries",
+        "tables": [
+          "first_order_boundaries"
+        ],
+        "style": {
+          "outline": "#e6ee9cff",
+          "outlineWidthPx": 0.9
+        }
+      },
+      {
+        "id": "areas",
+        "name": "VMAP0 Administrative Areas",
+        "tables": [
+          "admin_areas"
+        ],
+        "style": {
+          "fill": "#fff59d14"
+        }
+      }
+    ]
+  }
+}

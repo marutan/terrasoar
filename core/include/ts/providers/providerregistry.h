@@ -47,6 +47,7 @@ class ImageryProvider;
 class NetworkClient;
 class PackManifest;
 struct InstalledPack;
+struct PackDataset;
 struct WebTileSettings;
 
 /**
@@ -227,6 +228,10 @@ private:
   struct Replacement;
   /** The variant a base pack source's dimensions pick; null if none. */
   const Replacement* basePackVariant(const QJsonObject& source) const;
+  void addPackDatasetLocked(const QString& directory,
+                            const PackDataset& dataset);
+  std::shared_ptr<FeatureProvider> packFeaturesLocked(const QJsonObject& source,
+                                                      QString* errorString);
   std::shared_ptr<const GeoidModel> geoidLocked(const QString& dataset,
                                                 QString* errorString);
   std::shared_ptr<ElevationProvider>
@@ -267,6 +272,11 @@ private:
     QString path;
     bool features = false;
     QString attribution;
+    /**
+     * The same dataset's files in further packs (regional packs of a
+     * pack's own feature dataset, read together); empty otherwise.
+     */
+    std::vector<QString> morePaths;
   };
   /** A geoid grid of an installed pack. */
   struct PackGeoid {

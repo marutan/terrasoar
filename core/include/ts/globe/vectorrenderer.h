@@ -183,6 +183,12 @@ public:
   /** Returns this frame's counters. */
   VectorStatistics statistics() const { return m_statistics; }
 
+  /**
+   * Returns the stored tiles of @p provider drawn this frame (each once),
+   * for labels: none if no layer uses it.
+   */
+  std::vector<TileKey> drawnTiles(const FeatureProvider* provider) const;
+
 private:
   struct GpuMesh;
   struct Source;

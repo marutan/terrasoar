@@ -1,0 +1,40 @@
+Vector Map Level 0 (VMAP0), edition 5
+=====================================
+
+Producer: National Imagery and Mapping Agency (NIMA), now the National
+Geospatial-Intelligence Agency (NGA), United States.
+Edition 5, 30 September 2000. Four libraries: NOAMER (North America),
+EURNASIA (Europe and North Asia), SOAMAFR (South America, Africa and
+Antarctica) and SASAUS (South Asia and Australia).
+
+Terms, as the data state them:
+- Releasability (database header table): UNRESTRICTED.
+- Access constraints (FGDC metadata, FGDC_DAT.TXT): None.
+- Use constraints (FGDC metadata): Cite National Imagery and Mapping
+  Agency.
+
+Terra Soar credits it as "Vector Map Level 0 (VMAP0), NGA".
+
+Certain features of the Boundaries coverage and of the Reference library
+are the intellectual property of Environmental Systems Research
+Institute, Inc. (ESRI) and its licensors, under the ESRI Data License
+Agreement in README1.TXT (internal or non-commercial use only): first
+order administrative boundaries (bnd edge features with f_code FA000 and
+USE 26), named administrative areas (bnd faces with f_code FA001 and a
+name), and the Reference library's libref, placenam and polbnd
+coverages. Terra Soar's VMAP0 packs leave all of them out, except the
+separate "vmap0-admin" pack, which holds the first two under ESRI's
+terms.
+
+VMAP0 is a 1:1,000,000 product compiled mostly from the Operational
+Navigation Charts of the 1970s to 1990s. Its boundaries, names and
+features are of that time and of that accuracy (about 2 km); they are no
+statement of any government's position on boundaries or names, and they
+are not suitable for navigation.
+
+The source files' own README1.TXT and FGDC_DAT.TXT are included next to
+this notice, unchanged.
+
+The source as downloaded: https://geo.lib.umn.edu/gisdata/vmap0/ (the
+University of Minnesota's copy of the four CD-ROMs; NGA no longer
+publishes VMAP0).

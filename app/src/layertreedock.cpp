@@ -20,6 +20,7 @@
 
 #include "layertreedock.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -181,6 +182,28 @@ void LayerTreeDock::retranslateUi()
   updateControls();
 }
 
+namespace
+{
+
+/** Where a new entry goes: into a selected collection at its top, else
+ *  just above the selected entry, else at the top of the tree. */
+void insertionPoint(const LayerTreeModel& model, const QModelIndex& current,
+                    QModelIndex* parent, int32_t* row)
+{
+  if (!current.isValid()) {
+    *parent = QModelIndex();
+    *row = 0;
+  } else if (model.data(current, LayerTreeModel::IsCollectionRole).toBool()) {
+    *parent = current;
+    *row = 0;
+  } else {
+    *parent = current.parent();
+    *row = current.row();
+  }
+}
+
+} // namespace
+
 void LayerTreeDock::rebuildAddLayerMenu()
 {
   m_addLayerMenu->clear();
@@ -218,6 +241,54 @@ void LayerTreeDock::rebuildAddLayerMenu()
   QAction* solid = m_addLayerMenu->addAction(tr("Solid Colour…"));
   solid->setObjectName(QStringLiteral("addSolidColourAction"));
   connect(solid, &QAction::triggered, this, &LayerTreeDock::addSolidColorLayer);
+  if (m_packLayers.empty()) {
+    return;
+  }
+  m_addLayerMenu->addSeparator();
+  QMenu* packs = m_addLayerMenu->addMenu(tr("Data Packs"));
+  packs->setObjectName(QStringLiteral("addPackLayerMenu"));
+  for (const PackLayers& pack : m_packLayers) {
+    QMenu* menu = packs->addMenu(pack.name);
+    QAction* all = menu->addAction(tr("All Layers"));
+    connect(all, &QAction::triggered, this,
+            [this, pack]() { addPackCollection(pack); });
+    menu->addSeparator();
+    for (const LayerDefinition& definition : pack.layers) {
+      QAction* action = menu->addAction(definition.name);
+      connect(action, &QAction::triggered, this,
+              [this, definition]() { addLayer(definition); });
+    }
+  }
+}
+
+void LayerTreeDock::setPackLayers(std::vector<PackLayers> packs)
+{
+  // The packs change rarely; the menu isn't rebuilt (and closed, if open)
+  // for nothing.
+  const bool same = std::equal(
+      packs.begin(), packs.end(), m_packLayers.begin(), m_packLayers.end(),
+      [](const PackLayers& a, const PackLayers& b) {
+        return a.name == b.name && a.layers == b.layers;
+      });
+  if (same) {
+    return;
+  }
+  m_packLayers = std::move(packs);
+  rebuildAddLayerMenu();
+}
+
+void LayerTreeDock::addPackCollection(const PackLayers& pack)
+{
+  QModelIndex parent;
+  int32_t row = 0;
+  insertionPoint(*m_model, m_view->currentIndex(), &parent, &row);
+  const QModelIndex collection = m_model->addCollection(pack.name, parent, row);
+  // The pack lists its layers bottom first, like the tree's draw order.
+  for (const LayerDefinition& definition : pack.layers) {
+    m_model->addLayer(definition, collection, 0);
+  }
+  m_view->expand(collection);
+  m_view->setCurrentIndex(collection);
 }
 
 void LayerTreeDock::setGroupCompositingAvailable(bool available)
@@ -252,28 +323,6 @@ void LayerTreeDock::updateControls()
         m_model->data(current, LayerTreeModel::CompositeAsGroupRole).toBool());
   }
 }
-
-namespace
-{
-
-/** Where a new entry goes: into a selected collection at its top, else
- *  just above the selected entry, else at the top of the tree. */
-void insertionPoint(const LayerTreeModel& model, const QModelIndex& current,
-                    QModelIndex* parent, int32_t* row)
-{
-  if (!current.isValid()) {
-    *parent = QModelIndex();
-    *row = 0;
-  } else if (model.data(current, LayerTreeModel::IsCollectionRole).toBool()) {
-    *parent = current;
-    *row = 0;
-  } else {
-    *parent = current.parent();
-    *row = current.row();
-  }
-}
-
-} // namespace
 
 void LayerTreeDock::addLayer(const LayerDefinition& definition)
 {

@@ -148,11 +148,21 @@ at display level *n*, the provider reads the tables serving *n* and returns
 the features of the key's ancestor at their storage level. GIS programs
 (QGIS, `ogrinfo`) open the file as it is.
 
+From Phase 21 (the VMAP0 packs) a table's `geometry` may also be `points`
+(multipoints), and besides integer attribute columns it may have text
+ones; either may be NULL, which a feature then simply lacks. An integer
+`feature_id` names the feature for picking (`ts::Feature::id`). Tables may
+have no R-tree (the VMAP0 packs leave it out: a quarter of their size, and
+the provider reads by tile). Versions 0.0.2 and earlier skip `points`
+tables and read only the integer columns, so the base pack's format is
+unchanged.
+
 **Manifest** (`manifest.json`, read by `ts::PackManifest`): format 1;
 `id` (`terrasoar-base`), `version`, `files` (path, sha256, bytes),
 `datasets` (id, kind — `imagery`, `features` (tiled) or `areas` (the
 countries) — file, name, licence, attribution, source with name, version,
-url and sha256, and for extra packs `replaces`) and `notices`. Paths are relative, `/`-separated
+url and sha256, and for extra packs `replaces`) and `notices`; extra
+packs may add `name` and `layers` ([packs.md](../design/packs.md#pack-layers)). Paths are relative, `/`-separated
 and may not leave the pack directory.
 
 ## In the application
