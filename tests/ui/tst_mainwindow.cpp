@@ -1647,7 +1647,9 @@ private slots:
     QTest::touchEvent(zoomIn, touch).release(0, middle, zoomIn);
 #else
     // Qt 5 on Windows doesn't deliver QTest's touch to widgets: the events
-    // go straight to the control, which takes touch itself.
+    // go straight to the control, which takes touch itself (Qt 5 passes
+    // touch only to widgets that ask for it).
+    zoomIn->setAttribute(Qt::WA_AcceptTouchEvents, true);
     QTouchDevice* touch = QTest::createTouchDevice();
     for (const Qt::TouchPointState state :
          {Qt::TouchPointPressed, Qt::TouchPointReleased}) {

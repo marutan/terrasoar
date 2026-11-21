@@ -219,9 +219,6 @@ public:
     setObjectName(objectName);
     setFocusPolicy(Qt::TabFocus);
     setAttribute(Qt::WA_Hover, true);
-    // Touch is taken here, as presses, drags and releases, rather than
-    // relying on the platform to make mouse events of it.
-    setAttribute(Qt::WA_AcceptTouchEvents, true);
     setCursor(Qt::PointingHandCursor);
   }
 
@@ -270,7 +267,11 @@ protected:
     QWidget::focusOutEvent(event);
   }
 
-  /** One finger's touch as the mouse's left button. */
+  /**
+   * One finger's touch as the mouse's left button, for touch events that
+   * reach the control (Qt otherwise turns touch into mouse events, since
+   * the controls don't ask for touch: on Windows asking stops that).
+   */
   void touch(QTouchEvent* event)
   {
     if (event == nullptr) {
