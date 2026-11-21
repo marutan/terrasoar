@@ -138,8 +138,29 @@ QString AircraftLayers::keyOf(const QJsonObject& source)
       QJsonDocument(source).toJson(QJsonDocument::Compact));
 }
 
+namespace
+{
+
+/** True if @p a and @p b draw the same (layers, sources, styles, opacity). */
+bool sameLayers(const std::vector<AircraftLayerEntry>& a,
+                const std::vector<AircraftLayerEntry>& b)
+{
+  return std::equal(
+      a.begin(), a.end(), b.begin(), b.end(),
+      [](const AircraftLayerEntry& x, const AircraftLayerEntry& y) {
+        return x.nodeId == y.nodeId &&
+               x.definition.source == y.definition.source &&
+               x.definition.style == y.definition.style && x.alpha == y.alpha;
+      });
+}
+
+} // namespace
+
 void AircraftLayers::setLayers(std::vector<AircraftLayerEntry> layers)
 {
+  // The layers are set again whenever the tree is drawn (as the clock
+  // moves, too): trails are built again only if they changed.
+  const bool changed = !sameLayers(m_layers, layers);
   m_layers = std::move(layers);
   std::set<QString> wanted;
   for (const AircraftLayerEntry& layer : m_layers) {
@@ -156,8 +177,10 @@ void AircraftLayers::setLayers(std::vector<AircraftLayerEntry> layers)
   for (const QString& key : idle) {
     stopLive(key);
   }
-  rebuildTrails();
-  updateDraws();
+  if (changed) {
+    rebuildTrails();
+    updateDraws();
+  }
 }
 
 std::shared_ptr<const AircraftSet>
