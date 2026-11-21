@@ -87,10 +87,98 @@ replace. Each may be left out.
 | `shoreline-full` | 2 min 15 s | 750 MB | 241 MB |
 | `geoid-egm2008-fine` | 25 s | 450 MB | 13.4 MB |
 | `geoid-osgm15` | < 1 s | — | 1.5 MB |
+| `vmap0-*` (17) | 12 s – 7 min 41 s each | up to 1 GB | 4–143 MB each, 1.52 GB in all; see [vmap0.md](../data/vmap0.md#sizes) |
 
 The full-resolution Blue Marble is tiled to level 6, a 32768 × 16384
 mosaic: a little more than the source's 21600 pixels across, so that no
 detail of the source is lost to the tiling.
+
+## VMAP0 packs (Phase 21)
+
+The `vmap0-*` configurations turn NGA's Vector Map Level 0 into packs of
+vector layers; what they hold, their sizes and VMAP0's terms are in
+[docs/data/vmap0.md](../data/vmap0.md). They are written by
+`tools/packager/make_vmap0_configs.py` from one description (seventeen
+packs share their sources, levels and styles): edit it and run it rather
+than editing the JSON. Built like any extra pack:
+
+```sh
+python3 tools/packager/build_pack.py --build-dir <build> \
+    --config tools/packager/packs/vmap0-transportation.json \
+    --sources ~/vmap0-sources --index ~/terrasoar-packs/index.json
+```
+
+The sources are the four VMAP0 CD-ROMs as zips (920 MB together);
+`fetch_sources.py` downloads and checks them like every other source. The
+packager reads them straight from the zips through GDAL's `/vsizip/`,
+without unpacking.
+
+### The VPF reader
+
+`tools/packager/src/vpf/` reads the Vector Product Format (MIL-STD-2407)
+itself: GDAL's VPF driver needs the OGDI library, which isn't among our
+dependencies, and VPF is fully specified.
+
+- `vpftable`: a table's header (byte order, description, narrative,
+  columns) and rows, with every column type — text (`T`, `L`, `N`, `M`,
+  fixed or variable length), `S`, `I`, `F`, `R` (one value or several),
+  dates, triplet ids (`K`), coordinates in 2D and 3D, single and double
+  precision (`C`, `B`, `Z`, `Y`), and `X` — in either byte order. A
+  truncated or malformed table is reported with its file and row. The
+  variable-length index (`*.?x`) isn't needed to read the rows in order;
+  `checkIndex()` compares it with them. Thematic indexes (`*.?ti`,
+  inverted lists) are read by `ThematicIndex`. Names are matched without
+  regard to case: VMAP0's CD-ROMs are upper case, the standard lower.
+- `vpfcoverage`: the database (`dht`, `lat`), each library (`cat`, and
+  for a tiled library its tile reference coverage: `tileref.aft` names
+  each tile's directory, its face's bounding rectangle in `fbr` gives the
+  tile's extent), each coverage (`fcs`, the feature tables, the value
+  description tables `char.vdt` and `int.vdt`) and the features of a
+  class with their geometry from the primitives of their tile: edges for
+  lines, entity or connected nodes for points, text primitives for text,
+  and for areas the faces, whose rings (`rng`, outer ring first) are
+  walked along the winged-edge topology: forward along an edge with the
+  face on its right, then on to its right edge; backward along one with
+  the face on its left, then on to its left edge; loop edges and
+  dangles by the node they are reached from. A face whose ring doesn't
+  close is reported and left out.
+
+`terrasoar-packager --vpf-info <database> [--coverage <name>]` lists a
+database's libraries, coverages and classes with the features read from
+each, for example
+`--vpf-info /vsizip/$HOME/vmap0-sources/soamafr.zip/VMAPLV0`.
+
+### The conversion
+
+`vmap0builder` turns a pack's classes into one GeoPackage (one dataset):
+
+1. **Read** every library's features of the class (the world reference
+   library `rference` is never read), keep those passing the class's
+   `filters` (raw values; how the ESRI-owned features are kept out of the
+   public packs and in `vmap0-admin`), and make their geometry: lines,
+   points, polygons with holes, repaired with GEOS where invalid.
+2. **Decode** the attributes the class lists: by default a code becomes
+   its value description's text (`rtt` 14 → `route_type` "Primary
+   Route"); `"kind": "text"` keeps the value, `"number"` keeps a number
+   and makes the codes the value tables list (VMAP0's "Unknown" 29999)
+   NULL. "UNK" and "No entry present" are NULL.
+3. **Dissolve** the class by its attributes: the pieces with the same
+   values become one feature, lines merged end to end, areas united.
+   This joins what VMAP0 cut along its 15° and 30° tile edges (and
+   library edges), and it is what keeps the packs small: VMAP0 stores a
+   road between every two junctions as a feature of its own.
+4. For each **level of detail** serving the class (from the class's
+   `minLevel`), simplify each part (GEOS topology-preserving, within the
+   level's `toleranceDeg`), leave out below the finest level the parts
+   smaller than a square of twice the tolerance (or lines shorter than
+   it), cut them down the quadtree to the level's storage level, and
+   write one row per tile and attribute set into `<table>_<storage
+   level>`, with a `feature_id`. The tables have no R-tree.
+
+The report gives, per class, the features read, filtered, skipped
+(unusable geometry: fails the build), degenerate (faces that enclose
+nothing, a known VMAP0 error: left out and listed), joined and written,
+and per level the rows, vertices and parts left out as too small.
 
 ## What it does
 
@@ -192,6 +280,8 @@ area and GSHHG's area.
 | `countries` | `dataset`, `source` (Natural Earth admin-0 countries, with `ADM0_A3`, `ADMIN`, `ISO_A2_EH`, `ISO_A3_EH`), `name`, `licence`, `attribution`, `bufferDeg` (0.05), `simplifyDeg` (0.02; must be smaller), `exclude` (`ADM0_A3` codes left out: `ATA`) |
 | `geoids[]` | `dataset`, `source` (a PROJ GeoTIFF geoid grid), `name`, `licence`, `attribution`, `step` (keep every step-th sample), `replaces` (extra packs: the base pack geoid it is a finer grid of), `copy` (true: ship the grid as it is, for small regional grids with no-data cells; otherwise it is written as 16-bit centimetres) |
 | `datumShifts[]` | `dataset` (the id projections ask for, e.g. `ostn15`; the file is `<dataset>.tif`), `source` (a PROJ GeoTIFF horizontal offset grid, shipped as it is), `name`, `licence`, `attribution`; listed in the manifest's `datumShifts` |
+| `vmap0` | `dataset`, `sources[]` (the source ids of the VMAP0 zips), `libraries[]` (empty: all but `rference`), `name`, `licence`, `attribution`, `sourceName`, `sourceVersion`, `sourceUrl` (the manifest's dataset source), `lods[]` (`storageLevel`, `minLevel`, `maxLevel`, `toleranceDeg`), `classes[]` (`coverage`, `class`, `table`, `minLevel`, `maxLevel`, `attributes[]` with `column`, `name`, `kind` (`decoded`, `text` or `number`), `filters[]` with `column`, `values`, `exclude`), `layers[]` (`id`, `name`, `tables`, `style` with `labels`, `styleRules`): see [VMAP0 packs](#vmap0-packs-phase-21) |
+| `layerGroup` | (top level) The pack's name in the manifest, under which Add Layer lists its layers; regional packs of one theme share it. Default: `index.name` |
 | `elevation` | `dataset`, `source` (a global geographic DEM), `name`, `licence`, `attribution`, `maxLevel` (6), `samples` (65 per tile side), `verticalDatum` (a geoid dataset of `geoids`, written to the store) |
 
 ### Changing a source
@@ -206,8 +296,11 @@ area and GSHHG's area.
 ## Code and tests
 
 The packager's code is in `tools/packager/src/` (`imagerytiler`,
-`shorelinebuilder`, `countrybuilder`, `packbuilder`; `main.cpp` is only the command line);
-`packager.pri` shares it with `tests/packager`. It links `tscore` for the
+`shorelinebuilder`, `countrybuilder`, `vmap0builder`, `packbuilder`, and
+the VPF reader in `vpf/`; `main.cpp` is only the command line);
+`packager.pri` shares it with `tests/packager`, `tests/vmap0` and
+`tests/globe` (whose VMAP0 golden images build their packs from the test
+tile). It links `tscore` for the
 tile store and GeoPackage writers, the manifest and the dependency
 wrappers.
 

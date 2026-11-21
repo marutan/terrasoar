@@ -1,0 +1,188 @@
+{
+  "id": "vmap0-vegetation-noamer",
+  "version": "5.1",
+  "layerGroup": "VMAP0 vegetation",
+  "index": {
+    "name": "VMAP0 vegetation: North America",
+    "description": "Woodland (deciduous, evergreen, mixed), cropland, grassland and scrub, marsh and swamp, and tundra, from NGA's Vector Map Level 0 (1:1,000,000, edition 5, 2000). This pack covers VMAP0's North America library; install the regions you want.",
+    "licence": "Public domain (NGA)"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "vmap0-noamer",
+      "file": "vmap0-noamer.zip",
+      "url": "https://geo.lib.umn.edu/gisdata/vmap0/noamer.zip",
+      "sha256": "45241a1fb60d97eff7f69f7af836275440cc4dae0d8caeca3684b7d3f5dedd94",
+      "name": "Vector Map Level 0 (VMAP0) edition 5, library NOAMER (North America)",
+      "version": "5.0",
+      "notices": [
+        "README1.TXT",
+        "FGDC_DAT.TXT"
+      ],
+      "localNotices": [
+        "../notices/vmap0.txt"
+      ]
+    }
+  ],
+  "vmap0": {
+    "dataset": "vmap0-vegetation",
+    "sources": [
+      "vmap0-noamer"
+    ],
+    "name": "VMAP0 vegetation",
+    "licence": "Public domain (NGA)",
+    "attribution": "Vector Map Level 0 (VMAP0), NGA",
+    "sourceName": "Vector Map Level 0 (VMAP0) edition 5, NGA",
+    "sourceVersion": "5.0",
+    "sourceUrl": "https://geo.lib.umn.edu/gisdata/vmap0/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.08
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.001
+      }
+    ],
+    "classes": [
+      {
+        "coverage": "veg",
+        "class": "treesa",
+        "table": "trees",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "veg",
+            "name": "vegetation"
+          }
+        ]
+      },
+      {
+        "coverage": "veg",
+        "class": "cropa",
+        "table": "cropland",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          },
+          {
+            "column": "veg",
+            "name": "vegetation"
+          }
+        ]
+      },
+      {
+        "coverage": "veg",
+        "class": "grassa",
+        "table": "grassland",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "veg",
+        "class": "swampa",
+        "table": "swamps",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      },
+      {
+        "coverage": "veg",
+        "class": "tundraa",
+        "table": "tundra",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "f_code",
+            "name": "feature"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "vegetation",
+        "name": "VMAP0 Vegetation",
+        "tables": [
+          "trees",
+          "cropland",
+          "grassland",
+          "swamps",
+          "tundra"
+        ],
+        "style": {
+          "fill": "#66bb6a59"
+        },
+        "styleRules": [
+          {
+            "attribute": "feature",
+            "equals": "Cropland",
+            "fill": "#e6c35c59"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Grassland",
+            "fill": "#aed58159"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Scrub/Brush",
+            "fill": "#bcaaa459"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Marsh/Swamp",
+            "fill": "#4db6ac66"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Bog",
+            "fill": "#4db6ac66"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Tundra",
+            "fill": "#b0bec559"
+          }
+        ]
+      }
+    ],
+    "libraries": [
+      "noamer"
+    ]
+  }
+}
