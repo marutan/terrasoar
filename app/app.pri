@@ -54,6 +54,7 @@ HEADERS += \
     $$PWD/src/globeview.h \
     $$PWD/src/layertreedock.h \
     $$PWD/src/mainwindow.h \
+    $$PWD/src/navigationoverlay.h \
     $$PWD/src/newregiondialog.h \
     $$PWD/src/offlineregionmanager.h \
     $$PWD/src/packmanager.h \
@@ -103,6 +104,7 @@ SOURCES += \
     $$PWD/src/mainwindowkml.cpp \
     $$PWD/src/mainwindowsatellites.cpp \
     $$PWD/src/mainwindowships.cpp \
+    $$PWD/src/navigationoverlay.cpp \
     $$PWD/src/newregiondialog.cpp \
     $$PWD/src/offlineregionmanager.cpp \
     $$PWD/src/packmanager.cpp \

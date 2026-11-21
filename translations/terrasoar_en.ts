@@ -1976,6 +1976,14 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <source>Click each point of the line to profile; double-click or press Enter to finish. Backspace removes a point, Esc cancels.</source>
             <translation>Click each point of the line to profile; double-click or press Enter to finish. Backspace removes a point, Esc cancels.</translation>
         </message>
+        <message>
+            <source>Scale 1 : %1</source>
+            <translation>Scale 1 : %1</translation>
+        </message>
+        <message>
+            <source>Eye height %1</source>
+            <translation>Eye height %1</translation>
+        </message>
     </context>
     <context>
         <name>ts::HelpWindow</name>
@@ -3671,6 +3679,153 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Ship Layer Properties…</source>
             <translation>Ship Layer Properties…</translation>
+        </message>
+        <message>
+            <source>&amp;Navigation Controls</source>
+            <translation>&amp;Navigation Controls</translation>
+        </message>
+        <message>
+            <source>Show controls on the view to turn, move, zoom and tilt it</source>
+            <translation>Show controls on the view to turn, move, zoom and tilt it</translation>
+        </message>
+        <message>
+            <source>Navigation Controls &amp;Corner</source>
+            <translation>Navigation Controls &amp;Corner</translation>
+        </message>
+        <message>
+            <source>Top &amp;Right</source>
+            <translation>Top &amp;Right</translation>
+        </message>
+        <message>
+            <source>Top &amp;Left</source>
+            <translation>Top &amp;Left</translation>
+        </message>
+        <message>
+            <source>&amp;Bottom Left</source>
+            <translation>&amp;Bottom Left</translation>
+        </message>
+        <message>
+            <source>Bottom Ri&amp;ght</source>
+            <translation>Bottom Ri&amp;ght</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::NavigationOverlay</name>
+        <message>
+            <source>Compass</source>
+            <translation>Compass</translation>
+        </message>
+        <message>
+            <source>Drag the ring to turn the view; click N to turn north up (N when focused)</source>
+            <translation>Drag the ring to turn the view; click N to turn north up (N when focused)</translation>
+        </message>
+        <message>
+            <source>Turn left</source>
+            <translation>Turn left</translation>
+        </message>
+        <message>
+            <source>Turn left; hold to keep turning (Q)</source>
+            <translation>Turn left; hold to keep turning (Q)</translation>
+        </message>
+        <message>
+            <source>Turn right</source>
+            <translation>Turn right</translation>
+        </message>
+        <message>
+            <source>Turn right; hold to keep turning (E)</source>
+            <translation>Turn right; hold to keep turning (E)</translation>
+        </message>
+        <message>
+            <source>Move forward</source>
+            <translation>Move forward</translation>
+        </message>
+        <message>
+            <source>Move forward; hold to keep moving (W or Up)</source>
+            <translation>Move forward; hold to keep moving (W or Up)</translation>
+        </message>
+        <message>
+            <source>Move back</source>
+            <translation>Move back</translation>
+        </message>
+        <message>
+            <source>Move back; hold to keep moving (S or Down)</source>
+            <translation>Move back; hold to keep moving (S or Down)</translation>
+        </message>
+        <message>
+            <source>Move left</source>
+            <translation>Move left</translation>
+        </message>
+        <message>
+            <source>Move left; hold to keep moving (A or Left)</source>
+            <translation>Move left; hold to keep moving (A or Left)</translation>
+        </message>
+        <message>
+            <source>Move right</source>
+            <translation>Move right</translation>
+        </message>
+        <message>
+            <source>Move right; hold to keep moving (D or Right)</source>
+            <translation>Move right; hold to keep moving (D or Right)</translation>
+        </message>
+        <message>
+            <source>Reset view</source>
+            <translation>Reset view</translation>
+        </message>
+        <message>
+            <source>Back to the start view (Home)</source>
+            <translation>Back to the start view (Home)</translation>
+        </message>
+        <message>
+            <source>Zoom in</source>
+            <translation>Zoom in</translation>
+        </message>
+        <message>
+            <source>Zoom in; hold to keep zooming (+ or Page Up)</source>
+            <translation>Zoom in; hold to keep zooming (+ or Page Up)</translation>
+        </message>
+        <message>
+            <source>Zoom out</source>
+            <translation>Zoom out</translation>
+        </message>
+        <message>
+            <source>Zoom out; hold to keep zooming (− or Page Down)</source>
+            <translation>Zoom out; hold to keep zooming (− or Page Down)</translation>
+        </message>
+        <message>
+            <source>Zoom</source>
+            <translation>Zoom</translation>
+        </message>
+        <message>
+            <source>Click or drag to fly to a height</source>
+            <translation>Click or drag to fly to a height</translation>
+        </message>
+        <message>
+            <source>%1. Click or drag to fly to a height</source>
+            <translation>%1. Click or drag to fly to a height</translation>
+        </message>
+        <message>
+            <source>Tilt up</source>
+            <translation>Tilt up</translation>
+        </message>
+        <message>
+            <source>Tilt towards the horizon; hold to keep tilting (R)</source>
+            <translation>Tilt towards the horizon; hold to keep tilting (R)</translation>
+        </message>
+        <message>
+            <source>Tilt down</source>
+            <translation>Tilt down</translation>
+        </message>
+        <message>
+            <source>Tilt towards straight down; hold to keep tilting (F)</source>
+            <translation>Tilt towards straight down; hold to keep tilting (F)</translation>
+        </message>
+        <message>
+            <source>Tilt</source>
+            <translation>Tilt</translation>
+        </message>
+        <message>
+            <source>Click or drag to tilt; double-click for straight down</source>
+            <translation>Click or drag to tilt; double-click for straight down</translation>
         </message>
     </context>
     <context>

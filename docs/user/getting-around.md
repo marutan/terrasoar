@@ -24,15 +24,54 @@ view moves smoothly between them.
 Keys move the view for as long as you hold them, at the same speed however
 fast the computer draws.
 
+## The navigation controls
+
+The controls in the top-right corner of the view do the same with the
+mouse, a touch screen or the keyboard, without needing to know the
+buttons and keys:
+
+- **The compass** shows where north is. Drag its ring round to turn the
+  view; click the **N** to turn back to north up. The round arrows either
+  side turn the view a step at a time, or for as long as you hold them.
+- **The arrows** move the view: a click moves it a quarter of the way
+  across; held, it keeps moving, faster the longer you hold.
+- **The house** in the middle flies back to the start view (the same as
+  Home).
+- **+ and −** zoom in and out (a click halves or doubles the distance;
+  held, they keep zooming). **The slider** between them shows how high you
+  are (the eye's height on the globe, the scale on the map): click or
+  drag it to fly to another height.
+- **The tilt buttons** tilt towards the horizon or towards straight
+  down, and **the arc** below them shows the tilt: click or drag on it to
+  tilt; double-click it to look straight down.
+
+The controls are half see-through until the pointer is over them, and
+stay readable over snow, sea, space or a pale map. Their tooltips name the
+keys that do the same.
+
+**View → Navigation Controls** shows or hides them (hidden, a click there
+goes to the globe or map), and **View → Navigation Controls Corner** puts
+them in another corner. Terra Soar remembers both. With the keyboard, Tab
+from the view into the controls, then use the arrow keys and Enter. They
+grow with a larger system font, and are at least 9 mm across for fingers.
+With the system's high-contrast setting on, they are drawn opaque in the
+system's colours.
+
 With [terrain](terrain.md) switched on, zooming and moving follow the
 ground, and the camera stops above mountains.
 
 ## The flat map
 
-**View → 2D Map** (Ctrl+M) turns the globe into a flat map, and back. On
-the map the left button drags it, the wheel zooms, and the right button
-does nothing (a map isn't turned or tilted). **View → Map Projection**
-chooses how it is flattened:
+**View → 2D Map** (Ctrl+M) turns the globe into a flat map, and back. The
+map starts with north up, seen from straight above. On the map the left
+button drags it and the wheel zooms as on the globe, and it can be turned
+and tilted too: with the right button, Q / E and R / F, or the navigation
+controls. A tilted map looks towards its horizon, up to 70°; far off it
+fades into a haze, with the sky beyond, and with
+[terrain](terrain.md) on the mountains stand up in relief (straight down
+the map is flat, with its hillshade). The compass's **N** turns the map
+back to north up, and Home or **View → Reset View** goes back to north up
+and straight down. **View → Map Projection** chooses how it is flattened:
 
 - **Mercator** (on the WGS 84 ellipsoid): directions are true, so it is
   the projection of sea charts; areas grow towards the poles, and it stops

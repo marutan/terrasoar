@@ -745,7 +745,6 @@ void TileSelector::visit(
   if (!view.isVisible(key, samples, bounds)) {
     return;
   }
-  const Camera& camera = *view.camera;
   const bool renderable = isRenderable(key);
   if (wantsRefinement(view, key) &&
       refine(view, key, renderable, isRenderable, selection)) {

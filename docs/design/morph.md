@@ -212,8 +212,11 @@ costs more. A duration of 0 changes at once (opening a project).
   have (beyond Mercator's edge, or within a degree of a pole on Miller):
   then it slides to the nearest latitude the map allows.
 - Going to the map, **heading and tilt** ease to zero with t (the heading
-  the short way round): the map is north-up, seen from straight above.
-  Going back they stay at zero.
+  the short way round): the map starts north-up, seen from straight
+  above. It can then be turned and tilted (Phase 20). Going back to the
+  globe the map's heading and tilt are kept, and the change is as
+  continuous from a turned, tilted map as to one (`tests/camera`
+  `tiltedMapMorphIsContinuous`, `tests/globe` `morph-half-turned-tilted`).
 - The **range** stays, unless the view would be wider than the world on
   the map; then it eases in to that limit.
 - Like every motion here it is driven by elapsed time: at a low frame
@@ -225,8 +228,47 @@ costs more. A duration of 0 changes at once (opening a project).
   first.
 
 At exactly t = 1 the camera limits its pose to what a map allows
-(`Camera::setPose()`): heading and tilt 0, the latitude inside the
+(`Camera::setPose()`): the tilt at most 70°, the latitude inside the
 projection's domain, the range within `maximumMapRangeM()`.
+
+## Rotation and tilt on the map
+
+The map lies on a plane in front of the camera, and the camera looks at
+it as it looks at the globe, so turning and tilting it needed no new
+drawing: the same eye, heading and tilt, the same perspective. What
+changed is what assumed a map seen straight down with north up:
+
+- **Selection** uses the view's footprint on the plane, cut off at a far
+  limit, and, tilted, texels seen from their distance
+  ([tiling.md](tiling.md#a-turned-or-tilted-map)).
+- **The far limit and the horizon.** A tilted plane goes on for ever, so
+  it is drawn out to 40 eye heights (at most 10 000 km) and no further:
+  tiles, picks and requests stop there and the far clip plane is there.
+  Past 55 % of it the tiles fade into a pale haze (`tsMapHaze()`; vector
+  layers and the graticule fade out with them), and a sky pass, drawn
+  first, fills what lies beyond: the haze rising into blue above the
+  plane's horizon. Phase 14's atmosphere can replace it.
+- **The tilt limit** is 70°: with the view's half-height of 22.5° the top
+  of the view then looks just above the plane's horizon.
+- **Relief.** A map seen straight down is flat (with its hillshade, as
+  before). Tilted, the terrain stands up: each vertex is raised along the
+  plane's normal by its height times the map's relief, which rises
+  smoothly from 0 at no tilt to 1 at 15° (`Camera::mapReliefForTilt()`,
+  `tsMapRelief()`), times the morph factor. Vector layers are raised the
+  same way. The camera keeps its eye 20 m above the relief below it. The
+  map's tiles are then drawn with their full meshes, not strips.
+  Markers and labels stay on the plane.
+- **Picking** intersects the pixel's ray with the plane, as before; on a
+  tilted map nothing beyond the far limit is picked. Picking ignores the
+  relief (a point on a mountainside is picked where its ray meets the
+  plane).
+- **Panning under the pointer**: on a turned or tilted map the point
+  under the pointer is still a fixed offset from the centre in map
+  metres (the controller keeps the map's size as the centre moves), now
+  found by the pick (`Camera::mapOffsetAt()`) instead of from the pixel's
+  position, so a drag is still exact in one step.
+- The graticule, labels, markers and the scale bar follow, since they
+  are placed through the same camera.
 
 ## Navigating the map
 
@@ -239,9 +281,10 @@ coordinates:
 | Left drag | Slides the map: the grabbed place stays under the pointer. The pointer is a fixed offset from the centre in map coordinates, so the new centre is exact in one step |
 | Release while moving | Inertia with a velocity in map metres per second, decaying as e^(−3t) |
 | Wheel, Page Up/Down, + / − | Zoom as on the globe, keeping the place under the pointer |
-| Arrows / W A S D | Slide at half the map's range per second: straight lines on the map |
-| Right or middle drag, Q / E, R / F | Nothing: a map doesn't turn or tilt |
-| Double click, Home | Fly as on the globe, ending north-up |
+| Arrows / W A S D | Slide at half the map's range per second: straight lines on the map, the way the view faces |
+| Right or middle drag, Q / E, R / F, the navigation controls | Turn and tilt as on the globe (tilt up to 70°) |
+| Double click | Fly as on the globe, keeping the heading and tilt |
+| Home, View → Reset View | Fly to the start view: north-up, straight down |
 
 Sliding east or west goes **round the world**: the longitude wraps and
 the map carries on. North and south stop at the projection's latitude

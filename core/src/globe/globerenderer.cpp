@@ -1112,6 +1112,38 @@ std::optional<MarkerInstance> markerInstance(const GlobeMarker& marker,
        static_cast<float>(marker.hullStarboardM)}};
 }
 
+/**
+ * Writes the map's part of @p frame for @p camera at morph factor
+ * @p morph: the plane, the projection, the far limit of a tilted map and
+ * its relief (with terrain), and the projection's own domain.
+ */
+void writeMapFrame(const Camera& camera, double morph, bool terrain,
+                   FrameBlock& frame)
+{
+  const MapFrame map = camera.mapFrame();
+  const LocalFrame local =
+      localFrame(camera.pose().targetLatDeg, camera.pose().targetLonDeg);
+  frame.morph.at(0) = static_cast<float>(morph);
+  frame.morph.at(1) = static_cast<float>(map.planeScale);
+  frame.morph.at(2) =
+      static_cast<float>(std::max(projectionIndex(map.projection), 0));
+  // A tilted map: drawn up to its far limit, fading into a haze, with the
+  // terrain in relief.
+  const bool tilted =
+      camera.isMapTurnedOrTilted() && camera.pose().tiltDeg > 0.0;
+  frame.planeEast =
+      float4(local.eastEcef, tilted ? camera.mapFarLimitM() : 0.0);
+  frame.planeNorth = float4(
+      local.northEcef,
+      terrain ? morph * Camera::mapReliefForTilt(camera.pose().tiltDeg) : 0.0);
+  frame.planeOrigin = float4(camera.targetEcef() - camera.eyeEcef(), 0.0);
+  if (map.projection != nullptr && map.projection->hasOwnDomain()) {
+    const std::array<float, 8> domain = map.projection->glslDomainParameters();
+    frame.domain = {Float4{domain[0], domain[1], domain[2], domain[3]},
+                    Float4{domain[4], domain[5], domain[6], domain[7]}};
+  }
+}
+
 } // namespace
 
 void GlobeRenderer::uploadSpaceLines(const Camera& camera)
@@ -1353,30 +1385,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
   // The timed lines' time (morph.w), after their origin.
   frame.morph.at(3) = static_cast<float>(m_spaceLineTimeS - m_spaceLineOriginS);
   if (m_morph > 0.0) {
-    const MapFrame map = camera.mapFrame();
-    const LocalFrame local =
-        localFrame(camera.pose().targetLatDeg, camera.pose().targetLonDeg);
-    frame.morph = {
-        static_cast<float>(m_morph), static_cast<float>(map.planeScale),
-        static_cast<float>(std::max(projectionIndex(map.projection), 0)),
-        static_cast<float>(m_spaceLineTimeS - m_spaceLineOriginS)};
-    // A tilted map: drawn up to its far limit, fading into a haze, with
-    // the terrain in relief.
-    const bool tilted =
-        camera.isMapTurnedOrTilted() && camera.pose().tiltDeg > 0.0;
-    frame.planeEast =
-        float4(local.eastEcef, tilted ? camera.mapFarLimitM() : 0.0);
-    frame.planeNorth = float4(
-        local.northEcef,
-        terrain ? m_morph * Camera::mapReliefForTilt(camera.pose().tiltDeg)
-                : 0.0);
-    frame.planeOrigin = float4(camera.targetEcef() - eye, 0.0);
-    if (map.projection != nullptr && map.projection->hasOwnDomain()) {
-      const std::array<float, 8> domain =
-          map.projection->glslDomainParameters();
-      frame.domain = {Float4{domain[0], domain[1], domain[2], domain[3]},
-                      Float4{domain[4], domain[5], domain[6], domain[7]}};
-    }
+    writeMapFrame(camera, m_morph, terrain, frame);
   }
 
   const double a = wgs84::semiMajorAxisM;

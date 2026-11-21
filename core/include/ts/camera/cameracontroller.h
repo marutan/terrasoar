@@ -188,6 +188,16 @@ public:
   uint32_t motion() const { return m_motion; }
 
   /**
+   * Multiplies the speed of held moves (not zooming or turning) by
+   * @p factor, at least 1: the on-screen arrows speed up the longer they
+   * are held.
+   */
+  void setPanSpeedFactor(double factor);
+
+  /** Returns the factor set with setPanSpeedFactor() (1 by default). */
+  double panSpeedFactor() const { return m_panSpeedFactor; }
+
+  /**
    * Starts an animated flight to @p pose. @p durationS ≤ 0 picks a
    * duration from the distance (about 1 s to 4 s).
    */
@@ -277,6 +287,7 @@ private:
   std::optional<Morph> m_morph;
   ViewMode m_viewMode = ViewMode::Globe;
   uint32_t m_motion = NoMotion;
+  double m_panSpeedFactor = 1.0;
 };
 
 } // namespace ts

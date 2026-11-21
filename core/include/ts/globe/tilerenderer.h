@@ -223,6 +223,9 @@ public:
   /** Returns true if the terrain is shown (there is a source and it's on). */
   bool terrainShown() const;
 
+  /** Returns true if the tiles are drawn as strips for @p camera. */
+  bool drawsStrips(const Camera& camera) const;
+
   /** Returns the vertical exaggeration. */
   double exaggeration() const { return m_exaggeration; }
 

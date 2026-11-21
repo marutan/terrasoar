@@ -392,6 +392,11 @@ void CameraController::zoomAt(QPointF positionPx, double steps)
   }
 }
 
+void CameraController::setPanSpeedFactor(double factor)
+{
+  m_panSpeedFactor = std::max(factor, 1.0);
+}
+
 void CameraController::setMotion(uint32_t motion)
 {
   if (motion != NoMotion) {
@@ -574,7 +579,8 @@ void CameraController::advanceMotion(double elapsedS)
     // Forward is the way the view faces (up the screen on a turned map).
     if (forward != 0.0 || right != 0.0) {
       const MapFrame frame = m_camera.mapFrame();
-      const double distanceM = panRangeFractionPerS * rangeIntegral /
+      const double distanceM = panRangeFractionPerS * m_panSpeedFactor *
+                               rangeIntegral /
                                (frame.planeScale * std::hypot(forward, right));
       const double heading = degToRad(pose.headingDeg);
       const double eastward =
@@ -598,7 +604,7 @@ void CameraController::advanceMotion(double elapsedS)
         pose.headingDeg + radToDeg(std::atan2(right, forward));
     const GeodesicDirect end =
         rhumbDirect(pose.targetLatDeg, pose.targetLonDeg, azimuthDeg,
-                    panRangeFractionPerS * rangeIntegral);
+                    panRangeFractionPerS * m_panSpeedFactor * rangeIntegral);
     pose.targetLatDeg = end.latDeg;
     if (std::isfinite(end.lonDeg)) {
       pose.targetLonDeg = end.lonDeg;

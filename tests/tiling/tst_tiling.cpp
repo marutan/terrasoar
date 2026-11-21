@@ -33,6 +33,7 @@
 #include <vector>
 
 #include <QColor>
+#include <QElapsedTimer>
 #include <QStringList>
 #include <QtTest>
 
@@ -696,8 +697,9 @@ private slots:
       if (!hit) {
         continue;
       }
+      const ts::Geodetic at = hit.value_or(ts::Geodetic{});
       for (const ts::TileKey& key : selection.render) {
-        if (key.bounds().contains(hit->latDeg, hit->lonDeg)) {
+        if (key.bounds().contains(at.latDeg, at.lonDeg)) {
           QVERIFY2(key.level <= previous, qPrintable(key.toString()));
           previous = key.level;
           break;
@@ -706,8 +708,8 @@ private slots:
     }
     // Nothing beyond the far limit: no tile asked for whose nearest point
     // is past it, even with nothing loaded yet.
-    const ts::TileSelection cold = selector.select(
-        camera, [](const ts::TileKey& key) { return key.level <= 1; });
+    const ts::TileSelection cold =
+        selector.select(camera, [](ts::TileKey key) { return key.level <= 1; });
     for (const ts::TileLoadRequest& request : cold.load) {
       QVERIFY(request.distanceM <= camera.mapFarLimitM());
     }
@@ -719,9 +721,7 @@ private slots:
     }
     std::map<int32_t, double> nearestByLevel;
     for (const ts::TileLoadRequest& request : cold.load) {
-      if (nearestByLevel.count(request.key.level) == 0) {
-        nearestByLevel[request.key.level] = request.distanceM;
-      }
+      nearestByLevel.try_emplace(request.key.level, request.distanceM);
       QVERIFY(request.distanceM >= nearestByLevel[request.key.level] - 1.0 ||
               request.errorPx > limitPx);
     }
@@ -740,13 +740,44 @@ private slots:
         ts::CameraPose{51.5, -0.1, 5.0e3, 0.0, ts::Camera::maximumMapTiltDeg});
     const ts::TileSelector selector;
     const ts::TileSelection cold = selector.select(
-        camera, [](const ts::TileKey& key) { return key.level <= 10; });
+        camera, [](ts::TileKey key) { return key.level <= 10; });
     QVERIFY(cold.load.size() > 4);
     double farthest = 0.0;
     for (const ts::TileLoadRequest& request : cold.load) {
       farthest = std::max(farthest, request.distanceM);
     }
     QVERIFY(cold.load.front().distanceM < 0.25 * farthest);
+  }
+
+  void tiltedSelectionWithinBudget()
+  {
+    // Selections at the tilt limits, with terrain heights allowed for,
+    // take little time and few tiles (docs/design/tiling.md records them):
+    // the tilted city view on the globe and the flat map at its limit.
+    ts::TileSelectionSettings settings;
+    settings.terrainHeightM = 9000.0;
+    const ts::TileSelector selector(settings);
+    const ts::Camera globe =
+        makeCamera(ts::CameraPose{51.5, -0.1, 3.0e3, 30.0, 80.0});
+    const ts::Camera map = makeMapCamera(
+        "web-mercator",
+        ts::CameraPose{51.5, -0.1, 3.0e3, 30.0, ts::Camera::maximumMapTiltDeg});
+    for (const ts::Camera* camera : {&globe, &map}) {
+      QElapsedTimer timer;
+      timer.start();
+      ts::TileSelection selection;
+      constexpr int32_t runs = 20;
+      for (int32_t i = 0; i < runs; ++i) {
+        selection = selector.select(*camera, everythingRenderable);
+      }
+      const double ms = static_cast<double>(timer.nsecsElapsed()) * 1e-6 / runs;
+      qInfo("%s: %d tiles drawn, %d visited, %.2f ms",
+            camera == &map ? "map" : "globe",
+            static_cast<int32_t>(selection.render.size()), selection.visited,
+            ms);
+      QVERIFY(selection.render.size() < 800);
+      QVERIFY(ms < 25.0); // generous for sanitizer builds
+    }
   }
 
   void untiltedMapUnchanged()

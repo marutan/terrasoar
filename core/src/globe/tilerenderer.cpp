@@ -1087,15 +1087,22 @@ double TileRenderer::surfaceSagM() const
   return tileSurfaceSagM(coarsest, m_settings.loader.meshSegments);
 }
 
+bool TileRenderer::drawsStrips(const Camera& camera) const
+{
+  // A cylindrical map's tiles as strips; they have no vertices inside a
+  // row, so not for a map in relief.
+  const bool relief = terrainShown() && camera.pose().tiltDeg > 0.0;
+  return camera.morph() >= 1.0 && camera.mapProjection()->isCylindrical() &&
+         !relief;
+}
+
 void TileRenderer::prepare(const Camera& camera)
 {
   ++m_frame;
   m_statistics = TileStatistics();
   m_drawTiles.clear();
   m_morph = camera.morph();
-  // Strips have no vertices inside a row: not for a map in relief.
-  m_drawStrips = m_morph >= 1.0 && camera.mapProjection()->isCylindrical() &&
-                 !(terrainShown() && camera.pose().tiltDeg > 0.0);
+  m_drawStrips = drawsStrips(camera);
   // The map's surface and graticule are drawn on the tiles too, so it
   // needs them even without imagery.
   if (m_layers.empty() && m_morph <= 0.0 && !terrainShown()) {

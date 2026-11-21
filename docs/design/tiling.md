@@ -84,7 +84,10 @@ this) and its level is below the provider's deepest.
 all its visible children are on the GPU. Until then the tile itself is
 drawn and the missing children are requested. So the view is always
 covered by what is already loaded, and detail fills in level by level.
-Requests are ordered by level, then distance.
+Requests are ordered by screen-space error, largest first, then by
+distance: a parent's error is twice its children's, so coarse tiles still
+come first, and in a tilted view the near tiles of a level come before
+the far ones.
 
 `tests/tiling` checks, for cameras from a whole-globe view to a tilted
 view of a city: every pixel showing the globe is covered by a selected
@@ -115,6 +118,50 @@ it is drawn if a sphere bounding it there meets the frustum, without the
 horizon test, its error is that of a texel there, and it is never coarser
 than level 2 (see [morph.md](morph.md)). The same tests run for maps in all
 three projections, across the wrap and at the edges of the map.
+
+### A turned or tilted map
+
+Looking straight down with north up, the map's selection is as above,
+unchanged (`untiltedMapUnchanged`). Turned or tilted
+(`Camera::isMapTurnedOrTilted()`), the view is no longer a rectangle of
+the map, and a tilted one is not at one distance:
+
+- *What is in view*: `Camera::mapFrame()` gives the view's footprint on
+  the map's plane, a convex polygon in map metres: a 24-sided polygon
+  drawn round the circle within the far limit, cut by the four side planes
+  of the view. A tile is kept if its rectangle on the map (in any copy of
+  the world, or its part in the domain) meets the polygon, by separating
+  axes.
+- *The far limit* (`Camera::mapFarLimitM()`): a plane has no horizon of
+  its own, so a tilted map is drawn out to 40 times the eye's height above
+  it, at most 10 000 km. At 10 000 km a level-2 tile (the coarsest drawn
+  on the map, 45°) has a texel of 19.5 km, under 2 pixels in an 800-pixel
+  view: the coarsest level still nearly meets the error limit there, and
+  everything nearer is finer. Tiles beyond it are never selected or
+  requested, from any provider, and the far clip plane is there. A haze
+  hides the edge (from 55 % of the limit) and a sky is drawn beyond it.
+- *The tilt limit*: 70° (`Camera::maximumMapTiltDeg`), short of looking
+  along the plane; the globe keeps 85°.
+- *Screen-space error* on a tilted map: the size of a map texel seen
+  from the tile's nearest point, as on the globe: the texel on the plane
+  times the pixels per radian over the distance from the eye to the
+  nearest point of the tile's rectangle (`MapFrame::distanceToEyeM()`).
+  Detail falls off towards the horizon. Turned but straight down, every
+  texel is still the same size on screen, and the straight-down error is
+  kept. The geometry error is scaled the same way.
+- *Terrain*: a tilted map shows the terrain in relief (see
+  [morph.md](morph.md#rotation-and-tilt-on-the-map)), so its height
+  meshes use the same distance-based levels, and skirts close the gaps
+  between levels. A map in relief draws the tiles' full meshes, not the
+  cylindrical maps' strips, which have no vertices inside a row.
+
+`tests/tiling` (`tiltedMapSelection`) checks every projection, turned and
+tilted to the limit over a region and a city: every pixel covered once,
+every drawn tile within the error limit at its distance, levels never
+finer up the view, nothing requested beyond the far limit, requests in
+order, the same tiles for the same camera, and at most 600 tiles drawn
+(about 10 to 160 measured). `tiltedMapRequestsNearFirst` checks that the
+first requests in a tilted city view are the nearest.
 
 ## Geometry and imagery
 
@@ -211,6 +258,11 @@ the terrain is not on the ellipsoid ([terrain.md](terrain.md)).
 | Item | Default | Measured (llvmpipe, 320 × 240) |
 | --- | --- | --- |
 | Selection, tilted city view (263 tiles visited) | | 0.46 ms |
+| Selection, globe at 80° over a city with terrain margins, 800 × 600 (567 drawn, 808 visited) | at most 800 tiles | 1.6 ms (release) |
+| Selection, map at its 70° limit over a city, 800 × 600 (91 drawn, 154 visited) | at most 800 tiles | 1.0 ms (release) |
+| Frame at the tilt limit, checkerboard, 320 × 240: globe / map | 100 ms | 6.8 ms / 6.0 ms |
+| The same with terrain: globe / map | 100 ms | 10.9 ms / 12.8 ms |
+| GPU memory in those frames | 96 MB | at most 38 MB |
 | Tile mesh, 16 × 16 + skirt | | 0.02 ms |
 | Checkerboard tile, 256 px | | 1.0 ms (worker) |
 | Frame with 33 tiles | | 4.5 ms |

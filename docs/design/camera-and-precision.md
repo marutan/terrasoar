@@ -62,6 +62,58 @@ the tests drive it with a fake clock.
 | Q / E, R / F | Turn 60°/s, tilt 30°/s |
 | Home, View → Reset View | Fly back to the start view |
 
+The same input works on the flat map ([morph.md](morph.md#navigating-the-map)),
+which can be turned and tilted too.
+
+### The navigation controls
+
+`NavigationOverlay` (in the program) lays a group of controls over the
+view, in a corner chosen in the View menu (top right by default, the
+bottom corners lifted clear of the scale bar and the attributions). Each
+control is a widget of its own, so it takes the mouse, touch (Qt's
+synthesised mouse events), Tab focus and the arrow keys, and has a
+tooltip naming its key and an accessible name. The overlay's own area
+swallows clicks, so nothing pressed on it reaches the view; hidden, it
+is gone and clicks there reach the view. The controls say what the user
+wants with signals, and `GlobeView` turns them into the controller's own
+motions, so they share the keys' speeds, limits, inertia and terrain
+clearance:
+
+| Control | Click | Hold | Drag |
+| --- | --- | --- | --- |
+| Turn arrows | 15° of heading, flown in 0.35 s | `TurnLeft` / `TurnRight`, as Q / E | |
+| Compass | "N": heading 0, flown in 0.6 s | | the ring: the heading follows the pointer's angle |
+| Pan arrows | a quarter of the view's height along the heading, flown | `MoveForward` … as W A S D, speeding up by 1× a second to 4× (`setPanSpeedFactor()`) | |
+| Home | `goHome()`, as Home | | |
+| + / − | range × ½ / × 2, flown | `ZoomIn` / `ZoomOut` | |
+| Zoom slider | fly to that range | | the same, following the pointer |
+| Tilt buttons | 10° of tilt, flown | `TiltUp` / `TiltDown`, as R / F | |
+| Tilt arc | that tilt | | the same; a double click is straight down |
+
+A press becomes a hold after 0.3 s; released sooner, it is a click. Held
+motions are or-ed with the held keys. The zoom slider is logarithmic in
+the range, from 100 m to the farthest out (the globe's 50 000 km, or
+the map's widest), and shows the eye's height on the globe and the scale
+(1 : n, from the screen's DPI) on the map. Each frame `GlobeView` gives the
+overlay the camera's state; the overlay repaints only what changed, so it
+costs nothing while the view is idle.
+
+**Sizes.** A control is at least 9 mm across (touch targets) and 2.1 times
+the font's height, so the controls grow with the system's font size and
+the screen's DPI.
+
+**Readable on any background.** Each control sits on a dark translucent
+plate with a white edge; its symbols are light with a dark halo. The
+plates are 75 % opaque until the pointer is over the controls, 92 %
+then; hover makes a plate lighter and a press darker (brightness, not
+only transparency). `tests/ui` checks over white, black, grey, desert,
+cloud, a pale map and the pixels of a busy image that each symbol stands
+3:1 against its halo and each plate or its edge 3:1 against the
+background in every state (WCAG 2.1 non-text contrast). With the
+system's high-contrast setting (Windows' `SPI_GETHIGHCONTRAST`, or a
+`HighContrast` GTK theme) the plates are opaque in the palette's
+colours.
+
 ### Frame-rate independence
 
 Motion that continues on its own (held keys, inertia, flights) advances

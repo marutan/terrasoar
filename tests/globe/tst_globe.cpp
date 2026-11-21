@@ -2175,6 +2175,55 @@ private slots:
     QCOMPARE(cracks, 0);
   }
 
+  void tiltedViewsHoldFrameRate()
+  {
+    // At the tilt limit over detailed imagery, with and without terrain,
+    // on the globe and the map: frames within the software budget, the
+    // tiles drawn within a fixed limit, and the GPU budget kept.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>(256));
+    m_renderer->setElevationProvider(std::make_shared<SineElevation>());
+    for (const bool terrain : {false, true}) {
+      m_renderer->setTerrain(terrain, 1.0);
+      for (const double morph : {0.0, 1.0}) {
+        ts::Camera camera;
+        camera.setViewportSize(imageWidthPx, imageHeightPx);
+        camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+        camera.setMorph(morph);
+        camera.setPose(
+            ts::CameraPose{20.0, 30.0, 2.0e4, 30.0,
+                           morph > 0.0 ? ts::Camera::maximumMapTiltDeg : 80.0});
+        renderSettled(camera);
+        std::vector<double> timesS;
+        for (int32_t frame = 0; frame < 12; ++frame) {
+          QElapsedTimer one;
+          one.start();
+          render(camera, {});
+          timesS.push_back(static_cast<double>(one.nsecsElapsed()) * 1e-9);
+        }
+        std::sort(timesS.begin(), timesS.end());
+        const double quartileS = timesS.at(timesS.size() / 4);
+        const ts::TileStatistics tiles = m_renderer->tileStatistics();
+        qInfo("%s%s: %d tiles drawn, %.1f MB on the GPU, fastest quarter "
+              "%.1f ms",
+              morph > 0.0 ? "map" : "globe", terrain ? " with terrain" : "",
+              tiles.rendered,
+              static_cast<double>(tiles.gpuBytes) / (1024.0 * 1024.0),
+              quartileS * 1000.0);
+        QVERIFY2(quartileS < 0.1, qPrintable(QString::number(quartileS)));
+        QVERIFY(tiles.rendered < 400);
+        QVERIFY(tiles.gpuBytes <= std::size_t{96} * 1024 * 1024);
+      }
+    }
+    m_gl->makeCurrent();
+    m_renderer->setTerrain(false, 1.0);
+    m_renderer->setElevationProvider(nullptr);
+    m_renderer->setImageryProvider(nullptr);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+  }
+
   void tiltedMapShowsRelief()
   {
     // A tilted map with terrain shows it in relief, without cracks between

@@ -53,6 +53,7 @@
 #include <QMessageBox>
 #include <QMimeData>
 #include <QProgressDialog>
+#include <QSettings>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QStyle>
@@ -68,6 +69,7 @@
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
 #include "aircraftlayers.h"
+#include "appsettings.h"
 #include "balloonwindow.h"
 #include "clockwidget.h"
 #include "elevationprofiledialog.h"
@@ -585,6 +587,31 @@ void MainWindow::createActions()
   m_attributionsAction->setObjectName(QStringLiteral("attributionsAction"));
   m_attributionsAction->setCheckable(true);
   m_attributionsAction->setChecked(true);
+  // The navigation controls: shown unless the user hid them, in the
+  // corner they chose (both kept in the settings).
+  const std::unique_ptr<QSettings> settings = openSettings();
+  m_navigationControlsAction = new QAction(this);
+  m_navigationControlsAction->setObjectName(
+      QStringLiteral("navigationControlsAction"));
+  m_navigationControlsAction->setCheckable(true);
+  m_navigationControlsAction->setChecked(
+      settings->value(QStringLiteral("view/navigationControls"), true)
+          .toBool());
+  const OverlayCorner savedCorner = overlayCornerFromName(
+      settings->value(QStringLiteral("view/navigationControlsCorner"))
+          .toString());
+  m_navigationCornerGroup = new QActionGroup(this);
+  for (const OverlayCorner corner :
+       {OverlayCorner::TopRight, OverlayCorner::TopLeft,
+        OverlayCorner::BottomLeft, OverlayCorner::BottomRight}) {
+    QAction* action = new QAction(this);
+    action->setObjectName(QStringLiteral("navigationCorner_") +
+                          overlayCornerName(corner));
+    action->setCheckable(true);
+    action->setChecked(corner == savedCorner);
+    action->setData(overlayCornerName(corner));
+    m_navigationCornerGroup->addAction(action);
+  }
   m_projectionGroup = new QActionGroup(this);
   for (const Projection* projection : projections()) {
     QAction* action = new QAction(this);
@@ -609,6 +636,23 @@ void MainWindow::createActions()
             &GlobeView::setScaleBarVisible);
     connect(m_attributionsAction, &QAction::toggled, m_globeView,
             &GlobeView::setAttributionsVisible);
+    m_globeView->setNavigationControlsVisible(
+        m_navigationControlsAction->isChecked());
+    m_globeView->setNavigationControlsCorner(savedCorner);
+    connect(m_navigationControlsAction, &QAction::toggled, m_globeView,
+            [this](bool checked) {
+              m_globeView->setNavigationControlsVisible(checked);
+              openSettings()->setValue(
+                  QStringLiteral("view/navigationControls"), checked);
+            });
+    connect(m_navigationCornerGroup, &QActionGroup::triggered, m_globeView,
+            [this](const QAction* action) {
+              const QString name = action->data().toString();
+              m_globeView->setNavigationControlsCorner(
+                  overlayCornerFromName(name));
+              openSettings()->setValue(
+                  QStringLiteral("view/navigationControlsCorner"), name);
+            });
     connect(m_projectionGroup, &QActionGroup::triggered, m_globeView,
             [this](const QAction* action) {
               // Choosing the projection already shown keeps its settings.
@@ -626,6 +670,8 @@ void MainWindow::createActions()
     m_mapViewAction->setEnabled(false);
     m_scaleBarAction->setEnabled(false);
     m_attributionsAction->setEnabled(false);
+    m_navigationControlsAction->setEnabled(false);
+    m_navigationCornerGroup->setEnabled(false);
     m_projectionGroup->setEnabled(false);
   }
   syncViewActions();
@@ -993,6 +1039,10 @@ void MainWindow::createMenus()
   m_projectionMenu->addAction(m_projectionSettingsAction);
   m_viewMenu->addAction(m_scaleBarAction);
   m_viewMenu->addAction(m_attributionsAction);
+  m_viewMenu->addAction(m_navigationControlsAction);
+  m_navigationCornerMenu = m_viewMenu->addMenu(QString());
+  m_navigationCornerMenu->setObjectName(QStringLiteral("navigationCornerMenu"));
+  m_navigationCornerMenu->addActions(m_navigationCornerGroup->actions());
   m_viewMenu->addAction(m_timeBar->toggleViewAction());
   m_clockMenu = m_viewMenu->addMenu(QString());
   m_clockMenu->setObjectName(QStringLiteral("clockMenu"));
@@ -1104,6 +1154,28 @@ void MainWindow::retranslateUi()
   m_attributionsAction->setText(tr("&Attributions"));
   m_attributionsAction->setStatusTip(
       tr("Show the sources of the layers drawn in the corner of the view"));
+  m_navigationControlsAction->setText(tr("&Navigation Controls"));
+  m_navigationControlsAction->setStatusTip(
+      tr("Show controls on the view to turn, move, zoom and tilt it"));
+  m_navigationCornerMenu->setTitle(tr("Navigation Controls &Corner"));
+  for (QAction* action : m_navigationCornerGroup->actions()) {
+    const OverlayCorner corner =
+        overlayCornerFromName(action->data().toString());
+    switch (corner) {
+    case OverlayCorner::TopRight:
+      action->setText(tr("Top &Right"));
+      break;
+    case OverlayCorner::TopLeft:
+      action->setText(tr("Top &Left"));
+      break;
+    case OverlayCorner::BottomLeft:
+      action->setText(tr("&Bottom Left"));
+      break;
+    case OverlayCorner::BottomRight:
+      action->setText(tr("Bottom Ri&ght"));
+      break;
+    }
+  }
   m_addWebTerrainAction->setText(tr("Add Web &Terrain…"));
   m_addWebTerrainAction->setStatusTip(
       tr("Add elevation from a web terrain tile service or a Cloud "

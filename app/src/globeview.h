@@ -42,6 +42,7 @@
 #include <QStringList>
 #include <QTimer>
 
+#include "navigationoverlay.h"
 #include "ts/camera/cameracontroller.h"
 #include "ts/geo/geodetic.h"
 #include "ts/globe/globerenderer.h"
@@ -289,6 +290,24 @@ public:
 
   /** Returns how long an animated change of view mode takes, seconds. */
   double morphDurationS() const;
+
+  /**
+   * Shows or hides the on-screen navigation controls (shown by default);
+   * hidden, their clicks go to the view.
+   */
+  void setNavigationControlsVisible(bool visible);
+
+  /** Returns true if the navigation controls are shown. */
+  bool isNavigationControlsVisible() const;
+
+  /** Puts the navigation controls in @p corner of the view. */
+  void setNavigationControlsCorner(OverlayCorner corner);
+
+  /** Returns the navigation controls (never null). */
+  NavigationOverlay* navigationOverlay() const { return m_navigation; }
+
+  /** Returns what the navigation controls show of the camera now. */
+  NavigationState navigationState() const;
 
   /** Shows or hides the scale bar. */
   void setScaleBarVisible(bool visible);
@@ -605,6 +624,10 @@ private:
   void requestFrame();
   void updateSurfaceHeight();
   void onFrameTimer();
+  void connectNavigation();
+  void navigationHeld(NavigationAction action, bool held);
+  void navigationClicked(NavigationAction action);
+  void setHeldMotion();
   void releaseGl();
   void updatePointerReadout();
   void drawBillboards();
@@ -656,6 +679,10 @@ private:
   double m_lastAdvanceS = 0.0;
   bool m_animationClockRunning = false;
   uint32_t m_heldKeys = NoMotion;
+  NavigationOverlay* m_navigation = nullptr;
+  /** Motions held on the navigation controls, and since when. */
+  uint32_t m_heldControls = NoMotion;
+  double m_controlsHeldSinceS = 0.0;
 
   bool m_pointerInside = false;
   QPointF m_pointerPx;
