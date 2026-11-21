@@ -366,6 +366,20 @@ public:
     (void)toleranceDeg;
     return {};
   }
+
+  /**
+   * Returns the point features with attribute @p attribute set, among the
+   * loaded stored tiles @p tiles (those drawn, see
+   * VectorRenderer::drawnTiles()), one feature per point: the labels of
+   * a layer (VMAP0's place names). None by default.
+   */
+  virtual std::vector<Feature>
+  labelPoints(const QString& attribute, const std::vector<TileKey>& tiles) const
+  {
+    (void)attribute;
+    (void)tiles;
+    return {};
+  }
 };
 
 } // namespace ts

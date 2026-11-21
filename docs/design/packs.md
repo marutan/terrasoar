@@ -56,6 +56,7 @@ versions ignore the field.
 | `geoid-egm2008-fine` | `egm2008` | EGM2008 at its published 2.5′ grid (PROJ's `us_nga_egm08_25.tif`) instead of the base pack's 5′, as 16-bit centimetres: within 1 cm of PROJ's grid instead of 0.4 m | 13.4 MB |
 | `bluemarble-monthly` | (variants of `bluemarble`, see [Variants](#variants)) | Blue Marble for each month of 2004 (5400 × 2700 px each), tiled to level 3: the seasons follow the program's clock | 24.9 MB |
 | `geoid-osgm15` ("UK grids") | (a datum of its own, `osgm15`) | Ordnance Survey's OSGM15 for Ordnance Datum Newlyn (PROJ's `uk_os_OSGM15_GB.tif`, shipped as it is, BSD-2-Clause); from version 2015.2 also OSTN15 (PROJ's `uk_os_OSTN15_NTv2_OSGBtoETRS.tif`, BSD-2-Clause) for the UK National Grid projection | 4.5 MB |
+| `vmap0-*` (17 packs) | (datasets of their own, see [Pack layers](#pack-layers)) | NGA's Vector Map Level 0 by theme: boundaries, hydrography, transportation, population, elevation, vegetation and other themes; hydrography, elevation and vegetation as four regional packs each; the ESRI-owned administrative areas apart. Details in [docs/data/vmap0.md](../data/vmap0.md) | 4–150 MB each |
 
 A geoid pack replacing a base pack geoid makes every elevation source on
 that datum use the finer grid (the registry keys providers by the grid in
@@ -94,6 +95,62 @@ attribution, and any other value reads the dataset as usual
 month ([wms.md](wms.md#time)). The packager builds variants from
 `"imageryVariants"`, a list of imagery entries each with `variantOf` and
 `variant` ([docs/tools/packager.md](../tools/packager.md)).
+
+## Pack layers
+
+A pack may also bring data of its own rather than better data for the
+base pack's layers: the VMAP0 packs (Phase 21, see
+[docs/data/vmap0.md](../data/vmap0.md)). Such a dataset has no
+`replaces`; layer sources name it by its own id, as they name a base pack
+dataset (`{"kind": "basepack", "dataset": "vmap0-transportation"}`), and
+the registry finds its file among the installed packs
+(`setInstalledPacks()`). Two optional manifest keys, which older versions
+ignore, offer its layers:
+
+- `"name"`: the pack's name for the user, the title of its submenu;
+- `"layers"`: layer definitions (`ts::LayerDefinition`'s JSON) whose
+  sources name the pack's datasets, bottom first.
+
+**Add Layer → Data Packs** lists every installed pack that has layers, a
+submenu each: its layers one by one, and **All Layers**, which adds them
+together as a collection named after the pack (the topmost first in the
+tree, as drawn). The ids of the layers are `pack:<dataset>:<layer>`.
+Projects keep the layers as they keep any other; with the pack removed
+they show the error "… is in no installed data pack".
+
+A pack layer's source may also give:
+
+- `"tables"`: the dataset's tables to read, by name without the storage
+  level (`"roads"` reads `roads_4` and `roads_6`), so one GeoPackage
+  serves several layers;
+- `"styleRules"`: the per-feature style rules ([wfs.md](wfs.md#per-feature-styles)),
+  applied as the tiles load.
+
+and its style `"labels"`: an attribute whose value labels the layer's
+points on the view (VMAP0's place and airport names, spot heights). The
+window asks the renderer which stored tiles it drew
+(`VectorRenderer::drawnTiles()`) and the provider for their named points
+(`FeatureProvider::labelPoints()`) a few times a second while such a layer
+is shown, and hands them to the view with KML's labels, which thins them
+where they crowd.
+
+**Picking.** A GeoPackage with attributes keeps the 48 tiles it loaded
+last; What Is Here lists the features under the click from them, finest
+tiles first, each feature (by its `feature_id`) once, without the table
+name.
+
+### Regional packs
+
+A theme too big for one download is split along VMAP0's libraries into
+packs with the same dataset id and layers, and the same `"name"`
+(`layerGroup` in the packager configuration): `vmap0-hydrography-noamer`,
+`-eurnasia`, `-soamafr` and `-sasaus` all hold `vmap0-hydrography`. The
+registry reads the files of every installed pack of a dataset together
+(`ts::CompositeFeatureProvider`: a tile's features are those of each), so
+one layer shows whichever regions are installed, and Add Layer lists the
+theme once. The regions' tables are alike (the same levels), which the
+composite needs; where two regions meet, each has its own features cut at
+the library edge.
 
 ## The index
 

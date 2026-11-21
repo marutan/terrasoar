@@ -27,11 +27,17 @@ HEADERS += \
     $$PWD/src/elevationbuilder.h \
     $$PWD/src/imagerytiler.h \
     $$PWD/src/packbuilder.h \
-    $$PWD/src/shorelinebuilder.h
+    $$PWD/src/shorelinebuilder.h \
+    $$PWD/src/vmap0builder.h \
+    $$PWD/src/vpf/vpfcoverage.h \
+    $$PWD/src/vpf/vpftable.h
 
 SOURCES += \
     $$PWD/src/countrybuilder.cpp \
     $$PWD/src/elevationbuilder.cpp \
     $$PWD/src/imagerytiler.cpp \
     $$PWD/src/packbuilder.cpp \
-    $$PWD/src/shorelinebuilder.cpp
+    $$PWD/src/shorelinebuilder.cpp \
+    $$PWD/src/vmap0builder.cpp \
+    $$PWD/src/vpf/vpfcoverage.cpp \
+    $$PWD/src/vpf/vpftable.cpp

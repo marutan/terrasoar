@@ -30,6 +30,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <unordered_set>
 #include <vector>
 
@@ -48,6 +49,7 @@
 #include "mockwms.h"
 #include "mockwmts.h"
 #include "offscreengl.h"
+#include "packbuilder.h"
 #include "ts/adsb/adsbreaders.h"
 #include "ts/adsb/aircraftdraws.h"
 #include "ts/adsb/aircrafttracks.h"
@@ -71,6 +73,7 @@
 #include "ts/orbits/satellitedraws.h"
 #include "ts/orbits/satellitetrack.h"
 #include "ts/orbits/sgp4.h"
+#include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
 #include "ts/providers/gdalimageryprovider.h"
@@ -668,6 +671,53 @@ private:
   std::unique_ptr<ts::RenderTarget> m_target;
   bool m_softwareRenderer = false;
   std::array<QImage, 3> m_compositingImages;
+  /** VMAP0 packs built from the real tile, by configuration id. */
+  std::map<QString, QString> m_vmap0Packs;
+  std::unique_ptr<QTemporaryDir> m_vmap0Directory;
+
+  /**
+   * Returns the pack of configuration @p id (tools/packager/packs) built
+   * from the clipped VMAP0 tile (tests/data/vmap0), building it on first
+   * use; empty with @p error on failure.
+   */
+  QString vmap0Pack(const QString& id, QString* error)
+  {
+    const std::map<QString, QString>::const_iterator built =
+        m_vmap0Packs.find(id);
+    if (built != m_vmap0Packs.end()) {
+      return built->second;
+    }
+    if (!m_vmap0Directory) {
+      m_vmap0Directory = std::make_unique<QTemporaryDir>();
+    }
+    std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::read(
+            QStringLiteral(TS_ROOT_DIR "/tools/packager/packs/") + id +
+                QStringLiteral(".json"),
+            error);
+    if (!config || !config->vmap0) {
+      return QString();
+    }
+    // The fixture is one tile of SOAMAFR: as that library.
+    config->sources.resize(1);
+    config->sources.front().file = QStringLiteral("vmap0");
+    config->sources.front().notices.clear();
+    config->sources.front().localNotices.clear();
+    config->vmap0->sources = {config->sources.front().id};
+    config->vmap0->libraries = {QStringLiteral("soamafr")};
+    ts::packager::BuildOptions options;
+    options.sourcesDirectory = QStringLiteral(TS_TEST_DATA_DIR);
+    options.configDirectory =
+        QStringLiteral(TS_ROOT_DIR "/tools/packager/packs");
+    options.outputDirectory = m_vmap0Directory->filePath(id);
+    options.verifySources = false;
+    ts::packager::BuildReport report;
+    if (!ts::packager::buildPack(*config, options, &report, error)) {
+      return QString();
+    }
+    m_vmap0Packs[id] = options.outputDirectory;
+    return options.outputDirectory;
+  }
 
   // NOLINTNEXTLINE(readability-redundant-access-specifiers): Qt's slots marker
 private slots:
@@ -2123,6 +2173,248 @@ private slots:
     const QString failure =
         ts::test::checkGolden(image, golden, goldenTolerance);
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void vmap0Golden_data()
+  {
+    QTest::addColumn<QString>("pack");
+    QTest::addColumn<double>("latDeg");
+    QTest::addColumn<double>("lonDeg");
+    QTest::addColumn<double>("rangeM");
+    QTest::addColumn<QString>("projection");
+    // Each theme's layers (its pack's, as Add Layer offers them) over Blue
+    // Marble, from the clipped VMAP0 tile (30° W–15° W, 15°–30° N: the
+    // coast of Western Sahara and Mauritania, the Canaries, Cape Verde).
+    const std::array<std::pair<const char*, const char*>, 7> themes = {{
+        {"boundaries", "vmap0-boundaries"},
+        {"hydrography", "vmap0-hydrography-soamafr"},
+        {"transportation", "vmap0-transportation"},
+        {"population", "vmap0-population"},
+        {"elevation", "vmap0-elevation-soamafr"},
+        {"vegetation", "vmap0-vegetation-soamafr"},
+        {"other", "vmap0-other"},
+    }};
+    const QString globe;
+    const QString mercator = QStringLiteral("mercator");
+    for (const std::pair<const char*, const char*>& theme : themes) {
+      const QString name = QString::fromLatin1(theme.first);
+      const QString pack = QString::fromLatin1(theme.second);
+      QTest::newRow(qPrintable(QStringLiteral("vmap0-%1-globe").arg(name)))
+          << pack << 22.5 << -22.5 << 1.2e7 << globe;
+      // Close enough (about level 6) for every class but the smallest; the
+      // vegetation is further south, in Senegal.
+      const bool south = name == QLatin1String("vegetation");
+      const double regionLat = south ? 16.0 : 21.5;
+      const double regionLon = south ? -16.0 : -17.0;
+      QTest::newRow(qPrintable(QStringLiteral("vmap0-%1-region").arg(name)))
+          << pack << regionLat << regionLon << 3.0e5 << globe;
+      QTest::newRow(qPrintable(QStringLiteral("vmap0-%1-map").arg(name)))
+          << pack << 0.0 << 0.0 << 5.0e7 << mercator;
+      QTest::newRow(qPrintable(QStringLiteral("vmap0-%1-map-region").arg(name)))
+          << pack << regionLat << regionLon << 5.0e4 << mercator;
+    }
+  }
+
+  void vmap0Golden()
+  {
+    TS_TEST_REQUIRE_GL(*m_gl);
+    const QString basePack = qEnvironmentVariable("TS_BASEPACK_DIR");
+    if (basePack.isEmpty()) {
+      QSKIP("TS_BASEPACK_DIR is not set.");
+    }
+    QFETCH(QString, pack);
+    QFETCH(double, latDeg);
+    QFETCH(double, lonDeg);
+    QFETCH(double, rangeM);
+    QFETCH(QString, projection);
+    QString error;
+    const QString directory = vmap0Pack(pack, &error);
+    QVERIFY2(!directory.isEmpty(), qPrintable(error));
+    const std::optional<ts::PackManifest> base =
+        ts::PackManifest::read(basePack, &error);
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(directory, &error);
+    if (!base || !manifest) {
+      QFAIL(qPrintable(error));
+    }
+    ts::ProviderRegistry registry;
+    registry.setBasePack(basePack, *base);
+    ts::InstalledPack installed;
+    installed.directory = directory;
+    installed.manifest = *manifest;
+    registry.setInstalledPacks({installed});
+    ts::LayerTreeModel model;
+    for (const ts::LayerDefinition& definition :
+         ts::builtinLayerDefinitions()) {
+      if (definition.id == QLatin1String("builtin:bluemarble")) {
+        model.addLayer(definition);
+      }
+    }
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (int32_t i = 0; i < manifest->layers.size(); ++i) {
+      const std::optional<ts::LayerDefinition> definition =
+          ts::LayerDefinition::fromJson(manifest->layers.at(i).toObject(),
+                                        &error);
+      if (!definition) {
+        QFAIL(qPrintable(error));
+      }
+      model.addLayer(*definition);
+    }
+    const ts::LayerStack stack = model.layerStack();
+    QStringList errors;
+    const ts::ImageryDraws imagery =
+        ts::imageryDrawsForStack(stack, registry, &errors);
+    const std::vector<ts::VectorLayerDraw> vectors =
+        ts::vectorDrawsForStack(stack, registry, &errors);
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char(' '))));
+    QVERIFY(ts::attributionsForStack(stack, registry)
+                .contains(QStringLiteral("Vector Map Level 0 (VMAP0), NGA")));
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryLayers(imagery.layers, imagery.groupAlphas);
+    m_renderer->setVectorLayers(vectors);
+    ts::Camera camera =
+        makeCamera(ts::CameraPose{latDeg, lonDeg, rangeM, 0.0, 0.0});
+    if (!projection.isEmpty()) {
+      camera.setMapProjection(ts::projectionById(projection));
+      camera.setMorph(1.0);
+    }
+    const QImage image = renderSettled(camera);
+    const ts::VectorStatistics drawn = m_renderer->vectorStatistics();
+    m_gl->makeCurrent();
+    m_renderer->setVectorLayers({});
+    m_renderer->setImageryLayers({}, {});
+    m_renderer->setStyle(ts::GlobeStyle());
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    QVERIFY(drawn.tilesDrawn > 0);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void vmap0FrameBudget()
+  {
+    // Every VMAP0 theme at once (each pack's layers as Add Layer gives
+    // them) over Blue Marble: frames within the software budget and the
+    // vector meshes within their GPU budget, from the whole Earth down to
+    // a region. From the clipped tile; with TS_VMAP0_PACKS_DIR (a
+    // directory of built packs, one per subdirectory), from the real
+    // packs, over Europe, the densest part of VMAP0.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QString error;
+    std::vector<ts::InstalledPack> packs;
+    const QString real = qEnvironmentVariable("TS_VMAP0_PACKS_DIR");
+    if (real.isEmpty()) {
+      for (const char* id : {"vmap0-boundaries", "vmap0-hydrography-soamafr",
+                             "vmap0-transportation", "vmap0-population",
+                             "vmap0-elevation-soamafr",
+                             "vmap0-vegetation-soamafr", "vmap0-other"}) {
+        ts::InstalledPack pack;
+        pack.directory = vmap0Pack(QString::fromLatin1(id), &error);
+        QVERIFY2(!pack.directory.isEmpty(), qPrintable(error));
+        packs.push_back(pack);
+      }
+    } else {
+      const QDir root(real);
+      for (const QString& entry :
+           root.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name)) {
+        ts::InstalledPack pack;
+        pack.directory = root.filePath(entry);
+        packs.push_back(pack);
+      }
+    }
+    ts::LayerTreeModel model;
+    std::set<QString> listed;
+    for (ts::InstalledPack& pack : packs) {
+      const std::optional<ts::PackManifest> manifest =
+          ts::PackManifest::read(pack.directory, &error);
+      if (!manifest) {
+        QFAIL(qPrintable(error));
+      }
+      pack.manifest = *manifest;
+      // NOLINTNEXTLINE(modernize-loop-convert)
+      for (int32_t i = 0; i < manifest->layers.size(); ++i) {
+        const std::optional<ts::LayerDefinition> definition =
+            ts::LayerDefinition::fromJson(manifest->layers.at(i).toObject(),
+                                          &error);
+        if (!definition) {
+          QFAIL(qPrintable(error));
+        }
+        // Regional packs of one theme offer the same layers.
+        if (listed.insert(definition->id).second) {
+          model.addLayer(*definition);
+        }
+      }
+    }
+    ts::ProviderRegistry registry;
+    registry.setInstalledPacks(packs);
+    const ts::LayerStack stack = model.layerStack();
+    QStringList errors;
+    const std::vector<ts::VectorLayerDraw> vectors =
+        ts::vectorDrawsForStack(stack, registry, &errors);
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char(' '))));
+    QVERIFY(vectors.size() >= 20);
+    m_gl->makeCurrent();
+    m_renderer->setImageryProvider(
+        std::make_shared<ts::CheckerboardImageryProvider>(256));
+    m_renderer->setVectorLayers(vectors);
+    const double lat = real.isEmpty() ? 21.5 : 48.0;
+    const double lon = real.isEmpty() ? -17.0 : 8.0;
+    struct View {
+      const char* name;
+      double rangeM;
+      double morph;
+    };
+    for (const View& view :
+         {View{"whole Earth", 1.5e7, 0.0}, View{"continent", 3.0e6, 0.0},
+          View{"region", 3.0e5, 0.0}, View{"region on the map", 5.0e4, 1.0}}) {
+      ts::Camera camera =
+          makeCamera(ts::CameraPose{lat, lon, view.rangeM, 0.0, 0.0});
+      camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+      camera.setMorph(view.morph);
+      QElapsedTimer settling;
+      settling.start();
+      renderSettled(camera);
+      const double settleS =
+          static_cast<double>(settling.nsecsElapsed()) * 1e-9;
+      std::vector<double> timesS;
+      for (int32_t frame = 0; frame < 12; ++frame) {
+        QElapsedTimer one;
+        one.start();
+        render(camera, {});
+        timesS.push_back(static_cast<double>(one.nsecsElapsed()) * 1e-9);
+      }
+      std::sort(timesS.begin(), timesS.end());
+      const double quartileS = timesS.at(timesS.size() / 4);
+      const ts::VectorStatistics drawn = m_renderer->vectorStatistics();
+      qInfo("VMAP0 %s: loaded in %.1f s, %d tiles, %" PRId64
+            " triangles, %" PRId64 " segments, %d draw calls, %.1f MB on "
+            "the GPU, fastest quarter %.1f ms",
+            view.name, settleS, drawn.tilesDrawn, drawn.triangles,
+            drawn.segments, drawn.drawCalls,
+            static_cast<double>(drawn.gpuBytes) / (1024.0 * 1024.0),
+            quartileS * 1000.0);
+      // The software budget holds for the clipped tile at every view, and
+      // for the real packs at the whole Earth and a continent. A region of
+      // Europe with every theme on is some 300 000 line segments, more than
+      // software GL draws in 100 ms (about 190 ms on llvmpipe, see
+      // docs/data/vmap0.md): reported, not failed. The GPU budget holds
+      // everywhere.
+      if (real.isEmpty() || view.rangeM >= 3.0e6) {
+        QVERIFY2(quartileS < 0.1, qPrintable(QString::number(quartileS)));
+      }
+      QVERIFY(drawn.gpuBytes <= ts::VectorRendererSettings().gpuBytes);
+    }
+    m_gl->makeCurrent();
+    m_renderer->setVectorLayers({});
+    m_renderer->setImageryProvider(nullptr);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
   }
 
   void terrainHasNoCracks()

@@ -836,6 +836,12 @@ VectorStatistics GlobeRenderer::vectorStatistics() const
   return m_vectors ? m_vectors->statistics() : VectorStatistics();
 }
 
+std::vector<TileKey>
+GlobeRenderer::drawnVectorTiles(const FeatureProvider* provider) const
+{
+  return m_vectors ? m_vectors->drawnTiles(provider) : std::vector<TileKey>();
+}
+
 TileStatistics GlobeRenderer::tileStatistics() const
 {
   return m_tiles ? m_tiles->statistics() : TileStatistics();

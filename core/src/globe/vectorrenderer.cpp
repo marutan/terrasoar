@@ -330,6 +330,24 @@ VectorRenderer::VectorRenderer(RenderDevice& device,
 {
 }
 
+std::vector<TileKey>
+VectorRenderer::drawnTiles(const FeatureProvider* provider) const
+{
+  std::vector<TileKey> keys;
+  for (const std::unique_ptr<Source>& source : m_sources) {
+    if (source->provider.get() != provider) {
+      continue;
+    }
+    for (const DrawItem& item : source->items) {
+      if (item.mesh != nullptr &&
+          std::find(keys.begin(), keys.end(), item.mesh->key) == keys.end()) {
+        keys.push_back(item.mesh->key);
+      }
+    }
+  }
+  return keys;
+}
+
 VectorRenderer::~VectorRenderer()
 {
   // Stop the workers before the GPU resources go.

@@ -154,6 +154,35 @@ bool readDatumShifts(const QJsonObject& json, PackManifest* manifest,
   return true;
 }
 
+/**
+ * Reads the "notices", and the optional "name" and "layers", of @p json
+ * into @p manifest.
+ */
+bool readNoticesAndLayers(const QJsonObject& json, PackManifest* manifest,
+                          QString* errorString)
+{
+  const QJsonArray notices = json.value(QStringLiteral("notices")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < notices.size(); ++i) {
+    const QString path = notices.at(i).toString();
+    if (!isSafeRelativePath(path)) {
+      fail(errorString,
+           QStringLiteral("Bad notice entry %1 in the pack manifest").arg(i));
+      return false;
+    }
+    manifest->notices.push_back(path);
+  }
+  manifest->name = text(json, "name");
+  const QJsonArray layers = json.value(QStringLiteral("layers")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < layers.size(); ++i) {
+    if (layers.at(i).isObject()) {
+      manifest->layers.append(layers.at(i));
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
@@ -245,16 +274,8 @@ std::optional<PackManifest> PackManifest::fromJson(const QJsonObject& json,
     return std::nullopt;
   }
 
-  const QJsonArray notices = json.value(QStringLiteral("notices")).toArray();
-  // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int32_t i = 0; i < notices.size(); ++i) {
-    const QString path = notices.at(i).toString();
-    if (!isSafeRelativePath(path)) {
-      fail(errorString,
-           QStringLiteral("Bad notice entry %1 in the pack manifest").arg(i));
-      return std::nullopt;
-    }
-    manifest.notices.push_back(path);
+  if (!readNoticesAndLayers(json, &manifest, errorString)) {
+    return std::nullopt;
   }
   return manifest;
 }
@@ -325,6 +346,12 @@ QJsonObject PackManifest::toJson() const
     json.insert(QStringLiteral("datumShifts"), shiftArray);
   }
   json.insert(QStringLiteral("notices"), noticeArray);
+  if (!name.isEmpty()) {
+    json.insert(QStringLiteral("name"), name);
+  }
+  if (!layers.isEmpty()) {
+    json.insert(QStringLiteral("layers"), layers);
+  }
   return json;
 }
 

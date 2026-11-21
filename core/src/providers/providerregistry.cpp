@@ -42,6 +42,7 @@
 #include "ts/packs/packlibrary.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/projection/datumshift.h"
+#include "ts/providers/compositefeatureprovider.h"
 #include "ts/providers/gdalimageryprovider.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
@@ -111,6 +112,22 @@ bool isBasePackSource(const QJsonObject& source)
          QLatin1String("basepack");
 }
 
+/**
+ * How a pack layer reads its dataset: some of the dataset's tables, with
+ * its own style rules (see docs/design/packs.md#pack-layers).
+ */
+GeoPackageFeatureProvider::Options packLayerOptions(const QJsonObject& source)
+{
+  GeoPackageFeatureProvider::Options options;
+  const QJsonArray tables = source.value(QStringLiteral("tables")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < tables.size(); ++i) {
+    options.tables.push_back(tables.at(i).toString());
+  }
+  options.styleRules = source.value(QStringLiteral("styleRules")).toArray();
+  return options;
+}
+
 } // namespace
 
 QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
@@ -133,10 +150,17 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
       files.find(dataset);
   if (m_basePackDirectory.isEmpty() || file == files.end()) {
     if (errorString) {
-      *errorString = QCoreApplication::translate(
-                         "ts::ProviderRegistry",
-                         "The base pack, which holds \"%1\", is not installed.")
-                         .arg(dataset);
+      *errorString =
+          file == files.end() && !m_basePackDirectory.isEmpty()
+              ? QCoreApplication::translate(
+                    "ts::ProviderRegistry",
+                    "\"%1\" is in no installed data pack. Install its pack "
+                    "from the Data Packs window.")
+                    .arg(dataset)
+              : QCoreApplication::translate(
+                    "ts::ProviderRegistry",
+                    "The base pack, which holds \"%1\", is not installed.")
+                    .arg(dataset);
     }
     return QString();
   }
@@ -287,37 +311,53 @@ void ProviderRegistry::setInstalledPacks(
                              QDir(pack.directory).filePath(shift.file));
     }
     for (const PackDataset& dataset : pack.manifest.datasets) {
-      if (dataset.kind == PackDataset::Kind::Geoid) {
-        // A finer grid of a base pack datum, or a datum of its own.
-        const QString id =
-            dataset.replaces.isEmpty() ? dataset.id : dataset.replaces;
-        // The first pack with a grid for it wins.
-        m_packGeoids.try_emplace(id,
-                                 PackGeoid{pack.directory, dataset.file,
-                                           dataset.name, dataset.attribution});
-        continue;
-      }
-      if (!dataset.variantOf.isEmpty() && !dataset.variant.isEmpty()) {
-        Replacement variant;
-        variant.path = QDir(pack.directory).filePath(dataset.file);
-        variant.features = dataset.kind == PackDataset::Kind::Features;
-        variant.attribution = dataset.attribution;
-        // The first pack with this variant wins.
-        m_variants[dataset.variantOf].try_emplace(dataset.variant, variant);
-        continue;
-      }
-      if (dataset.replaces.isEmpty() ||
-          m_replacements.count(dataset.replaces) != 0) {
-        continue;
-      }
-      Replacement replacement;
-      replacement.path = QDir(pack.directory).filePath(dataset.file);
-      replacement.features = dataset.kind == PackDataset::Kind::Features;
-      replacement.attribution = dataset.attribution;
-      m_replacements[dataset.replaces] = replacement;
+      addPackDatasetLocked(pack.directory, dataset);
     }
   }
   setDatumShiftGrids(shiftGrids);
+}
+
+void ProviderRegistry::addPackDatasetLocked(const QString& directory,
+                                            const PackDataset& dataset)
+{
+  const QString path = QDir(directory).filePath(dataset.file);
+  if (dataset.kind == PackDataset::Kind::Geoid) {
+    // A finer grid of a base pack datum, or a datum of its own.
+    const QString id =
+        dataset.replaces.isEmpty() ? dataset.id : dataset.replaces;
+    // The first pack with a grid for it wins.
+    m_packGeoids.try_emplace(id, PackGeoid{directory, dataset.file,
+                                           dataset.name, dataset.attribution});
+    return;
+  }
+  Replacement replacement;
+  replacement.path = path;
+  replacement.features = dataset.kind == PackDataset::Kind::Features;
+  replacement.attribution = dataset.attribution;
+  if (!dataset.variantOf.isEmpty() && !dataset.variant.isEmpty()) {
+    // The first pack with this variant wins.
+    m_variants[dataset.variantOf].try_emplace(dataset.variant, replacement);
+    return;
+  }
+  // A dataset replacing none of the base pack's is one of its own
+  // (VMAP0's): layer sources name it by its id.
+  const bool own = dataset.replaces.isEmpty();
+  const QString id = own ? dataset.id : dataset.replaces;
+  const std::unordered_map<QString, Replacement>::iterator known =
+      m_replacements.find(id);
+  if (known != m_replacements.end()) {
+    // Regional packs of one dataset of its own (VMAP0's hydrography by
+    // library) are read together; otherwise the first pack wins.
+    if (own && replacement.features && known->second.features) {
+      known->second.morePaths.push_back(path);
+    }
+    return;
+  }
+  if (own && dataset.kind != PackDataset::Kind::Features &&
+      dataset.kind != PackDataset::Kind::Imagery) {
+    return;
+  }
+  m_replacements.emplace(id, replacement);
 }
 
 const ProviderRegistry::Replacement*
@@ -453,8 +493,25 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
     }
     return nullptr;
   }
-  // A pack source depends on which file it resolves to.
-  const QString key = canonical(source) + basePackFile(source, true, nullptr);
+  return packFeaturesLocked(source, errorString);
+}
+
+std::shared_ptr<FeatureProvider>
+ProviderRegistry::packFeaturesLocked(const QJsonObject& source,
+                                     QString* errorString)
+{
+  // A pack source depends on which files it resolves to.
+  const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  const std::unordered_map<QString, Replacement>::const_iterator regional =
+      m_replacements.find(dataset);
+  std::vector<QString> morePaths;
+  if (regional != m_replacements.end() && regional->second.features) {
+    morePaths = regional->second.morePaths;
+  }
+  QString key = canonical(source) + basePackFile(source, true, nullptr);
+  for (const QString& more : morePaths) {
+    key += QLatin1Char('|') + more;
+  }
   const std::unordered_map<QString, std::weak_ptr<FeatureProvider>>::iterator
       it = m_features.find(key);
   if (it != m_features.end()) {
@@ -467,19 +524,28 @@ ProviderRegistry::features(const QJsonObject& source, QString* errorString)
   if (path.isEmpty()) {
     return nullptr;
   }
-  std::shared_ptr<GeoPackageFeatureProvider> provider =
-      std::make_shared<GeoPackageFeatureProvider>(path);
-  if (!provider->isValid()) {
-    if (errorString) {
-      *errorString =
-          QCoreApplication::translate(
-              "ts::ProviderRegistry",
-              "Cannot read \"%1\" from the base pack: %2")
-              .arg(source.value(QStringLiteral("dataset")).toString(),
-                   provider->errorString());
+  const GeoPackageFeatureProvider::Options options = packLayerOptions(source);
+  std::vector<QString> paths = {path};
+  paths.insert(paths.end(), morePaths.begin(), morePaths.end());
+  std::vector<std::shared_ptr<FeatureProvider>> providers;
+  for (const QString& file : paths) {
+    std::shared_ptr<GeoPackageFeatureProvider> provider =
+        std::make_shared<GeoPackageFeatureProvider>(file, options);
+    if (!provider->isValid()) {
+      if (errorString) {
+        *errorString = QCoreApplication::translate(
+                           "ts::ProviderRegistry",
+                           "Cannot read \"%1\" from the base pack: %2")
+                           .arg(dataset, provider->errorString());
+      }
+      return nullptr;
     }
-    return nullptr;
+    providers.push_back(provider);
   }
+  std::shared_ptr<FeatureProvider> provider =
+      providers.size() == 1
+          ? providers.front()
+          : std::make_shared<CompositeFeatureProvider>(std::move(providers));
   m_features[key] = provider;
   return provider;
 }

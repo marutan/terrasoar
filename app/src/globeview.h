@@ -267,6 +267,9 @@ public:
   /** Returns what the vector renderer did in the last frame. */
   VectorStatistics vectorStatistics() const;
 
+  /** Returns the stored tiles of @p provider drawn in the last frame. */
+  std::vector<TileKey> drawnVectorTiles(const FeatureProvider* provider) const;
+
   /**
    * Returns false where composite groups fall back to multiplied opacity
    * (software rendering), true otherwise.

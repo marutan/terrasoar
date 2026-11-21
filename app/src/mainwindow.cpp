@@ -310,6 +310,7 @@ MainWindow::MainWindow(QWidget* parent)
     m_globeView->flyTo(*pose, 0.0);
     return true;
   });
+  createPackLayers();
   setAcceptDrops(true);
   m_icons = new IconCache(m_registry->network(), this);
   m_kmlLinks = new KmlLinks(m_registry->network(), this);
@@ -1356,6 +1357,7 @@ void MainWindow::refreshLayers()
       projectionWith(projection->id(), projection->parameterValues()));
   QStringList errors;
   applyImageryDraws(stack, &errors);
+  updatePackLabelTimer(stack);
   refreshBillboards(stack);
   m_drawnVectors = QJsonArray();
   for (const VectorStackEntry& entry : stack.vectors) {
@@ -2159,6 +2161,8 @@ void MainWindow::refreshBillboards(const LayerStack& stack)
       raised.push_back(raisedShapeDraw(shape));
     }
   }
+  // The pack layers' labels (VMAP0's place names) below KML's.
+  draws.insert(draws.begin(), m_packLabels.begin(), m_packLabels.end());
   m_globeView->setBillboards(std::move(draws));
   m_globeView->setRaisedShapes(std::move(raised));
   std::stable_sort(screens.begin(), screens.end(),
@@ -2324,26 +2328,8 @@ int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
           FeatureInfoQuery{definition.name, url, source->infoFormat});
     }
   }
-  // Vector layers whose features are at hand (WFS), topmost first: within
-  // a few pixels of the click.
-  std::vector<FeatureInfoLocal> local;
-  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
-    const LayerDefinition& definition = stack.vectors[i].definition;
-    if (definition.source.value(QStringLiteral("kind")).toString() !=
-        QLatin1String("wfs")) {
-      continue;
-    }
-    const std::shared_ptr<FeatureProvider> provider =
-        m_registry->features(definition.source, nullptr);
-    if (!provider) {
-      continue;
-    }
-    const std::vector<Feature> found = provider->featuresAt(
-        GeoPoint{point.latDeg, point.lonDeg}, 4.0 * degreesPerPixel);
-    if (!found.empty()) {
-      local.push_back(FeatureInfoLocal{definition.name, found});
-    }
-  }
+  const std::vector<FeatureInfoLocal> local =
+      localFeatureInfo(stack, point, degreesPerPixel);
   if (queries.empty() && local.empty()) {
     return 0;
   }
@@ -2354,6 +2340,41 @@ int32_t MainWindow::identifyAt(LonLat point, double degreesPerPixel)
   m_featureInfoWindow->show();
   m_featureInfoWindow->raise();
   return static_cast<int32_t>(queries.size() + local.size());
+}
+
+std::vector<FeatureInfoLocal>
+MainWindow::localFeatureInfo(const LayerStack& stack, LonLat point,
+                             double degreesPerPixel) const
+{
+  // Vector layers whose features are at hand (WFS, packs with attributes
+  // such as VMAP0's), topmost first: within a few pixels of the click.
+  std::vector<FeatureInfoLocal> local;
+  for (std::size_t i = stack.vectors.size(); i-- > 0;) {
+    const LayerDefinition& definition = stack.vectors[i].definition;
+    const QString kind =
+        definition.source.value(QStringLiteral("kind")).toString();
+    if (kind != QLatin1String("wfs") && kind != QLatin1String("basepack")) {
+      continue;
+    }
+    const std::shared_ptr<FeatureProvider> provider =
+        m_registry->features(definition.source, nullptr);
+    if (!provider) {
+      continue;
+    }
+    std::vector<Feature> found = provider->featuresAt(
+        GeoPoint{point.latDeg, point.lonDeg}, 4.0 * degreesPerPixel);
+    // A pack's table names (roads_6) mean nothing to the user.
+    if (kind == QLatin1String("basepack")) {
+      for (Feature& feature : found) {
+        feature.attributes.remove(QStringLiteral("table"));
+        feature.attributes.remove(QStringLiteral("feature_id"));
+      }
+    }
+    if (!found.empty()) {
+      local.push_back(FeatureInfoLocal{definition.name, found});
+    }
+  }
+  return local;
 }
 
 void MainWindow::updateTimeBar(const LayerStack& stack)

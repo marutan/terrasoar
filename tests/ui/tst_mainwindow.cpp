@@ -31,6 +31,7 @@
 #include <QCheckBox>
 #include <QClipboard>
 #include <QComboBox>
+#include <QDataStream>
 #include <QDir>
 #include <QDirIterator>
 #include <QDoubleSpinBox>
@@ -126,7 +127,9 @@
 #include "ts/network/tilediskcache.h"
 #include "ts/orbits/elementsource.h"
 #include "ts/orbits/satellitelayer.h"
+#include "ts/packs/packmanifest.h"
 #include "ts/projection/projection.h"
+#include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/providerregistry.h"
 #include "ts/regions/offlineregionstore.h"
 #include "ts/time/layertime.h"
@@ -4236,6 +4239,186 @@ private slots:
       QVERIFY(
           globe->attributions().contains(QStringLiteral("Fixture imagery")));
     }
+    qunsetenv("TS_PACKS_DIR");
+  }
+
+  void vmap0PackLayers()
+  {
+    // An installed pack offering layers (as the VMAP0 packs do): listed in
+    // Add Layer under Data Packs, added together as a collection; its
+    // points named on the globe and its features shown by What Is Here.
+    const QTemporaryDir packsDirectory;
+    qputenv("TS_PACKS_DIR", packsDirectory.path().toUtf8());
+    const QDir pack(packsDirectory.filePath(QStringLiteral("vmap0-test")));
+    QVERIFY(pack.mkpath(QStringLiteral(".")));
+    {
+      ts::GeoPackageFeatureWriter writer(
+          pack.filePath(QStringLiteral("vmap0-test.gpkg")), false);
+      ts::FeatureTableSpec places;
+      places.name = QStringLiteral("places_4");
+      places.geometry = ts::FeatureTableSpec::Geometry::Points;
+      places.storageLevel = 4;
+      places.minLevel = 4;
+      places.attributes = {QStringLiteral("feature_id")};
+      places.textAttributes = {QStringLiteral("feature"),
+                               QStringLiteral("name")};
+      ts::FeatureTableSpec roads = places;
+      roads.name = QStringLiteral("roads_4");
+      roads.geometry = ts::FeatureTableSpec::Geometry::Lines;
+      QVERIFY(writer.addTable(places));
+      QVERIFY(writer.addTable(roads));
+      // Level 4 tile (4, 15, 7): 11.25° W–0°, 33.75°–45° N.
+      const ts::TileKey tile =
+          ts::TileKey::containing(4, ts::Geodetic{40.0, -4.0, 0.0});
+      QByteArray point;
+      QDataStream pointStream(&point, QIODevice::WriteOnly);
+      pointStream.setByteOrder(QDataStream::LittleEndian);
+      pointStream << quint8(1) << quint32(1) << -4.0 << 40.0;
+      QVERIFY(writer.putFeature(
+          places.name, tile, point, {std::optional<int64_t>(1)},
+          {QStringLiteral("Settlement"), QStringLiteral("Alphaville")}));
+      QByteArray line;
+      QDataStream lineStream(&line, QIODevice::WriteOnly);
+      lineStream.setByteOrder(QDataStream::LittleEndian);
+      lineStream << quint8(1) << quint32(2) << quint32(2) << -6.0 << 39.0
+                 << -2.0 << 41.0;
+      QVERIFY(writer.putFeature(roads.name, tile, line,
+                                {std::optional<int64_t>(2)},
+                                {QStringLiteral("Road"), QString()}));
+      QVERIFY2(writer.finish(), qPrintable(writer.errorString()));
+    }
+    ts::PackManifest manifest;
+    manifest.id = QStringLiteral("vmap0-test");
+    manifest.version = QStringLiteral("1");
+    manifest.name = QStringLiteral("VMAP0 test");
+    ts::PackFile file;
+    file.path = QStringLiteral("vmap0-test.gpkg");
+    file.sizeBytes = QFileInfo(pack.filePath(file.path)).size();
+    const std::atomic<bool> notCancelled{false};
+    file.sha256 = ts::fileSha256(pack.filePath(file.path), notCancelled);
+    manifest.files.push_back(file);
+    ts::PackDataset dataset;
+    dataset.id = QStringLiteral("vmap0-test");
+    dataset.kind = ts::PackDataset::Kind::Features;
+    dataset.file = file.path;
+    dataset.name = QStringLiteral("VMAP0 test");
+    dataset.attribution = QStringLiteral("Vector Map Level 0 (VMAP0), NGA");
+    manifest.datasets.push_back(dataset);
+    const std::function<QJsonObject(const QString&, const QString&,
+                                    const QString&, const QJsonObject&)>
+        layer = [](const QString& id, const QString& name, const QString& table,
+                   const QJsonObject& style) {
+          return QJsonObject{
+              {QStringLiteral("id"),
+               QString(QStringLiteral("pack:vmap0-test:") + id)},
+              {QStringLiteral("origin"), QStringLiteral("catalogue")},
+              {QStringLiteral("type"), QStringLiteral("vector")},
+              {QStringLiteral("name"), name},
+              {QStringLiteral("source"),
+               QJsonObject{
+                   {QStringLiteral("kind"), QStringLiteral("basepack")},
+                   {QStringLiteral("dataset"), QStringLiteral("vmap0-test")},
+                   {QStringLiteral("tables"), QJsonArray{table}}}},
+              {QStringLiteral("style"), style}};
+        };
+    manifest.layers = QJsonArray{
+        layer(QStringLiteral("roads"), QStringLiteral("Test Roads"),
+              QStringLiteral("roads"),
+              QJsonObject{
+                  {QStringLiteral("outline"), QStringLiteral("#ff0000ff")},
+                  {QStringLiteral("outlineWidthPx"), 2.0}}),
+        layer(QStringLiteral("places"), QStringLiteral("Test Places"),
+              QStringLiteral("places"),
+              QJsonObject{
+                  {QStringLiteral("outline"), QStringLiteral("#ffffffff")},
+                  {QStringLiteral("pointSizePx"), 6.0},
+                  {QStringLiteral("labels"), QStringLiteral("name")}})};
+    QFile manifestFile(pack.filePath(ts::PackManifest::fileName()));
+    QVERIFY(manifestFile.open(QIODevice::WriteOnly));
+    manifestFile.write(QJsonDocument(manifest.toJson()).toJson());
+    manifestFile.close();
+
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    QMenu* packs = window.findChild<QMenu*>(QStringLiteral("addPackLayerMenu"));
+    if (packs == nullptr) {
+      QFAIL("no Data Packs menu");
+    }
+    const QList<QAction*> packMenus = packs->actions();
+    QCOMPARE(packMenus.size(), 1);
+    QMenu* menu = packMenus.front()->menu();
+    QVERIFY(menu != nullptr);
+    QCOMPARE(withoutMnemonic(menu->title()), QStringLiteral("VMAP0 test"));
+    QStringList names;
+    for (QAction* action : menu->actions()) {
+      names.append(withoutMnemonic(action->text()));
+    }
+    QCOMPARE(names, (QStringList{QStringLiteral("All Layers"), QString(),
+                                 QStringLiteral("Test Roads"),
+                                 QStringLiteral("Test Places")}));
+    ts::LayerTreeModel* model = window.layerModel();
+    const int32_t before = model->rowCount();
+    const QList<QAction*> menuActions = menu->actions();
+    menuActions.front()->trigger();
+    QCOMPARE(model->rowCount(), before + 1);
+    const QModelIndex collection = model->index(0, 0);
+    QVERIFY(
+        model->data(collection, ts::LayerTreeModel::IsCollectionRole).toBool());
+    QCOMPARE(model->data(collection, Qt::DisplayRole).toString(),
+             QStringLiteral("VMAP0 test"));
+    QCOMPARE(model->rowCount(collection), 2);
+    // The places on top, as the pack lists them bottom first.
+    QCOMPARE(
+        model->data(model->index(0, 0, collection), Qt::DisplayRole).toString(),
+        QStringLiteral("Test Places"));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      qunsetenv("TS_PACKS_DIR");
+      QSKIP("No OpenGL view on this platform.");
+    }
+    QVERIFY(globe->attributions().contains(
+        QStringLiteral("Vector Map Level 0 (VMAP0), NGA")));
+    globe->setPose(ts::CameraPose{40.0, -4.0, 4.0e5, 0.0, 0.0});
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    // The place's name as a label.
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          const std::vector<ts::BillboardDraw>& billboards =
+              globe->billboards();
+          return std::any_of(billboards.begin(), billboards.end(),
+                             [](const ts::BillboardDraw& billboard) {
+                               return billboard.label ==
+                                      QStringLiteral("Alphaville");
+                             });
+        },
+        10000));
+    // What Is Here: the place, with its attributes but not the table's.
+    QAction* info =
+        window.findChild<QAction*>(QStringLiteral("featureInfoAction"));
+    info->setChecked(true);
+    QVERIFY(window.identifyAt(ts::LonLat{-4.0, 40.0}, 0.01) >= 1);
+    ts::FeatureInfoWindow* results = window.featureInfoWindow();
+    if (!results) {
+      QFAIL("results is missing");
+    }
+    const QString text = results->resultsText();
+    QVERIFY2(text.contains(QStringLiteral("Alphaville")), qPrintable(text));
+    QVERIFY2(text.contains(QStringLiteral("Settlement")), qPrintable(text));
+    QVERIFY2(!text.contains(QStringLiteral("places_4")), qPrintable(text));
+    // Hiding the collection takes the labels away.
+    model->setData(collection, Qt::Unchecked, Qt::CheckStateRole);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          const std::vector<ts::BillboardDraw>& billboards =
+              globe->billboards();
+          return std::none_of(billboards.begin(), billboards.end(),
+                              [](const ts::BillboardDraw& billboard) {
+                                return billboard.label ==
+                                       QStringLiteral("Alphaville");
+                              });
+        },
+        10000));
     qunsetenv("TS_PACKS_DIR");
   }
 

@@ -30,6 +30,7 @@
 #include <optional>
 #include <vector>
 
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QString>
 
@@ -37,6 +38,7 @@
 #include "elevationbuilder.h"
 #include "imagerytiler.h"
 #include "shorelinebuilder.h"
+#include "vmap0builder.h"
 
 namespace ts::packager
 {
@@ -187,6 +189,38 @@ struct CountriesSpec {
   std::vector<QString> exclude;
 };
 
+/** A VMAP0 dataset (Phase 21): feature classes into one GeoPackage. */
+struct Vmap0Spec {
+  /** Dataset id in the manifest, e.g. "vmap0-transportation". */
+  QString dataset;
+  /** Source ids: one zip per VMAP0 library CD. */
+  std::vector<QString> sources;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+  /** The source as the manifest names it (all the zips together). */
+  QString sourceName;
+  /** Its version. */
+  QString sourceVersion;
+  /** Where it is published. */
+  QString sourceUrl;
+  /** Libraries used (empty: all but the reference library). */
+  std::vector<QString> libraries;
+  /** Levels of detail. */
+  std::vector<Vmap0Lod> lods;
+  /** Feature classes. */
+  std::vector<Vmap0Class> classes;
+  /**
+   * The layers the pack offers ("layers"): each `name`, `tables`, `style`
+   * and optional `styleRules`, made into layer definitions on this
+   * dataset in the manifest.
+   */
+  QJsonArray layers;
+};
+
 /** The whole pack configuration (tools/packager/basepack.json). */
 struct PackConfig {
   /** Pack id. */
@@ -216,6 +250,14 @@ struct PackConfig {
   std::vector<GeoidSpec> geoids;
   /** Datum shift grids. */
   std::vector<DatumShiftSpec> datumShifts;
+  /** A VMAP0 dataset, if any. */
+  std::optional<Vmap0Spec> vmap0;
+  /**
+   * The pack's name in the manifest, under which Add Layer lists its
+   * layers: "layerGroup" (regional packs of one theme share it), else the
+   * index entry's name.
+   */
+  QString name;
 
   /** Parses the configuration; nothing and @p errorString on failure. */
   static std::optional<PackConfig> fromJson(const QJsonObject& json,
@@ -251,6 +293,8 @@ struct BuildReport {
   CountryStats countries;
   /** DEM results. */
   ElevationStats elevation;
+  /** VMAP0 results per feature class. */
+  std::vector<Vmap0ClassStats> vmap0;
   /** The report as JSON, for CI and tests. */
   QJsonObject toJson() const;
 };

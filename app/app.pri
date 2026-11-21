@@ -103,6 +103,7 @@ SOURCES += \
     $$PWD/src/mainwindowaircraft.cpp \
     $$PWD/src/mainwindowkml.cpp \
     $$PWD/src/mainwindowsatellites.cpp \
+    $$PWD/src/mainwindowpacks.cpp \
     $$PWD/src/mainwindowships.cpp \
     $$PWD/src/navigationoverlay.cpp \
     $$PWD/src/newregiondialog.cpp \
