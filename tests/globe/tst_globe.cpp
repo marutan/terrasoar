@@ -3104,9 +3104,10 @@ private slots:
     // Its beam: 32 m, much narrower than long.
     QVERIFY(hull.width() * 4 < hull.height());
     // Far off: the symbol, 16 px long.
-    const ts::Camera far =
+    // (Not "far": a macro in Windows' headers.)
+    const ts::Camera distant =
         makeCamera(ts::CameraPose{50.85, -1.30, 2.0e5, 0.0, 0.0});
-    const QRect symbol = boxOfColor(render(far, {marker}), magenta);
+    const QRect symbol = boxOfColor(render(distant, {marker}), magenta);
     QCOMPARE(m_gl->device().takeErrors(), QString());
     qInfo("symbol %dx%d", symbol.width(), symbol.height());
     QVERIFY(symbol.height() >= 13 && symbol.height() <= 18);

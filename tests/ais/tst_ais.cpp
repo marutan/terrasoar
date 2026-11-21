@@ -94,7 +94,7 @@ std::optional<ts::AisMessage> decodeLines(const std::vector<const char*>& lines)
   return std::nullopt;
 }
 
-bool near(std::optional<double> value, double expected, double tolerance)
+bool isNear(std::optional<double> value, double expected, double tolerance)
 {
   return value && std::fabs(*value - expected) <= tolerance;
 }
@@ -305,9 +305,9 @@ void TestAis::classA()
   QCOMPARE(got(got(a).turnDegMin), 0.0);
   QCOMPARE(got(got(a).speedKn), 0.0);
   QVERIFY(!got(a).accurate);
-  QVERIFY(near(got(a).lonDeg, -122.341618, 1e-6));
-  QVERIFY(near(got(a).latDeg, 37.802118, 1e-6));
-  QVERIFY(near(got(a).courseDeg, 219.3, 1e-9));
+  QVERIFY(isNear(got(a).lonDeg, -122.341618, 1e-6));
+  QVERIFY(isNear(got(a).latDeg, 37.802118, 1e-6));
+  QVERIFY(isNear(got(a).courseDeg, 219.3, 1e-9));
   QCOMPARE(got(got(a).headingDeg), 1);
   QCOMPARE(got(got(a).second), 59);
 
@@ -320,8 +320,8 @@ void TestAis::classA()
   QVERIFY(!got(b).turnDegMin);
   QVERIFY(!got(b).headingDeg);
   QVERIFY(got(b).accurate);
-  QVERIFY(near(got(b).latDeg, 37.8084, 5e-5));
-  QVERIFY(near(got(b).lonDeg, -122.4082, 5e-5));
+  QVERIFY(isNear(got(b).latDeg, 37.8084, 5e-5));
+  QVERIFY(isNear(got(b).lonDeg, -122.4082, 5e-5));
   // Course 360 is "not available" too.
   QVERIFY(!got(b).courseDeg);
   QCOMPARE(got(got(b).second), 34);
@@ -329,28 +329,28 @@ void TestAis::classA()
   const std::optional<ts::AisMessage> c =
       decodeLine("!AIVDM,1,1,,B,181:Kjh01ewHFRPDK1s3IRcn06sd,0*08");
   QCOMPARE(got(c).mmsi, 538090443U);
-  QVERIFY(near(got(c).speedKn, 10.9, 1e-9));
-  QVERIFY(near(got(c).courseDeg, 87.0, 1e-9));
+  QVERIFY(isNear(got(c).speedKn, 10.9, 1e-9));
+  QVERIFY(isNear(got(c).courseDeg, 87.0, 1e-9));
   // This one's checksum is wrong in the source (7E, not 67), so its
   // payload is decoded directly.
   QVERIFY(!decodeLine("!AIVDM,1,1,,A,13@nePh01>PjcO4PGReoJEmL0HJg,0*67"));
-  QVERIFY(near(got(ts::decodeAis("13@nePh01>PjcO4PGReoJEmL0HJg", 0)).speedKn,
-               7.8, 1e-9));
+  QVERIFY(isNear(got(ts::decodeAis("13@nePh01>PjcO4PGReoJEmL0HJg", 0)).speedKn,
+                 7.8, 1e-9));
 
   // Type 3, moored, and from another talker at anchor.
   const std::optional<ts::AisMessage> moored =
       decodeLine("!AIVDM,1,1,,A,35NSH95001G?wopE`beasVk@0E5:,0*6F");
   QCOMPARE(got(moored).type, 3);
   QCOMPARE(got(got(moored).status), ts::AisNavStatus::Moored);
-  QVERIFY(near(got(moored).speedKn, 0.1, 1e-9));
-  QVERIFY(near(got(moored).courseDeg, 254.2, 1e-9));
+  QVERIFY(isNear(got(moored).speedKn, 0.1, 1e-9));
+  QVERIFY(isNear(got(moored).courseDeg, 254.2, 1e-9));
   QCOMPARE(got(got(moored).headingDeg), 217);
   const std::optional<ts::AisMessage> anchored =
       decodeLine("!ANVDM,1,1,,A,35O5WS1000r9FSHF@jBoLCACp000,0*42");
   QCOMPARE(got(anchored).mmsi, 368142220U);
   QCOMPARE(got(got(anchored).status), ts::AisNavStatus::AtAnchor);
-  QVERIFY(near(got(anchored).lonDeg, -81.84302, 1e-5));
-  QVERIFY(near(got(anchored).latDeg, 38.906152, 1e-6));
+  QVERIFY(isNear(got(anchored).lonDeg, -81.84302, 1e-5));
+  QVERIFY(isNear(got(anchored).latDeg, 38.906152, 1e-6));
   QCOMPARE(got(got(anchored).headingDeg), 104);
   // Type 2 (its checksum is wrong in the source too: 6A, not 68).
   QCOMPARE(got(ts::decodeAis("23aFfl0P00PCR?0MEB@h0?w020S7", 0)).type, 2);
@@ -380,8 +380,8 @@ void TestAis::baseStation()
       decodeLine("!AIVDM,1,1,,A,403OviQuMGCqWrRO9>E6fE700@GO,0*4D");
   QVERIFY(a);
   QCOMPARE(got(a).type, 4);
-  QVERIFY(near(got(a).lonDeg, -76.352362, 1e-6));
-  QVERIFY(near(got(a).latDeg, 36.883767, 1e-6));
+  QVERIFY(isNear(got(a).lonDeg, -76.352362, 1e-6));
+  QVERIFY(isNear(got(a).latDeg, 36.883767, 1e-6));
   QVERIFY(got(a).accurate);
   const std::vector<int32_t> utc = got(got(a).utc);
   QCOMPARE(utc.size(), std::size_t{6});
@@ -393,8 +393,8 @@ void TestAis::baseStation()
   const std::optional<ts::AisMessage> b =
       decodeLine("!AIVDM,1,1,,B,403OtVAv>lba;o?Ia`E`4G?02H6k,0*44");
   QCOMPARE(got(b).mmsi, 3669145U);
-  QVERIFY(near(got(b).lonDeg, -122.4648, 5e-5));
-  QVERIFY(near(got(b).latDeg, 37.7943, 5e-5));
+  QVERIFY(isNear(got(b).lonDeg, -122.4648, 5e-5));
+  QVERIFY(isNear(got(b).latDeg, 37.7943, 5e-5));
   QCOMPARE(got(got(b).utc), (std::vector<int32_t>{2019, 11, 9, 10, 41, 11}));
 }
 
@@ -415,7 +415,7 @@ void TestAis::staticVoyage()
   QCOMPARE(d.toStern, 70);
   QCOMPARE(d.toPort, 1);
   QCOMPARE(d.toStarboard, 31);
-  QVERIFY(near(got(m).draughtM, 12.2, 1e-9));
+  QVERIFY(isNear(got(m).draughtM, 12.2, 1e-9));
   QCOMPARE(got(got(m).destination), QStringLiteral("NEW YORK"));
 }
 
@@ -443,7 +443,7 @@ void TestAis::staticVoyageOneSentence()
   QCOMPARE(eta.day, 7);
   QCOMPARE(eta.hour, 17);
   QCOMPARE(eta.minute, 0);
-  QVERIFY(near(got(m).draughtM, 4.7, 1e-9));
+  QVERIFY(isNear(got(m).draughtM, 4.7, 1e-9));
   QCOMPARE(got(got(m).destination), QStringLiteral("VIANA DO CASTELO"));
 }
 
@@ -505,9 +505,9 @@ void TestAis::sarAircraft()
   QCOMPARE(got(m).mmsi, 111232511U);
   QCOMPARE(got(got(m).altitudeM), 303);
   QCOMPARE(got(got(m).speedKn), 42.0);
-  QVERIFY(near(got(m).lonDeg, -6.27884, 1e-5));
-  QVERIFY(near(got(m).latDeg, 58.144, 1e-6));
-  QVERIFY(near(got(m).courseDeg, 154.5, 1e-9));
+  QVERIFY(isNear(got(m).lonDeg, -6.27884, 1e-5));
+  QVERIFY(isNear(got(m).latDeg, 58.144, 1e-6));
+  QVERIFY(isNear(got(m).courseDeg, 154.5, 1e-9));
   QCOMPARE(got(got(m).second), 15);
 }
 
@@ -520,15 +520,15 @@ void TestAis::classB()
   QVERIFY(got(m).isClassB());
   QCOMPARE(got(m).mmsi, 367430530U);
   QCOMPARE(got(got(m).speedKn), 0.0);
-  QVERIFY(near(got(m).latDeg, 37.79, 0.005));
-  QVERIFY(near(got(m).lonDeg, -122.27, 0.005));
+  QVERIFY(isNear(got(m).latDeg, 37.79, 0.005));
+  QVERIFY(isNear(got(m).lonDeg, -122.27, 0.005));
   QCOMPARE(got(got(m).courseDeg), 0.0);
   QVERIFY(!got(m).headingDeg);
   QCOMPARE(got(got(m).second), 55);
   const std::optional<ts::AisMessage> fast =
       decodeLine("!AIVDO,1,1,,A,B5NJ;PP2aUl4ot5Isbl6GwsUkP06,0*35");
-  QVERIFY(near(got(fast).speedKn, 67.8, 1e-9));
-  QVERIFY(near(got(fast).courseDeg, 10.1, 1e-9));
+  QVERIFY(isNear(got(fast).speedKn, 67.8, 1e-9));
+  QVERIFY(isNear(got(fast).courseDeg, 10.1, 1e-9));
 }
 
 void TestAis::classBNotAvailable()
@@ -555,10 +555,10 @@ void TestAis::classBStatic()
   QVERIFY(m);
   QCOMPARE(got(m).type, 19);
   QCOMPARE(got(m).mmsi, 367059850U);
-  QVERIFY(near(got(m).speedKn, 8.7, 1e-9));
-  QVERIFY(near(got(m).latDeg, 29.543695, 1e-6));
-  QVERIFY(near(got(m).lonDeg, -88.810394, 1e-5));
-  QVERIFY(near(got(m).courseDeg, 335.9, 0.05));
+  QVERIFY(isNear(got(m).speedKn, 8.7, 1e-9));
+  QVERIFY(isNear(got(m).latDeg, 29.543695, 1e-6));
+  QVERIFY(isNear(got(m).lonDeg, -88.810394, 1e-5));
+  QVERIFY(isNear(got(m).courseDeg, 335.9, 0.05));
   QVERIFY(!got(m).headingDeg);
   QCOMPARE(got(got(m).second), 46);
   QCOMPARE(got(got(m).name), QStringLiteral("CAPT.J.RIMES"));
@@ -582,8 +582,8 @@ void TestAis::aidToNavigation()
   QCOMPARE(got(got(a).aidType), 1);
   QCOMPARE(got(got(a).name), QStringLiteral("DFO2"));
   QVERIFY(got(a).accurate);
-  QVERIFY(near(got(a).latDeg, 48.65457, 1e-5));
-  QVERIFY(near(got(a).lonDeg, -123.429155, 1e-6));
+  QVERIFY(isNear(got(a).latDeg, 48.65457, 1e-5));
+  QVERIFY(isNear(got(a).lonDeg, -123.429155, 1e-6));
   QVERIFY(!got(a).dimensions);
   // A starboard-hand mark, and a long name with its extension.
   const std::optional<ts::AisMessage> b = decodeLine(
@@ -591,8 +591,8 @@ void TestAis::aidToNavigation()
   QCOMPARE(got(b).mmsi, 995036013U);
   QCOMPARE(got(got(b).aidType), 25);
   QCOMPARE(got(got(b).name), QStringLiteral("STDB CUT 2"));
-  QVERIFY(near(got(b).lonDeg, 115.691833, 1e-6));
-  QVERIFY(near(got(b).latDeg, -32.004333, 1e-6));
+  QVERIFY(isNear(got(b).lonDeg, 115.691833, 1e-6));
+  QVERIFY(isNear(got(b).latDeg, -32.004333, 1e-6));
   const std::optional<ts::AisMessage> long_ = decodeLine(
       "!AIVDM,1,1,,B,E>jHDL1W73nWaanah7S39T7a2h;wror=@5nL`A2AISd002CQ1PDS@0,"
       "4*39");
@@ -644,15 +644,15 @@ void TestAis::longRange()
   QCOMPARE(got(m).type, 27);
   QCOMPARE(got(m).mmsi, 206914217U);
   QCOMPARE(got(got(m).status), ts::AisNavStatus::NotUnderCommand);
-  QVERIFY(near(got(m).lonDeg, 137.023333, 1e-6));
-  QVERIFY(near(got(m).latDeg, 4.84, 1e-6));
+  QVERIFY(isNear(got(m).lonDeg, 137.023333, 1e-6));
+  QVERIFY(isNear(got(m).latDeg, 4.84, 1e-6));
   QCOMPARE(got(got(m).speedKn), 57.0);
   QCOMPARE(got(got(m).courseDeg), 167.0);
   const std::optional<ts::AisMessage> south =
       decodeLine("!AIVDO,1,1,,A,K01;FQh?PbtE3P00,0*75");
   QCOMPARE(got(south).mmsi, 1234567U);
-  QVERIFY(near(got(south).lonDeg, -13.368333, 1e-6));
-  QVERIFY(near(got(south).latDeg, -50.121667, 1e-6));
+  QVERIFY(isNear(got(south).lonDeg, -13.368333, 1e-6));
+  QVERIFY(isNear(got(south).latDeg, -50.121667, 1e-6));
 }
 
 void TestAis::shortAndUnknown()
@@ -1537,9 +1537,15 @@ void TestAis::dayOfNoaa()
                              .arg(trailS, 0, 'f', 2)
                              .arg(placeMs, 0, 'f', 2)));
   QCOMPARE(shown, vessels);
-  // Budgets (generous for sanitizer builds).
+  // Budgets (generous for sanitizer builds, whose shadow memory adds
+  // several times the memory: 1.2 GB under ThreadSanitizer).
+#ifdef TS_INSTRUMENTED_BUILD
+  const double budgetMb = 2500.0;
+#else
+  const double budgetMb = 500.0;
+#endif
   QVERIFY(buildS < 30.0);
-  QVERIFY(usedMb < 900.0);
+  QVERIFY2(usedMb < budgetMb, qPrintable(QString::number(usedMb)));
   QVERIFY(trailS < 20.0);
   QVERIFY(placeMs < 50.0);
 }
