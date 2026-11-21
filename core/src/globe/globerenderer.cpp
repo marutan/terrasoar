@@ -66,9 +66,11 @@ struct MarkerInstance {
    * the shape (MarkerShape).
    */
   std::array<float, 4> heading{};
+  /** Ships: hull length, beam, middle ahead and to starboard, metres. */
+  std::array<float, 4> hull{};
 };
 
-static_assert(sizeof(MarkerInstance) == 48, "marker instance stride");
+static_assert(sizeof(MarkerInstance) == 64, "marker instance stride");
 
 /** One segment of a space line in the vertex buffer. */
 struct LineInstance {
@@ -232,20 +234,33 @@ layout(location = 2) in vec3 positionLow;
 layout(location = 3) in float radiusPx;
 layout(location = 4) in vec4 color;
 layout(location = 5) in vec4 heading;
+layout(location = 6) in vec4 hull;
 out vec2 vOffsetPx;
 out float vRadiusPx;
 out vec4 vColor;
 out float vDepthW;
 flat out float vShape;
+flat out vec4 vHull;
+flat out float vMetresPerPx;
 void main()
 {
   // Relative to the eye: the high parts cancel exactly near the eye.
   vec3 offset = (positionHigh - eyeHigh.xyz) + (positionLow - eyeLow.xyz);
   vec4 clip = viewProjection * vec4(offset, 1.0);
   float radius = radiusPx * depthParams.y;
-  float extent = radius + 1.0;
-  // Aircraft turn to their heading on the screen: towards a point a
-  // little along it (in pixels: y up the screen).
+  float metresPerPx = 2.0 * depthParams.z * viewport.w * clip.w;
+  // Ships whose hull is longer on the screen than the marker: the hull, to
+  // scale (vHull.x > 0), in a quad around it.
+  float halfPx = radius;
+  vHull = vec4(0.0);
+  if (hull.x > 0.0 && 0.5 * hull.x / metresPerPx > radius) {
+    vHull = hull;
+    halfPx = max(0.5 * hull.x + abs(hull.z), 0.5 * hull.y + abs(hull.w))
+           / metresPerPx;
+  }
+  float extent = halfPx + 1.5;
+  // Aircraft and ships turn to their heading on the screen: towards a
+  // point a little along it (in pixels: y up the screen).
   vec2 up = vec2(0.0, 1.0);
   if (dot(heading.xyz, heading.xyz) > 0.0) {
     vec4 ahead = viewProjection
@@ -263,11 +278,11 @@ void main()
   vRadiusPx = radius;
   vColor = color;
   vShape = heading.w;
+  vMetresPerPx = metresPerPx;
   // A marker is a flat disc facing the viewer at its point's depth; the
   // ground around the point can be nearer by up to a few times the disc's
   // size in metres (more at grazing angles). Bring the depth that much
   // nearer so the ground doesn't cut the disc.
-  float metresPerPx = 2.0 * depthParams.z * viewport.w * clip.w;
   vDepthW = max(clip.w - 4.0 * extent * metresPerPx, 0.5 * clip.w);
   // The depth is written in the fragment shader; z = 0 keeps markers in
   // space beyond the far plane (satellites past the Earth's edge) from
@@ -282,11 +297,13 @@ in float vRadiusPx;
 in vec4 vColor;
 in float vDepthW;
 flat in float vShape;
+flat in vec4 vHull;
+flat in float vMetresPerPx;
 out vec4 fragColor;
 
 // An aircraft from above, nose up, in units of its half length: fuselage,
 // swept wings and tailplane.
-float aircraft(vec2 q)
+bool aircraft(vec2 q)
 {
   float x = abs(q.x);
   bool fuselage = x <= 0.11 && q.y >= -0.86
@@ -295,20 +312,65 @@ float aircraft(vec2 q)
              && q.y >= 0.02 - 0.26 * x;
   bool tail = x <= 0.36 && q.y <= -0.56 - 0.3 * x
             && q.y >= -0.80 - 0.12 * x;
-  return (fuselage || wings || tail) ? 1.0 : 0.0;
+  return fuselage || wings || tail;
 }
 
-// The part of the pixel at p (pixels) inside the aircraft, grown by grow
-// pixels, from four samples.
-float aircraftCoverage(vec2 p, float grow)
+// A ship's symbol, bow up, in units of its half length: pointed at the
+// bow, square at the stern.
+bool ship(vec2 q)
 {
+  return q.y >= -0.9 && q.y <= 1.0
+      && abs(q.x) <= 0.42 * min(1.0, (1.0 - q.y) / 0.9);
+}
+
+// A hull to scale, bow up, in metres from its middle: length, beam, the
+// bow tapering to a point.
+bool hullShape(vec2 m, float lengthM, float beamM)
+{
+  float halfLength = 0.5 * lengthM;
+  float taper = max(min(1.2 * beamM, 0.3 * lengthM), 1e-3);
+  return m.y >= -halfLength && m.y <= halfLength
+      && abs(m.x) <= 0.5 * beamM * clamp((halfLength - m.y) / taper, 0.0, 1.0);
+}
+
+// True if p (pixels from the marker, y towards its heading) is inside its
+// shape grown by grow pixels.
+bool inside(vec2 p, float grow)
+{
+  if (vHull.x > 0.0) {
+    float g = grow * vMetresPerPx;
+    vec2 m = p * vMetresPerPx - vec2(vHull.w, vHull.z);
+    return hullShape(m, vHull.x + 2.0 * g, vHull.y + 2.0 * g);
+  }
   float r = max(vRadiusPx, 1.0);
-  float scale = r / (r + grow);
+  vec2 q = p / (r + grow);
+  if (vShape > 4.5) {
+    return max(abs(q.x), abs(q.y)) <= 0.75;
+  }
+  if (vShape > 3.5) {
+    return abs(q.x) + abs(q.y) <= 1.0;
+  }
+  if (vShape > 2.5) {
+    return length(q) <= 0.7;
+  }
+  if (vShape > 1.5) {
+    return ship(q);
+  }
+  if (vShape > 0.5) {
+    return aircraft(q);
+  }
+  return length(q) <= 1.0;
+}
+
+// The part of the pixel at p inside the shape grown by grow, from four
+// samples.
+float coverage(vec2 p, float grow)
+{
   float sum = 0.0;
-  sum += aircraft((p + vec2(-0.25, -0.25)) / r * scale);
-  sum += aircraft((p + vec2(0.25, -0.25)) / r * scale);
-  sum += aircraft((p + vec2(-0.25, 0.25)) / r * scale);
-  sum += aircraft((p + vec2(0.25, 0.25)) / r * scale);
+  sum += inside(p + vec2(-0.25, -0.25), grow) ? 1.0 : 0.0;
+  sum += inside(p + vec2(0.25, -0.25), grow) ? 1.0 : 0.0;
+  sum += inside(p + vec2(-0.25, 0.25), grow) ? 1.0 : 0.0;
+  sum += inside(p + vec2(0.25, 0.25), grow) ? 1.0 : 0.0;
   return 0.25 * sum;
 }
 
@@ -316,13 +378,13 @@ void main()
 {
   float alpha;
   float fill;
-  if (vShape > 0.5) {
-    fill = aircraftCoverage(vOffsetPx, 0.0);
-    alpha = max(fill, aircraftCoverage(vOffsetPx, 1.2)) * vColor.a;
-  } else {
+  if (vShape < 0.5 && vHull.x <= 0.0) {
     float r = length(vOffsetPx);
     alpha = clamp(vRadiusPx + 0.5 - r, 0.0, 1.0) * vColor.a;
     fill = clamp(vRadiusPx - 0.5 - r, 0.0, 1.0);
+  } else {
+    fill = coverage(vOffsetPx, 0.0);
+    alpha = max(fill, coverage(vOffsetPx, 1.2)) * vColor.a;
   }
   if (alpha <= 0.0) {
     discard;
@@ -606,7 +668,8 @@ bool GlobeRenderer::initialise(QString* errorString)
   markerPipeline.attributes = {
       {0, VertexFormat::Float2, 0, 0},    {1, VertexFormat::Float3, 1, 0},
       {2, VertexFormat::Float3, 1, 12},   {3, VertexFormat::Float, 1, 24},
-      {4, VertexFormat::UNorm8x4, 1, 28}, {5, VertexFormat::Float4, 1, 32}};
+      {4, VertexFormat::UNorm8x4, 1, 28}, {5, VertexFormat::Float4, 1, 32},
+      {6, VertexFormat::Float4, 1, 48}};
   markerPipeline.depthTest = true;
   markerPipeline.depthWrite = false;
   markerPipeline.depthCompare = CompareOp::LessOrEqual;
@@ -955,8 +1018,8 @@ std::optional<MarkerInstance> markerInstance(const GlobeMarker& marker,
                                              const MapFrame& frame)
 {
   const bool morphed = camera.morph() > 0.0;
-  const bool aircraft = marker.shape == MarkerShape::Aircraft;
-  const bool turned = aircraft && std::isfinite(marker.headingDeg);
+  const bool turned =
+      marker.shape != MarkerShape::Round && std::isfinite(marker.headingDeg);
   Vec3 position = marker.positionEcef;
   Vec3 heading{};
   const Geodetic geodetic =
@@ -987,7 +1050,11 @@ std::optional<MarkerInstance> markerInstance(const GlobeMarker& marker,
        split.lowZ, static_cast<float>(marker.radiusPx)},
       marker.rgba,
       {static_cast<float>(heading.x), static_cast<float>(heading.y),
-       static_cast<float>(heading.z), aircraft ? 1.0F : 0.0F}};
+       static_cast<float>(heading.z), static_cast<float>(marker.shape)},
+      {static_cast<float>(marker.hullLengthM),
+       static_cast<float>(marker.hullWidthM),
+       static_cast<float>(marker.hullForwardM),
+       static_cast<float>(marker.hullStarboardM)}};
 }
 
 } // namespace

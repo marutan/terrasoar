@@ -53,8 +53,12 @@ struct TileStatistics;
 
 /** The shape of a GlobeMarker. */
 enum class MarkerShape : std::uint8_t {
-  Round,    ///< A disc.
-  Aircraft, ///< An aircraft seen from above, nose along its heading.
+  Round,       ///< A disc.
+  Aircraft,    ///< An aircraft seen from above, nose along its heading.
+  Ship,        ///< A ship under way: pointed, bow along its heading.
+  ShipStopped, ///< A ship moored or at anchor: round.
+  Diamond,     ///< A diamond (aids to navigation).
+  Square,      ///< A square (base stations).
 };
 
 /**
@@ -73,10 +77,23 @@ struct GlobeMarker {
   /** The shape. */
   MarkerShape shape = MarkerShape::Round;
   /**
-   * Aircraft: the heading the nose points along, degrees from true north
-   * (on the ground below it); NaN draws it pointing up the screen.
+   * Aircraft and ships: the heading the nose or bow points along, degrees
+   * from true north (on the ground below it); NaN draws it pointing up the
+   * screen.
    */
   double headingDeg = std::numeric_limits<double>::quiet_NaN();
+  /**
+   * Ships: the hull's length and beam, metres (0: not known). When the
+   * hull is longer on the screen than the marker, it is drawn instead, to
+   * scale, with the marker's position as the antenna's.
+   */
+  double hullLengthM = 0.0;
+  /** The hull's beam, metres. */
+  double hullWidthM = 0.0;
+  /** How far the hull's middle is ahead of the antenna, metres. */
+  double hullForwardM = 0.0;
+  /** How far the hull's middle is to starboard of the antenna, metres. */
+  double hullStarboardM = 0.0;
 };
 
 /**

@@ -51,6 +51,9 @@
 #include "ts/adsb/adsbreaders.h"
 #include "ts/adsb/aircraftdraws.h"
 #include "ts/adsb/aircrafttracks.h"
+#include "ts/ais/aisreaders.h"
+#include "ts/ais/vesseldraws.h"
+#include "ts/ais/vesseltracks.h"
 #include "ts/camera/camera.h"
 #include "ts/elevation/heightgrid.h"
 #include "ts/geo/ellipsoid.h"
@@ -449,6 +452,71 @@ void aircraftScene(double timeS, ts::TrailSettings trail,
       lines.push_back(ts::dropLine(*at, 0.0, {255, 230, 0, 255}));
     }
   }
+}
+
+/** The made-up harbour of tests/ais's fixtures, as tracks. */
+std::vector<ts::VesselTrack> harbourFixture()
+{
+  ts::VesselTrackBuilder builder;
+  ts::readAisFile(
+      QStringLiteral(TS_TEST_DATA_DIR "/../ais/data/harbour-tagged.nmea"),
+      ts::AisFormat::Unknown, ts::AisReadOptions(),
+      [&builder](const ts::VesselReport& report) { builder.add(report); });
+  return builder.finish();
+}
+
+/**
+ * The harbour at @p timeS as the program draws it: stations by type
+ * colour, six-minute course vectors and trails coloured by type.
+ */
+void harbourScene(double timeS, ts::TrailSettings trail,
+                  std::vector<ts::GlobeMarker>& markers,
+                  std::vector<ts::SpaceLine>& lines)
+{
+  ts::TrackTiming timing;
+  timing.gapS = 60.0;
+  for (const ts::VesselTrack& vessel : harbourFixture()) {
+    const ts::VesselInfo* info = vessel.infoAt(timeS);
+    const ts::VesselInfo known = info != nullptr ? *info : ts::VesselInfo();
+    const ts::ShipTypeGroup group = known.kind == ts::AisStationKind::Vessel
+                                        ? ts::shipTypeGroup(known.shipType)
+                                        : ts::ShipTypeGroup::Navigation;
+    const std::array<std::uint8_t, 4> rgba = ts::shipTypeColour(group);
+    ts::TrailLook look;
+    look.rgba = rgba;
+    look.widthPx = 2.0F;
+    for (ts::SpaceLine& line :
+         ts::trailLines(vessel.track, timing, trail, look)) {
+      lines.push_back(std::move(line));
+    }
+    timing.staleS = ts::vesselStaleS(known, 0.0);
+    const std::optional<ts::TrackSample> at = vessel.track.at(timeS, timing);
+    if (!at) {
+      continue;
+    }
+    const std::size_t i = vessel.track.indexAtOrBefore(timeS).value_or(0);
+    markers.push_back(
+        ts::vesselMarker(*at, vessel.motion.at(i), known, 0.0, rgba, 7.0));
+    lines.push_back(ts::courseVector(*at, 6.0, 0.0, rgba));
+  }
+}
+
+/** The bounding box of @p image's pixels near @p color. */
+QRect boxOfColor(const QImage& image, const QColor& color)
+{
+  const QImage rgba = image.convertToFormat(QImage::Format_RGBA8888);
+  QRect box;
+  for (int32_t y = 0; y < rgba.height(); ++y) {
+    for (int32_t x = 0; x < rgba.width(); ++x) {
+      const QColor p = rgba.pixelColor(x, y);
+      if (std::abs(p.red() - color.red()) < 40 &&
+          std::abs(p.green() - color.green()) < 40 &&
+          std::abs(p.blue() - color.blue()) < 40) {
+        box = box.united(QRect(x, y, 1, 1));
+      }
+    }
+  }
+  return box;
 }
 
 /** Pixels of @p image near @p color in each part of a 2×2 split. */
@@ -2998,6 +3066,128 @@ private slots:
     m_renderer->setSpaceLines({}, 1);
     m_renderer->setMarkers({});
     QCOMPARE(m_gl->device().takeErrors(), QString());
+  }
+
+  void hullsToScale()
+  {
+    // A 200 m by 32 m ship heading north, its antenna 50 m behind the
+    // middle: close up its hull is drawn to scale (as long on the screen as
+    // the camera says 200 m is, ahead of the antenna by 50 m); far off,
+    // the symbol at its size in pixels.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    ts::TrackSample at;
+    at.latDeg = 50.85;
+    at.lonDeg = -1.30;
+    at.trackDeg = 0.0F;
+    at.speedMS = 5.0F;
+    ts::VesselMotion motion;
+    motion.headingDeg = 0.0F;
+    ts::VesselInfo info;
+    info.dimensions = ts::AisDimensions{150, 50, 16, 16};
+    const ts::GlobeMarker marker =
+        ts::vesselMarker(at, motion, info, 0.0, {255, 0, 255, 255}, 8.0);
+    const QColor magenta(255, 0, 255);
+    const ts::Camera close =
+        makeCamera(ts::CameraPose{50.85, -1.30, 1500.0, 0.0, 0.0});
+    const QRect hull = boxOfColor(render(close, {marker}), magenta);
+    const std::optional<ts::ScreenPoint> bow = close.project(
+        ts::geodeticToEcef(ts::Geodetic{50.85 + 150.0 / 111195.0, -1.30, 0.0}));
+    const std::optional<ts::ScreenPoint> stern = close.project(
+        ts::geodeticToEcef(ts::Geodetic{50.85 - 50.0 / 111195.0, -1.30, 0.0}));
+    QVERIFY(bow && stern);
+    const double bowY = bow.value_or(ts::ScreenPoint()).yPx;
+    const double sternY = stern.value_or(ts::ScreenPoint()).yPx;
+    qInfo("hull rows %d to %d; bow %.1f, stern %.1f", hull.top(), hull.bottom(),
+          bowY, sternY);
+    QVERIFY(std::fabs(hull.top() - bowY) <= 3.0);
+    QVERIFY(std::fabs(hull.bottom() - sternY) <= 3.0);
+    // Its beam: 32 m, much narrower than long.
+    QVERIFY(hull.width() * 4 < hull.height());
+    // Far off: the symbol, 16 px long.
+    const ts::Camera far =
+        makeCamera(ts::CameraPose{50.85, -1.30, 2.0e5, 0.0, 0.0});
+    const QRect symbol = boxOfColor(render(far, {marker}), magenta);
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    qInfo("symbol %dx%d", symbol.width(), symbol.height());
+    QVERIFY(symbol.height() >= 13 && symbol.height() <= 18);
+    QVERIFY(symbol.width() < symbol.height());
+  }
+
+  void harbourGolden_data()
+  {
+    QTest::addColumn<QString>("mode");
+    QTest::addColumn<bool>("map");
+    QTest::addColumn<double>("rangeM");
+    // The made-up harbour five minutes in: stations by type colour,
+    // course vectors, trails; close in, the hulls.
+    QTest::newRow("harbour-globe-off")
+        << QStringLiteral("off") << false << 9000.0;
+    QTest::newRow("harbour-globe-span")
+        << QStringLiteral("span") << false << 9000.0;
+    QTest::newRow("harbour-globe-all")
+        << QStringLiteral("all") << false << 9000.0;
+    QTest::newRow("harbour-mercator")
+        << QStringLiteral("all") << true << 9000.0;
+    QTest::newRow("harbour-hulls") << QStringLiteral("span") << false << 2500.0;
+  }
+
+  void harbourGolden()
+  {
+    TS_TEST_REQUIRE_GL(*m_gl);
+    QFETCH(QString, mode);
+    QFETCH(bool, map);
+    QFETCH(double, rangeM);
+    ts::TrailSettings trail;
+    trail.mode = ts::TrailMode::All;
+    if (mode == QLatin1String("off")) {
+      trail.mode = ts::TrailMode::Off;
+    } else if (mode == QLatin1String("span")) {
+      trail.mode = ts::TrailMode::Span;
+    }
+    trail.spanS = 120.0;
+    std::vector<ts::GlobeMarker> markers;
+    std::vector<ts::SpaceLine> lines;
+    const double timeS = 1795176000.0 + 300.0;
+    harbourScene(timeS, trail, markers, lines);
+    QCOMPARE(markers.size(), std::size_t{8});
+    // The close view looks at the cargo ship.
+    const double lat = rangeM < 5000.0 ? 50.845 : 50.85;
+    const double lon = rangeM < 5000.0 ? -1.318 : -1.30;
+    ts::Camera camera = makeCamera(ts::CameraPose{lat, lon, rangeM, 0.0, 0.0});
+    if (map) {
+      camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+      camera.setMorph(1.0);
+    }
+    m_gl->makeCurrent();
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
+    m_renderer->setImageryProvider(nullptr);
+    m_renderer->setVectorLayers({});
+    m_renderer->setSpaceLineTime(timeS);
+    m_renderer->setSpaceLines(lines);
+    QImage image;
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          image = render(camera, markers);
+          return !m_renderer->isBusy();
+        },
+        60000));
+    image = render(camera, markers);
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+    // The cargo ship's green is on screen.
+    const std::array<std::uint8_t, 4> cargo =
+        ts::shipTypeColour(ts::ShipTypeGroup::Cargo);
+    QVERIFY(countColor(image, QColor(cargo[0], cargo[1], cargo[2])) > 15);
+    if (!m_softwareRenderer &&
+        qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
+      QSKIP("Golden images are compared on Mesa llvmpipe only.");
+    }
+    const QString failure = ts::test::checkGolden(
+        image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
+    QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
   void satellitesHoldFrameRate()

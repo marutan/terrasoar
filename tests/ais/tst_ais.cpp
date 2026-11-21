@@ -17,8 +17,11 @@
   You should have received a copy of the GNU General Public License
   along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
+#include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <vector>
 
@@ -29,7 +32,9 @@
 
 #include "ts/ais/aismessage.h"
 #include "ts/ais/aisreaders.h"
+#include "ts/ais/vesseldraws.h"
 #include "ts/ais/vesseltracks.h"
+#include "ts/geo/geodetic.h"
 #include "ts/tracks/movingtrack.h"
 
 namespace
@@ -191,6 +196,10 @@ private slots:
   void csvColumns();
   void staleTimes();
   void liveBuilder();
+  void typeColours();
+  void symbols();
+  void hulls();
+  void courseVectors();
 };
 
 void TestAis::sentences()
@@ -935,6 +944,130 @@ void TestAis::liveBuilder()
   QCOMPARE(changed.front().track.points().size(), std::size_t{5});
   builder.forgetBefore(200.0);
   QVERIFY(builder.finish().empty());
+}
+
+void TestAis::typeColours()
+{
+  QCOMPARE(ts::shipTypeGroup(70), ts::ShipTypeGroup::Cargo);
+  QCOMPARE(ts::shipTypeGroup(79), ts::ShipTypeGroup::Cargo);
+  QCOMPARE(ts::shipTypeGroup(84), ts::ShipTypeGroup::Tanker);
+  QCOMPARE(ts::shipTypeGroup(60), ts::ShipTypeGroup::Passenger);
+  QCOMPARE(ts::shipTypeGroup(40), ts::ShipTypeGroup::HighSpeed);
+  QCOMPARE(ts::shipTypeGroup(52), ts::ShipTypeGroup::TugSpecial);
+  QCOMPARE(ts::shipTypeGroup(31), ts::ShipTypeGroup::TugSpecial);
+  QCOMPARE(ts::shipTypeGroup(30), ts::ShipTypeGroup::Fishing);
+  QCOMPARE(ts::shipTypeGroup(36), ts::ShipTypeGroup::Pleasure);
+  QCOMPARE(ts::shipTypeGroup(37), ts::ShipTypeGroup::Pleasure);
+  QCOMPARE(ts::shipTypeGroup(0), ts::ShipTypeGroup::Unknown);
+  QCOMPARE(ts::shipTypeGroup(99), ts::ShipTypeGroup::Other);
+  // Every group of the legend has its own colour.
+  std::vector<std::array<std::uint8_t, 4>> seen;
+  for (const ts::ShipTypeGroup group : ts::shipTypeLegend()) {
+    const std::array<std::uint8_t, 4> c = ts::shipTypeColour(group);
+    QVERIFY(std::find(seen.begin(), seen.end(), c) == seen.end());
+    seen.push_back(c);
+  }
+  QCOMPARE(ts::speedColour(0.0), ts::speedColour(-1.0));
+  QCOMPARE(ts::speedColour(30.0), ts::speedColour(40.0));
+  QVERIFY(ts::speedColour(2.0) != ts::speedColour(8.0));
+}
+
+void TestAis::symbols()
+{
+  ts::TrackSample at;
+  at.latDeg = 50.0;
+  at.lonDeg = -1.0;
+  at.trackDeg = 30.0F;
+  at.speedMS = 5.0F;
+  ts::VesselMotion motion;
+  ts::VesselInfo info;
+  // No heading: the course.
+  ts::GlobeMarker m = ts::vesselMarker(at, motion, info, 47.0, {}, 8.0);
+  QCOMPARE(m.shape, ts::MarkerShape::Ship);
+  QCOMPARE(m.headingDeg, 30.0);
+  // At sea level (the geoid's 47 m).
+  QVERIFY(std::fabs(ts::ecefToGeodetic(m.positionEcef).heightM - 47.0) < 1e-3);
+  // A heading wins.
+  motion.headingDeg = 35.0F;
+  QCOMPARE(ts::vesselMarker(at, motion, info, 0.0, {}, 8.0).headingDeg, 35.0);
+  // Moored or at anchor: round.
+  info.status = ts::AisNavStatus::Moored;
+  QCOMPARE(ts::vesselMarker(at, motion, info, 0.0, {}, 8.0).shape,
+           ts::MarkerShape::ShipStopped);
+  info.status = ts::AisNavStatus::AtAnchor;
+  QCOMPARE(ts::vesselMarker(at, motion, info, 0.0, {}, 8.0).shape,
+           ts::MarkerShape::ShipStopped);
+  // Neither heading nor course: round too.
+  ts::TrackSample still = at;
+  still.trackDeg = std::numeric_limits<float>::quiet_NaN();
+  info.status = ts::AisNavStatus::UnderWayEngine;
+  QCOMPARE(
+      ts::vesselMarker(still, ts::VesselMotion(), info, 0.0, {}, 8.0).shape,
+      ts::MarkerShape::ShipStopped);
+  // Other stations.
+  ts::VesselInfo aid;
+  aid.kind = ts::AisStationKind::AidToNavigation;
+  QCOMPARE(ts::vesselMarker(at, motion, aid, 0.0, {}, 8.0).shape,
+           ts::MarkerShape::Diamond);
+  ts::VesselInfo base;
+  base.kind = ts::AisStationKind::BaseStation;
+  QCOMPARE(ts::vesselMarker(at, motion, base, 0.0, {}, 8.0).shape,
+           ts::MarkerShape::Square);
+  ts::VesselInfo sar;
+  sar.kind = ts::AisStationKind::SarAircraft;
+  ts::TrackSample high = at;
+  high.heightM = 300.0;
+  const ts::GlobeMarker aircraft =
+      ts::vesselMarker(high, motion, sar, 0.0, {}, 8.0);
+  QCOMPARE(aircraft.shape, ts::MarkerShape::Aircraft);
+  QVERIFY(std::fabs(ts::ecefToGeodetic(aircraft.positionEcef).heightM - 300.0) <
+          1e-3);
+}
+
+void TestAis::hulls()
+{
+  // 150 m to the bow, 50 to the stern, 16 to each side: 200 by 32, the
+  // middle 50 m ahead of the antenna.
+  ts::TrackSample at;
+  at.trackDeg = 45.0F;
+  ts::VesselMotion motion;
+  motion.headingDeg = 45.0F;
+  ts::VesselInfo info;
+  info.dimensions = ts::AisDimensions{150, 50, 16, 16};
+  const ts::GlobeMarker m = ts::vesselMarker(at, motion, info, 0.0, {}, 8.0);
+  QCOMPARE(m.hullLengthM, 200.0);
+  QCOMPARE(m.hullWidthM, 32.0);
+  QCOMPARE(m.hullForwardM, 50.0);
+  QCOMPARE(m.hullStarboardM, 0.0);
+  // An antenna 3 m to port of the middle.
+  info.dimensions = ts::AisDimensions{10, 10, 1, 7};
+  QCOMPARE(ts::vesselMarker(at, motion, info, 0.0, {}, 8.0).hullStarboardM,
+           3.0);
+  // Unknown dimensions: no hull.
+  info.dimensions = ts::AisDimensions();
+  QCOMPARE(ts::vesselMarker(at, motion, info, 0.0, {}, 8.0).hullLengthM, 0.0);
+}
+
+void TestAis::courseVectors()
+{
+  // 10 knots east for 6 minutes: a nautical mile east.
+  ts::TrackSample at;
+  at.latDeg = 0.0;
+  at.lonDeg = 0.0;
+  at.speedMS = static_cast<float>(10.0 * 1852.0 / 3600.0);
+  at.trackDeg = 90.0F;
+  const ts::SpaceLine line = ts::courseVector(at, 6.0, 0.0, {});
+  QCOMPARE(line.points.size(), std::size_t{2});
+  const double metres = ts::length(line.points.at(1).positionEcef -
+                                   line.points.at(0).positionEcef);
+  // On a sphere of the mean radius: at the equator the ellipsoid is 0.1 %
+  // larger.
+  QVERIFY(std::fabs(metres - 1852.0) < 3.0);
+  QVERIFY(line.points.at(1).lonDeg > 0.0);
+  QVERIFY(std::fabs(line.points.at(1).latDeg) < 1e-9);
+  // Not moving: nothing.
+  at.speedMS = 0.0F;
+  QVERIFY(ts::courseVector(at, 6.0, 0.0, {}).points.empty());
 }
 
 QTEST_GUILESS_MAIN(TestAis)
