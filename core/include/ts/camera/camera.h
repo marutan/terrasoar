@@ -106,6 +106,43 @@ struct MapFrame {
   double halfHeightM = 0.0;
   /** The map repeats with this period in x, metres. */
   double worldWidthM = 0.0;
+  /**
+   * Half the extent in x of what is in view, map metres: halfWidthM
+   * looking straight down with north up, more on a turned or tilted map.
+   */
+  double viewHalfXM = 0.0;
+  /**
+   * On a turned or tilted map, the part of the map's plane in view: a
+   * convex polygon of offsets from the centre in map metres (anticlockwise),
+   * cut off at Camera::mapFarLimitM(). Empty looking straight down with
+   * north up, where the view is ± halfWidthM by ± halfHeightM.
+   */
+  std::vector<MapPoint> footprint;
+  /**
+   * On a turned or tilted map: the eye's foot on the plane, as an offset
+   * from the centre in map metres, and its height above the plane in
+   * metres (for distances to the eye). Zero otherwise.
+   */
+  MapPoint eyeFootM{};
+  /** See eyeFootM. */
+  double eyeHeightAbovePlaneM = 0.0;
+
+  /** Returns true if the view is turned or tilted (footprint not empty). */
+  bool isTurnedOrTilted() const { return !footprint.empty(); }
+
+  /**
+   * Returns the distance in metres from the eye to the nearest point of
+   * the map rectangle @p offsets (offsets from the centre, map metres),
+   * on a turned or tilted map.
+   */
+  double distanceToEyeM(const MapRect& offsets) const;
+
+  /**
+   * Returns true if the rectangle @p offsets (from the centre, map
+   * metres) meets what is in view: the footprint, or the straight-down
+   * rectangle.
+   */
+  bool rectInView(const MapRect& offsets) const;
 
   /**
    * Returns the offset of a map position from the centre, in map metres,
@@ -161,6 +198,20 @@ public:
   static constexpr double maximumRangeM = 5.0e7;
   /** Largest tilt, degrees. */
   static constexpr double maximumTiltDeg = 85.0;
+  /**
+   * Largest tilt of the flat map, degrees: short of looking along it,
+   * which a plane without a horizon of its own can't end.
+   */
+  static constexpr double maximumMapTiltDeg = 70.0;
+  /**
+   * How far a tilted map is drawn: this many times the eye's height above
+   * it (see mapFarLimitM()).
+   */
+  static constexpr double mapFarEyeHeights = 40.0;
+  /** The farthest a tilted map is drawn, metres. */
+  static constexpr double maximumMapFarM = 1.0e7;
+  /** The tilt at which a tilted map's terrain is in full relief, degrees. */
+  static constexpr double mapReliefFullTiltDeg = 15.0;
 
   /** Largest latitude of the centre of the 2D map, degrees. */
   static constexpr double maximumMapCentreLatDeg = 89.0;
@@ -217,12 +268,41 @@ public:
    * most maximumRangeM and at least what keeps the eye
    * minimumEyeHeightM above the ellipsoid.
    *
-   * On the flat map (morph() == 1) the view looks straight down with
-   * north up: heading and tilt are 0, the latitude stays within the
-   * projection's domain (and maximumMapCentreLatDeg) and the range within
-   * maximumMapRangeM().
+   * On the flat map (morph() == 1) the tilt is at most maximumMapTiltDeg,
+   * the latitude stays within the projection's domain (and
+   * maximumMapCentreLatDeg) and the range within maximumMapRangeM(); with
+   * the terrain in relief (a tilted map) the eye stays above it.
    */
   void setPose(const CameraPose& pose);
+
+  /**
+   * Returns true on the flat map (morph() == 1) turned from north-up or
+   * tilted from straight down.
+   */
+  bool isMapTurnedOrTilted() const;
+
+  /**
+   * Returns how far a tilted flat map is drawn from the eye, metres:
+   * mapFarEyeHeights times the eye's height above the map, at most
+   * maximumMapFarM. Nothing is drawn, picked or asked for beyond it; a
+   * haze hides the edge.
+   */
+  double mapFarLimitM() const;
+
+  /**
+   * Returns how much of the terrain's relief a flat map with tilt
+   * @p tiltDeg shows: 0 straight down (the map is flat, with its
+   * hillshade), rising smoothly to 1 at mapReliefFullTiltDeg.
+   */
+  static double mapReliefForTilt(double tiltDeg);
+
+  /**
+   * Returns the offset from the centre, in map metres (not wrapped), of
+   * the point of the flat map's plane under (@p xPx, @p yPx), or nothing
+   * if the ray misses the plane or meets it beyond mapFarLimitM() on a
+   * tilted map.
+   */
+  std::optional<MapPoint> mapOffsetAt(double xPx, double yPx) const;
 
   /**
    * The height of the surface above the ellipsoid at a point as drawn
@@ -350,6 +430,8 @@ public:
 
 private:
   void update();
+  void addFootprint(MapFrame& frame) const;
+  void keepAboveMapRelief(CameraPose& pose) const;
   double mapRangeLimitM(double latDeg, double lonDeg) const;
   std::optional<ScreenPoint> projectOffset(const Vec3& offset) const;
 

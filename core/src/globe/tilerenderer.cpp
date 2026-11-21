@@ -165,6 +165,7 @@ void main()
     position = tsMorph(position,
                        dLonLat * MAP_OVERLAP + mapOrigin.wz,
                        mapOrigin, projR0, projR1, projR2, projR3);
+    position = tsMapRelief(position, terrainIn);
   }
   vec4 clip = viewProjection * vec4(position, 1.0);
   vUv = uv;
@@ -264,6 +265,9 @@ void main()
     result.rgb = min(result.rgb * mix(1.0, clamp(lit, 0.3, 1.3), hillshade),
                      vec3(result.a));
   }
+  // A tilted map fades into the haze towards its far limit.
+  result.rgb = mix(result.rgb, tsHazeColor * result.a,
+                   tsMapHaze(length(vRelative)));
   fragColor = result;
   gl_FragDepth = clamp(log2(1.0 + max(vDepthW, 0.0)) * depthParams.x, 0.0, 1.0);
 }
@@ -295,7 +299,7 @@ void main()
   if (amount <= 0.0) {
     discard;
   }
-  fragColor = graticuleColor * amount;
+  fragColor = graticuleColor * amount * (1.0 - tsMapHaze(vDepthW));
   gl_FragDepth = tsOverlayDepth(vDepthW);
 }
 )";
@@ -1083,13 +1087,22 @@ double TileRenderer::surfaceSagM() const
   return tileSurfaceSagM(coarsest, m_settings.loader.meshSegments);
 }
 
+bool TileRenderer::drawsStrips(const Camera& camera) const
+{
+  // A cylindrical map's tiles as strips; they have no vertices inside a
+  // row, so not for a map in relief.
+  const bool relief = terrainShown() && camera.pose().tiltDeg > 0.0;
+  return camera.morph() >= 1.0 && camera.mapProjection()->isCylindrical() &&
+         !relief;
+}
+
 void TileRenderer::prepare(const Camera& camera)
 {
   ++m_frame;
   m_statistics = TileStatistics();
   m_drawTiles.clear();
   m_morph = camera.morph();
-  m_drawStrips = m_morph >= 1.0 && camera.mapProjection()->isCylindrical();
+  m_drawStrips = drawsStrips(camera);
   // The map's surface and graticule are drawn on the tiles too, so it
   // needs them even without imagery.
   if (m_layers.empty() && m_morph <= 0.0 && !terrainShown()) {

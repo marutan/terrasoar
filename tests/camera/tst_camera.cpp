@@ -692,15 +692,20 @@ private slots:
 
   void mapPoseIsLimited()
   {
-    // On the map the view looks straight down, north up, stays inside the
-    // projection's latitudes and is never wider than the world.
+    // On the map the view can be turned and tilted (up to the map's
+    // limit), stays inside the projection's latitudes and is never wider
+    // than the world.
     ts::Camera camera = makeMapCamera(
         "mercator", ts::CameraPose{89.5, 200.0, 4.9e7, 123.0, 60.0});
     const ts::Projection& mercator = *camera.mapProjection();
     QCOMPARE(camera.morph(), 1.0);
     QVERIFY(camera.isMap());
-    QCOMPARE(camera.pose().headingDeg, 0.0);
-    QCOMPARE(camera.pose().tiltDeg, 0.0);
+    QCOMPARE(camera.pose().headingDeg, 123.0);
+    QCOMPARE(camera.pose().tiltDeg, 60.0);
+    QVERIFY(camera.isMapTurnedOrTilted());
+    ts::Camera steep = camera;
+    steep.setPose(ts::CameraPose{40.0, 0.0, 1.0e5, 0.0, 85.0});
+    QCOMPARE(steep.pose().tiltDeg, ts::Camera::maximumMapTiltDeg);
     QCOMPARE(camera.pose().targetLatDeg, mercator.maximumLatDeg());
     QCOMPARE(camera.pose().targetLonDeg, -160.0);
     QCOMPARE(camera.pose().rangeM, camera.maximumMapRangeM());
@@ -1151,7 +1156,9 @@ private slots:
     controller.setPose(ts::CameraPose{10.0, 10.0, 1.0e6, 45.0, 45.0});
     QVERIFY(!controller.isMorphing());
     QCOMPARE(controller.camera().morph(), 1.0);
-    QCOMPARE(controller.camera().pose().headingDeg, 0.0);
+    // A map can be turned and tilted.
+    QCOMPARE(controller.camera().pose().headingDeg, 45.0);
+    QCOMPARE(controller.camera().pose().tiltDeg, 45.0);
     controller.setViewMode(ts::ViewMode::Globe, 1.0);
     controller.advance(0.1);
     controller.flyTo(ts::CameraPose{20.0, 20.0, 1.0e6, 0.0, 0.0}, 0.5);
@@ -1292,9 +1299,13 @@ private slots:
         QVERIFY(controller.isAnimating());
         runFor(controller, 1.5, rate);
         const ts::CameraPose& end = controller.camera().pose();
-        // Turning and tilting do nothing on a map.
-        QCOMPARE(end.headingDeg, 0.0);
-        QCOMPARE(end.tiltDeg, 0.0);
+        // The map turns and tilts as the globe does.
+        if ((motion & (ts::TurnLeft | ts::TurnRight)) == 0U) {
+          QCOMPARE(end.headingDeg, 0.0);
+        }
+        if ((motion & (ts::TiltUp | ts::TiltDown)) == 0U) {
+          QCOMPARE(end.tiltDeg, 0.0);
+        }
         if (!reference) {
           reference = end;
           QVERIFY(targetDistanceM(start, end) > 0.0 ||
@@ -1310,6 +1321,164 @@ private slots:
                 1e-9 * reference->rangeM);
       }
     }
+  }
+
+  void tiltedMapPicksAndProjects()
+  {
+    // On a turned and tilted map, in every projection: a pixel's point
+    // projects back to the pixel, north is where the heading says, the
+    // view's footprint holds what is picked, and nothing is picked beyond
+    // the far limit (above the haze).
+    for (const ts::Projection* projection : ts::projections()) {
+      const QByteArray id = projection->id().toLatin1();
+      const ts::Camera camera = makeMapCamera(
+          id.constData(), ts::CameraPose{45.0, 5.0, 5.0e5, 60.0, 55.0});
+      if (!camera.isMapTurnedOrTilted()) {
+        QFAIL(id.constData());
+      }
+      const ts::MapFrame frame = camera.mapFrame();
+      for (const QPointF pixel :
+           {QPointF(400.0, 300.0), QPointF(100.0, 550.0), QPointF(700.0, 200.0),
+            QPointF(400.0, 100.0)}) {
+        const std::optional<ts::Geodetic> hit =
+            camera.pickGeodetic(pixel.x(), pixel.y());
+        if (!hit) {
+          continue; // off a map that ends at its domain
+        }
+        const std::optional<ts::ScreenPoint> back =
+            camera.projectGeodetic(hit->latDeg, hit->lonDeg);
+        if (!back) {
+          QFAIL(id.constData());
+        }
+        QVERIFY2(std::hypot(back->xPx - pixel.x(), back->yPx - pixel.y()) <
+                     1e-3,
+                 id.constData());
+        const std::optional<ts::MapPoint> offset =
+            camera.mapOffsetAt(pixel.x(), pixel.y());
+        if (!offset) {
+          QFAIL(id.constData());
+        }
+        QVERIFY(
+            frame.rectInView(ts::MapRect{offset->xM - 1.0, offset->yM - 1.0,
+                                         offset->xM + 1.0, offset->yM + 1.0}));
+      }
+    }
+    // Heading 90: north is to the left of the screen at the centre.
+    const ts::Camera east =
+        makeMapCamera("mercator", ts::CameraPose{0.0, 0.0, 1.0e5, 90.0, 0.0});
+    const std::optional<ts::ScreenPoint> north = east.projectGeodetic(0.1, 0.0);
+    if (!north) {
+      QFAIL("north");
+    }
+    QVERIFY(north->xPx < 390.0 && std::abs(north->yPx - 300.0) < 1.0);
+    // At the tilt limit the top of the view is beyond the far limit.
+    const ts::Camera steep = makeMapCamera(
+        "mercator",
+        ts::CameraPose{45.0, 5.0, 1.0e4, 0.0, ts::Camera::maximumMapTiltDeg});
+    QVERIFY(!steep.pickGeodetic(400.0, 0.5).has_value());
+    QVERIFY(steep.pickGeodetic(400.0, 599.5).has_value());
+    QVERIFY(steep.farM() > steep.mapFarLimitM());
+    QVERIFY(steep.mapFarLimitM() <= ts::Camera::maximumMapFarM);
+  }
+
+  void tiltedMapDragsAndKeys()
+  {
+    // A drag on a turned and tilted map keeps the grabbed place under the
+    // pointer; Forward moves the way the view faces; turning and tilting
+    // keys work on the map as on the globe; Reset-like north-up flights end
+    // north-up and straight down.
+    ts::CameraController controller = makeMapController(
+        "mercator", ts::CameraPose{45.0, 5.0, 5.0e5, 90.0, 50.0});
+    const QPointF from(400.0, 400.0);
+    const QPointF to(300.0, 350.0);
+    const std::optional<ts::Geodetic> grabbed =
+        controller.camera().pickGeodetic(from.x(), from.y());
+    if (!grabbed) {
+      QFAIL("grab");
+    }
+    QVERIFY(controller.beginPan(from, 0.0));
+    controller.dragTo(to, 0.1);
+    controller.endDrag(1.0);
+    const std::optional<ts::Geodetic> under =
+        controller.camera().pickGeodetic(to.x(), to.y());
+    if (!under) {
+      QFAIL("under");
+    }
+    QVERIFY(groundDistanceM(*grabbed, *under) < 1e-3);
+    // Facing east, Forward goes east.
+    const ts::CameraPose before = controller.camera().pose();
+    controller.setMotion(ts::MoveForward);
+    runFor(controller, 1.0, 60.0);
+    controller.setMotion(ts::NoMotion);
+    const ts::CameraPose after = controller.camera().pose();
+    QVERIFY(after.targetLonDeg > before.targetLonDeg + 0.5);
+    QVERIFY(std::abs(after.targetLatDeg - before.targetLatDeg) < 0.05);
+    // Turning and tilting.
+    controller.setMotion(ts::TurnLeft | ts::TiltUp);
+    runFor(controller, 1.0, 60.0);
+    controller.setMotion(ts::NoMotion);
+    QVERIFY(std::abs(controller.camera().pose().headingDeg - 30.0) < 1e-6);
+    QCOMPARE(controller.camera().pose().tiltDeg, ts::Camera::maximumMapTiltDeg);
+    // A rotate drag on the map.
+    controller.beginRotate(QPointF(400.0, 300.0));
+    QVERIFY(controller.isDragging());
+    controller.dragTo(QPointF(500.0, 400.0), 0.0);
+    controller.endDrag(0.0);
+    QVERIFY(controller.camera().pose().headingDeg > 30.0);
+    QVERIFY(controller.camera().pose().tiltDeg < ts::Camera::maximumMapTiltDeg);
+    // Back to north-up and straight down.
+    ts::CameraPose home = controller.camera().pose();
+    home.headingDeg = 0.0;
+    home.tiltDeg = 0.0;
+    controller.flyTo(home, 0.5);
+    runFor(controller, 0.6, 60.0);
+    QCOMPARE(controller.camera().pose().headingDeg, 0.0);
+    QCOMPARE(controller.camera().pose().tiltDeg, 0.0);
+    QVERIFY(!controller.camera().isMapTurnedOrTilted());
+  }
+
+  void tiltedMapMorphIsContinuous()
+  {
+    // From a turned, tilted map back to the globe and to the map again:
+    // the centre stays, the heading and tilt are kept going to the globe
+    // and ease to north-up, straight down going to the map.
+    ts::CameraController controller = makeMapController(
+        "mercator", ts::CameraPose{40.0, 10.0, 2.0e6, 120.0, 50.0});
+    controller.setViewMode(ts::ViewMode::Globe, 1.0);
+    ts::CameraPose last = controller.camera().pose();
+    for (int32_t frame = 0; frame < 70; ++frame) {
+      controller.advance(1.0 / 60.0);
+      const ts::CameraPose& now = controller.camera().pose();
+      QVERIFY(std::abs(now.tiltDeg - last.tiltDeg) < 2.0);
+      QVERIFY(std::abs(now.targetLatDeg - 40.0) < 1e-6);
+      last = now;
+    }
+    QCOMPARE(controller.camera().morph(), 0.0);
+    QCOMPARE(controller.camera().pose().headingDeg, 120.0);
+    QCOMPARE(controller.camera().pose().tiltDeg, 50.0);
+    controller.setViewMode(ts::ViewMode::Map, 1.0);
+    runFor(controller, 1.1, 60.0);
+    QCOMPARE(controller.camera().morph(), 1.0);
+    QCOMPARE(controller.camera().pose().headingDeg, 0.0);
+    QCOMPARE(controller.camera().pose().tiltDeg, 0.0);
+  }
+
+  void tiltedMapKeepsAboveRelief()
+  {
+    // A tilted map shows the terrain in relief: the eye stays above it.
+    // Straight down (no relief) it may go lower.
+    ts::Camera camera =
+        makeMapCamera("mercator", ts::CameraPose{45.0, 5.0, 1000.0, 0.0, 0.0});
+    camera.setSurfaceHeight(
+        [](double, double) { return std::optional<double>(3000.0); });
+    camera.setPose(ts::CameraPose{45.0, 5.0, 1000.0, 0.0, 0.0});
+    QCOMPARE(camera.pose().rangeM, 1000.0);
+    camera.setPose(ts::CameraPose{45.0, 5.0, 1000.0, 0.0, 60.0});
+    const double aboveM = camera.pose().rangeM * std::cos(ts::degToRad(60.0));
+    QVERIFY(aboveM >= 3000.0 + ts::Camera::terrainClearanceM - 1e-6);
+    QCOMPARE(ts::Camera::mapReliefForTilt(0.0), 0.0);
+    QCOMPARE(ts::Camera::mapReliefForTilt(ts::Camera::mapReliefFullTiltDeg),
+             1.0);
   }
 
   void mapKeyRatesAndWrap()
@@ -1399,9 +1568,10 @@ private slots:
     QCOMPARE(controller.camera().pose().targetLatDeg, -33.9);
     QCOMPARE(controller.camera().pose().targetLonDeg, 151.2);
     QCOMPARE(controller.camera().pose().rangeM, 5.0e5);
-    // Still a map: north up, straight down.
-    QCOMPARE(controller.camera().pose().headingDeg, 0.0);
-    QCOMPARE(controller.camera().pose().tiltDeg, 0.0);
+    // Still a map, turned and tilted as asked.
+    QCOMPARE(controller.camera().morph(), 1.0);
+    QCOMPARE(controller.camera().pose().headingDeg, 77.0);
+    QCOMPARE(controller.camera().pose().tiltDeg, 33.0);
   }
 
   // --- Scale bar

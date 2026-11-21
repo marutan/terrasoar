@@ -171,7 +171,9 @@ void main()
   vec3 relative = onTerrain(offset, terrainIn);
   vLonLat = lonLat;
   vFacing = facing(offset, relative);
-  gl_Position = viewProjection * vec4(morphed(relative, lonLat), 1.0);
+  gl_Position = viewProjection
+              * vec4(tsMapRelief(morphed(relative, lonLat),
+                                 vec3(terrainIn, 0.0)), 1.0);
   vDepthW = gl_Position.w;
 }
 )";
@@ -186,7 +188,7 @@ void main()
   if (hidden(vFacing) || outsideClip(vLonLat)) {
     discard;
   }
-  fragColor = fillColor;
+  fragColor = fillColor * (1.0 - tsMapHaze(vDepthW));
   gl_FragDepth = tsOverlayDepth(vDepthW);
 }
 )";
@@ -216,8 +218,12 @@ void main()
 {
   vec3 relA = onTerrain(aOffset, aTerrain);
   vec3 relB = onTerrain(bOffset, bTerrain);
-  vec4 clipA = viewProjection * vec4(morphed(relA, aLonLat), 1.0);
-  vec4 clipB = viewProjection * vec4(morphed(relB, bLonLat), 1.0);
+  vec4 clipA = viewProjection
+             * vec4(tsMapRelief(morphed(relA, aLonLat), vec3(aTerrain, 0.0)),
+                    1.0);
+  vec4 clipB = viewProjection
+             * vec4(tsMapRelief(morphed(relB, bLonLat), vec3(bTerrain, 0.0)),
+                    1.0);
   float nearW = params.y;
   if (clipA.w < nearW && clipB.w < nearW) {
     gl_Position = vec4(2.0, 2.0, 2.0, 1.0); // behind the eye: off screen
@@ -277,7 +283,7 @@ void main()
   if (coverage <= 0.0) {
     discard;
   }
-  fragColor = outlineColor * coverage;
+  fragColor = outlineColor * coverage * (1.0 - tsMapHaze(vDepthW));
   gl_FragDepth = tsOverlayDepth(vDepthW);
 }
 )";

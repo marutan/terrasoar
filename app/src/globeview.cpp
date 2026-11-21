@@ -48,6 +48,7 @@
 
 #include "ts/camera/scalebar.h"
 #include "ts/geo/ellipsoid.h"
+#include "ts/geo/geodesic.h"
 #include "ts/geo/geodetic.h"
 #include "ts/geo/geoformat.h"
 #include "ts/globe/globerenderer.h"
@@ -159,7 +160,8 @@ uint32_t keyMotion(int32_t key)
 } // namespace
 
 GlobeView::GlobeView(QWidget* parent)
-    : QOpenGLWidget(parent), m_clickTimer(new QTimer(this))
+    : QOpenGLWidget(parent), m_navigation(new NavigationOverlay(this)),
+      m_clickTimer(new QTimer(this))
 {
   setObjectName(QStringLiteral("globeView"));
   // Qt 5 needs the type registered by name for queued connections and
@@ -169,6 +171,7 @@ GlobeView::GlobeView(QWidget* parent)
   qRegisterMetaType<ts::LonLat>("ts::LonLat");
   m_clickTimer->setSingleShot(true);
   connect(m_clickTimer, &QTimer::timeout, this, &GlobeView::reportClick);
+  connectNavigation();
   QSurfaceFormat format = QSurfaceFormat::defaultFormat();
   format.setRenderableType(QSurfaceFormat::OpenGL);
   format.setVersion(3, 3);
@@ -367,6 +370,229 @@ void GlobeView::setAttributionsVisible(bool visible)
     m_attributionsVisible = visible;
     update();
   }
+}
+
+// --- Navigation controls
+// ---------------------------------------------------------
+
+namespace
+{
+
+/** The motion flag a navigation action drives. */
+uint32_t actionMotion(NavigationAction action)
+{
+  switch (action) {
+  case NavigationAction::PanUp:
+    return MoveForward;
+  case NavigationAction::PanDown:
+    return MoveBackward;
+  case NavigationAction::PanLeft:
+    return MoveLeft;
+  case NavigationAction::PanRight:
+    return MoveRight;
+  case NavigationAction::ZoomIn:
+    return ZoomIn;
+  case NavigationAction::ZoomOut:
+    return ZoomOut;
+  case NavigationAction::TurnLeft:
+    return TurnLeft;
+  case NavigationAction::TurnRight:
+    return TurnRight;
+  case NavigationAction::TiltUp:
+    return TiltUp;
+  case NavigationAction::TiltDown:
+    break;
+  }
+  return TiltDown;
+}
+
+/** The nearest the zoom slider goes, metres of range. */
+constexpr double sliderNearestRangeM = 100.0;
+
+/** How far a click on a pan arrow moves: this much of the view's height. */
+constexpr double panClickViewFraction = 0.25;
+
+/** How long the step of a click takes, seconds. */
+constexpr double clickFlightS = 0.35;
+
+/** How much faster held arrows move each second they are held. */
+constexpr double panSpeedUpPerS = 1.0;
+
+/** The fastest held arrows move, as a multiple of the keys' speed. */
+constexpr double panSpeedUpMaximum = 4.0;
+
+} // namespace
+
+void GlobeView::connectNavigation()
+{
+  connect(m_navigation, &NavigationOverlay::actionHeld, this,
+          &GlobeView::navigationHeld);
+  connect(m_navigation, &NavigationOverlay::actionClicked, this,
+          &GlobeView::navigationClicked);
+  connect(m_navigation, &NavigationOverlay::homeRequested, this,
+          &GlobeView::goHome);
+  connect(m_navigation, &NavigationOverlay::northUpRequested, this, [this]() {
+    CameraPose pose = m_controller.camera().pose();
+    pose.headingDeg = 0.0;
+    flyTo(pose, 0.6);
+  });
+  connect(m_navigation, &NavigationOverlay::headingRequested, this,
+          [this](double headingDeg) {
+            CameraPose pose = m_controller.camera().pose();
+            pose.headingDeg = headingDeg;
+            setPose(pose);
+          });
+  connect(m_navigation, &NavigationOverlay::tiltRequested, this,
+          [this](double tiltDeg) {
+            CameraPose pose = m_controller.camera().pose();
+            pose.tiltDeg = tiltDeg;
+            setPose(pose);
+          });
+  connect(m_navigation, &NavigationOverlay::zoomRequested, this,
+          [this](double fraction) {
+            const Camera& camera = m_controller.camera();
+            const double farthestM = camera.morph() >= 1.0
+                                         ? camera.maximumMapRangeM()
+                                         : Camera::maximumRangeM;
+            CameraPose pose = camera.pose();
+            pose.rangeM = sliderNearestRangeM *
+                          std::pow(farthestM / sliderNearestRangeM,
+                                   1.0 - std::clamp(fraction, 0.0, 1.0));
+            flyTo(pose, clickFlightS);
+          });
+}
+
+void GlobeView::setHeldMotion()
+{
+  m_controller.setMotion(m_heldKeys | m_heldControls);
+  requestFrame();
+}
+
+void GlobeView::navigationHeld(NavigationAction action, bool held)
+{
+  const uint32_t motion = actionMotion(action);
+  if (held) {
+    if ((m_heldControls &
+         (MoveForward | MoveBackward | MoveLeft | MoveRight)) == 0U) {
+      m_controlsHeldSinceS = nowS();
+    }
+    m_heldControls |= motion;
+  } else {
+    m_heldControls &= ~motion;
+  }
+  if ((m_heldControls & (MoveForward | MoveBackward | MoveLeft | MoveRight)) ==
+      0U) {
+    m_controller.setPanSpeedFactor(1.0);
+  }
+  setHeldMotion();
+}
+
+void GlobeView::navigationClicked(NavigationAction action)
+{
+  const Camera& camera = m_controller.camera();
+  CameraPose pose = camera.pose();
+  // A step of the action: a set part of the view, a factor of 2, 15° of
+  // heading or 10° of tilt, flown smoothly.
+  const double stepM =
+      panClickViewFraction * 2.0 * pose.rangeM * camera.tanHalfFovY();
+  double towardsDeg = -1.0;
+  switch (action) {
+  case NavigationAction::PanUp:
+    towardsDeg = 0.0;
+    break;
+  case NavigationAction::PanRight:
+    towardsDeg = 90.0;
+    break;
+  case NavigationAction::PanDown:
+    towardsDeg = 180.0;
+    break;
+  case NavigationAction::PanLeft:
+    towardsDeg = 270.0;
+    break;
+  case NavigationAction::ZoomIn:
+    pose.rangeM *= 0.5;
+    break;
+  case NavigationAction::ZoomOut:
+    pose.rangeM *= 2.0;
+    break;
+  case NavigationAction::TurnLeft:
+    pose.headingDeg -= 15.0;
+    break;
+  case NavigationAction::TurnRight:
+    pose.headingDeg += 15.0;
+    break;
+  case NavigationAction::TiltUp:
+    pose.tiltDeg += 10.0;
+    break;
+  case NavigationAction::TiltDown:
+    pose.tiltDeg -= 10.0;
+    break;
+  }
+  if (towardsDeg >= 0.0) {
+    const GeodesicDirect end = rhumbDirect(pose.targetLatDeg, pose.targetLonDeg,
+                                           pose.headingDeg + towardsDeg, stepM);
+    pose.targetLatDeg = end.latDeg;
+    if (std::isfinite(end.lonDeg)) {
+      pose.targetLonDeg = end.lonDeg;
+    }
+  }
+  flyTo(pose, clickFlightS);
+}
+
+void GlobeView::setNavigationControlsVisible(bool visible)
+{
+  m_navigation->setVisible(visible);
+  if (!visible) {
+    m_heldControls = NoMotion;
+    setHeldMotion();
+  }
+}
+
+bool GlobeView::isNavigationControlsVisible() const
+{
+  return m_navigation->isVisibleTo(this);
+}
+
+void GlobeView::setNavigationControlsCorner(OverlayCorner corner)
+{
+  m_navigation->setCorner(corner);
+}
+
+NavigationState GlobeView::navigationState() const
+{
+  const Camera& camera = m_controller.camera();
+  const bool map = camera.morph() >= 1.0;
+  NavigationState state;
+  state.headingDeg = camera.pose().headingDeg;
+  state.tiltDeg = camera.pose().tiltDeg;
+  state.maximumTiltDeg =
+      map ? Camera::maximumMapTiltDeg : Camera::maximumTiltDeg;
+  const double farthestM =
+      map ? camera.maximumMapRangeM() : Camera::maximumRangeM;
+  const double rangeM =
+      std::clamp(camera.pose().rangeM, sliderNearestRangeM, farthestM);
+  state.zoomFraction = farthestM > sliderNearestRangeM
+                           ? 1.0 - std::log(rangeM / sliderNearestRangeM) /
+                                       std::log(farthestM / sliderNearestRangeM)
+                           : 1.0;
+  const QLocale locale;
+  if (map) {
+    // The scale at the centre: ground metres per metre of screen.
+    const double metresPerPx = 2.0 * camera.pose().rangeM *
+                               camera.tanHalfFovY() / camera.viewportHeightPx();
+    const double screenMetresPerPx = 0.0254 / std::max(logicalDpiY(), 1);
+    const double scale = metresPerPx / screenMetresPerPx;
+    const double rounded =
+        std::pow(10.0, std::floor(std::log10(std::max(scale, 1.0))) - 1.0);
+    state.zoomText = tr("Scale 1 : %1")
+                         .arg(locale.toString(
+                             std::round(scale / rounded) * rounded, 'f', 0));
+  } else {
+    state.zoomText =
+        tr("Eye height %1")
+            .arg(formatDistance(camera.eyeGeodetic().heightM, locale));
+  }
+  return state;
 }
 
 void GlobeView::setPose(const CameraPose& pose)
@@ -568,6 +794,7 @@ void GlobeView::paintGL()
   if (m_overlayVisible) {
     drawOverlay();
   }
+  m_navigation->setState(navigationState());
   emit cameraChanged(m_controller.camera().eyeGeodetic().heightM);
   updatePointerReadout();
   if (m_controller.isAnimating() || m_globe->isBusy()) {
@@ -596,6 +823,13 @@ void GlobeView::requestFrame()
 
 void GlobeView::onFrameTimer()
 {
+  if ((m_heldControls & (MoveForward | MoveBackward | MoveLeft | MoveRight)) !=
+      0U) {
+    // Held arrows speed up the longer they are held.
+    m_controller.setPanSpeedFactor(
+        std::min(1.0 + panSpeedUpPerS * (nowS() - m_controlsHeldSinceS),
+                 panSpeedUpMaximum));
+  }
   if (m_animationClockRunning) {
     const double now = nowS();
     m_controller.advance(now - m_lastAdvanceS);
@@ -888,7 +1122,7 @@ void GlobeView::keyPressEvent(QKeyEvent* event)
   if (motion != NoMotion) {
     if (!event->isAutoRepeat()) {
       m_heldKeys |= motion;
-      m_controller.setMotion(m_heldKeys);
+      setHeldMotion();
       requestFrame();
     }
     event->accept();
@@ -908,7 +1142,7 @@ void GlobeView::keyReleaseEvent(QKeyEvent* event)
   if (motion != NoMotion) {
     if (!event->isAutoRepeat()) {
       m_heldKeys &= ~motion;
-      m_controller.setMotion(m_heldKeys);
+      setHeldMotion();
     }
     event->accept();
     return;
@@ -919,7 +1153,7 @@ void GlobeView::keyReleaseEvent(QKeyEvent* event)
 void GlobeView::focusOutEvent(QFocusEvent* event)
 {
   m_heldKeys = NoMotion;
-  m_controller.setMotion(NoMotion);
+  m_controller.setMotion(m_heldControls);
   QOpenGLWidget::focusOutEvent(event);
 }
 

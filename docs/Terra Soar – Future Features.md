@@ -732,6 +732,12 @@ Goal: users can change the colours of the graticule and shoreline layers to suit
 
 Goal: an overlay of controls on the view (the globe and the flat map) to rotate, pan, zoom and tilt with the mouse or a touch screen, without needing to know the mouse buttons and keys.
 
+**Status (2026-11-21):** delivered (20a to 20e on one branch, one pull request): the flat map turns and tilts (20a), tile selection by distance with the far and tilt limits (20b), relief, haze and sky on a tilted map (20c), the navigation controls with View → Navigation Controls (20d), and the docs and tests (20e). Design: `docs/design/camera-and-precision.md`, `docs/design/tiling.md`, `docs/design/morph.md`; for users: `docs/user/getting-around.md`. Differences from the plan below:
+- **Going to the map** still starts north-up and straight down (the default); the map is turned and tilted once there, and going back to the globe keeps its heading and tilt.
+- **Golden images of the overlay** are not stored: its symbols and the "N" are drawn with the system's fonts and anti-aliasing, which differ between Linux and Windows. Its colours are checked for 3:1 contrast analytically over the listed backgrounds and the pixels of a busy image, its placement in each corner and its sizes by UI tests, and screenshots are saved with `TS_UI_SCREENSHOTS` for review. The turned and tilted map has golden images.
+- **Picking on a map in relief** finds the point on the plane, not on the mountainside; markers and labels stay on the plane.
+- The flat map's far limit is in eye heights (40, at most 10 000 km) rather than derived from each quality tier, which don't exist yet.
+
 **Decisions (2026-11-17)**: the flat map can be turned and tilted, like the globe. The rotate and tilt controls work on both views, and north-up and straight down stay the defaults.
 
 **Already in place**: the camera already moves in all of these ways from the keyboard. `CameraController` has motions for moving, zooming, turning and tilting, with inertia and smooth flights. The view already draws overlays (the scale bar and the attributions). On the flat map, though, turning and tilting are not possible today ("a map isn't turned or tilted"). This phase adds them there, as decided (see below).

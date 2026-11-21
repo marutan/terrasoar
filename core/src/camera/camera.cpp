@@ -21,8 +21,11 @@
 #include "ts/camera/camera.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
+#include <utility>
 
 #include "ts/geo/ellipsoid.h"
 #include "ts/geo/wgs84.h"
@@ -132,6 +135,54 @@ MapPoint MapFrame::offsetOf(MapPoint point) const
   return MapPoint{dx, point.yM - centreYM};
 }
 
+double MapFrame::distanceToEyeM(const MapRect& offsets) const
+{
+  const double dx =
+      std::max({offsets.westM - eyeFootM.xM, 0.0, eyeFootM.xM - offsets.eastM});
+  const double dy = std::max(
+      {offsets.southM - eyeFootM.yM, 0.0, eyeFootM.yM - offsets.northM});
+  return std::hypot(planeScale * std::hypot(dx, dy), eyeHeightAbovePlaneM);
+}
+
+bool MapFrame::rectInView(const MapRect& offsets) const
+{
+  if (footprint.empty()) {
+    return offsets.westM < halfWidthM && offsets.eastM > -halfWidthM &&
+           offsets.southM < halfHeightM && offsets.northM > -halfHeightM;
+  }
+  // Separating axes: the rectangle's (x and y), then the polygon's edges.
+  double minX = std::numeric_limits<double>::max();
+  double maxX = std::numeric_limits<double>::lowest();
+  double minY = minX;
+  double maxY = maxX;
+  for (const MapPoint& p : footprint) {
+    minX = std::min(minX, p.xM);
+    maxX = std::max(maxX, p.xM);
+    minY = std::min(minY, p.yM);
+    maxY = std::max(maxY, p.yM);
+  }
+  if (offsets.westM >= maxX || offsets.eastM <= minX ||
+      offsets.southM >= maxY || offsets.northM <= minY) {
+    return false;
+  }
+  const std::size_t n = footprint.size();
+  for (std::size_t i = 0; i < n; ++i) {
+    const MapPoint& a = footprint.at(i);
+    const MapPoint& b = footprint.at((i + 1) % n);
+    // The outward normal of an anticlockwise polygon's edge.
+    const double nx = b.yM - a.yM;
+    const double ny = a.xM - b.xM;
+    const double limit = nx * a.xM + ny * a.yM;
+    // The rectangle's corner farthest inwards along the normal.
+    const double inward = std::min(nx * offsets.westM, nx * offsets.eastM) +
+                          std::min(ny * offsets.southM, ny * offsets.northM);
+    if (inward >= limit) {
+      return false;
+    }
+  }
+  return true;
+}
+
 MapPoint MapFrame::offsetOf(double latDeg, double lonDeg) const
 {
   return offsetOf(projection->forward(latDeg, lonDeg));
@@ -147,7 +198,7 @@ std::vector<double> MapFrame::copyShiftsM(double westDeg, double eastDeg,
       offsetOf(projection->forward(centreLatDeg, 0.5 * (westDeg + eastDeg))).xM;
   const double halfSpanM = 0.5 * (eastDeg - westDeg) / 360.0 * worldWidthM;
   const double viewM =
-      wholeWorld ? 0.5 * worldWidthM : std::min(halfWidthM, 0.5 * worldWidthM);
+      wholeWorld ? 0.5 * worldWidthM : std::min(viewHalfXM, 0.5 * worldWidthM);
   std::vector<double> shifts;
   for (const double shift : {0.0, -worldWidthM, worldWidthM}) {
     if (middleXM + shift - halfSpanM < viewM &&
@@ -221,7 +272,99 @@ MapFrame Camera::mapFrame() const
   frame.halfHeightM = m_pose.rangeM * tanHalfFovY() / frame.planeScale;
   frame.worldWidthM =
       m_projection->repeats() ? m_projection->bounds().widthM() : 0.0;
+  frame.viewHalfXM = frame.halfWidthM;
+  if (isMapTurnedOrTilted()) {
+    addFootprint(frame);
+  }
   return frame;
+}
+
+bool Camera::isMapTurnedOrTilted() const
+{
+  return m_morph >= 1.0 && (m_pose.headingDeg != 0.0 || m_pose.tiltDeg != 0.0);
+}
+
+double Camera::mapFarLimitM() const
+{
+  const double heightM = m_pose.rangeM * std::cos(degToRad(m_pose.tiltDeg));
+  return std::min(maximumMapFarM,
+                  std::max(mapFarEyeHeights * heightM, 2.0 * m_pose.rangeM));
+}
+
+double Camera::mapReliefForTilt(double tiltDeg)
+{
+  const double u = std::clamp(tiltDeg / mapReliefFullTiltDeg, 0.0, 1.0);
+  return u * u * (3.0 - 2.0 * u);
+}
+
+void Camera::addFootprint(MapFrame& frame) const
+{
+  // In map metres from the centre: a point (x, y) of the map is at
+  // planeOrigin + E x s + N y s relative to the eye.
+  const double s = frame.planeScale;
+  const Vec3 origin = m_targetEcef - m_eyeEcef;
+  const Vec3& east = m_local.eastEcef;
+  const Vec3& north = m_local.northEcef;
+  const double heightM = -dot(origin, m_local.upEcef);
+  frame.eyeHeightAbovePlaneM = std::max(heightM, 0.0);
+  frame.eyeFootM = MapPoint{-dot(origin, east) / s, -dot(origin, north) / s};
+  // What is within the far limit: a polygon around the circle of that
+  // radius on the plane (drawn outside it, so nothing is left out).
+  const double farM = mapFarLimitM();
+  const double radiusM =
+      std::sqrt(std::max(farM * farM - heightM * heightM, 0.0)) / s;
+  constexpr int32_t sides = 24;
+  const double outer = radiusM / std::cos(pi / sides);
+  std::vector<MapPoint> polygon;
+  polygon.reserve(sides);
+  for (int32_t i = 0; i < sides; ++i) {
+    const double angle = 2.0 * pi * i / sides;
+    polygon.push_back(MapPoint{frame.eyeFootM.xM + outer * std::cos(angle),
+                               frame.eyeFootM.yM + outer * std::sin(angle)});
+  }
+  // Cut by the four sides of the view: a point p (from the eye) is inside
+  // where dot(p, n) >= 0 for each side's inward normal n.
+  const double tx = tanHalfFovX();
+  const double ty = tanHalfFovY();
+  const std::array<Vec3, 4> normals = {
+      m_right + m_forward * tx, m_forward * tx - m_right, m_up + m_forward * ty,
+      m_forward * ty - m_up};
+  for (const Vec3& n : normals) {
+    // dot(p, n) = c + a x + b y on the plane.
+    const double c = dot(origin, n);
+    const double a = s * dot(east, n);
+    const double b = s * dot(north, n);
+    std::vector<MapPoint> cut;
+    const std::size_t count = polygon.size();
+    for (std::size_t i = 0; i < count; ++i) {
+      const MapPoint& p = polygon.at(i);
+      const MapPoint& q = polygon.at((i + 1) % count);
+      const double fp = c + a * p.xM + b * p.yM;
+      const double fq = c + a * q.xM + b * q.yM;
+      if (fp >= 0.0) {
+        cut.push_back(p);
+      }
+      if ((fp >= 0.0) != (fq >= 0.0)) {
+        const double u = fp / (fp - fq);
+        cut.push_back(
+            MapPoint{p.xM + u * (q.xM - p.xM), p.yM + u * (q.yM - p.yM)});
+      }
+    }
+    polygon = std::move(cut);
+  }
+  if (polygon.size() < 3) {
+    // Nothing of the map in view (looking above it): a point no tile
+    // meets.
+    polygon = {MapPoint{frame.eyeFootM.xM, frame.eyeFootM.yM},
+               MapPoint{frame.eyeFootM.xM, frame.eyeFootM.yM},
+               MapPoint{frame.eyeFootM.xM, frame.eyeFootM.yM}};
+  }
+  double halfXM = 0.0;
+  for (const MapPoint& p : polygon) {
+    halfXM = std::max(halfXM, std::abs(p.xM));
+  }
+  frame.viewHalfXM = halfXM;
+  frame.footprint = std::move(polygon);
 }
 
 void Camera::setPose(const CameraPose& pose)
@@ -254,14 +397,18 @@ void Camera::setPose(const CameraPose& pose)
       clamped.targetLatDeg = inside.latDeg;
       clamped.targetLonDeg = inside.lonDeg;
     }
-    clamped.headingDeg = 0.0;
-    clamped.tiltDeg = 0.0;
+    clamped.tiltDeg = std::min(clamped.tiltDeg, maximumMapTiltDeg);
     clamped.rangeM =
         std::min(clamped.rangeM,
                  mapRangeLimitM(clamped.targetLatDeg, clamped.targetLonDeg));
   }
   if (!(clamped.rangeM > 0.0) || eyeHeightM(clamped) < minimumEyeHeightM) {
     clamped.rangeM = rangeForEyeHeight(clamped, minimumEyeHeightM);
+  }
+  if (m_surfaceHeight && m_morph >= 1.0 && clamped.tiltDeg > 0.0) {
+    // A tilted map shows the terrain in relief: the eye stays above the
+    // ground below it, at the height it is drawn there.
+    keepAboveMapRelief(clamped);
   }
   if (m_surfaceHeight && m_morph <= 0.0) {
     // Above the terrain, too: the range grows until the eye is clear.
@@ -274,6 +421,39 @@ void Camera::setPose(const CameraPose& pose)
   }
   m_pose = clamped;
   update();
+}
+
+void Camera::keepAboveMapRelief(CameraPose& pose) const
+{
+  const double relief = mapReliefForTilt(pose.tiltDeg);
+  const double cosTilt = std::cos(degToRad(pose.tiltDeg));
+  if (!(relief > 0.0) || !(cosTilt > 0.0)) {
+    return;
+  }
+  // The eye's foot on the plane, from the target: along the direction
+  // opposite the heading, range sin(tilt) metres on the plane.
+  const double scale =
+      1.0 /
+      m_projection->scaleAtPoint(pose.targetLatDeg, pose.targetLonDeg).parallel;
+  const double backM = pose.rangeM * std::sin(degToRad(pose.tiltDeg)) / scale;
+  const double heading = degToRad(pose.headingDeg);
+  const MapPoint centre =
+      m_projection->forward(pose.targetLatDeg, pose.targetLonDeg);
+  const std::optional<Geodetic> below =
+      m_projection->inverse(MapPoint{centre.xM - backM * std::sin(heading),
+                                     centre.yM - backM * std::cos(heading)});
+  if (!below) {
+    return;
+  }
+  const std::optional<double> ground =
+      m_surfaceHeight(below->latDeg, below->lonDeg);
+  if (!ground) {
+    return;
+  }
+  const double neededM = (std::max(*ground, 0.0) * relief + terrainClearanceM);
+  if (pose.rangeM * cosTilt < neededM) {
+    pose.rangeM = neededM / cosTilt;
+  }
 }
 
 void Camera::setViewportSize(double widthPx, double heightPx)
@@ -324,7 +504,12 @@ void Camera::update()
   m_farM = std::max(horizonM + farMarginM, m_pose.rangeM * 1.01 + 1.0);
   const double heightM = std::max(m_eyeGeodetic.heightM, 0.0);
   m_nearM = std::clamp(0.5 * heightM, 0.05, 0.5 * m_pose.rangeM);
-  if (m_morph >= 1.0) {
+  if (isMapTurnedOrTilted()) {
+    // As far as the map is drawn, and as near as its bottom edge can be.
+    const double aboveM = m_pose.rangeM * std::cos(degToRad(m_pose.tiltDeg));
+    m_nearM = std::clamp(0.25 * aboveM, 0.05, 0.5 * m_pose.rangeM);
+    m_farM = 1.01 * mapFarLimitM() + 1.0;
+  } else if (m_morph >= 1.0) {
     // The whole map is range metres in front of the eye.
     m_nearM = 0.5 * m_pose.rangeM;
     m_farM = 2.0 * m_pose.rangeM;
@@ -441,26 +626,21 @@ std::optional<Geodetic> Camera::pickGeodetic(double xPx, double yPx) const
   }
   if (isMap()) {
     // The ray against the map's plane: through the target, facing up.
-    const Ray ray = rayThroughPixel(xPx, yPx);
-    const Vec3 toTarget = m_targetEcef - m_eyeEcef;
-    const double towards = dot(ray.direction, m_local.upEcef);
-    if (!(towards < 0.0)) {
+    const std::optional<MapPoint> offset = mapOffsetAt(xPx, yPx);
+    if (!offset) {
       return std::nullopt;
     }
-    const double distanceM = dot(toTarget, m_local.upEcef) / towards;
-    const Vec3 onPlane = ray.direction * distanceM - toTarget;
-    const MapFrame frame = mapFrame();
+    const MapPoint centre =
+        m_projection->forward(m_pose.targetLatDeg, m_pose.targetLonDeg);
     const MapRect bounds = m_projection->bounds();
-    double xM =
-        frame.centreXM + dot(onPlane, m_local.eastEcef) / frame.planeScale;
-    const double yM =
-        frame.centreYM + dot(onPlane, m_local.northEcef) / frame.planeScale;
-    if (frame.worldWidthM > 0.0) {
+    const double worldWidthM = m_projection->repeats() ? bounds.widthM() : 0.0;
+    double xM = centre.xM + offset->xM;
+    const double yM = centre.yM + offset->yM;
+    if (worldWidthM > 0.0) {
       // The map repeats in x.
       xM = bounds.westM +
-           std::fmod(std::fmod(xM - bounds.westM, frame.worldWidthM) +
-                         frame.worldWidthM,
-                     frame.worldWidthM);
+           std::fmod(std::fmod(xM - bounds.westM, worldWidthM) + worldWidthM,
+                     worldWidthM);
     }
     return m_projection->inverse(MapPoint{xM, yM});
   }
@@ -473,6 +653,26 @@ std::optional<Geodetic> Camera::pickGeodetic(double xPx, double yPx) const
   // On the surface by construction; drop the rounding left in the height.
   position.heightM = 0.0;
   return position;
+}
+
+std::optional<MapPoint> Camera::mapOffsetAt(double xPx, double yPx) const
+{
+  const Ray ray = rayThroughPixel(xPx, yPx);
+  const Vec3 toTarget = m_targetEcef - m_eyeEcef;
+  const double towards = dot(ray.direction, m_local.upEcef);
+  if (!(towards < 0.0)) {
+    return std::nullopt;
+  }
+  const double distanceM = dot(toTarget, m_local.upEcef) / towards;
+  if (isMapTurnedOrTilted() && distanceM > mapFarLimitM()) {
+    return std::nullopt;
+  }
+  const Vec3 onPlane = ray.direction * distanceM - toTarget;
+  const double scale =
+      1.0 / m_projection->scaleAtPoint(m_pose.targetLatDeg, m_pose.targetLonDeg)
+                .parallel;
+  return MapPoint{dot(onPlane, m_local.eastEcef) / scale,
+                  dot(onPlane, m_local.northEcef) / scale};
 }
 
 std::optional<ScreenPoint> Camera::project(const Vec3& pointEcef) const

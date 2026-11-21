@@ -9,6 +9,20 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- Navigation controls on the view (View → Navigation Controls, shown by
+  default; View → Navigation Controls Corner): a compass to turn the view
+  and back to north up, arrows to move it (faster the longer they are
+  held), Home, zoom buttons and a height slider, and tilt buttons and an
+  arc. They work by mouse, touch and keyboard (Tab into them), name their
+  keys in tooltips, are at least 9 mm across, grow with the system font,
+  stay readable on any background (3:1 contrast), and follow the system's
+  high-contrast setting. Terra Soar remembers whether they are shown and
+  where.
+- The flat map can be turned and tilted (right drag, Q / E and R / F, or
+  the controls), up to 70°: towards its horizon detail falls off with
+  distance, the map fades into a haze with a sky beyond, and with
+  terrain on the mountains stand up in relief. It still starts north up
+  and straight down; N and Reset View go back.
 - Ships from AIS (File → Import AIS Data…, and dragging a file onto the
   window): NMEA logs (`!AIVDM`/`!AIVDO`, with tag-block, prefixed or no
   times) and CSV (NOAA MarineCadastre's columns recognised, others

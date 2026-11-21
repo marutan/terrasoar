@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -100,6 +101,7 @@
 #include "mockwfs.h"
 #include "mockwms.h"
 #include "mockwmts.h"
+#include "navigationoverlay.h"
 #include "newregiondialog.h"
 #include "offlineregionmanager.h"
 #include "offlineregionsdialog.h"
@@ -1412,6 +1414,421 @@ private slots:
     QCOMPARE(window.layerModel()->toJson(), saved);
   }
 
+  void navigationControlsMenu()
+  {
+    // View → Navigation Controls is checkable, beside Scale Bar and
+    // Attributions, on by default; off, the controls are gone and clicks
+    // where they were reach the view. It and the corner are kept in the
+    // settings.
+    const std::unique_ptr<QSettings> settings = ts::openSettings();
+    settings->remove(QStringLiteral("view/navigationControls"));
+    settings->remove(QStringLiteral("view/navigationControlsCorner"));
+    settings->sync();
+    {
+      ts::MainWindow window;
+      window.show();
+      QVERIFY(QTest::qWaitForWindowExposed(&window));
+      QAction* action = window.findChild<QAction*>(
+          QStringLiteral("navigationControlsAction"));
+      if (action == nullptr) {
+        QFAIL("no navigationControlsAction");
+      }
+      QVERIFY(action->isCheckable());
+      QMenu* view = window.findChild<QMenu*>(QStringLiteral("viewMenu"));
+      if (view == nullptr) {
+        QFAIL("no view menu");
+      }
+      const QList<QAction*> items = view->actions();
+      const int32_t attributions = static_cast<int32_t>(items.indexOf(
+          window.findChild<QAction*>(QStringLiteral("attributionsAction"))));
+      QVERIFY(attributions > 0);
+      QCOMPARE(items.indexOf(action), attributions + 1);
+      QCOMPARE(items.at(attributions - 1),
+               window.findChild<QAction*>(QStringLiteral("scaleBarAction")));
+      ts::GlobeView* globe = globeOf(window);
+      if (globe == nullptr) {
+        QVERIFY(!action->isEnabled());
+        QSKIP("No OpenGL view on this platform.");
+      }
+      QVERIFY(action->isChecked());
+      ts::NavigationOverlay* overlay = globe->navigationOverlay();
+      QVERIFY(overlay->isVisible());
+      QWidget* compass = overlay->control(QStringLiteral("navigationCompass"));
+      const QPoint onCompass = compass->mapTo(globe, compass->rect().center());
+      QCOMPARE(globe->childAt(onCompass), compass);
+      // In the top right, clear of the edges.
+      QVERIFY(overlay->geometry().right() < globe->width());
+      QVERIFY(overlay->geometry().left() > globe->width() / 2);
+      QVERIFY(overlay->geometry().top() > 0);
+      // Off: nothing there but the view, on the globe and the map.
+      action->setChecked(false);
+      QVERIFY(!overlay->isVisible());
+      QVERIFY(globe->childAt(onCompass) == nullptr);
+      globe->setViewMode(ts::ViewMode::Map, false);
+      QVERIFY(!overlay->isVisible());
+      globe->setViewMode(ts::ViewMode::Globe, false);
+      action->setChecked(true);
+      QVERIFY(overlay->isVisible());
+      // Another corner.
+      QAction* bottomLeft = window.findChild<QAction*>(
+          QStringLiteral("navigationCorner_bottom-left"));
+      if (bottomLeft == nullptr) {
+        QFAIL("no corner action");
+      }
+      bottomLeft->trigger();
+      QCOMPARE(overlay->corner(), ts::OverlayCorner::BottomLeft);
+      QVERIFY(overlay->geometry().left() < globe->width() / 2);
+      QVERIFY(overlay->geometry().bottom() > globe->height() / 2);
+      // Clear of the scale bar along the bottom.
+      QVERIFY(overlay->geometry().bottom() <
+              globe->height() - overlay->unitPx());
+      action->setChecked(false);
+    }
+    {
+      // Kept for the next start.
+      ts::MainWindow window;
+      window.show();
+      QVERIFY(QTest::qWaitForWindowExposed(&window));
+      QAction* action = window.findChild<QAction*>(
+          QStringLiteral("navigationControlsAction"));
+      QVERIFY(!action->isChecked());
+      ts::GlobeView* globe = globeOf(window);
+      QVERIFY(!globe->isNavigationControlsVisible());
+      QCOMPARE(globe->navigationOverlay()->corner(),
+               ts::OverlayCorner::BottomLeft);
+    }
+    settings->remove(QStringLiteral("view/navigationControls"));
+    settings->remove(QStringLiteral("view/navigationControlsCorner"));
+  }
+
+  void navigationControlsMove()
+  {
+    // Each control moves the camera the expected way, by mouse, touch and
+    // keyboard; holding keeps moving until released; the sliders follow
+    // the camera; clicks on the controls never reach the view.
+    ts::MainWindow window;
+    window.resize(1200, 900);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* globe = globeOf(window);
+    if (globe == nullptr) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    ts::NavigationOverlay* overlay = globe->navigationOverlay();
+    const ts::Camera& camera = globe->controller().camera();
+    const ts::CameraPose start{40.0, 10.0, 2.0e6, 0.0, 0.0};
+    globe->setPose(start);
+    QSignalSpy clicks(globe, &ts::GlobeView::pointClicked);
+    const std::function<QWidget*(const char*)> control =
+        [overlay](const char* name) {
+          QWidget* c = overlay->control(QLatin1String(name));
+          if (c == nullptr) {
+            qFatal("no control %s", name);
+          }
+          return c;
+        };
+    // Every check waits for its value: on a slow machine the click, the
+    // flight and the frame that shows it can all come late.
+    const std::function<bool(const std::function<bool()>&)> eventually =
+        [](const std::function<bool()>& condition) {
+          return QTest::qWaitFor(condition, 10000);
+        };
+    const std::function<void()> settle = [&]() {
+      // A click's flight (0.35 s), however slowly the frames come.
+      QTest::qWait(50);
+      QVERIFY(QTest::qWaitFor(
+          [&]() { return !globe->controller().isAnimating(); }, 10000));
+    };
+    // Large enough for a finger.
+    const double nineMmPx = 9.0 * overlay->logicalDpiY() / 25.4;
+    for (QWidget* c : overlay->controls()) {
+      QVERIFY2(std::min(c->width(), c->height()) >= nineMmPx - 1.0,
+               qPrintable(c->objectName()));
+      QVERIFY2(!c->accessibleName().isEmpty(), qPrintable(c->objectName()));
+      QVERIFY2(!c->toolTip().isEmpty(), qPrintable(c->objectName()));
+    }
+    QVERIFY(control("navigationTurnRight")
+                ->toolTip()
+                .contains(QLatin1String("(E)")));
+    // A click on Up moves a quarter of the view north; Zoom In halves the
+    // range; Turn Right turns 15°; Tilt Up tilts 10°.
+    QTest::mouseClick(control("navigationPanUp"), Qt::LeftButton);
+    settle();
+    QVERIFY(eventually([&]() {
+      return camera.pose().targetLatDeg > start.targetLatDeg + 1.0;
+    }));
+    QVERIFY(std::abs(camera.pose().targetLonDeg - start.targetLonDeg) < 0.01);
+    globe->setPose(start);
+    QTest::mouseClick(control("navigationZoomIn"), Qt::LeftButton);
+    settle();
+    QVERIFY(eventually([&]() {
+      return std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6;
+    }));
+    QTest::mouseClick(control("navigationZoomOut"), Qt::LeftButton);
+    settle();
+    QVERIFY(eventually([&]() {
+      return std::abs(camera.pose().rangeM / start.rangeM - 1.0) < 1e-6;
+    }));
+    QTest::mouseClick(control("navigationTurnRight"), Qt::LeftButton);
+    settle();
+    QVERIFY(eventually(
+        [&]() { return std::abs(camera.pose().headingDeg - 15.0) < 1e-6; }));
+    QTest::mouseClick(control("navigationTiltUp"), Qt::LeftButton);
+    settle();
+    QVERIFY(eventually(
+        [&]() { return std::abs(camera.pose().tiltDeg - 10.0) < 1e-6; }));
+    // The compass's N turns back to north-up.
+    {
+      // "N" is drawn 0.36 of the compass's width from its centre, turned
+      // by the heading.
+      QWidget* dial = control("navigationCompass");
+      const double a = -camera.pose().headingDeg * M_PI / 180.0;
+      const double r = 0.36 * dial->width();
+      const QPoint north =
+          dial->rect().center() +
+          QPoint(static_cast<int32_t>(std::lround(r * std::sin(a))),
+                 static_cast<int32_t>(std::lround(-r * std::cos(a))));
+      QTest::mouseClick(dial, Qt::LeftButton, Qt::NoModifier, north);
+    }
+    QVERIFY(QTest::qWaitFor([&]() { return camera.pose().headingDeg == 0.0; },
+                            3000));
+    // Dragging the ring turns the view.
+    QWidget* compass = control("navigationCompass");
+    const QPoint right(compass->width() - 4, compass->height() / 2);
+    const QPoint bottom(compass->width() / 2, compass->height() - 4);
+    // Events sent directly: Qt 5's QTest::mouseMove moves the real cursor.
+    sendMouse(compass, QEvent::MouseButtonPress, right, Qt::LeftButton,
+              Qt::LeftButton);
+    sendMouse(compass, QEvent::MouseMove, bottom, Qt::NoButton, Qt::LeftButton);
+    sendMouse(compass, QEvent::MouseButtonRelease, bottom, Qt::LeftButton,
+              Qt::NoButton);
+    QVERIFY(eventually(
+        [&]() { return std::abs(camera.pose().headingDeg - 270.0) < 1.0; }));
+    // Holding an arrow keeps moving until released, speeding up.
+    globe->setPose(start);
+    QWidget* east = control("navigationPanRight");
+    QTest::mousePress(east, Qt::LeftButton);
+    QTest::qWait(900);
+    const double heldLon = camera.pose().targetLonDeg;
+    QVERIFY(heldLon > start.targetLonDeg);
+    QTest::qWait(300);
+    QVERIFY(camera.pose().targetLonDeg > heldLon);
+    QVERIFY(globe->controller().panSpeedFactor() > 1.0);
+    QTest::mouseRelease(east, Qt::LeftButton);
+    QTest::qWait(50);
+    const double releasedLon = camera.pose().targetLonDeg;
+    QTest::qWait(300);
+    QCOMPARE(camera.pose().targetLonDeg, releasedLon);
+    QCOMPARE(globe->controller().motion(), static_cast<uint32_t>(ts::NoMotion));
+    // The zoom slider: near the top flies close in, and follows the
+    // camera; the tilt arc: double click for straight down.
+    globe->setPose(start);
+    QWidget* slider = control("navigationZoomSlider");
+    QTest::mouseClick(slider, Qt::LeftButton, Qt::NoModifier,
+                      QPoint(slider->width() / 2, 2));
+    settle();
+    QVERIFY(eventually([&]() { return camera.pose().rangeM < 1.0e3; }));
+    QVERIFY(eventually([&]() { return overlay->state().zoomFraction > 0.95; }));
+    globe->setPose(start);
+    QVERIFY(QTest::qWaitFor(
+        [&]() { return overlay->state().zoomFraction < 0.6; }, 5000));
+    QVERIFY(overlay->state().zoomText.contains(QLatin1String("km")));
+    QWidget* arc = control("navigationTiltArc");
+    QTest::mouseClick(arc, Qt::LeftButton, Qt::NoModifier,
+                      QPoint(arc->width() - 2, arc->height() / 4));
+    QVERIFY(eventually([&]() { return camera.pose().tiltDeg > 50.0; }));
+    QTest::mouseDClick(arc, Qt::LeftButton);
+    QVERIFY(eventually([&]() { return camera.pose().tiltDeg == 0.0; }));
+    // Home: the start view.
+    QTest::mouseClick(control("navigationHome"), Qt::LeftButton);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return std::abs(camera.pose().rangeM -
+                          ts::GlobeView::homePose().rangeM) < 1.0;
+        },
+        6000));
+    // Touch: a tap is a press and a release. The touch events go straight
+    // to the control, which takes touch itself: QTest's touch reaches
+    // widgets unreliably on Windows (as mouse events made of it, or not at
+    // all with Qt 5), and Qt passes touch only to widgets that ask for it.
+    globe->setPose(start);
+    QWidget* zoomIn = control("navigationZoomIn");
+    zoomIn->setAttribute(Qt::WA_AcceptTouchEvents, true);
+    const QPoint middle = zoomIn->rect().center();
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    // Qt 6 leaves the device to us (Qt 5 registers it for good).
+    const std::unique_ptr<QPointingDevice> touchDevice(
+        QTest::createTouchDevice());
+    const QPointF inWindow(zoomIn->mapTo(zoomIn->window(), middle));
+    const QPointF onScreen(zoomIn->mapToGlobal(middle));
+    for (const QEventPoint::State state :
+         {QEventPoint::State::Pressed, QEventPoint::State::Released}) {
+      const QEventPoint point(0, state, inWindow, onScreen);
+      QTouchEvent event(state == QEventPoint::State::Pressed
+                            ? QEvent::TouchBegin
+                            : QEvent::TouchEnd,
+                        touchDevice.get(), Qt::NoModifier, {point});
+      QCoreApplication::sendEvent(zoomIn, &event);
+    }
+#else
+    QTouchDevice* touch = QTest::createTouchDevice();
+    for (const Qt::TouchPointState state :
+         {Qt::TouchPointPressed, Qt::TouchPointReleased}) {
+      QTouchEvent::TouchPoint point(0);
+      point.setPos(QPointF(middle));
+      point.setState(state);
+      QTouchEvent event(state == Qt::TouchPointPressed ? QEvent::TouchBegin
+                                                       : QEvent::TouchEnd,
+                        touch, Qt::NoModifier, state, {point});
+      QCoreApplication::sendEvent(zoomIn, &event);
+    }
+#endif
+    // The tap's click may come a little later (Windows makes it of the
+    // touch): wait for the zoom it asks for.
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6;
+        },
+        5000));
+    // The keyboard: Enter on a focused control.
+    globe->setPose(start);
+    zoomIn->setFocus(Qt::TabFocusReason);
+    QTest::keyClick(zoomIn, Qt::Key_Return);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6;
+        },
+        5000));
+    // Tab from the view reaches the controls.
+    window.activateWindow();
+    QVERIFY(QTest::qWaitForWindowActive(&window));
+    globe->setFocus(Qt::OtherFocusReason);
+    bool reached = false;
+    for (int32_t i = 0; i < 40 && !reached; ++i) {
+      QWidget* focused = QApplication::focusWidget();
+      QTest::keyClick(focused != nullptr ? focused : globe, Qt::Key_Tab);
+      reached = QApplication::focusWidget() != nullptr &&
+                QApplication::focusWidget()->parentWidget() == overlay;
+    }
+    QVERIFY(reached);
+    // The map: the same controls turn and tilt it, to the map's limit.
+    globe->setViewMode(ts::ViewMode::Map, false);
+    QTest::mouseClick(control("navigationTurnLeft"), Qt::LeftButton);
+    settle();
+    QVERIFY2(eventually([&]() {
+               return std::abs(camera.pose().headingDeg - 345.0) < 1e-6;
+             }),
+             qPrintable(QString::number(camera.pose().headingDeg)));
+    QTest::mouseClick(arc, Qt::LeftButton, Qt::NoModifier,
+                      QPoint(arc->width() - 2, 2));
+    QVERIFY(eventually([&]() {
+      return camera.pose().tiltDeg == ts::Camera::maximumMapTiltDeg;
+    }));
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return overlay->state().maximumTiltDeg ==
+                 ts::Camera::maximumMapTiltDeg;
+        },
+        5000));
+    // Nothing reached the view as a click on the globe.
+    QTest::qWait(QGuiApplication::styleHints()->mouseDoubleClickInterval() +
+                 100);
+    QCOMPARE(clicks.count(), 0);
+    // With the controls shown and nothing moving, the view stops drawing.
+    QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
+    QVERIFY2(waitUntilQuiet(globe), "the view kept drawing");
+    const int32_t idle = globe->framesRendered();
+    QTest::qWait(400);
+    QCOMPARE(globe->framesRendered(), idle);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      window.grab().save(
+          QDir(shots).filePath(QStringLiteral("navigation-map.png")));
+    }
+  }
+
+  void navigationControlsContrast()
+  {
+    // On any background (white, black, grey, desert, cloud, a pale map,
+    // and the pixels of a busy image) every control's symbol stands 3:1
+    // against its halo, and its plate or edge 3:1 against the background,
+    // normal, hovered, pressed and at the least opacity (WCAG 2.1 non-text
+    // contrast). High contrast: opaque plates.
+    QWidget view;
+    view.resize(400, 600);
+    ts::NavigationOverlay overlay(&view);
+    std::vector<QColor> backgrounds = {
+        QColor(255, 255, 255), QColor(0, 0, 0),       QColor(128, 128, 128),
+        QColor(210, 180, 140), QColor(245, 245, 250), QColor(232, 226, 212),
+        QColor(20, 40, 90),    QColor(90, 120, 60)};
+    QImage busy(64, 64, QImage::Format_RGB32);
+    for (int32_t y = 0; y < busy.height(); ++y) {
+      for (int32_t x = 0; x < busy.width(); ++x) {
+        busy.setPixelColor(x, y,
+                           QColor((x * 37 + y * 11) % 256,
+                                  (x * 13 + y * 29) % 256,
+                                  (x * 7 + y * 53) % 256));
+      }
+    }
+    for (int32_t i = 0; i < busy.width() * busy.height(); i += 7) {
+      backgrounds.push_back(busy.pixelColor(i % 64, i / 64));
+    }
+    overlay.setHighContrast(false);
+    // The states there can be: hover only with the pointer over the
+    // controls; a press with it or (touch) without.
+    const std::vector<std::array<bool, 3>> states = {
+        {false, false, false}, {false, false, true}, {true, false, false},
+        {true, true, false},   {true, true, true},   {true, false, true}};
+    for (const std::array<bool, 3>& state : states) {
+      overlay.setPointerOver(state[0]);
+      const bool active = state[0];
+      const bool hovered = state[1];
+      const bool pressed = state[2];
+      {
+        {
+          const ts::NavigationColours c = overlay.colours(hovered, pressed);
+          for (const QColor& under : backgrounds) {
+            const QColor halo = ts::navigationComposite(c.halo, under);
+            const QColor plate = ts::navigationComposite(c.plate, under);
+            const QColor edge = ts::navigationComposite(c.edge, under);
+            QVERIFY2(ts::navigationContrastRatio(c.symbol, halo) >= 3.0,
+                     qPrintable(under.name()));
+            QVERIFY2(ts::navigationContrastRatio(c.accent, halo) >= 3.0,
+                     qPrintable(under.name()));
+            QVERIFY2(std::max(ts::navigationContrastRatio(plate, under),
+                              ts::navigationContrastRatio(edge, under)) >= 3.0,
+                     qPrintable(QStringLiteral("%1 %2 %3 %4")
+                                    .arg(under.name())
+                                    .arg(active)
+                                    .arg(hovered)
+                                    .arg(pressed)));
+          }
+        }
+      }
+    }
+    QVERIFY(overlay.plateOpacity() < 1.0 || overlay.isActive());
+    overlay.setHighContrast(true);
+    QCOMPARE(overlay.plateOpacity(), 1.0);
+    QCOMPARE(overlay.colours(false, false).plate.alpha(), 255);
+    // Larger fonts, larger controls.
+    QFont big = overlay.font();
+    big.setPixelSize(40);
+    overlay.setFont(big);
+    QVERIFY(overlay.unitPx() >= 80);
+    const QString shots = qEnvironmentVariable("TS_UI_SCREENSHOTS");
+    if (!shots.isEmpty()) {
+      for (const QColor& under : {QColor(Qt::white), QColor(Qt::black)}) {
+        overlay.setFont(QFont());
+        overlay.setHighContrast(false);
+        QPixmap pixmap(overlay.size());
+        pixmap.fill(under);
+        overlay.render(&pixmap, QPoint(), QRegion(), QWidget::DrawChildren);
+        pixmap.save(QDir(shots).filePath(
+            QStringLiteral("navigation-%1.png").arg(under.name().mid(1))));
+      }
+    }
+  }
+
   void mapViewToggle()
   {
     // View > 2D Map changes to the flat map and back, animated, keeping
@@ -1462,7 +1879,7 @@ private slots:
     QVERIFY2(pointer->text().startsWith(QStringLiteral("48.0")),
              qPrintable(pointer->text()));
 
-    // A left drag slides the map; a right drag does not turn it.
+    // A left drag slides the map; a right drag turns it (Phase 20).
     sendMouse(globe, QEvent::MouseButtonPress, centre, Qt::LeftButton,
               Qt::LeftButton);
     sendMouse(globe, QEvent::MouseMove, centre + QPointF(-50.0, 0.0),
@@ -1478,8 +1895,11 @@ private slots:
               Qt::NoButton, Qt::RightButton);
     sendMouse(globe, QEvent::MouseButtonRelease, centre + QPointF(80.0, 40.0),
               Qt::RightButton, Qt::NoButton);
-    QCOMPARE(camera.pose().headingDeg, 0.0);
-    QCOMPARE(camera.pose().tiltDeg, 0.0);
+    QVERIFY(camera.pose().headingDeg > 5.0);
+    ts::CameraPose northUp = camera.pose();
+    northUp.headingDeg = 0.0;
+    northUp.tiltDeg = 0.0;
+    globe->setPose(northUp);
 
     // The scale bar is drawn, and the map goes idle like the globe.
     QVERIFY(QTest::qWaitFor([&]() { return !globe->isLoadingTiles(); }, 20000));
