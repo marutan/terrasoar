@@ -241,7 +241,7 @@ public:
   void setMarkers(const std::vector<GlobeMarker>& markers);
 
   /** Groups of space lines, uploaded separately (setSpaceLines()). */
-  static constexpr int32_t spaceLineGroups = 4;
+  static constexpr int32_t spaceLineGroups = 6;
 
   /**
    * Replaces the lines through space (see SpaceLine) of @p group (0 to

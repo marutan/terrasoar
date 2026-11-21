@@ -69,6 +69,9 @@ class AircraftInfoWindow;
 class AircraftLayers;
 class AircraftListDialog;
 class SatelliteInfoWindow;
+class VesselInfoWindow;
+class VesselLayers;
+class VesselListDialog;
 class SatelliteLayers;
 class SatelliteListDialog;
 class IconCache;
@@ -464,6 +467,50 @@ public:
   /** Returns true while the camera follows the selected aircraft. */
   bool isFollowingAircraft() const { return m_followAircraft; }
 
+  /** Returns the ships of the layer tree. */
+  VesselLayers* vessels() const { return m_vessels; }
+
+  /** Opens the Import AIS Data dialog (for @p path, if given). */
+  void importAisData(const QString& path = QString());
+
+  /** Opens the Add AIS Source dialog (a receiver or an open feed). */
+  void addAisSource();
+
+  /** Adds the ship layer @p definition; returns its node id. */
+  QString addVesselLayer(const LayerDefinition& definition);
+
+  /**
+   * Adds the AIS recording @p path as a ship layer if it can be read
+   * without asking (NMEA with times, CSV with NOAA's columns); otherwise
+   * opens the import dialog. False (with @p errorString) if it isn't AIS.
+   */
+  bool openAisFile(const QString& path, QString* errorString);
+
+  /** Shows the list of layer @p nodeId's stations; null if not ships. */
+  VesselListDialog* showVesselList(const QString& nodeId);
+
+  /** Selects station @p mmsi of layer @p nodeId, its details shown. */
+  void selectVessel(const QString& nodeId, std::optional<uint32_t> mmsi);
+
+  /** Returns the ship details window, or null before the first. */
+  VesselInfoWindow* vesselInfoWindow() const { return m_vesselInfo; }
+
+  /** Makes the camera follow the selected station (or stop). */
+  void setFollowingVessel(bool follow);
+
+  /** Returns true while the camera follows the selected station. */
+  bool isFollowingVessel() const { return m_followVessel; }
+
+  /** Opens layer @p nodeId's ship properties (modal). */
+  void showVesselProperties(const QString& nodeId);
+
+  /**
+   * Exports station @p mmsi of layer @p nodeId's track to @p path (KML,
+   * GPX or CSV by its suffix); false with @p errorString if not.
+   */
+  bool exportVesselTrack(const QString& nodeId, uint32_t mmsi,
+                         const QString& path, QString* errorString);
+
   /** Opens layer @p nodeId's aircraft properties (modal). */
   void showAircraftProperties(const QString& nodeId);
 
@@ -571,6 +618,14 @@ private:
   std::vector<QAction*> satelliteNodeActions(const QString& id,
                                              QObject* parent);
   void showSatelliteProperties(const QString& nodeId);
+  void createShips();
+  void refreshVesselLayers(const LayerStack& stack);
+  void vesselsDrawn();
+  void vesselTrailsChanged();
+  void vesselSetChanged(const QJsonObject& source);
+  void vesselMarkerClicked(int32_t index);
+  void updateVesselInfo();
+  std::vector<QAction*> vesselNodeActions(const QString& id, QObject* parent);
   void createAircraft();
   void refreshAircraftLayers(const LayerStack& stack);
   void aircraftDrawn();
@@ -754,6 +809,14 @@ private:
   QTimer* m_satellitePointerTimer = nullptr;
   /** Old elements already pointed out, by source. */
   std::set<QString> m_oldSatelliteNotes;
+  VesselLayers* m_vessels = nullptr;
+  VesselInfoWindow* m_vesselInfo = nullptr;
+  QPointer<VesselListDialog> m_vesselList;
+  QAction* m_importAisAction = nullptr;
+  QAction* m_addAisSourceAction = nullptr;
+  bool m_followVessel = false;
+  /** Ship recordings whose start the clock was moved to, by source. */
+  std::set<QString> m_vesselsStarted;
   AircraftLayers* m_aircraft = nullptr;
   AircraftInfoWindow* m_aircraftInfo = nullptr;
   QPointer<AircraftListDialog> m_aircraftList;

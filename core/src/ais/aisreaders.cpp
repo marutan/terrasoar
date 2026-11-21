@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <utility>
 
 #include <QBuffer>
@@ -47,6 +48,73 @@ std::optional<double> toNumber(const QString& text)
                                     : std::nullopt;
 }
 
+/** Days from 1970-01-01 to a civil date (proleptic Gregorian). */
+int64_t daysFromCivil(int64_t year, int64_t month, int64_t day)
+{
+  year -= month <= 2 ? 1 : 0;
+  const int64_t era = (year >= 0 ? year : year - 399) / 400;
+  const int64_t yearOfEra = year - era * 400;
+  const int64_t dayOfYear =
+      (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+  const int64_t dayOfEra =
+      yearOfEra * 365 + yearOfEra / 4 - yearOfEra / 100 + dayOfYear;
+  return era * 146097 + dayOfEra - 719468;
+}
+
+/**
+ * Reads "YYYY-MM-DD[T ]HH:MM:SS[.fff][Z]" (UTC) by hand: a QDateTime for
+ * each row is slow. Nothing if it isn't exactly that.
+ */
+std::optional<double> parseSimpleIsoTime(const QString& text)
+{
+  const int32_t n = static_cast<int32_t>(text.size());
+  if (n < 19 || text.at(4) != QLatin1Char('-') ||
+      text.at(7) != QLatin1Char('-') || text.at(13) != QLatin1Char(':') ||
+      text.at(16) != QLatin1Char(':') ||
+      (text.at(10) != QLatin1Char('T') && text.at(10) != QLatin1Char(' '))) {
+    return std::nullopt;
+  }
+  bool ok = true;
+  const std::function<int64_t(int32_t, int32_t)> digits =
+      [&text, &ok](int32_t at, int32_t count) {
+        int64_t value = 0;
+        for (int32_t i = at; i < at + count; ++i) {
+          const char16_t c = text.at(i).unicode();
+          if (c < u'0' || c > u'9') {
+            ok = false;
+            return int64_t{0};
+          }
+          value = value * 10 + (c - u'0');
+        }
+        return value;
+      };
+  const int64_t year = digits(0, 4);
+  const int64_t month = digits(5, 2);
+  const int64_t day = digits(8, 2);
+  const int64_t hour = digits(11, 2);
+  const int64_t minute = digits(14, 2);
+  const int64_t second = digits(17, 2);
+  double fraction = 0.0;
+  int32_t at = 19;
+  if (at < n && text.at(at) == QLatin1Char('.')) {
+    double scale = 0.1;
+    for (++at; at < n && text.at(at).isDigit(); ++at) {
+      fraction += (text.at(at).unicode() - u'0') * scale;
+      scale /= 10.0;
+    }
+  }
+  if (at < n && text.at(at) == QLatin1Char('Z')) {
+    ++at;
+  }
+  if (!ok || at != n || month < 1 || month > 12 || day < 1 || day > 31 ||
+      hour > 23 || minute > 59 || second > 60) {
+    return std::nullopt;
+  }
+  return static_cast<double>(daysFromCivil(year, month, day) * 86400 +
+                             hour * 3600 + minute * 60 + second) +
+         fraction;
+}
+
 /**
  * Reads a time: Unix seconds (milliseconds if very large) or ISO 8601
  * (with a space or a T; UTC unless an offset is given).
@@ -60,6 +128,10 @@ std::optional<double> parseTime(QString text)
   const std::optional<double> number = toNumber(text);
   if (number) {
     return *number > 1.0e11 ? *number / 1000.0 : *number;
+  }
+  const std::optional<double> simple = parseSimpleIsoTime(text);
+  if (simple) {
+    return simple;
   }
   if (text.size() > 10 && text.at(10) == QLatin1Char(' ')) {
     text[10] = QLatin1Char('T');

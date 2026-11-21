@@ -156,7 +156,7 @@ struct AisDimensions {
     return toBow + toStern > 0 && toPort + toStarboard > 0;
   }
   /** Equality. */
-  bool operator==(const AisDimensions& other) const
+  bool operator==(AisDimensions other) const
   {
     return toBow == other.toBow && toStern == other.toStern &&
            toPort == other.toPort && toStarboard == other.toStarboard;

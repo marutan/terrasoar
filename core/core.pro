@@ -47,6 +47,7 @@ HEADERS += \
     include/ts/ais/aismessage.h \
     include/ts/ais/aisreaders.h \
     include/ts/ais/vesseldraws.h \
+    include/ts/ais/vesselexport.h \
     include/ts/ais/vessellayer.h \
     include/ts/ais/vesseltracks.h \
     include/ts/camera/camera.h \
@@ -188,6 +189,7 @@ SOURCES += \
     src/ais/aismessage.cpp \
     src/ais/aisreaders.cpp \
     src/ais/vesseldraws.cpp \
+    src/ais/vesselexport.cpp \
     src/ais/vessellayer.cpp \
     src/ais/vesseltracks.cpp \
     src/camera/camera.cpp \

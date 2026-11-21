@@ -3190,6 +3190,86 @@ private slots:
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
   }
 
+  void shipsHoldFrameRate()
+  {
+    // A live national feed: 10 000 stations (ships with their hulls'
+    // sizes), 1500 of them with a trail of their last hour, the clock
+    // moving every frame; on the globe and the map within the software
+    // budget, no trail uploaded as the clock moves. (Software GL is bound
+    // by the markers' pixels: 20 000 take about 65 ms there.)
+    TS_TEST_REQUIRE_GL(*m_gl);
+    std::vector<ts::GlobeMarker> markers;
+    std::vector<ts::SpaceLine> trails;
+    ts::TrackTiming timing;
+    timing.gapS = 600.0;
+    ts::TrailSettings span;
+    span.mode = ts::TrailMode::Span;
+    span.spanS = 3600.0;
+    for (int32_t v = 0; v < 10000; ++v) {
+      ts::TrackSample at;
+      at.latDeg = 54.0 + 12.0 * std::sin(0.37 * v);
+      at.lonDeg = 5.0 + 25.0 * std::cos(0.71 * v);
+      at.trackDeg = static_cast<float>(std::fmod(17.0 * v, 360.0));
+      at.speedMS = 5.0F;
+      ts::VesselMotion motion;
+      motion.headingDeg = at.trackDeg;
+      ts::VesselInfo info;
+      info.shipType = 70 + v % 20;
+      info.dimensions = ts::AisDimensions{80, 20, 8, 8};
+      markers.push_back(ts::vesselMarker(
+          at, motion, info, 0.0,
+          ts::shipTypeColour(ts::shipTypeGroup(info.shipType)), 6.0));
+      if (v % 7 != 0 || trails.size() >= 1500) {
+        continue;
+      }
+      ts::MovingTrack track;
+      for (int32_t m = 0; m <= 60; ++m) {
+        ts::TrackSample p = at;
+        p.timeS = 1.8e9 + 60.0 * m;
+        p.lonDeg = at.lonDeg + 0.002 * m;
+        p.latDeg = at.latDeg + 0.001 * std::sin(0.2 * m);
+        track.add(p);
+      }
+      track.finish();
+      for (ts::SpaceLine& line :
+           ts::trailLines(track, timing, span, ts::TrailLook())) {
+        trails.push_back(std::move(line));
+      }
+    }
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines(trails, 3);
+    for (const double morph : {0.0, 1.0}) {
+      ts::Camera camera =
+          makeCamera(ts::CameraPose{55.0, 10.0, 6.0e6, 0.0, 0.0});
+      camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+      camera.setMorph(morph);
+      m_renderer->setSpaceLineTime(1.8e9 + 3600.0);
+      render(camera, markers);
+      const int64_t uploads = m_renderer->spaceLineUploads();
+      std::vector<double> timesS;
+      for (int32_t frame = 0; frame < 15; ++frame) {
+        QElapsedTimer one;
+        one.start();
+        m_renderer->setSpaceLineTime(1.8e9 + 3000.0 + 10.0 * frame);
+        // The markers move every frame, as the clock runs.
+        m_renderer->setMarkers(markers);
+        render(camera, markers);
+        timesS.push_back(static_cast<double>(one.nsecsElapsed()) * 1e-9);
+      }
+      QCOMPARE(m_renderer->spaceLineUploads(), uploads);
+      std::sort(timesS.begin(), timesS.end());
+      const double quartileS = timesS.at(timesS.size() / 4);
+      qInfo("ships %s: fastest quarter within %.1f ms, slowest %.1f ms",
+            morph > 0.0 ? "map" : "globe", quartileS * 1000.0,
+            timesS.back() * 1000.0);
+      QVERIFY2(quartileS < 0.1, qPrintable(QString::number(quartileS)));
+    }
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({}, 3);
+    m_renderer->setMarkers({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
+  }
+
   void satellitesHoldFrameRate()
   {
     // A whole constellation: 6000 satellites (72 planes at 53°, 550 km),

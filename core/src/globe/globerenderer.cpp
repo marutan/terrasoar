@@ -249,16 +249,26 @@ void main()
   vec4 clip = viewProjection * vec4(offset, 1.0);
   float radius = radiusPx * depthParams.y;
   float metresPerPx = 2.0 * depthParams.z * viewport.w * clip.w;
+  // The quad fits the shape (across, along): narrow for ships, whose
+  // shaded pixels are what costs with thousands of them.
+  vec2 halfPx = vec2(radius);
+  if (heading.w > 1.5 && heading.w < 2.5) {
+    halfPx.x = 0.45 * radius;
+  } else if (heading.w > 2.5 && heading.w < 3.5) {
+    halfPx = vec2(0.7 * radius);
+  } else if (heading.w > 4.5) {
+    halfPx = vec2(0.75 * radius);
+  }
   // Ships whose hull is longer on the screen than the marker: the hull, to
   // scale (vHull.x > 0), in a quad around it.
-  float halfPx = radius;
   vHull = vec4(0.0);
   if (hull.x > 0.0 && 0.5 * hull.x / metresPerPx > radius) {
     vHull = hull;
-    halfPx = max(0.5 * hull.x + abs(hull.z), 0.5 * hull.y + abs(hull.w))
+    halfPx = vec2(0.5 * hull.y + abs(hull.w), 0.5 * hull.x + abs(hull.z))
            / metresPerPx;
   }
-  float extent = halfPx + 1.5;
+  vec2 extentPx = halfPx + vec2(1.5);
+  float extent = max(extentPx.x, extentPx.y);
   // Aircraft and ships turn to their heading on the screen: towards a
   // point a little along it (in pixels: y up the screen).
   vec2 up = vec2(0.0, 1.0);
@@ -271,7 +281,7 @@ void main()
     }
   }
   vec2 right = vec2(up.y, -up.x);
-  vec2 offsetPx = corner * extent;
+  vec2 offsetPx = corner * extentPx;
   vec2 screenPx = right * offsetPx.x + up * offsetPx.y;
   clip.xy += screenPx * 2.0 * viewport.zw * clip.w;
   vOffsetPx = offsetPx;
@@ -382,7 +392,15 @@ void main()
     float r = length(vOffsetPx);
     alpha = clamp(vRadiusPx + 0.5 - r, 0.0, 1.0) * vColor.a;
     fill = clamp(vRadiusPx - 0.5 - r, 0.0, 1.0);
+  } else if (!inside(vOffsetPx, 1.9)) {
+    // Clearly outside the shape and its rim: one test, not eight.
+    discard;
+  } else if (inside(vOffsetPx, -0.75)) {
+    // Clearly inside.
+    fill = 1.0;
+    alpha = vColor.a;
   } else {
+    // At an edge: four samples of the shape and four of its rim.
     fill = coverage(vOffsetPx, 0.0);
     alpha = max(fill, coverage(vOffsetPx, 1.2)) * vColor.a;
   }

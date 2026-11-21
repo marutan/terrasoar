@@ -79,7 +79,7 @@ std::array<std::uint8_t, 4> speedColour(double speedMS);
  * Returns the direction a vessel points: its heading, or its course when
  * it has none (NaN if neither).
  */
-double vesselDirectionDeg(const TrackSample& at, const VesselMotion& motion);
+double vesselDirectionDeg(const TrackSample& at, VesselMotion motion);
 
 /**
  * Returns the marker of station @p info at @p at (at @p seaLevelM unless
@@ -88,7 +88,7 @@ double vesselDirectionDeg(const TrackSample& at, const VesselMotion& motion);
  * aircraft, a diamond for aids to navigation, a square for base stations;
  * the hull to scale from the dimensions when known.
  */
-GlobeMarker vesselMarker(const TrackSample& at, const VesselMotion& motion,
+GlobeMarker vesselMarker(const TrackSample& at, VesselMotion motion,
                          const VesselInfo& info, double seaLevelM,
                          std::array<std::uint8_t, 4> rgba, double radiusPx);
 

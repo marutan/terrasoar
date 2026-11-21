@@ -9,6 +9,25 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- Ships from AIS (File → Import AIS Data…, and dragging a file onto the
+  window): NMEA logs (`!AIVDM`/`!AIVDO`, with tag-block, prefixed or no
+  times) and CSV (NOAA MarineCadastre's columns recognised, others
+  chosen), decoded by Terra Soar's own AIS decoder (Class A and B
+  positions and static data, base stations, SAR aircraft, aids to
+  navigation, long-range reports). Ships are drawn turned to their
+  heading (or course) and coloured by type, moored and anchored ships
+  differently, hulls to scale when close in, with names (and speeds and
+  destinations), course vectors and trails: off, a time span before the
+  clock, or all the data, coloured by type, the layer's colour or speed.
+  Recordings play on the clock; ships stay drawn for a time that depends
+  on their class and speed. A list to find, show, hide and give ships
+  their own trails; details on click; following a ship; filters by name
+  or MMSI, type, status, speed and area; tracks exported as KML, GPX or
+  CSV.
+- Live ships (File → Add AIS Source…): from a receiver (AIS-catcher,
+  rtl-ais, a ship's AIS) over TCP or UDP, recorded for replay if wanted,
+  or from open feeds: Fintraffic's Digitraffic (CC BY 4.0, credited) and
+  the Norwegian Coastal Administration's stream (NLOD).
 - Aircraft from ADS-B (File → Import ADS-B Data…, and dragging a file
   onto the window): SBS, raw Mode S messages (AVR, timed), Beast,
   dump1090/readsb aircraft.json, tar1090 traces and CSV with chosen

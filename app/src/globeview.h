@@ -355,8 +355,9 @@ public:
 
   /**
    * Sets the lines through space of @p group (0: satellite tracks and
-   * footprints, 1: aircraft trails, 2: aircraft drop lines); each group is
-   * uploaded on its own (see GlobeRenderer::setSpaceLines()).
+   * footprints, 1: aircraft trails, 2: aircraft drop lines, 3: ship
+   * trails, 4: course vectors); each group is uploaded on its own (see
+   * GlobeRenderer::setSpaceLines()).
    */
   void setSpaceLines(std::vector<SpaceLine> lines, int32_t group = 0);
 
@@ -369,6 +370,25 @@ public:
    */
   void setAircraft(std::vector<GlobeMarker> markers,
                    std::vector<BillboardDraw> labels);
+
+  /**
+   * Sets the ships' (and other AIS stations') markers and labels, drawn
+   * after the aircraft's (markerAt() counts them after the aircraft's).
+   */
+  void setVessels(std::vector<GlobeMarker> markers,
+                  std::vector<BillboardDraw> labels);
+
+  /** Returns the ships' markers set (for tests). */
+  const std::vector<GlobeMarker>& vesselMarkers() const
+  {
+    return m_vesselMarkers;
+  }
+
+  /** Returns the ships' labels set (for tests). */
+  const std::vector<BillboardDraw>& vesselLabels() const
+  {
+    return m_vesselLabels;
+  }
 
   /** Returns the aircraft's markers set (for tests). */
   const std::vector<GlobeMarker>& aircraftMarkers() const
@@ -397,7 +417,8 @@ public:
   /**
    * Returns the marker nearest @p positionPx within a few pixels of its
    * edge, −1 if none: satellites' first (markers()), then aircraft's
-   * (aircraftMarkers(), counted on from markers().size()).
+   * (aircraftMarkers(), counted on from markers().size()), then ships'
+   * (vesselMarkers()).
    */
   int32_t markerAt(QPointF positionPx) const;
 
@@ -577,7 +598,7 @@ protected:
   void leaveEvent(QEvent* event) override;
 
 private:
-  /** The satellites' markers, then the aircraft's. */
+  /** The satellites' markers, then the aircraft's, then the ships'. */
   std::vector<GlobeMarker> allMarkers() const;
 
   double nowS() const;
@@ -660,6 +681,8 @@ private:
   std::vector<BillboardDraw> m_satelliteLabels;
   std::vector<GlobeMarker> m_aircraftMarkers;
   std::vector<BillboardDraw> m_aircraftLabels;
+  std::vector<GlobeMarker> m_vesselMarkers;
+  std::vector<BillboardDraw> m_vesselLabels;
   std::array<std::vector<SpaceLine>, GlobeRenderer::spaceLineGroups>
       m_spaceLines;
   double m_spaceLineTimeS = 0.0;

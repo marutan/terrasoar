@@ -440,9 +440,11 @@ void GlobeView::initializeGL()
 std::vector<GlobeMarker> GlobeView::allMarkers() const
 {
   std::vector<GlobeMarker> all;
-  all.reserve(m_markers.size() + m_aircraftMarkers.size());
+  all.reserve(m_markers.size() + m_aircraftMarkers.size() +
+              m_vesselMarkers.size());
   all.insert(all.end(), m_markers.begin(), m_markers.end());
   all.insert(all.end(), m_aircraftMarkers.begin(), m_aircraftMarkers.end());
+  all.insert(all.end(), m_vesselMarkers.begin(), m_vesselMarkers.end());
   return all;
 }
 
@@ -460,6 +462,17 @@ void GlobeView::setAircraft(std::vector<GlobeMarker> markers,
 {
   m_aircraftMarkers = std::move(markers);
   m_aircraftLabels = std::move(labels);
+  if (m_globe) {
+    m_globe->setMarkers(allMarkers());
+  }
+  update();
+}
+
+void GlobeView::setVessels(std::vector<GlobeMarker> markers,
+                           std::vector<BillboardDraw> labels)
+{
+  m_vesselMarkers = std::move(markers);
+  m_vesselLabels = std::move(labels);
   if (m_globe) {
     m_globe->setMarkers(allMarkers());
   }
@@ -1523,7 +1536,7 @@ void GlobeView::drawBillboards()
   m_billboardsDrawn = 0;
   m_labelsDrawn = 0;
   if (m_billboards.empty() && m_satelliteLabels.empty() &&
-      m_aircraftLabels.empty()) {
+      m_aircraftLabels.empty() && m_vesselLabels.empty()) {
     return;
   }
   constexpr double cellPx = 6.0;
@@ -1543,11 +1556,14 @@ void GlobeView::drawBillboards()
   // Satellites' labels first: KML icons can't then crowd them out.
   std::vector<const BillboardDraw*> all;
   all.reserve(m_satelliteLabels.size() + m_aircraftLabels.size() +
-              m_billboards.size());
+              m_vesselLabels.size() + m_billboards.size());
   for (const BillboardDraw& billboard : m_satelliteLabels) {
     all.push_back(&billboard);
   }
   for (const BillboardDraw& billboard : m_aircraftLabels) {
+    all.push_back(&billboard);
+  }
+  for (const BillboardDraw& billboard : m_vesselLabels) {
     all.push_back(&billboard);
   }
   for (const BillboardDraw& billboard : m_billboards) {

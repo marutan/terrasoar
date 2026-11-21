@@ -1199,6 +1199,87 @@
         </message>
     </context>
     <context>
+        <name>ts::AisSourceDialog</name>
+        <message>
+            <source>Connect over TCP</source>
+            <translation>Connect over TCP</translation>
+        </message>
+        <message>
+            <source>Listen for UDP</source>
+            <translation>Listen for UDP</translation>
+        </message>
+        <message>
+            <source>Add AIS Source</source>
+            <translation>Add AIS Source</translation>
+        </message>
+        <message>
+            <source>Not recorded</source>
+            <translation>Not recorded</translation>
+        </message>
+        <message>
+            <source>Host:</source>
+            <translation>Host:</translation>
+        </message>
+        <message>
+            <source>Port:</source>
+            <translation>Port:</translation>
+        </message>
+        <message>
+            <source>Choose…</source>
+            <translation>Choose…</translation>
+        </message>
+        <message>
+            <source>Record to:</source>
+            <translation>Record to:</translation>
+        </message>
+        <message>
+            <source>AIS-catcher, rtl-ais, a ship's AIS: NMEA sentences.</source>
+            <translation>AIS-catcher, rtl-ais, a ship's AIS: NMEA sentences.</translation>
+        </message>
+        <message>
+            <source>Receiver</source>
+            <translation>Receiver</translation>
+        </message>
+        <message>
+            <source>Open Feeds</source>
+            <translation>Open Feeds</translation>
+        </message>
+        <message>
+            <source>Layer name:</source>
+            <translation>Layer name:</translation>
+        </message>
+        <message>
+            <source>Record To</source>
+            <translation>Record To</translation>
+        </message>
+        <message>
+            <source>NMEA logs (*.nmea);;All files (*)</source>
+            <translation>NMEA logs (*.nmea);;All files (*)</translation>
+        </message>
+        <message>
+            <source>%1
+Licence: %2. Credited as "%3" while the layer is shown.</source>
+            <translation>%1
+Licence: %2. Credited as "%3" while the layer is shown.</translation>
+        </message>
+        <message>
+            <source>Enter the receiver's host name or address.</source>
+            <translation>Enter the receiver's host name or address.</translation>
+        </message>
+        <message>
+            <source>AIS on UDP port %1</source>
+            <translation>AIS on UDP port %1</translation>
+        </message>
+        <message>
+            <source>AIS from %1:%2</source>
+            <translation>AIS from %1:%2</translation>
+        </message>
+        <message>
+            <source>Choose a feed.</source>
+            <translation>Choose a feed.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BalloonWindow</name>
         <message>
             <source>Placemark</source>
@@ -2200,6 +2281,133 @@
         <message>
             <source>Choose the time, address, latitude and longitude columns.</source>
             <translation>Choose the time, address, latitude and longitude columns.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ImportAisDialog</name>
+        <message>
+            <source>Time:</source>
+            <translation>Time:</translation>
+        </message>
+        <message>
+            <source>MMSI:</source>
+            <translation>MMSI:</translation>
+        </message>
+        <message>
+            <source>Latitude:</source>
+            <translation>Latitude:</translation>
+        </message>
+        <message>
+            <source>Longitude:</source>
+            <translation>Longitude:</translation>
+        </message>
+        <message>
+            <source>Speed (knots):</source>
+            <translation>Speed (knots):</translation>
+        </message>
+        <message>
+            <source>Course:</source>
+            <translation>Course:</translation>
+        </message>
+        <message>
+            <source>Heading:</source>
+            <translation>Heading:</translation>
+        </message>
+        <message>
+            <source>Name:</source>
+            <translation>Name:</translation>
+        </message>
+        <message>
+            <source>Ship type:</source>
+            <translation>Ship type:</translation>
+        </message>
+        <message>
+            <source>First sentence at:</source>
+            <translation>First sentence at:</translation>
+        </message>
+        <message>
+            <source>CSV columns</source>
+            <translation>CSV columns</translation>
+        </message>
+        <message>
+            <source>The first line names the columns</source>
+            <translation>The first line names the columns</translation>
+        </message>
+        <message>
+            <source>Import AIS Data</source>
+            <translation>Import AIS Data</translation>
+        </message>
+        <message>
+            <source>Detect automatically</source>
+            <translation>Detect automatically</translation>
+        </message>
+        <message>
+            <source>NMEA sentences (!AIVDM)</source>
+            <translation>NMEA sentences (!AIVDM)</translation>
+        </message>
+        <message>
+            <source>CSV (NOAA MarineCadastre's or other columns)</source>
+            <translation>CSV (NOAA MarineCadastre's or other columns)</translation>
+        </message>
+        <message>
+            <source>Comma</source>
+            <translation>Comma</translation>
+        </message>
+        <message>
+            <source>Semicolon</source>
+            <translation>Semicolon</translation>
+        </message>
+        <message>
+            <source>Tab</source>
+            <translation>Tab</translation>
+        </message>
+        <message>
+            <source>Browse…</source>
+            <translation>Browse…</translation>
+        </message>
+        <message>
+            <source>File:</source>
+            <translation>File:</translation>
+        </message>
+        <message>
+            <source>Format:</source>
+            <translation>Format:</translation>
+        </message>
+        <message>
+            <source>Layer name:</source>
+            <translation>Layer name:</translation>
+        </message>
+        <message>
+            <source>Separator:</source>
+            <translation>Separator:</translation>
+        </message>
+        <message>
+            <source>AIS recordings (*.nmea *.ais *.txt *.log *.csv *.gz);;All files (*)</source>
+            <translation>AIS recordings (*.nmea *.ais *.txt *.log *.csv *.gz);;All files (*)</translation>
+        </message>
+        <message>
+            <source>The format can't be told from the file: choose it.</source>
+            <translation>The format can't be told from the file: choose it.</translation>
+        </message>
+        <message>
+            <source>Looks like: %1</source>
+            <translation>Looks like: %1</translation>
+        </message>
+        <message>
+            <source>(none)</source>
+            <translation>(none)</translation>
+        </message>
+        <message>
+            <source>Choose a recording.</source>
+            <translation>Choose a recording.</translation>
+        </message>
+        <message>
+            <source>Choose the recording's format.</source>
+            <translation>Choose the recording's format.</translation>
+        </message>
+        <message>
+            <source>Choose the time, MMSI, latitude and longitude columns.</source>
+            <translation>Choose the time, MMSI, latitude and longitude columns.</translation>
         </message>
     </context>
     <context>
@@ -3428,6 +3636,42 @@
             <source>Connect Again</source>
             <translation>Connect Again</translation>
         </message>
+        <message>
+            <source>Import AIS Data…</source>
+            <translation>Import AIS Data…</translation>
+        </message>
+        <message>
+            <source>Show ships from a recording of AIS data: NMEA logs or CSV (NOAA MarineCadastre's and others)</source>
+            <translation>Show ships from a recording of AIS data: NMEA logs or CSV (NOAA MarineCadastre's and others)</translation>
+        </message>
+        <message>
+            <source>Add AIS Source…</source>
+            <translation>Add AIS Source…</translation>
+        </message>
+        <message>
+            <source>Show ships live from an AIS receiver or an open online feed</source>
+            <translation>Show ships live from an AIS receiver or an open online feed</translation>
+        </message>
+        <message>
+            <source>Can't reach the source (%1); trying again.</source>
+            <translation>Can't reach the source (%1); trying again.</translation>
+        </message>
+        <message>
+            <source>The sentences have no times: they are a second apart from the start.</source>
+            <translation>The sentences have no times: they are a second apart from the start.</translation>
+        </message>
+        <message>
+            <source>That station isn't there any more.</source>
+            <translation>That station isn't there any more.</translation>
+        </message>
+        <message>
+            <source>Ships…</source>
+            <translation>Ships…</translation>
+        </message>
+        <message>
+            <source>Ship Layer Properties…</source>
+            <translation>Ship Layer Properties…</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -4642,6 +4886,93 @@
         </message>
     </context>
     <context>
+        <name>ts::Ships</name>
+        <message>
+            <source>Cargo</source>
+            <translation>Cargo</translation>
+        </message>
+        <message>
+            <source>Tanker</source>
+            <translation>Tanker</translation>
+        </message>
+        <message>
+            <source>Passenger</source>
+            <translation>Passenger</translation>
+        </message>
+        <message>
+            <source>High-speed craft</source>
+            <translation>High-speed craft</translation>
+        </message>
+        <message>
+            <source>Tug, pilot or special</source>
+            <translation>Tug, pilot or special</translation>
+        </message>
+        <message>
+            <source>Fishing</source>
+            <translation>Fishing</translation>
+        </message>
+        <message>
+            <source>Sailing or pleasure</source>
+            <translation>Sailing or pleasure</translation>
+        </message>
+        <message>
+            <source>Other</source>
+            <translation>Other</translation>
+        </message>
+        <message>
+            <source>Aids to navigation and base stations</source>
+            <translation>Aids to navigation and base stations</translation>
+        </message>
+        <message>
+            <source>Type not known</source>
+            <translation>Type not known</translation>
+        </message>
+        <message>
+            <source>Under way using engine</source>
+            <translation>Under way using engine</translation>
+        </message>
+        <message>
+            <source>At anchor</source>
+            <translation>At anchor</translation>
+        </message>
+        <message>
+            <source>Not under command</source>
+            <translation>Not under command</translation>
+        </message>
+        <message>
+            <source>Restricted manoeuvrability</source>
+            <translation>Restricted manoeuvrability</translation>
+        </message>
+        <message>
+            <source>Constrained by her draught</source>
+            <translation>Constrained by her draught</translation>
+        </message>
+        <message>
+            <source>Moored</source>
+            <translation>Moored</translation>
+        </message>
+        <message>
+            <source>Aground</source>
+            <translation>Aground</translation>
+        </message>
+        <message>
+            <source>Engaged in fishing</source>
+            <translation>Engaged in fishing</translation>
+        </message>
+        <message>
+            <source>Under way sailing</source>
+            <translation>Under way sailing</translation>
+        </message>
+        <message>
+            <source>AIS-SART</source>
+            <translation>AIS-SART</translation>
+        </message>
+        <message>
+            <source>Not given</source>
+            <translation>Not given</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::SpanOverrideDialog</name>
         <message>
             <source>Track Spans of %1</source>
@@ -4762,6 +5093,387 @@
         <message>
             <source>minutes</source>
             <translation>minutes</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::VesselInfoWindow</name>
+        <message>
+            <source>Follow</source>
+            <translation>Follow</translation>
+        </message>
+        <message>
+            <source>Export Track…</source>
+            <translation>Export Track…</translation>
+        </message>
+        <message>
+            <source>Ship</source>
+            <translation>Ship</translation>
+        </message>
+        <message>
+            <source>MMSI:</source>
+            <translation>MMSI:</translation>
+        </message>
+        <message>
+            <source>Name:</source>
+            <translation>Name:</translation>
+        </message>
+        <message>
+            <source>Callsign:</source>
+            <translation>Callsign:</translation>
+        </message>
+        <message>
+            <source>IMO number:</source>
+            <translation>IMO number:</translation>
+        </message>
+        <message>
+            <source>Type:</source>
+            <translation>Type:</translation>
+        </message>
+        <message>
+            <source>Length and beam:</source>
+            <translation>Length and beam:</translation>
+        </message>
+        <message>
+            <source>Draught:</source>
+            <translation>Draught:</translation>
+        </message>
+        <message>
+            <source>Destination:</source>
+            <translation>Destination:</translation>
+        </message>
+        <message>
+            <source>ETA:</source>
+            <translation>ETA:</translation>
+        </message>
+        <message>
+            <source>Status:</source>
+            <translation>Status:</translation>
+        </message>
+        <message>
+            <source>Speed:</source>
+            <translation>Speed:</translation>
+        </message>
+        <message>
+            <source>Course:</source>
+            <translation>Course:</translation>
+        </message>
+        <message>
+            <source>Heading:</source>
+            <translation>Heading:</translation>
+        </message>
+        <message>
+            <source>Rate of turn:</source>
+            <translation>Rate of turn:</translation>
+        </message>
+        <message>
+            <source>Position:</source>
+            <translation>Position:</translation>
+        </message>
+        <message>
+            <source>Last position report:</source>
+            <translation>Last position report:</translation>
+        </message>
+        <message>
+            <source>Last static report:</source>
+            <translation>Last static report:</translation>
+        </message>
+        <message>
+            <source>Layer:</source>
+            <translation>Layer:</translation>
+        </message>
+        <message>
+            <source>%1 (%2)</source>
+            <translation>%1 (%2)</translation>
+        </message>
+        <message>
+            <source>%1 m by %2 m</source>
+            <translation>%1 m by %2 m</translation>
+        </message>
+        <message>
+            <source>%1 m</source>
+            <translation>%1 m</translation>
+        </message>
+        <message>
+            <source>%1-%2 %3:%4 UTC</source>
+            <translation>%1-%2 %3:%4 UTC</translation>
+        </message>
+        <message>
+            <source>%1 kn</source>
+            <translation>%1 kn</translation>
+        </message>
+        <message>
+            <source>%1°</source>
+            <translation>%1°</translation>
+        </message>
+        <message>
+            <source>%1°/min</source>
+            <translation>%1°/min</translation>
+        </message>
+        <message>
+            <source>%1 (%2 s before the clock)</source>
+            <translation>%1 (%2 s before the clock)</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::VesselLayers</name>
+        <message>
+            <source>No positions were found.</source>
+            <translation>No positions were found.</translation>
+        </message>
+        <message>
+            <source>This isn't a ship layer's source.</source>
+            <translation>This isn't a ship layer's source.</translation>
+        </message>
+        <message>
+            <source>%1 kn</source>
+            <translation>%1 kn</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::VesselListDialog</name>
+        <message>
+            <source>Layer's</source>
+            <translation>Layer's</translation>
+        </message>
+        <message>
+            <source>Off</source>
+            <translation>Off</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n min</source>
+            <translation>
+                <numerusform>%n min</numerusform>
+                <numerusform>%n min</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>All</source>
+            <translation>All</translation>
+        </message>
+        <message>
+            <source>Find by name, MMSI or destination</source>
+            <translation>Find by name, MMSI or destination</translation>
+        </message>
+        <message>
+            <source>Name</source>
+            <translation>Name</translation>
+        </message>
+        <message>
+            <source>MMSI</source>
+            <translation>MMSI</translation>
+        </message>
+        <message>
+            <source>Type</source>
+            <translation>Type</translation>
+        </message>
+        <message>
+            <source>Status</source>
+            <translation>Status</translation>
+        </message>
+        <message>
+            <source>Speed</source>
+            <translation>Speed</translation>
+        </message>
+        <message>
+            <source>Destination</source>
+            <translation>Destination</translation>
+        </message>
+        <message>
+            <source>Trail</source>
+            <translation>Trail</translation>
+        </message>
+        <message>
+            <source>Show All</source>
+            <translation>Show All</translation>
+        </message>
+        <message>
+            <source>Hide All</source>
+            <translation>Hide All</translation>
+        </message>
+        <message>
+            <source>%1 – Ships</source>
+            <translation>%1 – Ships</translation>
+        </message>
+        <message>
+            <source>Reading…</source>
+            <translation>Reading…</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1 of %n station(s) listed</source>
+            <translation>
+                <numerusform>%1 of %n station listed</numerusform>
+                <numerusform>%1 of %n stations listed</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>%1 kn</source>
+            <translation>%1 kn</translation>
+        </message>
+        <message>
+            <source>This station's trail</source>
+            <translation>This station's trail</translation>
+        </message>
+        <message>
+            <source>The layer's</source>
+            <translation>The layer's</translation>
+        </message>
+        <message numerus="yes">
+            <source>The last %n min</source>
+            <translation>
+                <numerusform>The last %n min</numerusform>
+                <numerusform>The last %n min</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>All the data</source>
+            <translation>All the data</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::VesselPropertiesDialog</name>
+        <message>
+            <source>Coloured by ship type</source>
+            <translation>Coloured by ship type</translation>
+        </message>
+        <message>
+            <source>Names</source>
+            <translation>Names</translation>
+        </message>
+        <message>
+            <source>with speeds</source>
+            <translation>with speeds</translation>
+        </message>
+        <message>
+            <source>with destinations</source>
+            <translation>with destinations</translation>
+        </message>
+        <message>
+            <source>At least</source>
+            <translation>At least</translation>
+        </message>
+        <message>
+            <source>At most</source>
+            <translation>At most</translation>
+        </message>
+        <message>
+            <source>Only within</source>
+            <translation>Only within</translation>
+        </message>
+        <message>
+            <source>Use the View</source>
+            <translation>Use the View</translation>
+        </message>
+        <message>
+            <source>%1 – Ship Layer Properties</source>
+            <translation>%1 – Ship Layer Properties</translation>
+        </message>
+        <message>
+            <source> px</source>
+            <translation> px</translation>
+        </message>
+        <message>
+            <source> min</source>
+            <translation> min</translation>
+        </message>
+        <message>
+            <source>None</source>
+            <translation>None</translation>
+        </message>
+        <message>
+            <source>Off</source>
+            <translation>Off</translation>
+        </message>
+        <message>
+            <source>A time span before the clock</source>
+            <translation>A time span before the clock</translation>
+        </message>
+        <message>
+            <source>All the data up to the clock</source>
+            <translation>All the data up to the clock</translation>
+        </message>
+        <message>
+            <source>The ship type</source>
+            <translation>The ship type</translation>
+        </message>
+        <message>
+            <source>The layer's colour</source>
+            <translation>The layer's colour</translation>
+        </message>
+        <message>
+            <source>Speed</source>
+            <translation>Speed</translation>
+        </message>
+        <message>
+            <source>Any name or MMSI</source>
+            <translation>Any name or MMSI</translation>
+        </message>
+        <message>
+            <source> kn</source>
+            <translation> kn</translation>
+        </message>
+        <message>
+            <source>Ships</source>
+            <translation>Ships</translation>
+        </message>
+        <message>
+            <source>Colour:</source>
+            <translation>Colour:</translation>
+        </message>
+        <message>
+            <source>Size:</source>
+            <translation>Size:</translation>
+        </message>
+        <message>
+            <source>Labels:</source>
+            <translation>Labels:</translation>
+        </message>
+        <message>
+            <source>Course vectors:</source>
+            <translation>Course vectors:</translation>
+        </message>
+        <message>
+            <source>Shown at least for:</source>
+            <translation>Shown at least for:</translation>
+        </message>
+        <message>
+            <source>Trails</source>
+            <translation>Trails</translation>
+        </message>
+        <message>
+            <source>Show:</source>
+            <translation>Show:</translation>
+        </message>
+        <message>
+            <source>Span:</source>
+            <translation>Span:</translation>
+        </message>
+        <message>
+            <source>Coloured by:</source>
+            <translation>Coloured by:</translation>
+        </message>
+        <message>
+            <source>Broken at gaps over:</source>
+            <translation>Broken at gaps over:</translation>
+        </message>
+        <message>
+            <source>Show Only</source>
+            <translation>Show Only</translation>
+        </message>
+        <message>
+            <source>Name or MMSI:</source>
+            <translation>Name or MMSI:</translation>
+        </message>
+        <message>
+            <source>Ship types:</source>
+            <translation>Ship types:</translation>
+        </message>
+        <message>
+            <source>Statuses:</source>
+            <translation>Statuses:</translation>
+        </message>
+        <message>
+            <source>Colour of %1</source>
+            <translation>Colour of %1</translation>
         </message>
     </context>
     <context>

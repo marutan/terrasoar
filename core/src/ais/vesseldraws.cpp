@@ -152,7 +152,7 @@ std::array<std::uint8_t, 4> speedColour(double speedMS)
   return stops.back();
 }
 
-double vesselDirectionDeg(const TrackSample& at, const VesselMotion& motion)
+double vesselDirectionDeg(const TrackSample& at, VesselMotion motion)
 {
   if (!std::isnan(motion.headingDeg)) {
     return static_cast<double>(motion.headingDeg);
@@ -160,7 +160,7 @@ double vesselDirectionDeg(const TrackSample& at, const VesselMotion& motion)
   return static_cast<double>(at.trackDeg);
 }
 
-GlobeMarker vesselMarker(const TrackSample& at, const VesselMotion& motion,
+GlobeMarker vesselMarker(const TrackSample& at, VesselMotion motion,
                          const VesselInfo& info, double seaLevelM,
                          std::array<std::uint8_t, 4> rgba, double radiusPx)
 {

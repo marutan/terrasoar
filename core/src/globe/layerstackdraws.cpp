@@ -64,12 +64,12 @@ std::vector<VectorLayerDraw> vectorDrawsForStack(const LayerStack& stack,
   std::vector<VectorLayerDraw> draws;
   // The stack lists vectors from the bottom, like imagery.
   for (const VectorStackEntry& entry : stack.vectors) {
-    // Satellites and aircraft are drawn by the application (markers,
-    // tracks and trails).
+    // Satellites, aircraft and ships are drawn by the application
+    // (markers, tracks and trails).
     const QString kind =
         entry.definition.source.value(QStringLiteral("kind")).toString();
     if (kind == QLatin1String("satellites") ||
-        kind == QLatin1String("aircraft")) {
+        kind == QLatin1String("aircraft") || kind == QLatin1String("vessels")) {
       continue;
     }
     VectorLayerDraw draw;

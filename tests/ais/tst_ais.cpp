@@ -27,6 +27,7 @@
 
 #include <map>
 
+#include <QElapsedTimer>
 #include <QFile>
 #include <QNetworkProxy>
 #include <QSignalSpy>
@@ -46,7 +47,9 @@
 #include "ts/ais/vesseltracks.h"
 #include "ts/geo/geodetic.h"
 #include "ts/network/networkclient.h"
+#include "ts/perf/processstats.h"
 #include "ts/tracks/movingtrack.h"
+#include "ts/tracks/trackdraws.h"
 
 namespace
 {
@@ -220,6 +223,8 @@ private slots:
   void digitrafficFeed();
   void digitrafficBacksOff();
   void digitrafficLive();
+  void dayOfNoaa();
+  void csvReadingRate();
 };
 
 void TestAis::sentences()
@@ -1466,6 +1471,109 @@ void TestAis::digitrafficLive()
                              .arg(positions)
                              .arg(named)));
   feed.stop();
+}
+
+void TestAis::dayOfNoaa()
+{
+  // A day of NOAA-like data: 2000 vessels reporting every minute (2.9
+  // million reports), built into tracks within the time and memory
+  // budgets; their trails and positions at a time.
+  const ts::ProcessStats before = ts::currentProcessStats();
+  QElapsedTimer timer;
+  timer.start();
+  ts::VesselTrackBuilder builder;
+  const int32_t vessels = 2000;
+  const int32_t minutes = 24 * 60;
+  for (int32_t minute = 0; minute < minutes; ++minute) {
+    for (int32_t v = 0; v < vessels; ++v) {
+      ts::VesselReport r;
+      r.mmsi = 366000000U + static_cast<uint32_t>(v);
+      r.timeS = 1.8e9 + 60.0 * minute + 0.01 * v;
+      const double phase = 0.002 * minute + v;
+      r.latDeg = 25.0 + 20.0 * std::sin(0.37 * v) + 0.5 * std::sin(phase);
+      r.lonDeg = -90.0 + 25.0 * std::cos(0.71 * v) + 0.5 * std::cos(phase);
+      r.speedKn = 10.0;
+      r.courseDeg = std::fmod(30.0 * phase, 360.0);
+      r.headingDeg = r.courseDeg;
+      if (minute == 0) {
+        r.name = QStringLiteral("VESSEL %1").arg(v);
+        r.shipType = 70;
+      }
+      builder.add(r);
+    }
+  }
+  const std::vector<ts::VesselTrack> tracks = builder.finish();
+  const double buildS = static_cast<double>(timer.elapsed()) / 1000.0;
+  const ts::ProcessStats after = ts::currentProcessStats();
+  const double usedMb = (static_cast<double>(after.peakResidentBytes) -
+                         static_cast<double>(before.residentBytes)) /
+                        (1024.0 * 1024.0);
+  QCOMPARE(tracks.size(), static_cast<std::size_t>(vessels));
+  timer.restart();
+  ts::TrackTiming timing;
+  timing.gapS = 600.0;
+  ts::TrailSettings all;
+  all.mode = ts::TrailMode::All;
+  std::size_t trailPoints = 0;
+  for (const ts::VesselTrack& track : tracks) {
+    for (const ts::SpaceLine& line :
+         ts::trailLines(track.track, timing, all, ts::TrailLook())) {
+      trailPoints += line.points.size();
+    }
+  }
+  const double trailS = static_cast<double>(timer.elapsed()) / 1000.0;
+  timer.restart();
+  int32_t shown = 0;
+  for (const ts::VesselTrack& track : tracks) {
+    shown += track.track.at(1.8e9 + 43200.0, timing) ? 1 : 0;
+  }
+  const double placeMs = static_cast<double>(timer.nsecsElapsed()) * 1e-6;
+  qInfo("%s", qPrintable(QStringLiteral("%1 reports in %2 s, %3 MB; trails "
+                                        "%4 points in %5 s; placed in %6 ms")
+                             .arg(vessels * minutes)
+                             .arg(buildS, 0, 'f', 2)
+                             .arg(usedMb, 0, 'f', 0)
+                             .arg(trailPoints)
+                             .arg(trailS, 0, 'f', 2)
+                             .arg(placeMs, 0, 'f', 2)));
+  QCOMPARE(shown, vessels);
+  // Budgets (generous for sanitizer builds).
+  QVERIFY(buildS < 30.0);
+  QVERIFY(usedMb < 900.0);
+  QVERIFY(trailS < 20.0);
+  QVERIFY(placeMs < 50.0);
+}
+
+void TestAis::csvReadingRate()
+{
+  // NOAA's CSV read at tens of thousands of rows a second at least (far
+  // more without sanitizers).
+  QTemporaryDir dir;
+  const QString path = dir.filePath(QStringLiteral("day.csv"));
+  {
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QByteArray noaa = readData("harbour-noaa.csv");
+    const int32_t header = static_cast<int32_t>(noaa.indexOf('\n')) + 1;
+    file.write(noaa.left(header));
+    for (int32_t i = 0; i < 1000; ++i) {
+      file.write(noaa.mid(header));
+    }
+  }
+  ts::AisReadOptions options;
+  options.csv = ts::guessAisCsvColumns(readData("harbour-noaa.csv"));
+  QElapsedTimer timer;
+  timer.start();
+  const ts::AisReadResult result = ts::readAisFile(
+      path, ts::AisFormat::Csv, options, [](const ts::VesselReport&) {});
+  const double seconds =
+      std::max(static_cast<double>(timer.elapsed()) / 1000.0, 1e-3);
+  qInfo("%s", qPrintable(QStringLiteral("%1 CSV rows in %2 s")
+                             .arg(result.records)
+                             .arg(seconds, 0, 'f', 2)));
+  QVERIFY(result.records > 100000);
+  QCOMPARE(result.problemCount, int64_t{0});
+  QVERIFY(static_cast<double>(result.records) / seconds > 20000.0);
 }
 
 QTEST_GUILESS_MAIN(TestAis)

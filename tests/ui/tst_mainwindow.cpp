@@ -81,6 +81,7 @@
 #include "adsbdialogs.h"
 #include "aircraftlayers.h"
 #include "aircraftwindows.h"
+#include "aisdialogs.h"
 #include "appsettings.h"
 #include "balloonwindow.h"
 #include "clockwidget.h"
@@ -111,6 +112,7 @@
 #include "timebar.h"
 #include "timemodebox.h"
 #include "ts/adsb/aircraftlayer.h"
+#include "ts/ais/vessellayer.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/kml/kmledit.h"
@@ -133,6 +135,8 @@
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
 #include "userguide.h"
+#include "vessellayers.h"
+#include "vesselwindows.h"
 #include "wmscataloguefile.h"
 
 namespace
@@ -4183,6 +4187,153 @@ private slots:
     QVERIFY(!aircraft->dropLines().empty());
     QCOMPARE(aircraft->drawn().front().info.registration,
              QStringLiteral("G-TSOA"));
+  }
+
+  void shipsFromRecording()
+  {
+    // An NMEA log with tag blocks opened as a layer: the clock goes to its
+    // start; its eight stations are drawn with names, coloured by type;
+    // trails, course vectors when asked for, the list, details, follow
+    // and export.
+    const QString path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../ais/data/harbour-tagged.nmea");
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    const QString nodeId =
+        layer.data(ts::LayerTreeModel::NodeIdRole).toString();
+    QCOMPARE(layer.data().toString(), QStringLiteral("harbour-tagged"));
+    ts::VesselLayers* vessels = window.vessels();
+    // At the start only the first stations have reported.
+    QVERIFY(
+        QTest::qWaitFor([&]() { return !vessels->drawn().empty(); }, 10000));
+    QCOMPARE(window.clock()->time(),
+             QDateTime(QDate(2026, 11, 20), QTime(12, 0), QTimeZone::utc()));
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 20), QTime(12, 5), QTimeZone::utc()));
+    QVERIFY(
+        QTest::qWaitFor([&]() { return vessels->drawn().size() == 8; }, 5000));
+    QVERIFY(std::any_of(vessels->labels().begin(), vessels->labels().end(),
+                        [](const ts::BillboardDraw& label) {
+                          return label.label == QLatin1String("TSO CARGO ONE");
+                        }));
+    QVERIFY(!vessels->trails().empty());
+    QVERIFY(vessels->courseVectors().empty());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QCOMPARE(globe->vesselMarkers().size(), std::size_t{8});
+    }
+    // Course vectors, by type colour off, a name filter.
+    const QModelIndex index = window.layerModel()->indexOfId(nodeId);
+    ts::LayerDefinition definition =
+        window.layerModel()->layerDefinition(index);
+    ts::VesselStyle style = ts::VesselStyle::fromJson(definition.style);
+    style.courseVectorMinutes = 6.0;
+    definition.style = style.toJson();
+    window.layerModel()->setLayerDefinition(index, definition);
+    QVERIFY(QTest::qWaitFor([&]() { return !vessels->courseVectors().empty(); },
+                            5000));
+    style.nameFilter = QStringLiteral("tug");
+    definition.style = style.toJson();
+    window.layerModel()->setLayerDefinition(index, definition);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return vessels->drawn().size() == 1; }, 5000));
+    QCOMPARE(vessels->drawn().front().info.name, QStringLiteral("TSO TUG"));
+    style.nameFilter.clear();
+    definition.style = style.toJson();
+    window.layerModel()->setLayerDefinition(index, definition);
+    // Details, follow and export of the cargo ship.
+    window.selectVessel(nodeId, 235000001U);
+    ts::VesselInfoWindow* info = window.vesselInfoWindow();
+    if (info == nullptr) {
+      QFAIL("no details window");
+    }
+    QCOMPARE(info->fieldText(QStringLiteral("name")),
+             QStringLiteral("TSO CARGO ONE"));
+    QCOMPARE(info->fieldText(QStringLiteral("imo")), QStringLiteral("9000001"));
+    QCOMPARE(info->fieldText(QStringLiteral("destination")),
+             QStringLiteral("SOUTHAMPTON"));
+    QVERIFY(info->fieldText(QStringLiteral("dimensions"))
+                .startsWith(QStringLiteral("200")));
+    window.setFollowingVessel(true);
+    QVERIFY(window.isFollowingVessel());
+    QTemporaryDir dir;
+    for (const char* name : {"s.kml", "s.gpx", "s.csv"}) {
+      QVERIFY2(window.exportVesselTrack(nodeId, 235000001U,
+                                        dir.filePath(QLatin1String(name)),
+                                        &error),
+               qPrintable(error));
+    }
+    QFile csv(dir.filePath(QStringLiteral("s.csv")));
+    QVERIFY(csv.open(QIODevice::ReadOnly));
+    QVERIFY(csv.readAll().contains("TSO CARGO ONE"));
+    window.selectVessel(QString(), std::nullopt);
+    QVERIFY(!window.isFollowingVessel());
+    // The list.
+    ts::VesselListDialog* list = window.showVesselList(nodeId);
+    if (list == nullptr) {
+      QFAIL("no ship list");
+    }
+    QCOMPARE(list->rowCount(), 8);
+    list->setFilter(QStringLiteral("SOUTHAMPTON"));
+    QCOMPARE(list->rowCount(), 4);
+    // The menu.
+    QMenu* menu = window.findChild<ts::LayerTreeDock*>()->contextMenu(index);
+    QVERIFY(menu->findChild<QAction*>(QStringLiteral("vesselListAction")));
+    QVERIFY(menu->findChild<QAction*>(QStringLiteral("vesselStartAction")));
+  }
+
+  void shipsFromReceiverAndProject()
+  {
+    // A mock AIS receiver over TCP: the live layer shows its ship; saved
+    // in a project and opened again, the layer comes back.
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    QTemporaryDir dir;
+    const QString project = dir.filePath(QStringLiteral("ships.terrasoar"));
+    {
+      ts::MainWindow window;
+      ts::AisSourceDialog dialog(&window);
+      dialog.setReceiver(false, QStringLiteral("127.0.0.1"),
+                         server.serverPort());
+      dialog.accept();
+      const QString nodeId = window.addVesselLayer(dialog.layerDefinition());
+      QVERIFY(server.waitForNewConnection(5000));
+      QTcpSocket* client = server.nextPendingConnection();
+      client->write("!AIVDM,1,1,,B,15M67FC000G?ufbE`FepT@3n00Sa,0*5C\r\n");
+      client->flush();
+      ts::VesselLayers* vessels = window.vessels();
+      QVERIFY(QTest::qWaitFor([&]() { return vessels->drawn().size() == 1; },
+                              10000));
+      QCOMPARE(vessels->drawn().front().track->mmsi, 366053209U);
+      // Gone: marked.
+      server.close();
+      client->disconnectFromHost();
+      const QModelIndex index = window.layerModel()->indexOfId(nodeId);
+      QVERIFY(QTest::qWaitFor(
+          [&]() {
+            return window.layerModel()
+                ->data(index, ts::LayerTreeModel::StatusRole)
+                .isValid();
+          },
+          5000));
+      // A feed layer: credited.
+      ts::AisSourceDialog feeds(&window);
+      feeds.setFeed(QStringLiteral("digitraffic"));
+      feeds.accept();
+      const ts::LayerDefinition feed = feeds.layerDefinition();
+      QCOMPARE(feed.source.value(QStringLiteral("attribution")).toString(),
+               QStringLiteral("Fintraffic / digitraffic.fi"));
+      QString error;
+      QVERIFY2(window.saveProject(project, &error), qPrintable(error));
+    }
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openProject(project, &error), qPrintable(error));
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    QVERIFY(ts::VesselSource::isVessels(
+        window.layerModel()->layerDefinition(layer).source));
   }
 
   void satellitesFromFile()
