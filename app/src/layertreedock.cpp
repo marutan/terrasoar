@@ -41,6 +41,7 @@
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPersistentModelIndex>
+#include <QPointer>
 #include <QPushButton>
 #include <QSlider>
 #include <QToolButton>
@@ -396,15 +397,19 @@ QMenu* LayerTreeDock::contextMenu(const QModelIndex& index)
     m_contextMenu = new QMenu(this);
     m_contextMenu->setObjectName(QStringLiteral("layerContextMenu"));
   }
+  // Actions made for the last menu go with it. clear() deletes those the
+  // menu owns (their parent), so only what is left is deleted here:
+  // deleting them again crashed in the event loop.
   m_contextMenu->clear();
-  // Actions made for the last menu go with it.
-  for (QAction* old : m_contextActions) {
-    old->deleteLater();
+  for (const QPointer<QAction>& old : m_contextActions) {
+    if (old) {
+      old->deleteLater();
+    }
   }
   m_contextActions.clear();
   if (m_nodeActions) {
-    m_contextActions = m_nodeActions(index, m_contextMenu);
-    for (QAction* action : m_contextActions) {
+    for (QAction* action : m_nodeActions(index, m_contextMenu)) {
+      m_contextActions.emplace_back(action);
       m_contextMenu->addAction(action);
     }
   }

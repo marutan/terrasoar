@@ -124,6 +124,9 @@ signals:
   void resultReady();
 
 private:
+  /** Emits resultReady() (queued here from the worker thread). */
+  Q_INVOKABLE void announceResult();
+
   void run();
 
   mutable std::mutex m_mutex;

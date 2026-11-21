@@ -206,6 +206,7 @@ ClockWidget::ClockWidget(ProgramClock* clock, QWidget* parent)
   connect(m_clock, &ProgramClock::timeChanged, this, &ClockWidget::updateTime);
   connect(m_clock, &ProgramClock::runningChanged, this,
           &ClockWidget::updateState);
+  buildMenus();
   retranslateUi();
 }
 
@@ -284,35 +285,47 @@ void ClockWidget::retranslateUi()
                               "date and time"));
   m_rateButton->setToolTip(tr("How fast the clock runs"));
   m_timeButton->setToolTip(m_jumpAction->toolTip());
-  rebuildRateMenu();
+  retranslateMenus();
   updateState();
 }
 
-void ClockWidget::rebuildRateMenu()
+void ClockWidget::buildMenus()
 {
-  m_rateMenu->clear();
+  // Made once: an action must outlive its own triggered() (choosing a
+  // step used to rebuild the menus from within it, and QMenu then used
+  // the deleted action).
   m_rateMenu->addAction(m_fasterAction);
   m_rateMenu->addAction(m_slowerAction);
   m_rateMenu->addSeparator();
   for (const double rate : ProgramClock::rates()) {
-    QAction* action = m_rateMenu->addAction(rateLabel(rate));
+    QAction* action = m_rateMenu->addAction(QString());
     action->setCheckable(true);
     action->setData(rate);
     connect(action, &QAction::triggered, this,
             [this, rate]() { m_clock->setRate(rate); });
+    m_rateActions.push_back(action);
   }
   m_rateMenu->addSeparator();
-  // The submenu stays (clear() keeps it); only its actions are made again.
-  m_stepMenu->clear();
-  m_stepMenu->setTitle(tr("S&tep"));
   m_rateMenu->addMenu(m_stepMenu);
   for (const double seconds : stepChoices()) {
-    QAction* action = m_stepMenu->addAction(stepLabel(seconds));
+    QAction* action = m_stepMenu->addAction(QString());
     action->setCheckable(true);
-    action->setChecked(seconds == m_stepSeconds);
     action->setData(seconds);
     connect(action, &QAction::triggered, this,
             [this, seconds]() { setStepSeconds(seconds); });
+    m_stepActions.push_back(action);
+  }
+}
+
+void ClockWidget::retranslateMenus()
+{
+  for (QAction* action : m_rateActions) {
+    action->setText(rateLabel(action->data().toDouble()));
+  }
+  m_stepMenu->setTitle(tr("S&tep"));
+  for (QAction* action : m_stepActions) {
+    action->setText(stepLabel(action->data().toDouble()));
+    action->setChecked(action->data().toDouble() == m_stepSeconds);
   }
 }
 
@@ -326,10 +339,8 @@ void ClockWidget::updateState()
                                                       : QStyle::SP_MediaPlay));
   m_rateButton->setText(m_clock->isRealTime() ? tr("Real time")
                                               : rateLabel(m_clock->rate()));
-  for (QAction* action : m_rateMenu->actions()) {
-    if (action->isCheckable()) {
-      action->setChecked(action->data().toDouble() == m_clock->rate());
-    }
+  for (QAction* action : m_rateActions) {
+    action->setChecked(action->data().toDouble() == m_clock->rate());
   }
   m_fasterAction->setEnabled(m_clock->fasterRate() != m_clock->rate());
   m_slowerAction->setEnabled(m_clock->slowerRate() != m_clock->rate());

@@ -25,6 +25,8 @@
 #ifndef TS_APP_CLOCKWIDGET_H
 #define TS_APP_CLOCKWIDGET_H
 
+#include <vector>
+
 #include <QDateTime>
 #include <QDialog>
 #include <QWidget>
@@ -137,7 +139,8 @@ private:
   void updateState();
   void updateTime();
   void togglePlay();
-  void rebuildRateMenu();
+  void buildMenus();
+  void retranslateMenus();
 
   ProgramClock* m_clock;
   QToolButton* m_backButton = nullptr;
@@ -148,6 +151,10 @@ private:
   QToolButton* m_nowButton = nullptr;
   QMenu* m_rateMenu = nullptr;
   QMenu* m_stepMenu = nullptr;
+  /** The speeds in the menu. */
+  std::vector<QAction*> m_rateActions;
+  /** The steps in its Step submenu. */
+  std::vector<QAction*> m_stepActions;
   QAction* m_playAction = nullptr;
   QAction* m_forwardAction = nullptr;
   QAction* m_backAction = nullptr;
