@@ -123,11 +123,10 @@ signals:
   /** A new result() is there (emitted on the GUI thread). */
   void resultReady();
 
-private slots:
-  /** Emits resultReady() (queued here from the worker thread). */
-  void announceResult();
-
 private:
+  /** Emits resultReady() (queued here from the worker thread). */
+  Q_INVOKABLE void announceResult();
+
   void run();
 
   mutable std::mutex m_mutex;

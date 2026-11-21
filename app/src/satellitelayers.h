@@ -216,11 +216,10 @@ signals:
   /** The selection changed. */
   void selectionChanged();
 
-private slots:
-  /** Takes the loads the pool finished (queued from its threads). */
-  void takeFinishedLoads();
-
 private:
+  /** Takes the loads the pool finished (queued from its threads). */
+  Q_INVOKABLE void takeFinishedLoads();
+
   /** A load a pool thread finished, waiting for the GUI thread. */
   struct FinishedLoad {
     QString key;
