@@ -43,6 +43,9 @@ HEADERS += \
     include/ts/adsb/modesmessage.h \
     include/ts/adsb/receiverfeed.h \
     include/ts/base/buildinfo.h \
+    include/ts/ais/aismessage.h \
+    include/ts/ais/aisreaders.h \
+    include/ts/ais/vesseltracks.h \
     include/ts/camera/camera.h \
     include/ts/camera/cameracontroller.h \
     include/ts/camera/scalebar.h \
@@ -178,6 +181,9 @@ SOURCES += \
     src/adsb/modesmessage.cpp \
     src/adsb/receiverfeed.cpp \
     src/base/buildinfo.cpp \
+    src/ais/aismessage.cpp \
+    src/ais/aisreaders.cpp \
+    src/ais/vesseltracks.cpp \
     src/camera/camera.cpp \
     src/camera/cameracontroller.cpp \
     src/camera/scalebar.cpp \

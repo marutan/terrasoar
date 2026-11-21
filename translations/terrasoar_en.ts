@@ -1141,6 +1141,45 @@
         </message>
     </context>
     <context>
+        <name>ts::AisReader</name>
+        <message>
+            <source>Not an AIS sentence.</source>
+            <translation>Not an AIS sentence.</translation>
+        </message>
+        <message>
+            <source>A broken AIS sentence.</source>
+            <translation>A broken AIS sentence.</translation>
+        </message>
+        <message>
+            <source>The time can't be read.</source>
+            <translation>The time can't be read.</translation>
+        </message>
+        <message>
+            <source>The MMSI can't be read.</source>
+            <translation>The MMSI can't be read.</translation>
+        </message>
+        <message>
+            <source>The position can't be read.</source>
+            <translation>The position can't be read.</translation>
+        </message>
+        <message>
+            <source>Choose the time, MMSI, latitude and longitude columns.</source>
+            <translation>Choose the time, MMSI, latitude and longitude columns.</translation>
+        </message>
+        <message>
+            <source>The file's format isn't one Terra Soar reads.</source>
+            <translation>The file's format isn't one Terra Soar reads.</translation>
+        </message>
+        <message>
+            <source>The file has no AIS data.</source>
+            <translation>The file has no AIS data.</translation>
+        </message>
+        <message>
+            <source>The compressed data can't be read.</source>
+            <translation>The compressed data can't be read.</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BalloonWindow</name>
         <message>
             <source>Placemark</source>
