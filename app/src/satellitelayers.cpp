@@ -195,8 +195,8 @@ void SatelliteLayers::startLoad(const QString& key, const QJsonObject& json,
       source->isDownloaded() && m_network ? m_network() : nullptr;
   const ElementDownloadSettings settings = m_download;
   const std::shared_ptr<std::atomic<bool>> cancelled = m_cancelled;
-  const SatelliteSource what = *source;
-  m_pool.start([this, key, json, what, network, settings, force, cancelled]() {
+  m_pool.start([this, key, json, what = *source, network, settings, force,
+                cancelled]() {
     std::shared_ptr<const SatelliteSet> result;
     if (!what.isDownloaded()) {
       result = std::make_shared<const SatelliteSet>(readLocal(what));
