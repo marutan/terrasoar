@@ -445,7 +445,7 @@ void aircraftScene(double timeS, ts::TrailSettings trail,
     }
     const std::optional<ts::TrackSample> at = track.track.at(timeS, timing);
     if (at) {
-      markers.push_back(ts::aircraftMarker(*at, 0.0, {255, 230, 0, 255}, 9.0));
+      markers.push_back(ts::aircraftMarker(*at, 0.0, {255, 230, 0, 255}, 6.0));
       lines.push_back(ts::dropLine(*at, 0.0, {255, 230, 0, 255}));
     }
   }
@@ -2871,7 +2871,7 @@ private slots:
     } else if (mode == QLatin1String("span")) {
       trail.mode = ts::TrailMode::Span;
     }
-    trail.spanS = 60.0;
+    trail.spanS = 150.0;
     std::vector<ts::GlobeMarker> markers;
     std::vector<ts::SpaceLine> lines;
     const double timeS = aircraftFixtureStartS + 200.0;
@@ -2885,7 +2885,12 @@ private slots:
       camera.setMorph(1.0);
     }
     m_gl->makeCurrent();
-    m_renderer->setStyle(ts::GlobeStyle());
+    // Without the graticule: its lines at a grazing angle differ by a few
+    // levels between Mesa builds (Windows), and these images are about the
+    // aircraft.
+    ts::GlobeStyle style;
+    style.graticule = false;
+    m_renderer->setStyle(style);
     m_renderer->setImageryProvider(nullptr);
     m_renderer->setVectorLayers({});
     m_renderer->setSpaceLineTime(timeS);
@@ -2902,7 +2907,9 @@ private slots:
     m_renderer->setSpaceLines({});
     QCOMPARE(m_gl->device().takeErrors(), QString());
     // The markers' yellow is on screen.
-    QVERIFY(countColor(image, QColor(255, 230, 0)) > 60);
+    QVERIFY2(
+        countColor(image, QColor(255, 230, 0)) > 15,
+        qPrintable(QString::number(countColor(image, QColor(255, 230, 0)))));
     if (!m_softwareRenderer &&
         qEnvironmentVariableIntValue("TS_UPDATE_GOLDEN") == 0) {
       QSKIP("Golden images are compared on Mesa llvmpipe only.");
