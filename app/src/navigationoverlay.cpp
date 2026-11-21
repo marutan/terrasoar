@@ -39,6 +39,7 @@
 #include <QPalette>
 #include <QResizeEvent>
 #include <QTimerEvent>
+#include <QTouchEvent>
 #include <QWheelEvent>
 
 #ifdef Q_OS_WIN
@@ -218,6 +219,9 @@ public:
     setObjectName(objectName);
     setFocusPolicy(Qt::TabFocus);
     setAttribute(Qt::WA_Hover, true);
+    // Touch is taken here, as presses, drags and releases, rather than
+    // relying on the platform to make mouse events of it.
+    setAttribute(Qt::WA_AcceptTouchEvents, true);
     setCursor(Qt::PointingHandCursor);
   }
 
@@ -230,6 +234,14 @@ protected:
   bool event(QEvent* event) override
   {
     switch (event->type()) {
+    case QEvent::TouchBegin:
+    case QEvent::TouchUpdate:
+    case QEvent::TouchEnd:
+      touch(static_cast<QTouchEvent*>(event));
+      return true;
+    case QEvent::TouchCancel:
+      setPressed(false);
+      return true;
     case QEvent::Enter:
     case QEvent::HoverEnter:
       m_hovered = true;
@@ -256,6 +268,47 @@ protected:
   {
     update();
     QWidget::focusOutEvent(event);
+  }
+
+  /** One finger's touch as the mouse's left button. */
+  void touch(QTouchEvent* event)
+  {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    if (event->points().isEmpty()) {
+      return;
+    }
+    const QPointF at = event->points().first().position();
+#else
+    if (event->touchPoints().isEmpty()) {
+      return;
+    }
+    const QPointF at = event->touchPoints().first().pos();
+#endif
+    event->accept();
+    QEvent::Type type = QEvent::MouseMove;
+    Qt::MouseButton button = Qt::NoButton;
+    Qt::MouseButtons buttons = Qt::LeftButton;
+    if (event->type() == QEvent::TouchBegin) {
+      type = QEvent::MouseButtonPress;
+      button = Qt::LeftButton;
+    } else if (event->type() == QEvent::TouchEnd) {
+      type = QEvent::MouseButtonRelease;
+      button = Qt::LeftButton;
+      buttons = Qt::NoButton;
+    }
+    QMouseEvent mouse(type, at, QPointF(mapToGlobal(at.toPoint())), button,
+                      buttons, Qt::NoModifier);
+    switch (type) {
+    case QEvent::MouseButtonPress:
+      mousePressEvent(&mouse);
+      break;
+    case QEvent::MouseButtonRelease:
+      mouseReleaseEvent(&mouse);
+      break;
+    default:
+      mouseMoveEvent(&mouse);
+      break;
+    }
   }
 
   void setPressed(bool pressed)

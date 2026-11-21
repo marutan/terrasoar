@@ -22,6 +22,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -1634,7 +1635,10 @@ private slots:
     // Touch: a tap is a click.
     globe->setPose(start);
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    QPointingDevice* touch = QTest::createTouchDevice();
+    // Qt 6 leaves the device to us (Qt 5 registers it for good).
+    const std::unique_ptr<QPointingDevice> touchDevice(
+        QTest::createTouchDevice());
+    QPointingDevice* touch = touchDevice.get();
 #else
     QTouchDevice* touch = QTest::createTouchDevice();
 #endif
