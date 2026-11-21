@@ -33,6 +33,7 @@
         <file alias="user/adding-wfs-layers.md">../docs/user/adding-wfs-layers.md</file>
         <file alias="user/kml.md">../docs/user/kml.md</file>
         <file alias="user/satellites.md">../docs/user/satellites.md</file>
+        <file alias="user/aircraft.md">../docs/user/aircraft.md</file>
         <file alias="user/getting-around.md">../docs/user/getting-around.md</file>
         <file alias="user/installation.md">../docs/user/installation.md</file>
         <file alias="user/layers.md">../docs/user/layers.md</file>

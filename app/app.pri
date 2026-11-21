@@ -41,6 +41,10 @@ HEADERS += \
     $$PWD/src/addwmsdialog.h \
     $$PWD/src/addwmtsdialog.h \
     $$PWD/src/addsatellitesdialog.h \
+    $$PWD/src/adsbdialogs.h \
+    $$PWD/src/aircraftlayers.h \
+    $$PWD/src/aircraftpropertiesdialog.h \
+    $$PWD/src/aircraftwindows.h \
     $$PWD/src/addxyzdialog.h \
     $$PWD/src/balloonwindow.h \
     $$PWD/src/clockwidget.h \
@@ -79,6 +83,10 @@ SOURCES += \
     $$PWD/src/addwmsdialog.cpp \
     $$PWD/src/addwmtsdialog.cpp \
     $$PWD/src/addsatellitesdialog.cpp \
+    $$PWD/src/adsbdialogs.cpp \
+    $$PWD/src/aircraftlayers.cpp \
+    $$PWD/src/aircraftpropertiesdialog.cpp \
+    $$PWD/src/aircraftwindows.cpp \
     $$PWD/src/addxyzdialog.cpp \
     $$PWD/src/balloonwindow.cpp \
     $$PWD/src/clockwidget.cpp \
@@ -87,6 +95,7 @@ SOURCES += \
     $$PWD/src/globeview.cpp \
     $$PWD/src/layertreedock.cpp \
     $$PWD/src/mainwindow.cpp \
+    $$PWD/src/mainwindowaircraft.cpp \
     $$PWD/src/mainwindowkml.cpp \
     $$PWD/src/mainwindowsatellites.cpp \
     $$PWD/src/newregiondialog.cpp \

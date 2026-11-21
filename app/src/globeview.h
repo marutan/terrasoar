@@ -25,6 +25,7 @@
 #ifndef TS_APP_GLOBEVIEW_H
 #define TS_APP_GLOBEVIEW_H
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -352,8 +353,34 @@ public:
   /** Returns the markers set (for tests). */
   const std::vector<GlobeMarker>& markers() const { return m_markers; }
 
-  /** Sets the lines through space (satellite tracks, footprints). */
-  void setSpaceLines(std::vector<SpaceLine> lines);
+  /**
+   * Sets the lines through space of @p group (0: satellite tracks and
+   * footprints, 1: aircraft trails, 2: aircraft drop lines); each group is
+   * uploaded on its own (see GlobeRenderer::setSpaceLines()).
+   */
+  void setSpaceLines(std::vector<SpaceLine> lines, int32_t group = 0);
+
+  /** Sets the time timed lines (trails) are drawn up to, Unix seconds. */
+  void setSpaceLineTime(double timeS);
+
+  /**
+   * Sets the aircraft's markers and labels, drawn after the satellites'
+   * (markerAt() counts them after the satellites' markers).
+   */
+  void setAircraft(std::vector<GlobeMarker> markers,
+                   std::vector<BillboardDraw> labels);
+
+  /** Returns the aircraft's markers set (for tests). */
+  const std::vector<GlobeMarker>& aircraftMarkers() const
+  {
+    return m_aircraftMarkers;
+  }
+
+  /** Returns the aircraft's labels set (for tests). */
+  const std::vector<BillboardDraw>& aircraftLabels() const
+  {
+    return m_aircraftLabels;
+  }
 
   /**
    * Sets the satellites' labels: billboards without icons, drawn before the
@@ -369,15 +396,19 @@ public:
 
   /**
    * Returns the marker nearest @p positionPx within a few pixels of its
-   * edge, −1 if none.
+   * edge, −1 if none: satellites' first (markers()), then aircraft's
+   * (aircraftMarkers(), counted on from markers().size()).
    */
   int32_t markerAt(QPointF positionPx) const;
 
   /** Returns where @p marker is on the screen; nothing if hidden. */
   std::optional<QPointF> markerOnScreen(const GlobeMarker& marker) const;
 
-  /** Returns the lines set (for tests). */
-  const std::vector<SpaceLine>& spaceLines() const { return m_spaceLines; }
+  /** Returns the lines of @p group set (for tests). */
+  const std::vector<SpaceLine>& spaceLines(int32_t group = 0) const
+  {
+    return m_spaceLines.at(static_cast<std::size_t>(group));
+  }
 
   /** Returns how many line segments the last frame drew (for tests). */
   int32_t spaceSegmentsDrawn() const;
@@ -546,6 +577,9 @@ protected:
   void leaveEvent(QEvent* event) override;
 
 private:
+  /** The satellites' markers, then the aircraft's. */
+  std::vector<GlobeMarker> allMarkers() const;
+
   double nowS() const;
   void requestFrame();
   void updateSurfaceHeight();
@@ -624,7 +658,11 @@ private:
   std::vector<BillboardDraw> m_billboards;
   std::vector<GlobeMarker> m_markers;
   std::vector<BillboardDraw> m_satelliteLabels;
-  std::vector<SpaceLine> m_spaceLines;
+  std::vector<GlobeMarker> m_aircraftMarkers;
+  std::vector<BillboardDraw> m_aircraftLabels;
+  std::array<std::vector<SpaceLine>, GlobeRenderer::spaceLineGroups>
+      m_spaceLines;
+  double m_spaceLineTimeS = 0.0;
   std::vector<RaisedShapeDraw> m_raised;
   std::vector<ScreenOverlayDraw> m_screens;
   std::vector<EditHandleDraw> m_editHandles;

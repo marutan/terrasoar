@@ -67,6 +67,7 @@
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
+#include "aircraftlayers.h"
 #include "balloonwindow.h"
 #include "clockwidget.h"
 #include "elevationprofiledialog.h"
@@ -85,6 +86,7 @@
 #include "projectionsettingsdialog.h"
 #include "satellitelayers.h"
 #include "timebar.h"
+#include "ts/adsb/adsbreaders.h"
 #include "ts/base/buildinfo.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/elevationprofile.h"
@@ -125,6 +127,26 @@ constexpr int32_t kmlViewSettleMs = 300;
 
 /** How many NetworkLinks may sit inside each other. */
 constexpr int32_t kmlMostLinkDepth = 8;
+
+/**
+ * Returns true if @p path is named like an ADS-B recording: .sbs, .avr,
+ * .beast, .jsonl, a tar1090 trace, or the same compressed.
+ */
+bool isAdsbFileName(const QString& path)
+{
+  QString name = QFileInfo(path).fileName().toLower();
+  if (name.endsWith(QLatin1String(".gz"))) {
+    name.chop(3);
+  }
+  for (const char* suffix :
+       {".sbs", ".basestation", ".avr", ".beast", ".jsonl"}) {
+    if (name.endsWith(QLatin1String(suffix))) {
+      return true;
+    }
+  }
+  return name.startsWith(QLatin1String("trace_full_")) ||
+         name.startsWith(QLatin1String("trace_recent_"));
+}
 
 /** Returns true if a layer of the tree @p nodes has satellites from CelesTrak.
  */
@@ -347,6 +369,7 @@ MainWindow::MainWindow(QWidget* parent)
   m_downloadLabel->hide();
 
   createSatellites();
+  createAircraft();
   createActions();
   createMenus();
   createKmlEditing();
@@ -943,6 +966,8 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_openKmlAction);
   m_fileMenu->addAction(m_addWfsAction);
   m_fileMenu->addAction(m_addSatellitesAction);
+  m_fileMenu->addAction(m_importAdsbAction);
+  m_fileMenu->addAction(m_connectReceiverAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
@@ -1012,6 +1037,13 @@ void MainWindow::retranslateUi()
   m_addSatellitesAction->setStatusTip(
       tr("Add satellites from CelesTrak, a TLE or OMM file, or TLEs pasted "
          "in"));
+  m_importAdsbAction->setText(tr("Import ADS-&B Data…"));
+  m_importAdsbAction->setStatusTip(
+      tr("Show aircraft from a recording of ADS-B data: SBS, raw messages, "
+         "Beast, readsb JSON, traces or CSV"));
+  m_connectReceiverAction->setText(tr("Connect to ADS-B &Receiver…"));
+  m_connectReceiverAction->setStatusTip(
+      tr("Show aircraft live from a dump1090 or readsb receiver"));
   m_helpMenu->setTitle(tr("&Help"));
   m_quitAction->setText(tr("&Quit"));
   m_quitAction->setStatusTip(tr("Close the program"));
@@ -1221,6 +1253,9 @@ void MainWindow::refreshLayers()
   if (m_satellites != nullptr) {
     refreshSatelliteLayers(stack);
   }
+  if (m_aircraft != nullptr) {
+    refreshAircraftLayers(stack);
+  }
   if (!m_globeView) {
     // No OpenGL view: nothing is drawn, but layers that can't be opened are
     // still marked in the dock.
@@ -1379,6 +1414,17 @@ bool MainWindow::openFile(const QString& path, QString* errorString)
     return openKml(path, errorString);
   }
   const QString suffix = QFileInfo(path).suffix().toLower();
+  if (isAdsbFileName(path)) {
+    return openAdsbFile(path, errorString);
+  }
+  if (suffix == QLatin1String("txt")) {
+    // Raw ADS-B messages, or element sets.
+    QFile file(path);
+    if (file.open(QIODevice::ReadOnly) &&
+        detectAdsbFormat(file.read(4096)) == AdsbFormat::Raw) {
+      return openAdsbFile(path, errorString);
+    }
+  }
   if (suffix == QLatin1String("tle") || suffix == QLatin1String("3le") ||
       suffix == QLatin1String("2le") || suffix == QLatin1String("txt")) {
     return addSatelliteFile(path, errorString);
@@ -1789,6 +1835,8 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   actions.insert(actions.end(), fly.begin(), fly.end());
   const std::vector<QAction*> satellites = satelliteNodeActions(id, parent);
   actions.insert(actions.end(), satellites.begin(), satellites.end());
+  const std::vector<QAction*> aircraft = aircraftNodeActions(id, parent);
+  actions.insert(actions.end(), aircraft.begin(), aircraft.end());
   if (m_kmlNodes.count(id) != 0 && kmlKeyOf(id).isEmpty()) {
     QAction* edit = new QAction(tr("Edit This Document"), parent);
     edit->setObjectName(QStringLiteral("editKmlNodeAction"));
@@ -2106,7 +2154,8 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
            path.endsWith(QLatin1String(".terrasoar")) ||
            path.endsWith(QLatin1String(".tle")) ||
            path.endsWith(QLatin1String(".3le")) ||
-           path.endsWith(QLatin1String(".2le"));
+           path.endsWith(QLatin1String(".2le")) ||
+           path.endsWith(QLatin1String(".txt")) || isAdsbFileName(path);
   });
   if (any) {
     event->acceptProposedAction();
@@ -2238,6 +2287,12 @@ void MainWindow::updateTimeBar(const LayerStack& stack)
                  : QString();
     if (!extent.isEmpty()) {
       extents.append(extent);
+    }
+  }
+  if (m_aircraft != nullptr) {
+    const QString recordings = m_aircraft->timeExtent();
+    if (!recordings.isEmpty()) {
+      extents.append(recordings);
     }
   }
   m_timeBar->setExtent(TimeExtent::parse(extents));

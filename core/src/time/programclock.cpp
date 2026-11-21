@@ -172,6 +172,8 @@ void ProgramClock::step(double seconds)
 
 void ProgramClock::setTicking(bool ticking)
 {
+  m_tickingWanted = ticking;
+  ticking = ticking || !m_tickingClients.empty();
   if (ticking == m_ticking) {
     return;
   }
@@ -180,6 +182,16 @@ void ProgramClock::setTicking(bool ticking)
   if (ticking) {
     tick();
   }
+}
+
+void ProgramClock::setTicking(const void* client, bool ticking)
+{
+  if (ticking) {
+    m_tickingClients.insert(client);
+  } else {
+    m_tickingClients.erase(client);
+  }
+  setTicking(m_tickingWanted);
 }
 
 void ProgramClock::setTickIntervalMs(int32_t intervalMs)

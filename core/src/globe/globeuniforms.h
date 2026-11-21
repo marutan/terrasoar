@@ -51,7 +51,9 @@ struct FrameBlock {
   Float4 depthParams{};
   /**
    * Morph factor (0 globe, 1 flat map), metres on the map's plane per map
-   * metre, the projection's index for tsProject(), unused.
+   * metre, the projection's index for tsProject(), and the time timed
+   * space lines are drawn up to, seconds after their origin (set on the
+   * globe too; see GlobeRenderer::setSpaceLineTime()).
    */
   Float4 morph{};
   /** Direction of map east on the plane (xyz), ECEF. */

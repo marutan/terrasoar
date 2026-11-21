@@ -25,6 +25,7 @@
 #define TS_TIME_PROGRAMCLOCK_H
 
 #include <cstdint>
+#include <set>
 #include <vector>
 
 #include <QDateTime>
@@ -117,6 +118,12 @@ public:
   /** Turns ticking on or off: timeChanged() while running (see class). */
   void setTicking(bool ticking);
 
+  /**
+   * Turns ticking on or off for @p client (satellites, aircraft): it ticks
+   * while any client, or setTicking(), wants it to.
+   */
+  void setTicking(const void* client, bool ticking);
+
   /** Returns true if ticking is on. */
   bool isTicking() const { return m_ticking; }
 
@@ -148,6 +155,10 @@ private:
   bool m_running = true;
   bool m_realTime = true;
   bool m_ticking = false;
+  /** Clients wanting ticks (setTicking(const void*, bool)). */
+  std::set<const void*> m_tickingClients;
+  /** setTicking(bool)'s own wish. */
+  bool m_tickingWanted = false;
   QTimer* m_timer = nullptr;
 };
 

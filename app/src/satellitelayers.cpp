@@ -96,6 +96,9 @@ SatelliteLayers::SatelliteLayers(ProgramClock* clock, NetworkSource network,
 
 SatelliteLayers::~SatelliteLayers()
 {
+  if (m_clock) {
+    m_clock->setTicking(this, false);
+  }
   m_cancelled->store(true);
   m_pool.waitForDone();
 }
@@ -342,7 +345,7 @@ void SatelliteLayers::requestPositions()
       infos->push_back(std::move(info));
     }
   }
-  m_clock->setTicking(!request.tasks.empty());
+  m_clock->setTicking(this, !request.tasks.empty());
   if (request.tasks.empty() && m_drawn.empty() && m_pending.empty()) {
     // Nothing shown before or now: nothing to draw again.
     return;

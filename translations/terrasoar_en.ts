@@ -653,6 +653,494 @@
         </message>
     </context>
     <context>
+        <name>ts::AdsbReader</name>
+        <message>
+            <source>%1 bytes were not Beast frames and were skipped.</source>
+            <translation>%1 bytes were not Beast frames and were skipped.</translation>
+        </message>
+        <message>
+            <source>Not a trace file: no ICAO address or timestamp.</source>
+            <translation>Not a trace file: no ICAO address or timestamp.</translation>
+        </message>
+        <message>
+            <source>A trace point without a time or position.</source>
+            <translation>A trace point without a time or position.</translation>
+        </message>
+        <message>
+            <source>Choose the time, address, latitude and longitude columns.</source>
+            <translation>Choose the time, address, latitude and longitude columns.</translation>
+        </message>
+        <message>
+            <source>Too few columns.</source>
+            <translation>Too few columns.</translation>
+        </message>
+        <message>
+            <source>The time can't be read.</source>
+            <translation>The time can't be read.</translation>
+        </message>
+        <message>
+            <source>The ICAO address can't be read.</source>
+            <translation>The ICAO address can't be read.</translation>
+        </message>
+        <message>
+            <source>The position can't be read.</source>
+            <translation>The position can't be read.</translation>
+        </message>
+        <message>
+            <source>The file's format isn't one Terra Soar reads.</source>
+            <translation>The file's format isn't one Terra Soar reads.</translation>
+        </message>
+        <message>
+            <source>The file has no aircraft data.</source>
+            <translation>The file has no aircraft data.</translation>
+        </message>
+        <message>
+            <source>The compressed data can't be read.</source>
+            <translation>The compressed data can't be read.</translation>
+        </message>
+        <message>
+            <source>Not an SBS line.</source>
+            <translation>Not an SBS line.</translation>
+        </message>
+        <message>
+            <source>An SBS line with too few fields.</source>
+            <translation>An SBS line with too few fields.</translation>
+        </message>
+        <message>
+            <source>The date or time can't be read.</source>
+            <translation>The date or time can't be read.</translation>
+        </message>
+        <message>
+            <source>Not a Mode S message.</source>
+            <translation>Not a Mode S message.</translation>
+        </message>
+        <message>
+            <source>Not an aircraft.json snapshot: no "now" or aircraft.</source>
+            <translation>Not an aircraft.json snapshot: no "now" or aircraft.</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::AircraftInfoWindow</name>
+        <message>
+            <source>None</source>
+            <translation>None</translation>
+        </message>
+        <message>
+            <source>Emergency</source>
+            <translation>Emergency</translation>
+        </message>
+        <message>
+            <source>Medical</source>
+            <translation>Medical</translation>
+        </message>
+        <message>
+            <source>Minimum fuel</source>
+            <translation>Minimum fuel</translation>
+        </message>
+        <message>
+            <source>No communications</source>
+            <translation>No communications</translation>
+        </message>
+        <message>
+            <source>Unlawful interference</source>
+            <translation>Unlawful interference</translation>
+        </message>
+        <message>
+            <source>Downed aircraft</source>
+            <translation>Downed aircraft</translation>
+        </message>
+        <message>
+            <source>Reserved</source>
+            <translation>Reserved</translation>
+        </message>
+        <message>
+            <source>Follow</source>
+            <translation>Follow</translation>
+        </message>
+        <message>
+            <source>Export Track…</source>
+            <translation>Export Track…</translation>
+        </message>
+        <message>
+            <source>Aircraft</source>
+            <translation>Aircraft</translation>
+        </message>
+        <message>
+            <source>ICAO address:</source>
+            <translation>ICAO address:</translation>
+        </message>
+        <message>
+            <source>Callsign:</source>
+            <translation>Callsign:</translation>
+        </message>
+        <message>
+            <source>Registration:</source>
+            <translation>Registration:</translation>
+        </message>
+        <message>
+            <source>Type:</source>
+            <translation>Type:</translation>
+        </message>
+        <message>
+            <source>Category:</source>
+            <translation>Category:</translation>
+        </message>
+        <message>
+            <source>Squawk:</source>
+            <translation>Squawk:</translation>
+        </message>
+        <message>
+            <source>Emergency:</source>
+            <translation>Emergency:</translation>
+        </message>
+        <message>
+            <source>Barometric altitude:</source>
+            <translation>Barometric altitude:</translation>
+        </message>
+        <message>
+            <source>Geometric altitude:</source>
+            <translation>Geometric altitude:</translation>
+        </message>
+        <message>
+            <source>Height above the ellipsoid:</source>
+            <translation>Height above the ellipsoid:</translation>
+        </message>
+        <message>
+            <source>Ground speed:</source>
+            <translation>Ground speed:</translation>
+        </message>
+        <message>
+            <source>Track:</source>
+            <translation>Track:</translation>
+        </message>
+        <message>
+            <source>Vertical rate:</source>
+            <translation>Vertical rate:</translation>
+        </message>
+        <message>
+            <source>Position:</source>
+            <translation>Position:</translation>
+        </message>
+        <message>
+            <source>Last report:</source>
+            <translation>Last report:</translation>
+        </message>
+        <message>
+            <source>Layer:</source>
+            <translation>Layer:</translation>
+        </message>
+        <message>
+            <source>On the ground</source>
+            <translation>On the ground</translation>
+        </message>
+        <message>
+            <source>%1 ft</source>
+            <translation>%1 ft</translation>
+        </message>
+        <message>
+            <source>about %1 m</source>
+            <translation>about %1 m</translation>
+        </message>
+        <message>
+            <source>%1 m</source>
+            <translation>%1 m</translation>
+        </message>
+        <message>
+            <source>%1 kt</source>
+            <translation>%1 kt</translation>
+        </message>
+        <message>
+            <source>%1°</source>
+            <translation>%1°</translation>
+        </message>
+        <message>
+            <source>%1 ft/min</source>
+            <translation>%1 ft/min</translation>
+        </message>
+        <message>
+            <source>%1 (%2 s before the clock)</source>
+            <translation>%1 (%2 s before the clock)</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::AircraftLayers</name>
+        <message>
+            <source>No aircraft positions were found.</source>
+            <translation>No aircraft positions were found.</translation>
+        </message>
+        <message>
+            <source>This isn't an aircraft layer's source.</source>
+            <translation>This isn't an aircraft layer's source.</translation>
+        </message>
+        <message>
+            <source>GND</source>
+            <translation>GND</translation>
+        </message>
+        <message>
+            <source>%1 ft</source>
+            <translation>%1 ft</translation>
+        </message>
+        <message>
+            <source>%1 kt</source>
+            <translation>%1 kt</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::AircraftListDialog</name>
+        <message>
+            <source>%1 ft</source>
+            <translation>%1 ft</translation>
+        </message>
+        <message>
+            <source>Layer's</source>
+            <translation>Layer's</translation>
+        </message>
+        <message>
+            <source>Off</source>
+            <translation>Off</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n min</source>
+            <translation>
+                <numerusform>%n min</numerusform>
+                <numerusform>%n min</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>All</source>
+            <translation>All</translation>
+        </message>
+        <message>
+            <source>Find by callsign, address, registration or type</source>
+            <translation>Find by callsign, address, registration or type</translation>
+        </message>
+        <message>
+            <source>Callsign</source>
+            <translation>Callsign</translation>
+        </message>
+        <message>
+            <source>ICAO address</source>
+            <translation>ICAO address</translation>
+        </message>
+        <message>
+            <source>Registration</source>
+            <translation>Registration</translation>
+        </message>
+        <message>
+            <source>Type</source>
+            <translation>Type</translation>
+        </message>
+        <message>
+            <source>Altitude</source>
+            <translation>Altitude</translation>
+        </message>
+        <message>
+            <source>Speed</source>
+            <translation>Speed</translation>
+        </message>
+        <message>
+            <source>Trail</source>
+            <translation>Trail</translation>
+        </message>
+        <message>
+            <source>Show All</source>
+            <translation>Show All</translation>
+        </message>
+        <message>
+            <source>Hide All</source>
+            <translation>Hide All</translation>
+        </message>
+        <message>
+            <source>%1 – Aircraft</source>
+            <translation>%1 – Aircraft</translation>
+        </message>
+        <message>
+            <source>%1 kt</source>
+            <translation>%1 kt</translation>
+        </message>
+        <message>
+            <source>Reading…</source>
+            <translation>Reading…</translation>
+        </message>
+        <message numerus="yes">
+            <source>%1 of %n aircraft listed</source>
+            <translation>
+                <numerusform>%1 of %n aircraft listed</numerusform>
+                <numerusform>%1 of %n aircraft listed</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>This aircraft's trail</source>
+            <translation>This aircraft's trail</translation>
+        </message>
+        <message>
+            <source>The layer's</source>
+            <translation>The layer's</translation>
+        </message>
+        <message numerus="yes">
+            <source>The last %n min</source>
+            <translation>
+                <numerusform>The last %n min</numerusform>
+                <numerusform>The last %n min</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>All the data</source>
+            <translation>All the data</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::AircraftPropertiesDialog</name>
+        <message>
+            <source>%1 ft</source>
+            <translation>%1 ft</translation>
+        </message>
+        <message>
+            <source>Callsigns</source>
+            <translation>Callsigns</translation>
+        </message>
+        <message>
+            <source>with altitudes</source>
+            <translation>with altitudes</translation>
+        </message>
+        <message>
+            <source>with speeds</source>
+            <translation>with speeds</translation>
+        </message>
+        <message>
+            <source>Lines down to the ground</source>
+            <translation>Lines down to the ground</translation>
+        </message>
+        <message>
+            <source>At or above</source>
+            <translation>At or above</translation>
+        </message>
+        <message>
+            <source>At or below</source>
+            <translation>At or below</translation>
+        </message>
+        <message>
+            <source>Only within</source>
+            <translation>Only within</translation>
+        </message>
+        <message>
+            <source>Use the View</source>
+            <translation>Use the View</translation>
+        </message>
+        <message>
+            <source>%1 – Aircraft Layer Properties</source>
+            <translation>%1 – Aircraft Layer Properties</translation>
+        </message>
+        <message>
+            <source> px</source>
+            <translation> px</translation>
+        </message>
+        <message>
+            <source>Off</source>
+            <translation>Off</translation>
+        </message>
+        <message>
+            <source>A time span before the clock</source>
+            <translation>A time span before the clock</translation>
+        </message>
+        <message>
+            <source>All the data up to the clock</source>
+            <translation>All the data up to the clock</translation>
+        </message>
+        <message>
+            <source> min</source>
+            <translation> min</translation>
+        </message>
+        <message>
+            <source>The layer's colour</source>
+            <translation>The layer's colour</translation>
+        </message>
+        <message>
+            <source>Altitude</source>
+            <translation>Altitude</translation>
+        </message>
+        <message>
+            <source>Climbing or descending</source>
+            <translation>Climbing or descending</translation>
+        </message>
+        <message>
+            <source> s</source>
+            <translation> s</translation>
+        </message>
+        <message>
+            <source>Any</source>
+            <translation>Any</translation>
+        </message>
+        <message>
+            <source> ft</source>
+            <translation> ft</translation>
+        </message>
+        <message>
+            <source>Aircraft</source>
+            <translation>Aircraft</translation>
+        </message>
+        <message>
+            <source>Colour:</source>
+            <translation>Colour:</translation>
+        </message>
+        <message>
+            <source>Size:</source>
+            <translation>Size:</translation>
+        </message>
+        <message>
+            <source>Labels:</source>
+            <translation>Labels:</translation>
+        </message>
+        <message>
+            <source>Gone after no reports for:</source>
+            <translation>Gone after no reports for:</translation>
+        </message>
+        <message>
+            <source>Trails</source>
+            <translation>Trails</translation>
+        </message>
+        <message>
+            <source>Show:</source>
+            <translation>Show:</translation>
+        </message>
+        <message>
+            <source>Span:</source>
+            <translation>Span:</translation>
+        </message>
+        <message>
+            <source>Coloured by:</source>
+            <translation>Coloured by:</translation>
+        </message>
+        <message>
+            <source>Broken at gaps over:</source>
+            <translation>Broken at gaps over:</translation>
+        </message>
+        <message>
+            <source>Show Only</source>
+            <translation>Show Only</translation>
+        </message>
+        <message>
+            <source>Callsigns containing:</source>
+            <translation>Callsigns containing:</translation>
+        </message>
+        <message>
+            <source>ICAO addresses starting:</source>
+            <translation>ICAO addresses starting:</translation>
+        </message>
+        <message>
+            <source>South, west:</source>
+            <translation>South, west:</translation>
+        </message>
+        <message>
+            <source>North, east:</source>
+            <translation>North, east:</translation>
+        </message>
+        <message>
+            <source>Colour of %1</source>
+            <translation>Colour of %1</translation>
+        </message>
+    </context>
+    <context>
         <name>ts::BalloonWindow</name>
         <message>
             <source>Placemark</source>
@@ -1435,6 +1923,225 @@
         <message>
             <source>No pages match</source>
             <translation>No pages match</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ImportAdsbDialog</name>
+        <message>
+            <source>Import ADS-B Data</source>
+            <translation>Import ADS-B Data</translation>
+        </message>
+        <message>
+            <source>Detect automatically</source>
+            <translation>Detect automatically</translation>
+        </message>
+        <message>
+            <source>SBS-1 / BaseStation (port 30003)</source>
+            <translation>SBS-1 / BaseStation (port 30003)</translation>
+        </message>
+        <message>
+            <source>Raw Mode S messages (AVR, time and hex)</source>
+            <translation>Raw Mode S messages (AVR, time and hex)</translation>
+        </message>
+        <message>
+            <source>Beast binary (port 30005)</source>
+            <translation>Beast binary (port 30005)</translation>
+        </message>
+        <message>
+            <source>dump1090/readsb aircraft.json snapshots</source>
+            <translation>dump1090/readsb aircraft.json snapshots</translation>
+        </message>
+        <message>
+            <source>tar1090/readsb trace</source>
+            <translation>tar1090/readsb trace</translation>
+        </message>
+        <message>
+            <source>CSV with chosen columns</source>
+            <translation>CSV with chosen columns</translation>
+        </message>
+        <message>
+            <source>This computer's local time</source>
+            <translation>This computer's local time</translation>
+        </message>
+        <message>
+            <source>UTC</source>
+            <translation>UTC</translation>
+        </message>
+        <message>
+            <source>Receiver at</source>
+            <translation>Receiver at</translation>
+        </message>
+        <message>
+            <source>Browse…</source>
+            <translation>Browse…</translation>
+        </message>
+        <message>
+            <source>File:</source>
+            <translation>File:</translation>
+        </message>
+        <message>
+            <source>Format:</source>
+            <translation>Format:</translation>
+        </message>
+        <message>
+            <source>Receiver:</source>
+            <translation>Receiver:</translation>
+        </message>
+        <message>
+            <source>Layer name:</source>
+            <translation>Layer name:</translation>
+        </message>
+        <message>
+            <source>First message at:</source>
+            <translation>First message at:</translation>
+        </message>
+        <message>
+            <source>SBS times are in:</source>
+            <translation>SBS times are in:</translation>
+        </message>
+        <message>
+            <source>CSV columns</source>
+            <translation>CSV columns</translation>
+        </message>
+        <message>
+            <source>Comma</source>
+            <translation>Comma</translation>
+        </message>
+        <message>
+            <source>Semicolon</source>
+            <translation>Semicolon</translation>
+        </message>
+        <message>
+            <source>Tab</source>
+            <translation>Tab</translation>
+        </message>
+        <message>
+            <source>Bar</source>
+            <translation>Bar</translation>
+        </message>
+        <message>
+            <source>The first line names the columns</source>
+            <translation>The first line names the columns</translation>
+        </message>
+        <message>
+            <source>Unix seconds</source>
+            <translation>Unix seconds</translation>
+        </message>
+        <message>
+            <source>Unix milliseconds</source>
+            <translation>Unix milliseconds</translation>
+        </message>
+        <message>
+            <source>ISO 8601</source>
+            <translation>ISO 8601</translation>
+        </message>
+        <message>
+            <source>Barometric, feet</source>
+            <translation>Barometric, feet</translation>
+        </message>
+        <message>
+            <source>Barometric, metres</source>
+            <translation>Barometric, metres</translation>
+        </message>
+        <message>
+            <source>Above the ellipsoid, feet</source>
+            <translation>Above the ellipsoid, feet</translation>
+        </message>
+        <message>
+            <source>Above the ellipsoid, metres</source>
+            <translation>Above the ellipsoid, metres</translation>
+        </message>
+        <message>
+            <source>Knots</source>
+            <translation>Knots</translation>
+        </message>
+        <message>
+            <source>Metres a second</source>
+            <translation>Metres a second</translation>
+        </message>
+        <message>
+            <source>Kilometres an hour</source>
+            <translation>Kilometres an hour</translation>
+        </message>
+        <message>
+            <source>Time:</source>
+            <translation>Time:</translation>
+        </message>
+        <message>
+            <source>ICAO address:</source>
+            <translation>ICAO address:</translation>
+        </message>
+        <message>
+            <source>Latitude:</source>
+            <translation>Latitude:</translation>
+        </message>
+        <message>
+            <source>Longitude:</source>
+            <translation>Longitude:</translation>
+        </message>
+        <message>
+            <source>Altitude:</source>
+            <translation>Altitude:</translation>
+        </message>
+        <message>
+            <source>Track or heading:</source>
+            <translation>Track or heading:</translation>
+        </message>
+        <message>
+            <source>Speed:</source>
+            <translation>Speed:</translation>
+        </message>
+        <message>
+            <source>Callsign:</source>
+            <translation>Callsign:</translation>
+        </message>
+        <message>
+            <source>Vertical rate (ft/min):</source>
+            <translation>Vertical rate (ft/min):</translation>
+        </message>
+        <message>
+            <source>Separator:</source>
+            <translation>Separator:</translation>
+        </message>
+        <message>
+            <source>Times are:</source>
+            <translation>Times are:</translation>
+        </message>
+        <message>
+            <source>Altitudes are:</source>
+            <translation>Altitudes are:</translation>
+        </message>
+        <message>
+            <source>Speeds are in:</source>
+            <translation>Speeds are in:</translation>
+        </message>
+        <message>
+            <source>(none)</source>
+            <translation>(none)</translation>
+        </message>
+        <message>
+            <source>ADS-B recordings (*.sbs *.basestation *.avr *.raw *.beast *.bin *.json *.jsonl *.csv *.txt *.gz);;All files (*)</source>
+            <translation>ADS-B recordings (*.sbs *.basestation *.avr *.raw *.beast *.bin *.json *.jsonl *.csv *.txt *.gz);;All files (*)</translation>
+        </message>
+        <message>
+            <source>The format can't be told from the file: choose it.</source>
+            <translation>The format can't be told from the file: choose it.</translation>
+        </message>
+        <message>
+            <source>Looks like: %1</source>
+            <translation>Looks like: %1</translation>
+        </message>
+        <message>
+            <source>Choose a recording.</source>
+            <translation>Choose a recording.</translation>
+        </message>
+        <message>
+            <source>Choose the recording's format.</source>
+            <translation>Choose the recording's format.</translation>
+        </message>
+        <message>
+            <source>Choose the time, address, latitude and longitude columns.</source>
+            <translation>Choose the time, address, latitude and longitude columns.</translation>
         </message>
     </context>
     <context>
@@ -2588,6 +3295,81 @@
             <source>Refresh Elements</source>
             <translation>Refresh Elements</translation>
         </message>
+        <message>
+            <source>Import ADS-&amp;B Data…</source>
+            <translation>Import ADS-&amp;B Data…</translation>
+        </message>
+        <message>
+            <source>Show aircraft from a recording of ADS-B data: SBS, raw messages, Beast, readsb JSON, traces or CSV</source>
+            <translation>Show aircraft from a recording of ADS-B data: SBS, raw messages, Beast, readsb JSON, traces or CSV</translation>
+        </message>
+        <message>
+            <source>Connect to ADS-B &amp;Receiver…</source>
+            <translation>Connect to ADS-B &amp;Receiver…</translation>
+        </message>
+        <message>
+            <source>Show aircraft live from a dump1090 or readsb receiver</source>
+            <translation>Show aircraft live from a dump1090 or readsb receiver</translation>
+        </message>
+        <message>
+            <source>Can't reach the receiver (%1); trying again.</source>
+            <translation>Can't reach the receiver (%1); trying again.</translation>
+        </message>
+        <message numerus="yes">
+            <source>%n line(s) couldn't be read; the first, line %1: %2</source>
+            <translation>
+                <numerusform>%n line couldn't be read: line %1: %2</numerusform>
+                <numerusform>%n lines couldn't be read; the first, line %1: %2</numerusform>
+            </translation>
+        </message>
+        <message>
+            <source>The messages have no times: all are placed at the start.</source>
+            <translation>The messages have no times: all are placed at the start.</translation>
+        </message>
+        <message>
+            <source>%1: the clock is at the start of the recording; press Play to play it.</source>
+            <translation>%1: the clock is at the start of the recording; press Play to play it.</translation>
+        </message>
+        <message>
+            <source>%1 isn't a file Terra Soar reads.</source>
+            <translation>%1 isn't a file Terra Soar reads.</translation>
+        </message>
+        <message>
+            <source>Export Track</source>
+            <translation>Export Track</translation>
+        </message>
+        <message>
+            <source>KML (*.kml);;GPX (*.gpx);;CSV (*.csv)</source>
+            <translation>KML (*.kml);;GPX (*.gpx);;CSV (*.csv)</translation>
+        </message>
+        <message>
+            <source>That aircraft isn't there any more.</source>
+            <translation>That aircraft isn't there any more.</translation>
+        </message>
+        <message>
+            <source>%1 (%2)</source>
+            <translation>%1 (%2)</translation>
+        </message>
+        <message>
+            <source>Aircraft…</source>
+            <translation>Aircraft…</translation>
+        </message>
+        <message>
+            <source>Aircraft Layer Properties…</source>
+            <translation>Aircraft Layer Properties…</translation>
+        </message>
+        <message>
+            <source>Go to the Start of the Recording</source>
+            <translation>Go to the Start of the Recording</translation>
+        </message>
+        <message>
+            <source>Read Again</source>
+            <translation>Read Again</translation>
+        </message>
+        <message>
+            <source>Connect Again</source>
+            <translation>Connect Again</translation>
+        </message>
     </context>
     <context>
         <name>ts::NewRegionDialog</name>
@@ -3380,6 +4162,93 @@
         <message>
             <source>Cannot use "%1" as imagery: %2</source>
             <translation>Cannot use "%1" as imagery: %2</translation>
+        </message>
+    </context>
+    <context>
+        <name>ts::ReceiverDialog</name>
+        <message>
+            <source>Host:</source>
+            <translation>Host:</translation>
+        </message>
+        <message>
+            <source>Port:</source>
+            <translation>Port:</translation>
+        </message>
+        <message>
+            <source>aircraft.json address:</source>
+            <translation>aircraft.json address:</translation>
+        </message>
+        <message>
+            <source>Fetch every:</source>
+            <translation>Fetch every:</translation>
+        </message>
+        <message>
+            <source>Connect to ADS-B Receiver</source>
+            <translation>Connect to ADS-B Receiver</translation>
+        </message>
+        <message>
+            <source>SBS-1 / BaseStation (port 30003)</source>
+            <translation>SBS-1 / BaseStation (port 30003)</translation>
+        </message>
+        <message>
+            <source>Raw AVR (port 30002)</source>
+            <translation>Raw AVR (port 30002)</translation>
+        </message>
+        <message>
+            <source>Beast binary (port 30005)</source>
+            <translation>Beast binary (port 30005)</translation>
+        </message>
+        <message>
+            <source>aircraft.json over HTTP</source>
+            <translation>aircraft.json over HTTP</translation>
+        </message>
+        <message>
+            <source> s</source>
+            <translation> s</translation>
+        </message>
+        <message>
+            <source>Receiver at</source>
+            <translation>Receiver at</translation>
+        </message>
+        <message>
+            <source>Not recorded</source>
+            <translation>Not recorded</translation>
+        </message>
+        <message>
+            <source>Choose…</source>
+            <translation>Choose…</translation>
+        </message>
+        <message>
+            <source>Receiver sends:</source>
+            <translation>Receiver sends:</translation>
+        </message>
+        <message>
+            <source>Position:</source>
+            <translation>Position:</translation>
+        </message>
+        <message>
+            <source>Record to:</source>
+            <translation>Record to:</translation>
+        </message>
+        <message>
+            <source>Layer name:</source>
+            <translation>Layer name:</translation>
+        </message>
+        <message>
+            <source>Record To</source>
+            <translation>Record To</translation>
+        </message>
+        <message>
+            <source>Recordings (*.sbs *.txt *.jsonl);;All files (*)</source>
+            <translation>Recordings (*.sbs *.txt *.jsonl);;All files (*)</translation>
+        </message>
+        <message>
+            <source>Enter the address of the receiver's aircraft.json.</source>
+            <translation>Enter the address of the receiver's aircraft.json.</translation>
+        </message>
+        <message>
+            <source>Enter the receiver's host name or address.</source>
+            <translation>Enter the receiver's host name or address.</translation>
         </message>
     </context>
     <context>

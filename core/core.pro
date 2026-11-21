@@ -32,6 +32,16 @@ QT = core gui network $$TS_QT_OPENGL
 INCLUDEPATH += $$PWD/include
 
 HEADERS += \
+    include/ts/adsb/adsbdecoder.h \
+    include/ts/adsb/adsbreaders.h \
+    include/ts/adsb/aircraftdraws.h \
+    include/ts/adsb/aircraftexport.h \
+    include/ts/adsb/aircraftlayer.h \
+    include/ts/adsb/aircraftreport.h \
+    include/ts/adsb/aircrafttracks.h \
+    include/ts/adsb/cpr.h \
+    include/ts/adsb/modesmessage.h \
+    include/ts/adsb/receiverfeed.h \
     include/ts/base/buildinfo.h \
     include/ts/camera/camera.h \
     include/ts/camera/cameracontroller.h \
@@ -142,6 +152,8 @@ HEADERS += \
     include/ts/time/layertime.h \
     include/ts/time/programclock.h \
     include/ts/time/timeextent.h \
+    include/ts/tracks/movingtrack.h \
+    include/ts/tracks/trackdraws.h \
     include/ts/wfs/wfscapabilities.h \
     include/ts/wfs/wfsfeatureprovider.h \
     include/ts/wfs/wfssource.h \
@@ -155,6 +167,16 @@ HEADERS += \
     src/providers/sqlitestatementpool.h
 
 SOURCES += \
+    src/adsb/adsbdecoder.cpp \
+    src/adsb/adsbreaders.cpp \
+    src/adsb/aircraftdraws.cpp \
+    src/adsb/aircraftexport.cpp \
+    src/adsb/aircraftlayer.cpp \
+    src/adsb/aircraftreport.cpp \
+    src/adsb/aircrafttracks.cpp \
+    src/adsb/cpr.cpp \
+    src/adsb/modesmessage.cpp \
+    src/adsb/receiverfeed.cpp \
     src/base/buildinfo.cpp \
     src/camera/camera.cpp \
     src/camera/cameracontroller.cpp \
@@ -259,6 +281,8 @@ SOURCES += \
     src/time/layertime.cpp \
     src/time/programclock.cpp \
     src/time/timeextent.cpp \
+    src/tracks/movingtrack.cpp \
+    src/tracks/trackdraws.cpp \
     src/wfs/wfscapabilities.cpp \
     src/wfs/wfsfeatureprovider.cpp \
     src/wfs/wfssource.cpp \

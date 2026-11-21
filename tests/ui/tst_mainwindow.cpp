@@ -58,6 +58,8 @@
 #include <QStatusBar>
 #include <QStyleHints>
 #include <QTabWidget>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
 #include <QTextBrowser>
 #include <QTimeZone>
@@ -76,6 +78,9 @@
 #include "addwmsdialog.h"
 #include "addwmtsdialog.h"
 #include "addxyzdialog.h"
+#include "adsbdialogs.h"
+#include "aircraftlayers.h"
+#include "aircraftwindows.h"
 #include "appsettings.h"
 #include "balloonwindow.h"
 #include "clockwidget.h"
@@ -105,6 +110,7 @@
 #include "satellitelistdialog.h"
 #include "timebar.h"
 #include "timemodebox.h"
+#include "ts/adsb/aircraftlayer.h"
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/kml/kmledit.h"
@@ -3924,6 +3930,259 @@ private slots:
                             .arg(globe->framesRendered() - frames)
                             .arg(allowed)
                             .arg(witness.report())));
+  }
+
+  void aircraftFromRecording()
+  {
+    // A readsb JSON recording opened as a layer: the clock goes to its
+    // start, paused; its three made-up flights are drawn there with their
+    // callsigns and trails, move with the clock and go when it passes the
+    // end; the time slider spans it.
+    const QString path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../adsb/data/flights-aircraft.jsonl");
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    QCOMPARE(layer.data().toString(), QStringLiteral("flights-aircraft"));
+    ts::AircraftLayers* aircraft = window.aircraft();
+    QVERIFY(QTest::qWaitFor([&]() { return aircraft->drawn().size() == 3; },
+                            10000));
+    const QDateTime start(QDate(2026, 11, 20), QTime(12, 0), QTimeZone::utc());
+    QCOMPARE(window.clock()->time(), start);
+    QVERIFY(!window.clock()->isRunning());
+    QVERIFY(std::any_of(aircraft->labels().begin(), aircraft->labels().end(),
+                        [](const ts::BillboardDraw& label) {
+                          return label.label == QLatin1String("TSO101");
+                        }));
+    // One trail a flight, the third broken at its gap.
+    QCOMPARE(aircraft->trails().size(), std::size_t{4});
+    QVERIFY(std::all_of(aircraft->trails().begin(), aircraft->trails().end(),
+                        [](const ts::SpaceLine& line) { return line.timed; }));
+    QVERIFY(window.timeBar()->isEnabled());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      QCOMPARE(globe->aircraftMarkers().size(), std::size_t{3});
+      QCOMPARE(globe->aircraftLabels().size(), std::size_t{3});
+      QCOMPARE(globe->spaceLines(1).size(), std::size_t{4});
+    }
+    // The clock moves them; trails aren't rebuilt for it.
+    const double lonBefore = aircraft->drawn().front().at.lonDeg;
+    QSignalSpy trails(aircraft, &ts::AircraftLayers::trailsChanged);
+    window.clock()->step(60.0);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return !aircraft->drawn().empty() &&
+                 aircraft->drawn().front().at.lonDeg > lonBefore + 0.1;
+        },
+        5000));
+    QVERIFY(trails.isEmpty());
+    if (globe != nullptr) {
+      QVERIFY(std::fabs(aircraft->timeS() - 1795176060.0) < 1e-6);
+    }
+    // Past the end (and stale): none.
+    window.clock()->setTime(start.addSecs(600));
+    QVERIFY(QTest::qWaitFor([&]() { return aircraft->drawn().empty(); }, 5000));
+    // Its menu.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QMenu* menu = dock->contextMenu(layer);
+    QVERIFY(menu->findChild<QAction*>(QStringLiteral("aircraftListAction")));
+    QAction* toStart =
+        menu->findChild<QAction*>(QStringLiteral("aircraftStartAction"));
+    QVERIFY(toStart);
+    toStart->trigger();
+    QCOMPARE(window.clock()->time(), start);
+  }
+
+  void aircraftDetailsListAndExport()
+  {
+    // Raw timed messages as a layer: an aircraft selected shows its
+    // details and can be followed and exported; the list filters, hides
+    // and gives one its own trail; the properties filter by callsign.
+    ts::MainWindow window;
+    ts::AircraftSource source;
+    source.path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../adsb/data/flights-timed.txt");
+    const QString nodeId =
+        window.addAircraftLayer(ts::ImportAdsbDialog::definitionFor(
+            source.toJson(), QStringLiteral("Flights")));
+    ts::AircraftLayers* aircraft = window.aircraft();
+    QVERIFY(QTest::qWaitFor([&]() { return aircraft->drawn().size() == 3; },
+                            10000));
+    window.clock()->setTime(
+        QDateTime(QDate(2026, 11, 20), QTime(12, 2), QTimeZone::utc()));
+    QVERIFY(
+        QTest::qWaitFor([&]() { return aircraft->drawn().size() == 3; }, 5000));
+    window.selectAircraft(nodeId, 0xABC002U);
+    ts::AircraftInfoWindow* info = window.aircraftInfoWindow();
+    if (info == nullptr) {
+      QFAIL("no details window");
+    }
+    QVERIFY(info->isVisible());
+    QCOMPARE(info->fieldText(QStringLiteral("callsign")),
+             QStringLiteral("TSO202"));
+    QCOMPARE(info->fieldText(QStringLiteral("address")),
+             QStringLiteral("ABC002"));
+    QVERIFY(info->fieldText(QStringLiteral("baroAltitude"))
+                .contains(QStringLiteral("37")));
+    // Follow: the view's centre goes to it.
+    window.setFollowingAircraft(true);
+    QVERIFY(window.isFollowingAircraft());
+    ts::GlobeView* globe = globeOf(window);
+    if (globe != nullptr) {
+      const ts::CameraPose pose = globe->controller().camera().pose();
+      QVERIFY(std::fabs(pose.targetLatDeg + 16.5) < 0.2);
+    }
+    // Export.
+    QTemporaryDir dir;
+    QString error;
+    for (const char* name : {"t.kml", "t.gpx", "t.csv"}) {
+      const QString path = dir.filePath(QLatin1String(name));
+      QVERIFY2(window.exportAircraftTrack(nodeId, 0xABC002U, path, &error),
+               qPrintable(error));
+      QFile file(path);
+      QVERIFY(file.open(QIODevice::ReadOnly));
+      const QByteArray data = file.readAll();
+      QVERIFY(data.contains("TSO202") || data.contains("ABC002"));
+    }
+    QVERIFY(!window.exportAircraftTrack(
+        nodeId, 0x123456U, dir.filePath(QStringLiteral("x.kml")), &error));
+    // Deselected: no longer followed.
+    window.selectAircraft(QString(), std::nullopt);
+    QVERIFY(!window.isFollowingAircraft());
+
+    // The list.
+    ts::AircraftListDialog* list = window.showAircraftList(nodeId);
+    if (list == nullptr) {
+      QFAIL("no aircraft list");
+    }
+    QCOMPARE(list->rowCount(), 3);
+    list->setFilter(QStringLiteral("tso3"));
+    QCOMPARE(list->rowCount(), 1);
+    list->setFilter(QString());
+    QTreeWidget* rows = list->findChild<QTreeWidget*>();
+    QTreeWidgetItem* first = rows->topLevelItem(0);
+    first->setCheckState(0, Qt::Unchecked);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return aircraft->drawn().size() == 2; }, 5000));
+    // Hidden: its trail goes too (four in all, the third flight's broken
+    // in two).
+    QVERIFY(aircraft->trails().size() < 4);
+    first->setCheckState(0, Qt::Checked);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return aircraft->drawn().size() == 3; }, 5000));
+    // Properties: only callsigns with "202".
+    const QModelIndex index = window.layerModel()->indexOfId(nodeId);
+    ts::LayerDefinition definition =
+        window.layerModel()->layerDefinition(index);
+    ts::AircraftStyle style = ts::AircraftStyle::fromJson(definition.style);
+    style.callsignFilter = QStringLiteral("202");
+    style.trail.mode = ts::TrailMode::All;
+    definition.style = style.toJson();
+    window.layerModel()->setLayerDefinition(index, definition);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return aircraft->drawn().size() == 1; }, 5000));
+    QCOMPARE(aircraft->drawn().front().info.callsign, QStringLiteral("TSO202"));
+    QCOMPARE(aircraft->trails().size(), std::size_t{1});
+    QVERIFY(std::isinf(aircraft->trails().front().shownS));
+  }
+
+  void aircraftFromReceiver()
+  {
+    // A mock receiver sending SBS: a live layer shows its aircraft at the
+    // real time and records them; when it goes away the layer says so.
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost));
+    QTemporaryDir dir;
+    ts::MainWindow window;
+    ts::ReceiverDialog dialog(&window);
+    dialog.setReceiver(ts::ReceiverProtocol::Sbs, QStringLiteral("127.0.0.1"),
+                       server.serverPort());
+    dialog.findChild<QLineEdit*>(QStringLiteral("receiverRecord"))
+        ->setText(dir.filePath(QStringLiteral("live.sbs")));
+    dialog.accept();
+    QCOMPARE(dialog.result(), static_cast<int32_t>(QDialog::Accepted));
+    const QString nodeId = window.addAircraftLayer(dialog.layerDefinition());
+    QVERIFY(server.waitForNewConnection(5000));
+    QTcpSocket* client = server.nextPendingConnection();
+    const QDateTime now = QDateTime::currentDateTime();
+    const QString date = now.toString(QStringLiteral("yyyy/MM/dd"));
+    const QString time = now.toString(QStringLiteral("HH:mm:ss.zzz"));
+    QByteArray lines;
+    for (int32_t i = 0; i < 5; ++i) {
+      lines += QStringLiteral("MSG,3,1,1,4840D6,1,%1,%2,%1,%2,,35000,,,"
+                              "%3,4.50000,,,0,0,0,0\r\n")
+                   .arg(date, time)
+                   .arg(52.0 + 0.01 * i, 0, 'f', 5)
+                   .toLatin1();
+    }
+    lines += QStringLiteral("MSG,1,1,1,4840D6,1,%1,%2,%1,%2,KLM1023,,,,,,,,0,"
+                            "0,0,0\r\n")
+                 .arg(date, time)
+                 .toLatin1();
+    client->write(lines);
+    client->flush();
+    ts::AircraftLayers* aircraft = window.aircraft();
+    QVERIFY(window.clock()->isRealTime());
+    QVERIFY(QTest::qWaitFor([&]() { return aircraft->drawn().size() == 1; },
+                            10000));
+    QCOMPARE(aircraft->drawn().front().track->address, 0x4840D6U);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return aircraft->drawn().front().info.callsign ==
+                 QLatin1String("KLM1023");
+        },
+        5000));
+    QVERIFY(window.clock()->isTicking());
+    // Recorded.
+    QFile recording(dir.filePath(QStringLiteral("live.sbs")));
+    QVERIFY(recording.open(QIODevice::ReadOnly));
+    QVERIFY(recording.readAll().contains("4840D6"));
+    // Gone: the layer is marked.
+    server.close();
+    client->disconnectFromHost();
+    const QModelIndex index = window.layerModel()->indexOfId(nodeId);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return window.layerModel()
+              ->data(index, ts::LayerTreeModel::StatusRole)
+              .isValid();
+        },
+        5000));
+    // Its menu offers connecting again.
+    QMenu* menu = window.findChild<ts::LayerTreeDock*>()->contextMenu(index);
+    QVERIFY(
+        menu->findChild<QAction*>(QStringLiteral("aircraftReconnectAction")));
+  }
+
+  void aircraftInProject()
+  {
+    // An aircraft layer is saved in a project and opened from it.
+    QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("aircraft.terrasoar"));
+    ts::AircraftSource source;
+    source.path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../adsb/data/trace_full_abc001.json");
+    {
+      ts::MainWindow window;
+      ts::LayerDefinition definition = ts::ImportAdsbDialog::definitionFor(
+          source.toJson(), QStringLiteral("Trace"));
+      ts::AircraftStyle style;
+      style.dropLines = true;
+      definition.style = style.toJson();
+      window.addAircraftLayer(definition);
+      QString error;
+      QVERIFY2(window.saveProject(path, &error), qPrintable(error));
+    }
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openProject(path, &error), qPrintable(error));
+    ts::AircraftLayers* aircraft = window.aircraft();
+    QVERIFY(QTest::qWaitFor([&]() { return aircraft->drawn().size() == 1; },
+                            10000));
+    QVERIFY(!aircraft->dropLines().empty());
+    QCOMPARE(aircraft->drawn().front().info.registration,
+             QStringLiteral("G-TSOA"));
   }
 
   void satellitesFromFile()
