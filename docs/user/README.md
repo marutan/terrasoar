@@ -5,7 +5,7 @@ the Earth from NASA's Blue Marble imagery, shorelines, country outlines and
 terrain built into the program, works fully offline, and adds layers from
 web map servers (WMS, WMTS and XYZ tiles), features from web feature
 services (WFS), KML files, satellites from their orbits, aircraft from
-ADS-B, your own elevation files and web terrain services.
+ADS-B, ships from AIS, your own elevation files and web terrain services.
 
 1. [Installing Terra Soar](installation.md): Windows, Linux, what the
    computer needs, where your files go.
@@ -29,7 +29,9 @@ ADS-B, your own elevation files and web terrain services.
     their tracks and passes, and the clock.
 11. [Aircraft](aircraft.md): aircraft from ADS-B recordings and live
     receivers, their trails, playback and details.
-12. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
+12. [Ships](ships.md): ships from AIS recordings, receivers and open
+    feeds, their symbols, trails, playback and details.
+13. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
    disk space.
 
 You can read this guide inside Terra Soar too, offline: **Help → User

@@ -43,6 +43,7 @@ HEADERS += \
     $$PWD/src/addsatellitesdialog.h \
     $$PWD/src/adsbdialogs.h \
     $$PWD/src/aircraftlayers.h \
+    $$PWD/src/aisdialogs.h \
     $$PWD/src/aircraftpropertiesdialog.h \
     $$PWD/src/aircraftwindows.h \
     $$PWD/src/addxyzdialog.h \
@@ -66,6 +67,8 @@ HEADERS += \
     $$PWD/src/timebar.h \
     $$PWD/src/timemodebox.h \
     $$PWD/src/userguide.h \
+    $$PWD/src/vessellayers.h \
+    $$PWD/src/vesselwindows.h \
     $$PWD/src/wmscataloguefile.h
 
 SOURCES += \
@@ -85,6 +88,7 @@ SOURCES += \
     $$PWD/src/addsatellitesdialog.cpp \
     $$PWD/src/adsbdialogs.cpp \
     $$PWD/src/aircraftlayers.cpp \
+    $$PWD/src/aisdialogs.cpp \
     $$PWD/src/aircraftpropertiesdialog.cpp \
     $$PWD/src/aircraftwindows.cpp \
     $$PWD/src/addxyzdialog.cpp \
@@ -98,6 +102,7 @@ SOURCES += \
     $$PWD/src/mainwindowaircraft.cpp \
     $$PWD/src/mainwindowkml.cpp \
     $$PWD/src/mainwindowsatellites.cpp \
+    $$PWD/src/mainwindowships.cpp \
     $$PWD/src/newregiondialog.cpp \
     $$PWD/src/offlineregionmanager.cpp \
     $$PWD/src/packmanager.cpp \
@@ -111,6 +116,8 @@ SOURCES += \
     $$PWD/src/timebar.cpp \
     $$PWD/src/timemodebox.cpp \
     $$PWD/src/userguide.cpp \
+    $$PWD/src/vessellayers.cpp \
+    $$PWD/src/vesselwindows.cpp \
     $$PWD/src/wmscataloguefile.cpp
 
 # Translations: compiled by lrelease during the build and embedded as

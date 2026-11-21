@@ -772,7 +772,7 @@ QString ProviderRegistry::attribution(const QJsonObject& source) const
   if (kind == QLatin1String("wms") || kind == QLatin1String("wmts") ||
       kind == QLatin1String("xyz") || kind == QLatin1String("wfs") ||
       kind == QLatin1String("web") || kind == QLatin1String("file") ||
-      kind == QLatin1String("satellites")) {
+      kind == QLatin1String("satellites") || kind == QLatin1String("vessels")) {
     return source.value(QStringLiteral("attribution")).toString();
   }
   const std::lock_guard<std::mutex> lock(m_mutex);

@@ -600,6 +600,11 @@ Drawing shares Phase 15's machinery for moving objects and tracks, and the progr
 
 Goal: AIS (Automatic Identification System) data, from files, a receiver or open online feeds, shows vessels on the map and the globe, with their names, types, headings and trails.
 
+**Status (2026-11-21):** delivered (18a to 18e on one branch, one pull request): sentences and the decoder (18a), readers and vessel tracks (18b), drawing with hulls to scale and course vectors (18c), ship layers in the program (18d), and live receivers and open feeds (18e). Design: `docs/design/ais.md`; for users: `docs/user/ships.md`. Differences from the plan below:
+- **Kystverket's stream is not verified live**: it didn't answer from the development machine, so it is tested against a mock server only. Digitraffic is checked live (an optional test).
+- **Test sentences** come from pyais's test suite (MIT); the recordings are made up by our own encoder. No ITU example sentences were used.
+- **Performance**: 10 000 stations with 1500 trails hold the software frame budget; 20 000 take about 100 ms in software GL (shading the markers' pixels), far less on a GPU.
+
 **Approach (proposed)**: a `core` subsection (`ts/ais`) with its own unit test project (`tests/ais`). It holds our own AIS decoder and readers for the common formats. The track store, trails, playback and live connections are shared with Phase 17 (aircraft) through `ts/tracks`. Vessels are drawn at sea level, so they work the same on the flat map and the globe, and stay on the water surface when terrain is on.
 
 **Deliverables**

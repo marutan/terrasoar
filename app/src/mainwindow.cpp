@@ -87,6 +87,7 @@
 #include "satellitelayers.h"
 #include "timebar.h"
 #include "ts/adsb/adsbreaders.h"
+#include "ts/ais/aisreaders.h"
 #include "ts/base/buildinfo.h"
 #include "ts/deps/dependencies.h"
 #include "ts/elevation/elevationprofile.h"
@@ -115,6 +116,7 @@
 #include "ts/vector/vectorstyle.h"
 #include "ts/wms/wmsimageryprovider.h"
 #include "ts/wms/wmssource.h"
+#include "vessellayers.h"
 
 namespace ts
 {
@@ -370,6 +372,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   createSatellites();
   createAircraft();
+  createShips();
   createActions();
   createMenus();
   createKmlEditing();
@@ -968,6 +971,8 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_addSatellitesAction);
   m_fileMenu->addAction(m_importAdsbAction);
   m_fileMenu->addAction(m_connectReceiverAction);
+  m_fileMenu->addAction(m_importAisAction);
+  m_fileMenu->addAction(m_addAisSourceAction);
   m_fileMenu->addAction(m_addImageryAction);
   m_fileMenu->addAction(m_addElevationAction);
   m_fileMenu->addAction(m_addWebTerrainAction);
@@ -1044,6 +1049,13 @@ void MainWindow::retranslateUi()
   m_connectReceiverAction->setText(tr("Connect to ADS-B &Receiver…"));
   m_connectReceiverAction->setStatusTip(
       tr("Show aircraft live from a dump1090 or readsb receiver"));
+  m_importAisAction->setText(tr("Import AIS Data…"));
+  m_importAisAction->setStatusTip(
+      tr("Show ships from a recording of AIS data: NMEA logs or CSV (NOAA "
+         "MarineCadastre's and others)"));
+  m_addAisSourceAction->setText(tr("Add AIS Source…"));
+  m_addAisSourceAction->setStatusTip(
+      tr("Show ships live from an AIS receiver or an open online feed"));
   m_helpMenu->setTitle(tr("&Help"));
   m_quitAction->setText(tr("&Quit"));
   m_quitAction->setStatusTip(tr("Close the program"));
@@ -1256,6 +1268,9 @@ void MainWindow::refreshLayers()
   if (m_aircraft != nullptr) {
     refreshAircraftLayers(stack);
   }
+  if (m_vessels != nullptr) {
+    refreshVesselLayers(stack);
+  }
   if (!m_globeView) {
     // No OpenGL view: nothing is drawn, but layers that can't be opened are
     // still marked in the dock.
@@ -1417,11 +1432,21 @@ bool MainWindow::openFile(const QString& path, QString* errorString)
   if (isAdsbFileName(path)) {
     return openAdsbFile(path, errorString);
   }
-  if (suffix == QLatin1String("txt")) {
-    // Raw ADS-B messages, or element sets.
+  if (suffix == QLatin1String("nmea") || suffix == QLatin1String("ais")) {
+    return openAisFile(path, errorString);
+  }
+  if (suffix == QLatin1String("txt") || suffix == QLatin1String("log") ||
+      suffix == QLatin1String("csv")) {
+    // AIS sentences or CSV, raw ADS-B messages, or element sets.
     QFile file(path);
-    if (file.open(QIODevice::ReadOnly) &&
-        detectAdsbFormat(file.read(4096)) == AdsbFormat::Raw) {
+    const QByteArray head =
+        file.open(QIODevice::ReadOnly) ? file.read(4096) : QByteArray();
+    if (detectAisFormat(head) != AisFormat::Unknown) {
+      return openAisFile(path, errorString);
+    }
+    const AdsbFormat adsb = detectAdsbFormat(head);
+    if (adsb == AdsbFormat::Raw || adsb == AdsbFormat::Sbs ||
+        (adsb == AdsbFormat::Csv && suffix == QLatin1String("csv"))) {
       return openAdsbFile(path, errorString);
     }
   }
@@ -1837,6 +1862,8 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   actions.insert(actions.end(), satellites.begin(), satellites.end());
   const std::vector<QAction*> aircraft = aircraftNodeActions(id, parent);
   actions.insert(actions.end(), aircraft.begin(), aircraft.end());
+  const std::vector<QAction*> vessels = vesselNodeActions(id, parent);
+  actions.insert(actions.end(), vessels.begin(), vessels.end());
   if (m_kmlNodes.count(id) != 0 && kmlKeyOf(id).isEmpty()) {
     QAction* edit = new QAction(tr("Edit This Document"), parent);
     edit->setObjectName(QStringLiteral("editKmlNodeAction"));
@@ -2155,7 +2182,11 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
            path.endsWith(QLatin1String(".tle")) ||
            path.endsWith(QLatin1String(".3le")) ||
            path.endsWith(QLatin1String(".2le")) ||
-           path.endsWith(QLatin1String(".txt")) || isAdsbFileName(path);
+           path.endsWith(QLatin1String(".txt")) ||
+           path.endsWith(QLatin1String(".nmea")) ||
+           path.endsWith(QLatin1String(".ais")) ||
+           path.endsWith(QLatin1String(".log")) ||
+           path.endsWith(QLatin1String(".csv")) || isAdsbFileName(path);
   });
   if (any) {
     event->acceptProposedAction();
@@ -2291,6 +2322,12 @@ void MainWindow::updateTimeBar(const LayerStack& stack)
   }
   if (m_aircraft != nullptr) {
     const QString recordings = m_aircraft->timeExtent();
+    if (!recordings.isEmpty()) {
+      extents.append(recordings);
+    }
+  }
+  if (m_vessels != nullptr) {
+    const QString recordings = m_vessels->timeExtent();
     if (!recordings.isEmpty()) {
       extents.append(recordings);
     }

@@ -454,7 +454,12 @@ std::vector<QAction*> MainWindow::aircraftNodeActions(const QString& id,
 void MainWindow::aircraftMarkerClicked(int32_t index)
 {
   const std::vector<DrawnAircraft>& drawn = m_aircraft->drawn();
-  if (index < 0 || static_cast<std::size_t>(index) >= drawn.size()) {
+  if (index < 0) {
+    return;
+  }
+  // Ships' markers come after the aircraft's.
+  if (static_cast<std::size_t>(index) >= drawn.size()) {
+    vesselMarkerClicked(index - static_cast<int32_t>(drawn.size()));
     return;
   }
   const DrawnAircraft& aircraft = drawn[static_cast<std::size_t>(index)];
