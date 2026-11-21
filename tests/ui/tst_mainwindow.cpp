@@ -1662,14 +1662,22 @@ private slots:
       QCoreApplication::sendEvent(zoomIn, &event);
     }
 #endif
-    settle();
-    QVERIFY(std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6);
+    // The tap's click may come a little later (Windows makes it of the
+    // touch): wait for the zoom it asks for.
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6;
+        },
+        5000));
     // The keyboard: Enter on a focused control.
     globe->setPose(start);
     zoomIn->setFocus(Qt::TabFocusReason);
     QTest::keyClick(zoomIn, Qt::Key_Return);
-    settle();
-    QVERIFY(std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          return std::abs(camera.pose().rangeM / start.rangeM - 0.5) < 1e-6;
+        },
+        5000));
     // Tab from the view reaches the controls.
     window.activateWindow();
     QVERIFY(QTest::qWaitForWindowActive(&window));
