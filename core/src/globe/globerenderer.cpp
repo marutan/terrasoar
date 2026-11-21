@@ -1133,9 +1133,14 @@ void writeMapFrame(const Camera& camera, double morph, bool terrain,
       camera.isMapTurnedOrTilted() && camera.pose().tiltDeg > 0.0;
   frame.planeEast =
       float4(local.eastEcef, tilted ? camera.mapFarLimitM() : 0.0);
-  frame.planeNorth = float4(
-      local.northEcef,
-      terrain ? morph * Camera::mapReliefForTilt(camera.pose().tiltDeg) : 0.0);
+  // The map's relief comes in over the second half of the change (half
+  // way the globe's terrain is half flattened and the map's is not yet
+  // there), and so goes out the same way back to the globe.
+  frame.planeNorth =
+      float4(local.northEcef,
+             terrain ? smoothStep(0.5, 1.0, morph) *
+                           Camera::mapReliefForTilt(camera.pose().tiltDeg)
+                     : 0.0);
   frame.planeOrigin = float4(camera.targetEcef() - camera.eyeEcef(), 0.0);
   if (map.projection != nullptr && map.projection->hasOwnDomain()) {
     const std::array<float, 8> domain = map.projection->glslDomainParameters();

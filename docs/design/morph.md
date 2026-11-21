@@ -254,7 +254,9 @@ changed is what assumed a map seen straight down with north up:
   before). Tilted, the terrain stands up: each vertex is raised along the
   plane's normal by its height times the map's relief, which rises
   smoothly from 0 at no tilt to 1 at 15° (`Camera::mapReliefForTilt()`,
-  `tsMapRelief()`), times the morph factor. Vector layers are raised the
+  `tsMapRelief()`), coming in over the second half of the change to the
+  map (half way, the globe's terrain is half flattened and the map's
+  relief not yet there). Vector layers are raised the
   same way. The camera keeps its eye 20 m above the relief below it. The
   map's tiles are then drawn with their full meshes, not strips.
   Markers and labels stay on the plane.

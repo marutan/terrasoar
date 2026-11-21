@@ -1527,7 +1527,10 @@ private slots:
           return c;
         };
     const std::function<void()> settle = [&]() {
-      QTest::qWait(500); // a click's flight is 0.35 s
+      // A click's flight (0.35 s), however slowly the frames come.
+      QTest::qWait(50);
+      QVERIFY(QTest::qWaitFor(
+          [&]() { return !globe->controller().isAnimating(); }, 10000));
     };
     // Large enough for a finger.
     const double nineMmPx = 9.0 * overlay->logicalDpiY() / 25.4;
@@ -1663,7 +1666,8 @@ private slots:
     globe->setViewMode(ts::ViewMode::Map, false);
     QTest::mouseClick(control("navigationTurnLeft"), Qt::LeftButton);
     settle();
-    QVERIFY(std::abs(camera.pose().headingDeg - 345.0) < 1e-6);
+    QVERIFY2(std::abs(camera.pose().headingDeg - 345.0) < 1e-6,
+             qPrintable(QString::number(camera.pose().headingDeg)));
     QTest::mouseClick(arc, Qt::LeftButton, Qt::NoModifier,
                       QPoint(arc->width() - 2, 2));
     QCOMPARE(camera.pose().tiltDeg, ts::Camera::maximumMapTiltDeg);

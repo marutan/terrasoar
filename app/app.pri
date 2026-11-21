@@ -127,3 +127,6 @@ SOURCES += \
 TRANSLATIONS = $$TS_ROOT/translations/terrasoar_en.ts
 CONFIG += lrelease embed_translations
 QM_FILES_RESOURCE_PREFIX = /i18n
+
+# The navigation controls ask Windows whether high contrast is on.
+win32: LIBS += -luser32

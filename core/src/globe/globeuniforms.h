@@ -63,8 +63,9 @@ struct FrameBlock {
   Float4 planeEast{};
   /**
    * Direction of map north on the plane (xyz), ECEF; how much of the
-   * terrain's relief the map shows, times the morph factor (w; 0 when
-   * straight down or without terrain). See Camera::mapReliefForTilt().
+   * terrain's relief the map shows, coming in over the second half of the
+   * change to the map (w; 0 when straight down or without terrain). See
+   * Camera::mapReliefForTilt().
    */
   Float4 planeNorth{};
   /** The centre of the map (the camera's target) relative to the eye. */
