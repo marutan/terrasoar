@@ -27,7 +27,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonDocument>
-#include <QPointer>
 
 #include "ts/network/networkclient.h"
 #include "ts/orbits/satellitedraws.h"
@@ -196,9 +195,8 @@ void SatelliteLayers::startLoad(const QString& key, const QJsonObject& json,
       source->isDownloaded() && m_network ? m_network() : nullptr;
   const ElementDownloadSettings settings = m_download;
   const std::shared_ptr<std::atomic<bool>> cancelled = m_cancelled;
-  const QPointer<SatelliteLayers> self(this);
-  const SatelliteSource& what = *source;
-  m_pool.start([=]() {
+  m_pool.start([this, key, json, what = *source, network, settings, force,
+                cancelled]() {
     std::shared_ptr<const SatelliteSet> result;
     if (!what.isDownloaded()) {
       result = std::make_shared<const SatelliteSet>(readLocal(what));
@@ -218,15 +216,28 @@ void SatelliteLayers::startLoad(const QString& key, const QJsonObject& json,
       loaded->downloadedS = download.downloadedS;
       result = loaded;
     }
-    QMetaObject::invokeMethod(
-        QCoreApplication::instance(),
-        [self, key, json, result]() {
-          if (self) {
-            self->finishLoad(key, json, result);
-          }
-        },
-        Qt::QueuedConnection);
+    // Handed over under our own lock, then a call by name, made and freed
+    // inside Qt: a functor's slot object would cross the threads through
+    // Qt's event queue, whose locks ThreadSanitizer can't see. The
+    // destructor waits for the pool, so this outlives the task.
+    {
+      const std::lock_guard<std::mutex> lock(m_finishedMutex);
+      m_finished.push_back(FinishedLoad{key, json, result});
+    }
+    QMetaObject::invokeMethod(this, "takeFinishedLoads", Qt::QueuedConnection);
   });
+}
+
+void SatelliteLayers::takeFinishedLoads()
+{
+  std::vector<FinishedLoad> finished;
+  {
+    const std::lock_guard<std::mutex> lock(m_finishedMutex);
+    finished.swap(m_finished);
+  }
+  for (FinishedLoad& load : finished) {
+    finishLoad(load.key, load.source, std::move(load.set));
+  }
 }
 
 void SatelliteLayers::finishLoad(const QString& key, const QJsonObject& source,

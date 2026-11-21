@@ -107,6 +107,11 @@ OrbitResult OrbitComputer::compute(
   return result;
 }
 
+void OrbitComputer::announceResult()
+{
+  emit resultReady();
+}
+
 void OrbitComputer::run()
 {
   std::map<const Sgp4*, std::unique_ptr<TrackSampler>> samplers;
@@ -134,8 +139,11 @@ void OrbitComputer::run()
       m_computing = false;
     }
     m_condition.notify_all();
-    QMetaObject::invokeMethod(
-        this, [this]() { emit resultReady(); }, Qt::QueuedConnection);
+    // By name, not with a lambda: the queued call is then made and freed
+    // inside Qt, whose event queue's locks ThreadSanitizer can't see, so
+    // nothing of ours crosses the threads unseen (a lambda's QCallableObject
+    // is our code, written here and read on the GUI thread).
+    QMetaObject::invokeMethod(this, "announceResult", Qt::QueuedConnection);
   }
 }
 

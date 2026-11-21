@@ -62,6 +62,7 @@
 #include <QTextBrowser>
 #include <QTimeZone>
 #include <QTimer>
+#include <QToolButton>
 #include <QTreeView>
 #include <QTreeWidget>
 #include <QUrlQuery>
@@ -4303,6 +4304,107 @@ private slots:
     realTime.clock()->setTime(paused);
     QVERIFY2(realTime.openProject(path, &error), qPrintable(error));
     QVERIFY(realTime.clock()->isRealTime());
+  }
+
+  void clockMenusChosenByMouse()
+  {
+    // Speeds and steps chosen in the speed button's menu with the mouse,
+    // as a user does: the menus stay usable (choosing a step once rebuilt
+    // the menus from within the chosen action, which crashed).
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::ClockWidget* widget = window.clockWidget();
+    QToolButton* rate =
+        widget->findChild<QToolButton*>(QStringLiteral("clockRate"));
+    if (rate == nullptr || rate->menu() == nullptr) {
+      QFAIL("no speed menu");
+    }
+    QMenu* menu = rate->menu();
+    // By what they set (their data): seconds, or a speed.
+    const std::function<QAction*(QMenu*, double)> find =
+        [](QMenu* in, double value) -> QAction* {
+      for (QAction* action : in->actions()) {
+        if (action->data().isValid() && action->data().toDouble() == value) {
+          return action;
+        }
+      }
+      return nullptr;
+    };
+    const std::function<void(QMenu*, QAction*)> click = [](QMenu* in,
+                                                           QAction* action) {
+      in->popup(QPoint(100, 100));
+      QVERIFY(QTest::qWaitForWindowExposed(in));
+      QTest::mouseClick(in, Qt::LeftButton, Qt::NoModifier,
+                        in->actionGeometry(action).center());
+      QCoreApplication::processEvents();
+    };
+    for (int32_t round = 0; round < 3; ++round) {
+      QMenu* steps = nullptr;
+      for (QAction* action : menu->actions()) {
+        if (action->menu() != nullptr) {
+          steps = action->menu();
+        }
+      }
+      if (steps == nullptr) {
+        QFAIL("no step menu");
+      }
+      QAction* hour = find(steps, 3600.0);
+      if (hour == nullptr) {
+        QFAIL("no step of an hour");
+      }
+      click(steps, hour);
+      QCOMPARE(widget->stepSeconds(), 3600.0);
+      QVERIFY(hour->isChecked());
+      QAction* sixty = find(menu, 60.0);
+      if (sixty == nullptr) {
+        QFAIL("no speed of 60");
+      }
+      click(menu, sixty);
+      QCOMPARE(window.clock()->rate(), 60.0);
+      QAction* minute = find(steps, 60.0);
+      if (minute == nullptr) {
+        QFAIL("no step of a minute");
+      }
+      click(steps, minute);
+      QCOMPARE(widget->stepSeconds(), 60.0);
+      QTest::qWait(50);
+    }
+  }
+
+  void layerMenuOpenedAgain()
+  {
+    // A layer's menu opened again and again (right-clicks on a satellite
+    // layer, whose menu has actions of its own): the last menu's actions
+    // were deleted twice, and the second, deferred deletion reached freed
+    // memory in the event loop.
+    ts::MainWindow window;
+    const QString path =
+        QStringLiteral(TS_TEST_DATA_DIR "/../orbits/data/stations.tle");
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    QVERIFY(dock != nullptr);
+    const QModelIndex layer = window.layerModel()->index(0, 0);
+    for (int32_t i = 0; i < 5; ++i) {
+      QMenu* menu = dock->contextMenu(layer);
+      if (menu == nullptr) {
+        QFAIL("no menu");
+      }
+      QAction* list =
+          menu->findChild<QAction*>(QStringLiteral("satelliteListAction"));
+      if (list == nullptr) {
+        QFAIL("no Satellites… action");
+      }
+      QVERIFY(menu->actions().contains(list));
+      QCOMPARE(
+          menu->findChildren<QAction*>(QStringLiteral("satelliteListAction"))
+              .size(),
+          1);
+      // Deferred deletions are delivered between clicks.
+      QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+      QCoreApplication::processEvents();
+    }
   }
 };
 

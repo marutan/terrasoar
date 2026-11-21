@@ -31,6 +31,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -216,6 +217,16 @@ signals:
   void selectionChanged();
 
 private:
+  /** Takes the loads the pool finished (queued from its threads). */
+  Q_INVOKABLE void takeFinishedLoads();
+
+  /** A load a pool thread finished, waiting for the GUI thread. */
+  struct FinishedLoad {
+    QString key;
+    QJsonObject source;
+    std::shared_ptr<const SatelliteSet> set;
+  };
+
   struct TaskInfo {
     QString nodeId;
     std::shared_ptr<const Sgp4> sgp4;
@@ -240,6 +251,9 @@ private:
   std::map<QString, std::shared_ptr<const SatelliteSet>> m_sets;
   QThreadPool m_pool;
   std::shared_ptr<std::atomic<bool>> m_cancelled;
+  /** Loads finished on the pool's threads (under m_finishedMutex). */
+  std::vector<FinishedLoad> m_finished;
+  std::mutex m_finishedMutex;
   OrbitComputer* m_computer = nullptr;
   uint64_t m_generation = 0;
   /** What each task of the requests still to come back was. */
