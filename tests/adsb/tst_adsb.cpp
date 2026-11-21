@@ -28,17 +28,25 @@
 #include <QDateTime>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QSignalSpy>
+#include <QTcpServer>
 #include <QTcpSocket>
+#include <QTemporaryDir>
 #include <QtTest>
 
 #include "ts/adsb/adsbdecoder.h"
 #include "ts/adsb/adsbreaders.h"
+#include "ts/adsb/aircraftexport.h"
+#include "ts/adsb/aircraftlayer.h"
 #include "ts/adsb/aircraftreport.h"
 #include "ts/adsb/aircrafttracks.h"
 #include "ts/adsb/cpr.h"
 #include "ts/adsb/modesmessage.h"
+#include "ts/adsb/receiverfeed.h"
 #include "ts/geo/geodetic.h"
+#include "ts/perf/processstats.h"
 #include "ts/tracks/movingtrack.h"
+#include "ts/tracks/trackdraws.h"
 
 namespace
 {
@@ -52,6 +60,8 @@ std::optional<ts::ModeSMessage> decodeHex(const char* hex)
  * Encodes a position as a CPR frame, as DO-260B's encoding does: the
  * test's own, to make frames at chosen places.
  */
+// A latitude, then a longitude, as named.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 ts::CprFrame encodeCpr(double latDeg, double lonDeg, bool odd, bool surface)
 {
   const double span = surface ? 90.0 : 360.0;
@@ -74,7 +84,7 @@ ts::CprFrame encodeCpr(double latDeg, double lonDeg, bool odd, bool surface)
 }
 
 /** Positions agree to @p metres. */
-bool near(const ts::CprPosition& a, double latDeg, double lonDeg, double metres)
+bool near(ts::CprPosition a, double latDeg, double lonDeg, double metres)
 {
   return ts::distanceNm(a, ts::CprPosition{latDeg, lonDeg}) * 1852.0 <= metres;
 }
@@ -122,7 +132,7 @@ std::map<uint32_t, std::vector<Truth>> readTruth()
 
 /** Reads a fixture into tracks. */
 std::vector<ts::AircraftTrack> readTracks(const char* name,
-                                          ts::AdsbReadOptions options,
+                                          const ts::AdsbReadOptions& options,
                                           ts::AdsbReadResult* result = nullptr)
 {
   ts::AircraftTrackBuilder builder;
@@ -137,6 +147,16 @@ std::vector<ts::AircraftTrack> readTracks(const char* name,
 
 /** The fixtures' start, 2026-11-20T12:00Z. */
 constexpr double fixtureStartS = 1795176000.0;
+
+/**
+ * Returns @p value's value, or a default one: for after a check that it
+ * has one (QVERIFY), which the static analysis can't follow.
+ */
+template <typename T>
+T got(const std::optional<T>& value)
+{
+  return value.value_or(T());
+}
 
 } // namespace
 
@@ -173,6 +193,15 @@ private slots:
   void trailModes();
   void heights();
   void builderOrder();
+  void layerJson();
+  void styleFilters();
+  void exportTrack();
+  void receiverSbs();
+  void receiverBeastReconnects();
+  void receiverRecordingReadsBack();
+  void liveBuilder();
+  void dayRecording();
+  void readingRate();
   void liveFeed();
 };
 
@@ -205,11 +234,11 @@ void TestAdsb::identification()
   const std::optional<ts::ModeSMessage> m =
       decodeHex("8D4840D6202CC371C32CE0576098");
   QVERIFY(m);
-  QCOMPARE(m->downlinkFormat, 17);
-  QCOMPARE(m->typeCode, 4);
-  QCOMPARE(ts::formatIcaoAddress(m->address), QStringLiteral("4840D6"));
-  QCOMPARE(*m->callsign, QStringLiteral("KLM1023"));
-  QVERIFY(!m->addressFromParity);
+  QCOMPARE(got(m).downlinkFormat, 17);
+  QCOMPARE(got(m).typeCode, 4);
+  QCOMPARE(ts::formatIcaoAddress(got(m).address), QStringLiteral("4840D6"));
+  QCOMPARE(got(got(m).callsign), QStringLiteral("KLM1023"));
+  QVERIFY(!got(m).addressFromParity);
 }
 
 void TestAdsb::airbornePosition()
@@ -219,30 +248,29 @@ void TestAdsb::airbornePosition()
   const std::optional<ts::ModeSMessage> odd =
       decodeHex("8D40621D58C386435CC412692AD6");
   QVERIFY(even && odd && even->cpr && odd->cpr);
-  QCOMPARE(even->cpr->lat, 93000U);
-  QCOMPARE(even->cpr->lon, 51372U);
-  QCOMPARE(odd->cpr->lat, 74158U);
-  QCOMPARE(odd->cpr->lon, 50194U);
-  QVERIFY(!even->cpr->odd && odd->cpr->odd);
-  QCOMPARE(*even->altitudeFt, 38000);
+  QCOMPARE(got(got(even).cpr).lat, 93000U);
+  QCOMPARE(got(got(even).cpr).lon, 51372U);
+  QCOMPARE(got(got(odd).cpr).lat, 74158U);
+  QCOMPARE(got(got(odd).cpr).lon, 50194U);
+  QVERIFY(!got(got(even).cpr).odd && got(got(odd).cpr).odd);
+  QCOMPARE(got(got(even).altitudeFt), 38000);
   QCOMPARE(ts::cprLongitudeZones(52.2572021484375), 36);
   // The even frame is newer (1457996402 against 1457996400).
   const std::optional<ts::CprPosition> p =
-      ts::cprGlobalAirborne(*even->cpr, *odd->cpr, false);
+      ts::cprGlobalAirborne(got(got(even).cpr), got(got(odd).cpr), false);
   QVERIFY(p);
-  QCOMPARE(p->latDeg, 52.2572021484375);
-  QCOMPARE(p->lonDeg, 3.91937255859375);
+  QCOMPARE(got(p).latDeg, 52.2572021484375);
+  QCOMPARE(got(p).lonDeg, 3.91937255859375);
 
   ts::AdsbDecoder decoder;
-  QVERIFY(!decoder
-               .decode(ts::modeSFromHex("8D40621D58C386435CC412692AD6"),
-                       1457996400.0)
-               ->position);
+  QVERIFY(!got(decoder.decode(ts::modeSFromHex("8D40621D58C386435CC412692AD6"),
+                              1457996400.0))
+               .position);
   const std::optional<ts::AircraftReport> report = decoder.decode(
       ts::modeSFromHex("8D40621D58C382D690C8AC2863A7"), 1457996402.0);
   QVERIFY(report && report->position);
-  QCOMPARE(report->position->latDeg, 52.2572021484375);
-  QCOMPARE(*report->baroAltitudeFt, 38000.0);
+  QCOMPARE(got(got(report).position).latDeg, 52.2572021484375);
+  QCOMPARE(got(got(report).baroAltitudeFt), 38000.0);
 }
 
 void TestAdsb::localPosition()
@@ -250,7 +278,7 @@ void TestAdsb::localPosition()
   const std::optional<ts::ModeSMessage> even =
       decodeHex("8D40621D58C382D690C8AC2863A7");
   const ts::CprPosition p =
-      ts::cprLocal(*even->cpr, ts::CprPosition{52.258, 3.918});
+      ts::cprLocal(got(got(even).cpr), ts::CprPosition{52.258, 3.918});
   QCOMPARE(p.latDeg, 52.2572021484375);
   QCOMPARE(p.lonDeg, 3.91937255859375);
 }
@@ -262,26 +290,27 @@ void TestAdsb::surfacePosition()
   const std::optional<ts::ModeSMessage> odd =
       decodeHex("8C4841753A8A35323FAEBDAC702D");
   QVERIFY(even && odd && even->cpr && odd->cpr);
-  QVERIFY(even->cpr->surface);
-  QVERIFY(*even->onGround);
-  QCOMPARE(even->cpr->lat, 115609U);
-  QCOMPARE(odd->cpr->lon, 110269U);
+  QVERIFY(got(got(even).cpr).surface);
+  QVERIFY(got(got(even).onGround));
+  QCOMPARE(got(got(even).cpr).lat, 115609U);
+  QCOMPARE(got(got(odd).cpr).lon, 110269U);
   // The odd frame is newer; the airfield is the reference.
-  const std::optional<ts::CprPosition> p = ts::cprGlobalSurface(
-      *even->cpr, *odd->cpr, true, ts::CprPosition{51.990, 4.375});
+  const std::optional<ts::CprPosition> p =
+      ts::cprGlobalSurface(got(got(even).cpr), got(got(odd).cpr), true,
+                           ts::CprPosition{51.990, 4.375});
   QVERIFY(p);
-  QVERIFY(std::fabs(p->latDeg - 52.320607072215964) < 1e-9);
-  QVERIFY(std::fabs(p->lonDeg - 4.734734671456474) < 1e-9);
+  QVERIFY(std::fabs(got(p).latDeg - 52.320607072215964) < 1e-9);
+  QVERIFY(std::fabs(got(p).lonDeg - 4.734734671456474) < 1e-9);
 
   const std::optional<ts::ModeSMessage> next =
       decodeHex("8C4841753A9A153237AEF0F275BE");
   QVERIFY(next && next->cpr);
   const ts::CprPosition local =
-      ts::cprLocal(*next->cpr, ts::CprPosition{52.320607, 4.734735});
+      ts::cprLocal(got(got(next).cpr), ts::CprPosition{52.320607, 4.734735});
   QVERIFY(std::fabs(local.latDeg - 52.32056051997815) < 1e-9);
   QVERIFY(std::fabs(local.lonDeg - 4.735735212053571) < 1e-9);
-  QCOMPARE(*next->groundSpeedKt, 17.0);
-  QCOMPARE(*next->trackDeg, 92.8125);
+  QCOMPARE(got(got(next).groundSpeedKt), 17.0);
+  QCOMPARE(got(got(next).trackDeg), 92.8125);
 }
 
 void TestAdsb::velocity()
@@ -289,35 +318,35 @@ void TestAdsb::velocity()
   const std::optional<ts::ModeSMessage> a =
       decodeHex("8D485020994409940838175B284F");
   QVERIFY(a && a->groundSpeedKt && a->trackDeg);
-  QCOMPARE(a->typeCode, 19);
-  QVERIFY(std::fabs(*a->groundSpeedKt - 159.20) < 0.01);
-  QVERIFY(std::fabs(*a->trackDeg - 182.88) < 0.01);
-  QCOMPARE(*a->verticalRateFtMin, -832);
-  QVERIFY(!a->verticalRateBaro);
-  QCOMPARE(*a->gnssMinusBaroFt, 550);
+  QCOMPARE(got(a).typeCode, 19);
+  QVERIFY(std::fabs(got(got(a).groundSpeedKt) - 159.20) < 0.01);
+  QVERIFY(std::fabs(got(got(a).trackDeg) - 182.88) < 0.01);
+  QCOMPARE(got(got(a).verticalRateFtMin), -832);
+  QVERIFY(!got(a).verticalRateBaro);
+  QCOMPARE(got(got(a).gnssMinusBaroFt), 550);
 
   const std::optional<ts::ModeSMessage> b =
       decodeHex("8DA05F219B06B6AF189400CBC33F");
   QVERIFY(b && b->headingDeg && b->airspeedKt);
-  QVERIFY(std::fabs(*b->headingDeg - 243.98) < 0.01);
-  QCOMPARE(*b->airspeedKt, 375.0);
-  QVERIFY(b->trueAirspeed);
-  QCOMPARE(*b->verticalRateFtMin, -2304);
-  QVERIFY(b->verticalRateBaro);
-  QVERIFY(!b->groundSpeedKt);
+  QVERIFY(std::fabs(got(got(b).headingDeg) - 243.98) < 0.01);
+  QCOMPARE(got(got(b).airspeedKt), 375.0);
+  QVERIFY(got(b).trueAirspeed);
+  QCOMPARE(got(got(b).verticalRateFtMin), -2304);
+  QVERIFY(got(b).verticalRateBaro);
+  QVERIFY(!got(b).groundSpeedKt);
 }
 
 void TestAdsb::surveillanceReplies()
 {
   const std::optional<ts::ModeSMessage> altitude = decodeHex("2000171806A983");
   QVERIFY(altitude);
-  QCOMPARE(altitude->downlinkFormat, 4);
-  QVERIFY(altitude->addressFromParity);
-  QCOMPARE(*altitude->altitudeFt, 36000);
+  QCOMPARE(got(altitude).downlinkFormat, 4);
+  QVERIFY(got(altitude).addressFromParity);
+  QCOMPARE(got(got(altitude).altitudeFt), 36000);
   const std::optional<ts::ModeSMessage> identity = decodeHex("2A00516D492B80");
   QVERIFY(identity);
-  QCOMPARE(identity->downlinkFormat, 5);
-  QCOMPARE(*identity->squawk, QStringLiteral("0356"));
+  QCOMPARE(got(identity).downlinkFormat, 5);
+  QCOMPARE(got(got(identity).squawk), QStringLiteral("0356"));
 }
 
 void TestAdsb::altitudeCodes()
@@ -328,7 +357,7 @@ void TestAdsb::altitudeCodes()
     const uint32_t n = static_cast<uint32_t>((feet + 1000) / 25);
     const uint32_t code =
         ((n & 0x7E0U) << 2U) | ((n & 0x10U) << 1U) | 0x10U | (n & 0x0FU);
-    QCOMPARE(*ts::decodeAltitudeCode(code), feet);
+    QCOMPARE(got(ts::decodeAltitudeCode(code)), feet);
   }
   // Gillham (100 ft): the encoding of ICAO Annex 10 (Gray code in 500 ft
   // with a reflected 100 ft code), written out independently here.
@@ -359,7 +388,7 @@ void TestAdsb::altitudeCodes()
                           (d2 << 2U) | (b4 << 1U) | d4;
     const std::optional<int32_t> decoded = ts::decodeAltitudeCode(code);
     QVERIFY2(decoded, qPrintable(QString::number(feet)));
-    QCOMPARE(*decoded, feet);
+    QCOMPARE(got(decoded), feet);
   }
 }
 
@@ -408,10 +437,10 @@ void TestAdsb::cprRoundTrip()
         surface ? ts::cprGlobalSurface(even, odd, oddNewer, reference)
                 : ts::cprGlobalAirborne(even, odd, oddNewer);
     QVERIFY(global);
-    QVERIFY2(near(*global, lat, lon, tolerance),
+    QVERIFY2(near(got(global), lat, lon, tolerance),
              qPrintable(QStringLiteral("%1 %2")
-                            .arg(global->latDeg, 0, 'f', 7)
-                            .arg(global->lonDeg, 0, 'f', 7)));
+                            .arg(got(global).latDeg, 0, 'f', 7)
+                            .arg(got(global).lonDeg, 0, 'f', 7)));
   }
   for (const ts::CprFrame& frame : {even, odd}) {
     QVERIFY(near(ts::cprLocal(frame, reference), lat, lon, tolerance));
@@ -424,7 +453,8 @@ void TestAdsb::cprZoneBoundary()
   // (53.095°): the frames lie in different zones and no position is given.
   const double boundary = 53.095;
   bool refusedSome = false;
-  for (double lat = boundary - 0.02; lat < boundary + 0.02; lat += 0.0005) {
+  for (int32_t step = -40; step < 40; ++step) {
+    const double lat = boundary + 0.0005 * step;
     const ts::CprFrame even = encodeCpr(lat - 0.01, 5.0, false, false);
     const ts::CprFrame odd = encodeCpr(lat + 0.01, 5.0, true, false);
     const std::optional<ts::CprPosition> p =
@@ -445,16 +475,16 @@ void TestAdsb::decoderPairs()
   const QByteArray even = ts::modeSFromHex("8D40621D58C382D690C8AC2863A7");
   const QByteArray odd = ts::modeSFromHex("8D40621D58C386435CC412692AD6");
   ts::AdsbDecoder decoder;
-  QVERIFY(!decoder.decode(odd, 1000.0)->position);
-  QVERIFY(!decoder.decode(even, 1011.0)->position);
+  QVERIFY(!got(decoder.decode(odd, 1000.0)).position);
+  QVERIFY(!got(decoder.decode(even, 1011.0)).position);
   // Then a newer odd within 10 s of that even makes one.
   const std::optional<ts::AircraftReport> report = decoder.decode(odd, 1015.0);
   QVERIFY(report && report->position);
-  QVERIFY(near(*report->position, 52.2657801741, 3.9389, 300.0));
+  QVERIFY(near(got(got(report).position), 52.2657801741, 3.9389, 300.0));
   // Next, decoded locally from there.
   const std::optional<ts::AircraftReport> next = decoder.decode(even, 1016.0);
   QVERIFY(next && next->position);
-  QCOMPARE(next->position->latDeg, 52.2572021484375);
+  QCOMPARE(got(got(next).position).latDeg, 52.2572021484375);
   QCOMPARE(decoder.counts().positions, int64_t{2});
 
   // A receiver far away refuses the positions.
@@ -462,7 +492,7 @@ void TestAdsb::decoderPairs()
   far.receiver = ts::CprPosition{-33.0, 151.0};
   ts::AdsbDecoder distant(far);
   distant.decode(odd, 1000.0);
-  QVERIFY(!distant.decode(even, 1001.0)->position);
+  QVERIFY(!got(distant.decode(even, 1001.0)).position);
   QCOMPARE(distant.counts().positionsRefused, int64_t{1});
 }
 
@@ -476,13 +506,13 @@ void TestAdsb::decoderUnknownAddress()
   const std::optional<ts::ModeSMessage> altitude = decodeHex("2000171806A983");
   ts::ModeSMessage heard;
   heard.downlinkFormat = 17;
-  heard.address = altitude->address;
+  heard.address = got(altitude).address;
   heard.callsign = QStringLiteral("TEST");
   QVERIFY(decoder.decode(heard, 11.0));
   const std::optional<ts::AircraftReport> report =
       decoder.decode(ts::modeSFromHex("2000171806A983"), 12.0);
   QVERIFY(report);
-  QCOMPARE(*report->baroAltitudeFt, 36000.0);
+  QCOMPARE(got(got(report).baroAltitudeFt), 36000.0);
   // Not after a minute without a checked message.
   QVERIFY(!decoder.decode(ts::modeSFromHex("2000171806A983"), 80.0));
 }
@@ -748,7 +778,7 @@ void TestAdsb::beastStream()
     }
     QCOMPARE(messages.size(), all.size());
     QCOMPARE(messages.back().bytes, all.back().bytes);
-    QCOMPARE(*messages.back().counter, *all.back().counter);
+    QCOMPARE(got(messages.back().counter), got(all.back().counter));
   }
   // Noise before and between frames is skipped.
   ts::BeastParser noisy;
@@ -797,13 +827,13 @@ void TestAdsb::trackStore()
   const std::optional<ts::TrackSample> middle = track.at(15.0, timing);
   QVERIFY(middle);
   // The shorter way round the antimeridian, and through north.
-  QVERIFY(std::fabs(std::fabs(middle->lonDeg) - 180.0) < 1e-9);
-  QCOMPARE(middle->heightM, 1500.0);
-  QVERIFY(std::fabs(static_cast<double>(middle->trackDeg)) < 1e-4 ||
-          std::fabs(static_cast<double>(middle->trackDeg) - 360.0) < 1e-4);
+  QVERIFY(std::fabs(std::fabs(got(middle).lonDeg) - 180.0) < 1e-9);
+  QCOMPARE(got(middle).heightM, 1500.0);
+  QVERIFY(std::fabs(static_cast<double>(got(middle).trackDeg)) < 1e-4 ||
+          std::fabs(static_cast<double>(got(middle).trackDeg) - 360.0) < 1e-4);
   QVERIFY(!track.at(9.0, timing));
-  QCOMPARE(*track.indexAtOrBefore(10.0), std::size_t{0});
-  QCOMPARE(*track.indexAtOrBefore(25.0), std::size_t{1});
+  QCOMPARE(got(track.indexAtOrBefore(10.0)), std::size_t{0});
+  QCOMPARE(got(track.indexAtOrBefore(25.0)), std::size_t{1});
 }
 
 void TestAdsb::trackGapsAndStale()
@@ -820,12 +850,12 @@ void TestAdsb::trackGapsAndStale()
   timing.staleS = 20.0;
   timing.gapS = 30.0;
   QCOMPARE(track.pieces(timing).size(), std::size_t{2});
-  QCOMPARE(track.at(1.5, timing)->latDeg, 1.5);
+  QCOMPARE(got(track.at(1.5, timing)).latDeg, 1.5);
   // In the gap: at the last report until stale, then not shown.
-  QCOMPARE(track.at(15.0, timing)->latDeg, 2.0);
+  QCOMPARE(got(track.at(15.0, timing)).latDeg, 2.0);
   QVERIFY(!track.at(30.0, timing));
-  QCOMPARE(track.at(100.5, timing)->latDeg, 100.5);
-  QCOMPARE(track.at(121.0, timing)->latDeg, 101.0);
+  QCOMPARE(got(track.at(100.5, timing)).latDeg, 100.5);
+  QCOMPARE(got(track.at(121.0, timing)).latDeg, 101.0);
   QVERIFY(!track.at(121.5, timing));
 }
 
@@ -930,7 +960,9 @@ void TestAdsb::heights()
   QCOMPARE(g.heightM, 3048.0);
   QCOMPARE(tracks.at(1).altitudes.front().baroFt, 9500.0F);
   QVERIFY(std::isnan(tracks.at(2).track.points().front().heightM));
-  QCOMPARE(*tracks.at(2).infoAt(100.0)->onGround, true);
+  const ts::AircraftInfo* groundInfo = tracks.at(2).infoAt(100.0);
+  QVERIFY(groundInfo != nullptr);
+  QCOMPARE(groundInfo->onGround.value_or(false), true);
 }
 
 void TestAdsb::builderOrder()
@@ -955,6 +987,438 @@ void TestAdsb::builderOrder()
              static_cast<float>(1000.0 * static_cast<double>(i + 1)));
   }
   QCOMPARE(builder.reportCount(), int64_t{0});
+}
+
+void TestAdsb::layerJson()
+{
+  ts::AircraftSource file;
+  file.path = QStringLiteral("/data/day.beast");
+  file.format = ts::AdsbFormat::Beast;
+  file.startTimeS = 1.7e9;
+  file.sbsLocalTime = false;
+  file.receiverPosition = ts::CprPosition{52.0, 4.5};
+  const std::optional<ts::AircraftSource> fileBack =
+      ts::AircraftSource::fromJson(file.toJson());
+  QVERIFY(fileBack);
+  QCOMPARE(got(fileBack).path, file.path);
+  QCOMPARE(got(fileBack).format, ts::AdsbFormat::Beast);
+  QCOMPARE(got(fileBack).startTimeS, 1.7e9);
+  QVERIFY(!got(fileBack).sbsLocalTime);
+  QCOMPARE(got(got(fileBack).receiverPosition).lonDeg, 4.5);
+  ts::AircraftSource receiver;
+  receiver.origin = ts::AircraftSource::Origin::Receiver;
+  receiver.protocol = ts::ReceiverProtocol::Beast;
+  receiver.host = QStringLiteral("receiver.local");
+  receiver.port = 30005;
+  receiver.recordPath = QStringLiteral("/tmp/x.txt");
+  const std::optional<ts::AircraftSource> receiverBack =
+      ts::AircraftSource::fromJson(receiver.toJson());
+  QVERIFY(receiverBack);
+  QCOMPARE(got(receiverBack).protocol, ts::ReceiverProtocol::Beast);
+  QCOMPARE(got(receiverBack).host, receiver.host);
+  QCOMPARE(got(receiverBack).port, uint16_t{30005});
+  QCOMPARE(got(receiverBack).recordPath, receiver.recordPath);
+  QVERIFY(ts::AircraftSource::isAircraft(receiver.toJson()));
+  QVERIFY(!ts::AircraftSource::fromJson(QJsonObject()));
+  QJsonObject broken = receiver.toJson();
+  broken.insert(QStringLiteral("port"), 0);
+  QVERIFY(!ts::AircraftSource::fromJson(broken));
+
+  ts::AircraftStyle style;
+  style.color = QColor(10, 20, 30, 200);
+  style.labelAltitude = true;
+  style.dropLines = true;
+  style.trail.mode = ts::TrailMode::All;
+  style.colouring = ts::TrailColouring::VerticalRate;
+  style.timing.staleS = 90.0;
+  style.callsignFilter = QStringLiteral("KLM");
+  style.minimumAltitudeFt = 10000.0;
+  style.area = ts::LatLonBox{50.0, 170.0, 55.0, -170.0};
+  style.hidden = {0xABC001U};
+  style.overrides[0xABC002U].trail = ts::TrailSettings{ts::TrailMode::Off, 0.0};
+  const ts::AircraftStyle back = ts::AircraftStyle::fromJson(style.toJson());
+  QVERIFY(back == style);
+  QVERIFY(ts::AircraftStyle::fromJson(QJsonObject()) == ts::AircraftStyle());
+  QCOMPARE(back.trailOf(0xABC002U).mode, ts::TrailMode::Off);
+  QCOMPARE(back.trailOf(0xABC003U).mode, ts::TrailMode::All);
+}
+
+void TestAdsb::styleFilters()
+{
+  ts::AircraftStyle style;
+  QVERIFY(!style.isFiltered());
+  QVERIFY(style.shows(1, QString(), 0.0, 0.0, 1000.0));
+  style.callsignFilter = QStringLiteral("klm");
+  QVERIFY(style.shows(1, QStringLiteral("KLM1023"), 0.0, 0.0, 0.0));
+  QVERIFY(!style.shows(1, QStringLiteral("BAW1"), 0.0, 0.0, 0.0));
+  style.callsignFilter.clear();
+  style.addressFilter = QStringLiteral("48");
+  QVERIFY(style.shows(0x4840D6U, QString(), 0.0, 0.0, 0.0));
+  QVERIFY(!style.shows(0x3C0000U, QString(), 0.0, 0.0, 0.0));
+  style.addressFilter.clear();
+  style.minimumAltitudeFt = 10000.0;
+  style.maximumAltitudeFt = 20000.0;
+  QVERIFY(style.shows(1, QString(), 0.0, 0.0, 15000.0));
+  QVERIFY(!style.shows(1, QString(), 0.0, 0.0, 5000.0));
+  QVERIFY(!style.shows(1, QString(), 0.0, 0.0, 25000.0));
+  // No altitude: not known to be above the minimum.
+  QVERIFY(!style.shows(1, QString(), 0.0, 0.0,
+                       std::numeric_limits<double>::quiet_NaN()));
+  style.minimumAltitudeFt.reset();
+  style.maximumAltitudeFt.reset();
+  // An area across the antimeridian.
+  style.area = ts::LatLonBox{-20.0, 175.0, -10.0, -175.0};
+  QVERIFY(style.shows(1, QString(), -15.0, 179.0, 0.0));
+  QVERIFY(style.shows(1, QString(), -15.0, -178.0, 0.0));
+  QVERIFY(!style.shows(1, QString(), -15.0, 0.0, 0.0));
+  style.area.reset();
+  style.hidden.insert(7);
+  QVERIFY(!style.shows(7, QString(), 0.0, 0.0, 0.0));
+}
+
+void TestAdsb::exportTrack()
+{
+  ts::AdsbReadOptions options;
+  const std::vector<ts::AircraftTrack> tracks =
+      readTracks("flights-aircraft.jsonl", options);
+  const ts::AircraftTrack& track = tracks.front();
+  const std::size_t n = track.track.points().size();
+  // KML: a gx:Track with a when and a coord for each report.
+  const QByteArray kml = ts::exportAircraftTrack(
+      track, QStringLiteral("TSO101"), ts::TrackExportFormat::Kml,
+      [](double, double) { return 47.0; });
+  QCOMPARE(static_cast<std::size_t>(kml.count("<when>")), n);
+  QCOMPARE(static_cast<std::size_t>(kml.count("<gx:coord>")), n);
+  QVERIFY(kml.contains("<altitudeMode>absolute</altitudeMode>"));
+  // Above sea level: the height less the geoid's 47 m.
+  const double msl = track.track.points().front().heightM - 47.0;
+  QVERIFY(kml.contains(QByteArray::number(msl, 'f', 1)));
+  QVERIFY(kml.contains("2026-11-20T12:00:00.000Z"));
+  // GPX.
+  const QByteArray gpx = ts::exportAircraftTrack(
+      track, QStringLiteral("TSO101"), ts::TrackExportFormat::Gpx);
+  QCOMPARE(static_cast<std::size_t>(gpx.count("<trkpt ")), n);
+  QVERIFY(gpx.contains("<ele>"));
+  // CSV: a header and a row a report, the callsign and altitudes in it.
+  const QByteArray csv = ts::exportAircraftTrack(
+      track, QStringLiteral("TSO101"), ts::TrackExportFormat::Csv);
+  const QList<QByteArray> rows = csv.trimmed().split('\n');
+  QCOMPARE(static_cast<std::size_t>(rows.size()), n + 1);
+  QVERIFY(rows.at(1).contains(",ABC001,TSO101,"));
+  QVERIFY(rows.at(1).contains(",30000,"));
+  // And it reads back as CSV, at the same places.
+  ts::AdsbReadOptions back;
+  back.csv = ts::guessCsvColumns(csv.left(512));
+  back.csv.time = 1;
+  QVERIFY(back.csv.isComplete());
+  ts::AircraftTrackBuilder builder;
+  const ts::AdsbReadResult result = ts::readAdsbData(
+      csv, ts::AdsbFormat::Csv, back,
+      [&builder](const ts::AircraftReport& r) { builder.add(r); });
+  QCOMPARE(result.problemCount, int64_t{0});
+  const std::vector<ts::AircraftTrack> again = builder.finish();
+  QCOMPARE(again.front().track.points().size(), n);
+  QCOMPARE(ts::trackExportFormatFor(QStringLiteral("a.GPX")),
+           ts::TrackExportFormat::Gpx);
+  QCOMPARE(ts::trackExportFormatFor(QStringLiteral("a.csv")),
+           ts::TrackExportFormat::Csv);
+  QCOMPARE(ts::trackExportFormatFor(QStringLiteral("a")),
+           ts::TrackExportFormat::Kml);
+}
+
+void TestAdsb::receiverSbs()
+{
+  // A mock receiver sending SBS lines: reports arrive, timed as they come.
+  QTcpServer server;
+  QVERIFY(server.listen(QHostAddress::LocalHost));
+  ts::AircraftSource source;
+  source.origin = ts::AircraftSource::Origin::Receiver;
+  source.protocol = ts::ReceiverProtocol::Sbs;
+  source.host = QStringLiteral("127.0.0.1");
+  source.port = server.serverPort();
+  ts::ReceiverFeed feed(source, nullptr, nullptr);
+  QSignalSpy ready(&feed, &ts::ReceiverFeed::reportsReady);
+  feed.start();
+  QVERIFY(server.waitForNewConnection(5000));
+  QTcpSocket* client = server.nextPendingConnection();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::ReceiverFeed::State::Connected; },
+      5000));
+  const QByteArray lines = readData("flights.sbs").left(4000);
+  // Sent in two pieces, split inside a line.
+  client->write(lines.left(1500));
+  client->flush();
+  QVERIFY(QTest::qWaitFor([&]() { return !ready.isEmpty(); }, 5000));
+  client->write(lines.mid(1500));
+  client->flush();
+  std::vector<ts::AircraftReport> reports;
+  const double before =
+      static_cast<double>(QDateTime::currentMSecsSinceEpoch()) / 1000.0 - 1.0;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        for (const ts::AircraftReport& r : feed.takeReports()) {
+          reports.push_back(r);
+        }
+        return reports.size() >= 30;
+      },
+      5000));
+  QVERIFY(reports.front().timeS >= before);
+  QVERIFY(std::any_of(
+      reports.begin(), reports.end(),
+      [](const ts::AircraftReport& r) { return r.position.has_value(); }));
+  QCOMPARE(feed.connections(), 1);
+  feed.stop();
+  QCOMPARE(feed.state(), ts::ReceiverFeed::State::Stopped);
+}
+
+void TestAdsb::receiverBeastReconnects()
+{
+  // A Beast receiver that drops the connection: the feed connects again
+  // (after a second) and goes on decoding.
+  QTcpServer server;
+  QVERIFY(server.listen(QHostAddress::LocalHost));
+  ts::AircraftSource source;
+  source.origin = ts::AircraftSource::Origin::Receiver;
+  source.protocol = ts::ReceiverProtocol::Beast;
+  source.host = QStringLiteral("127.0.0.1");
+  source.port = server.serverPort();
+  ts::ReceiverFeed feed(source, nullptr, nullptr);
+  feed.start();
+  QVERIFY(server.waitForNewConnection(5000));
+  QTcpSocket* first = server.nextPendingConnection();
+  const QByteArray beast = readData("flights.beast");
+  first->write(beast.left(20000));
+  first->flush();
+  int64_t positions = 0;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        for (const ts::AircraftReport& r : feed.takeReports()) {
+          positions += r.position ? 1 : 0;
+        }
+        return positions > 10;
+      },
+      5000));
+  // Dropped.
+  first->disconnectFromHost();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::ReceiverFeed::State::Reconnecting; },
+      5000));
+  QVERIFY(!feed.errorString().isEmpty());
+  // Back: it connects again and reads on.
+  QVERIFY(
+      QTest::qWaitFor([&]() { return server.hasPendingConnections(); }, 5000));
+  QTcpSocket* second = server.nextPendingConnection();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::ReceiverFeed::State::Connected; },
+      5000));
+  QCOMPARE(feed.connections(), 2);
+  second->write(beast.mid(20000, 20000));
+  second->flush();
+  int64_t more = 0;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        more += static_cast<int64_t>(feed.takeReports().size());
+        return more > 10;
+      },
+      5000));
+  // A receiver that isn't there: it keeps trying, waiting longer.
+  server.close();
+  second->disconnectFromHost();
+  QVERIFY(QTest::qWaitFor(
+      [&]() { return feed.state() == ts::ReceiverFeed::State::Reconnecting; },
+      5000));
+  QVERIFY(feed.retryDelayMs() >= 2000);
+  feed.stop();
+}
+
+void TestAdsb::receiverRecordingReadsBack()
+{
+  // Recorded as "time,hex" lines, the session reads back as a recording.
+  QTemporaryDir dir;
+  QTcpServer server;
+  QVERIFY(server.listen(QHostAddress::LocalHost));
+  ts::AircraftSource source;
+  source.origin = ts::AircraftSource::Origin::Receiver;
+  source.protocol = ts::ReceiverProtocol::Avr;
+  source.host = QStringLiteral("127.0.0.1");
+  source.port = server.serverPort();
+  source.recordPath = dir.filePath(QStringLiteral("session.txt"));
+  ts::ReceiverFeed feed(source, nullptr, nullptr);
+  feed.start();
+  QVERIFY(server.waitForNewConnection(5000));
+  QTcpSocket* client = server.nextPendingConnection();
+  QByteArray avr;
+  for (const QByteArray& line : readData("flights-mlat.avr").split('\n')) {
+    if (line.size() > 13) {
+      avr += '*' + line.mid(13);
+      avr += '\n';
+    }
+    if (avr.size() > 30000) {
+      break;
+    }
+  }
+  client->write(avr);
+  client->flush();
+  int64_t reports = 0;
+  QVERIFY(QTest::qWaitFor(
+      [&]() {
+        reports += static_cast<int64_t>(feed.takeReports().size());
+        return feed.messages() >= avr.count('\n');
+      },
+      5000));
+  feed.stop();
+  QVERIFY(reports > 100);
+  ts::AdsbReadResult result;
+  ts::AircraftTrackBuilder builder;
+  result = ts::readAdsbFile(
+      source.recordPath, ts::AdsbFormat::Unknown, ts::AdsbReadOptions(),
+      [&builder](const ts::AircraftReport& r) { builder.add(r); });
+  QCOMPARE(result.format, ts::AdsbFormat::Raw);
+  QVERIFY(!result.untimed);
+  QCOMPARE(result.records, avr.count('\n'));
+  QCOMPARE(builder.finish().size(), std::size_t{3});
+}
+
+void TestAdsb::liveBuilder()
+{
+  // Live data: only the aircraft with new reports are built again, and
+  // those not heard for long are forgotten.
+  ts::AircraftTrackBuilder builder;
+  for (int32_t i = 0; i < 10; ++i) {
+    for (const uint32_t address : {1U, 2U}) {
+      ts::AircraftReport r;
+      r.address = address;
+      r.timeS = 100.0 + i;
+      r.position = ts::CprPosition{static_cast<double>(i), 0.0};
+      builder.add(r);
+    }
+  }
+  QCOMPARE(builder.buildChanged().size(), std::size_t{2});
+  QVERIFY(builder.buildChanged().empty());
+  ts::AircraftReport r;
+  r.address = 2;
+  r.timeS = 200.0;
+  r.position = ts::CprPosition{20.0, 0.0};
+  builder.add(r);
+  const std::vector<ts::AircraftTrack> changed = builder.buildChanged();
+  QCOMPARE(changed.size(), std::size_t{1});
+  QCOMPARE(changed.front().track.points().size(), std::size_t{11});
+  builder.forgetBefore(150.0);
+  QCOMPARE(builder.finish().size(), std::size_t{1});
+}
+
+void TestAdsb::dayRecording()
+{
+  // A day's recording of a busy receiver: 120 aircraft over 8 hours,
+  // reported every 2 s (1.7 million reports), built into tracks within
+  // the time and memory budgets, and their trails made.
+  const ts::ProcessStats before = ts::currentProcessStats();
+  QElapsedTimer timer;
+  timer.start();
+  ts::AircraftTrackBuilder builder;
+  const int32_t aircraft = 120;
+  const int32_t steps = 8 * 3600 / 2;
+  for (int32_t step = 0; step < steps; ++step) {
+    for (int32_t a = 0; a < aircraft; ++a) {
+      const double t = 1.8e9 + 2.0 * step + 0.01 * a;
+      ts::AircraftReport r;
+      r.address = 0x400000U + static_cast<uint32_t>(a);
+      r.timeS = t;
+      // Gentle curves, so the trails keep some of their points.
+      const double phase = 0.0002 * step + a;
+      r.position = ts::CprPosition{40.0 + 8.0 * std::sin(phase) + 0.05 * a,
+                                   -10.0 + 20.0 * std::cos(0.7 * phase)};
+      r.baroAltitudeFt = 30000.0 + 5000.0 * std::sin(0.001 * step);
+      r.groundSpeedKt = 450.0;
+      r.trackDeg = std::fmod(10.0 * phase, 360.0);
+      builder.add(r);
+    }
+  }
+  const std::vector<ts::AircraftTrack> tracks = builder.finish();
+  const double buildS = static_cast<double>(timer.elapsed()) / 1000.0;
+  QCOMPARE(tracks.size(), static_cast<std::size_t>(aircraft));
+  std::size_t points = 0;
+  for (const ts::AircraftTrack& track : tracks) {
+    points += track.track.points().size();
+  }
+  QCOMPARE(points, static_cast<std::size_t>(aircraft) *
+                       static_cast<std::size_t>(steps));
+  const ts::ProcessStats after = ts::currentProcessStats();
+  const double usedMb = (static_cast<double>(after.peakResidentBytes) -
+                         static_cast<double>(before.residentBytes)) /
+                        (1024.0 * 1024.0);
+  timer.restart();
+  ts::TrackTiming timing;
+  ts::TrailSettings all;
+  all.mode = ts::TrailMode::All;
+  ts::TrailLook look;
+  std::size_t trailPoints = 0;
+  for (const ts::AircraftTrack& track : tracks) {
+    for (const ts::SpaceLine& line :
+         ts::trailLines(track.track, timing, all, look)) {
+      trailPoints += line.points.size();
+    }
+  }
+  const double trailS = static_cast<double>(timer.elapsed()) / 1000.0;
+  // Where each is at a time: a binary search each.
+  timer.restart();
+  int32_t shown = 0;
+  for (int32_t i = 0; i < 100; ++i) {
+    for (const ts::AircraftTrack& track : tracks) {
+      shown += track.track.at(1.8e9 + 3600.0 + i, timing) ? 1 : 0;
+    }
+  }
+  const double placeMs = static_cast<double>(timer.elapsed()) / 100.0;
+  qInfo("%s", qPrintable(QStringLiteral("%1 reports built in %2 s, %3 MB; "
+                                        "trails %4 points in %5 s; placed in "
+                                        "%6 ms")
+                             .arg(points)
+                             .arg(buildS, 0, 'f', 2)
+                             .arg(usedMb, 0, 'f', 0)
+                             .arg(trailPoints)
+                             .arg(trailS, 0, 'f', 2)
+                             .arg(placeMs, 0, 'f', 2)));
+  QCOMPARE(shown, 100 * aircraft);
+  // Budgets (generous for sanitizer builds): build 30 s, 700 MB, trails
+  // 20 s, placing every aircraft well within a frame.
+  QVERIFY(buildS < 30.0);
+  QVERIFY(usedMb < 700.0);
+  QVERIFY(trailS < 20.0);
+  QVERIFY(placeMs < 20.0);
+  // Simplification keeps a fraction of the points.
+  QVERIFY(trailPoints < points / 4);
+}
+
+void TestAdsb::readingRate()
+{
+  // SBS lines read at well over a hundred thousand a second (the budget is
+  // lower, for sanitizer builds).
+  QTemporaryDir dir;
+  const QString path = dir.filePath(QStringLiteral("big.sbs"));
+  {
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    const QByteArray sbs = readData("flights.sbs");
+    for (int32_t i = 0; i < 80; ++i) {
+      file.write(sbs);
+    }
+  }
+  QElapsedTimer timer;
+  timer.start();
+  ts::AdsbReadOptions options;
+  options.sbsLocalTime = false;
+  int64_t reports = 0;
+  const ts::AdsbReadResult result =
+      ts::readAdsbFile(path, ts::AdsbFormat::Unknown, options,
+                       [&reports](const ts::AircraftReport&) { ++reports; });
+  const double seconds =
+      std::max(static_cast<double>(timer.elapsed()) / 1000.0, 1e-3);
+  qInfo("%s", qPrintable(QStringLiteral("%1 SBS lines in %2 s")
+                             .arg(result.records)
+                             .arg(seconds, 0, 'f', 2)));
+  QVERIFY(result.records > 100000);
+  QCOMPARE(result.problemCount, int64_t{0});
+  QVERIFY(static_cast<double>(result.records) / seconds > 20000.0);
 }
 
 void TestAdsb::liveFeed()

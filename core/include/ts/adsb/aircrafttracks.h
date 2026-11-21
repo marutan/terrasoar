@@ -30,6 +30,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -156,6 +157,15 @@ public:
    */
   std::vector<AircraftTrack> finish();
 
+  /**
+   * Returns the tracks of the aircraft with reports since the last call
+   * (built from copies; the builder keeps everything), for live data.
+   */
+  std::vector<AircraftTrack> buildChanged();
+
+  /** Forgets aircraft with no report since @p timeS (live data). */
+  void forgetBefore(double timeS);
+
 private:
   struct Point {
     TrackSample point;
@@ -173,12 +183,15 @@ private:
     std::optional<double> trackDeg;
     std::optional<double> verticalRateFtMin;
     double motionTimeS = 0.0;
+    double lastS = 0.0;
   };
 
-  static AircraftTrack build(uint32_t address, Aircraft&& aircraft);
+  Point pointOf(const Aircraft& a, double t, CprPosition position) const;
+  static AircraftTrack build(uint32_t address, Aircraft aircraft);
 
   AircraftHeightSettings m_settings;
   std::unordered_map<uint32_t, Aircraft> m_aircraft;
+  std::set<uint32_t> m_changed;
   int64_t m_reports = 0;
   int64_t m_positions = 0;
 };

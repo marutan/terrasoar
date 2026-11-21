@@ -55,8 +55,8 @@ int32_t cprLongitudeZones(double latDeg);
  * aircraft crossed a zone boundary between them) or the latitude is
  * impossible. The frames must be close in time (10 s).
  */
-std::optional<CprPosition>
-cprGlobalAirborne(const CprFrame& even, const CprFrame& odd, bool oddNewer);
+std::optional<CprPosition> cprGlobalAirborne(CprFrame even, CprFrame odd,
+                                             bool oddNewer);
 
 /**
  * Decodes a surface position from an even and an odd frame. Surface
@@ -64,16 +64,16 @@ cprGlobalAirborne(const CprFrame& even, const CprFrame& odd, bool oddNewer);
  * one nearest @p reference (the receiver, or where the aircraft was) is
  * returned.
  */
-std::optional<CprPosition> cprGlobalSurface(const CprFrame& even,
-                                            const CprFrame& odd, bool oddNewer,
-                                            const CprPosition& reference);
+std::optional<CprPosition> cprGlobalSurface(CprFrame even, CprFrame odd,
+                                            bool oddNewer,
+                                            CprPosition reference);
 
 /**
  * Decodes one frame near @p reference (locally unambiguous): correct if
  * the aircraft is within half a zone of it, 180 NM airborne or 45 NM on
  * the surface.
  */
-CprPosition cprLocal(const CprFrame& frame, const CprPosition& reference);
+CprPosition cprLocal(CprFrame frame, CprPosition reference);
 
 } // namespace ts
 

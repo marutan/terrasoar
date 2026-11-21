@@ -66,10 +66,8 @@ struct TrailLook {
  * track with nothing rebuilt; the shader cuts each line at the time and
  * the span. Nothing for TrailMode::Off.
  */
-std::vector<SpaceLine> trailLines(const MovingTrack& track,
-                                  const TrackTiming& timing,
-                                  const TrailSettings& trail,
-                                  const TrailLook& look);
+std::vector<SpaceLine> trailLines(const MovingTrack& track, TrackTiming timing,
+                                  TrailSettings trail, const TrailLook& look);
 
 /** Returns the ECEF position of @p point (its height, or @p groundM). */
 Vec3 trackSampleEcef(const TrackSample& point, double groundM);

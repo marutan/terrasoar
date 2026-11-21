@@ -4,8 +4,8 @@ Terra Soar is a 3D globe and 2D map viewer for Windows and Linux. It shows
 the Earth from NASA's Blue Marble imagery, shorelines, country outlines and
 terrain built into the program, works fully offline, and adds layers from
 web map servers (WMS, WMTS and XYZ tiles), features from web feature
-services (WFS), KML files, satellites from their orbits, your own
-elevation files and web terrain services.
+services (WFS), KML files, satellites from their orbits, aircraft from
+ADS-B, your own elevation files and web terrain services.
 
 1. [Installing Terra Soar](installation.md): Windows, Linux, what the
    computer needs, where your files go.
@@ -27,7 +27,9 @@ elevation files and web terrain services.
    hillshade, the height readout, elevation profiles, sea level.
 10. [Satellites](satellites.md): satellites from CelesTrak or TLE files,
     their tracks and passes, and the clock.
-11. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
+11. [Aircraft](aircraft.md): aircraft from ADS-B recordings and live
+    receivers, their trails, playback and details.
+12. [Using Terra Soar offline](offline-use.md): offline regions, data packs,
    disk space.
 
 You can read this guide inside Terra Soar too, offline: **Help → User

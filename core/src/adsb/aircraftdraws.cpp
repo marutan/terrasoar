@@ -33,14 +33,14 @@ namespace
 
 constexpr std::array<std::uint8_t, 4> groundGrey = {150, 150, 150, 255};
 
-std::array<std::uint8_t, 4> mix(const std::array<std::uint8_t, 4>& a,
-                                const std::array<std::uint8_t, 4>& b, double f)
+std::array<std::uint8_t, 4> mix(std::array<std::uint8_t, 4> a,
+                                std::array<std::uint8_t, 4> b, double f)
 {
   std::array<std::uint8_t, 4> c{};
   for (std::size_t i = 0; i < 4; ++i) {
-    c[i] = static_cast<std::uint8_t>(std::lround(
-        static_cast<double>(a[i]) +
-        (static_cast<double>(b[i]) - static_cast<double>(a[i])) * f));
+    c.at(i) = static_cast<std::uint8_t>(std::lround(
+        static_cast<double>(a.at(i)) +
+        (static_cast<double>(b.at(i)) - static_cast<double>(a.at(i))) * f));
   }
   return c;
 }

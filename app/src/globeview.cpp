@@ -429,25 +429,59 @@ void GlobeView::initializeGL()
   m_globe->setElevationProvider(m_elevationDraw.provider);
   m_globe->setTerrain(m_elevationDraw.visible, m_elevationDraw.exaggeration);
   m_globe->setHillshade(m_elevationDraw.hillshade ? 1.0 : 0.0);
-  m_globe->setMarkers(m_markers);
-  m_globe->setSpaceLines(m_spaceLines);
+  m_globe->setMarkers(allMarkers());
+  for (std::size_t g = 0; g < m_spaceLines.size(); ++g) {
+    m_globe->setSpaceLines(m_spaceLines.at(g), static_cast<int32_t>(g));
+  }
+  m_globe->setSpaceLineTime(m_spaceLineTimeS);
   updateSurfaceHeight();
+}
+
+std::vector<GlobeMarker> GlobeView::allMarkers() const
+{
+  std::vector<GlobeMarker> all;
+  all.reserve(m_markers.size() + m_aircraftMarkers.size());
+  all.insert(all.end(), m_markers.begin(), m_markers.end());
+  all.insert(all.end(), m_aircraftMarkers.begin(), m_aircraftMarkers.end());
+  return all;
 }
 
 void GlobeView::setMarkers(std::vector<GlobeMarker> markers)
 {
   m_markers = std::move(markers);
   if (m_globe) {
-    m_globe->setMarkers(m_markers);
+    m_globe->setMarkers(allMarkers());
   }
   update();
 }
 
-void GlobeView::setSpaceLines(std::vector<SpaceLine> lines)
+void GlobeView::setAircraft(std::vector<GlobeMarker> markers,
+                            std::vector<BillboardDraw> labels)
 {
-  m_spaceLines = std::move(lines);
+  m_aircraftMarkers = std::move(markers);
+  m_aircraftLabels = std::move(labels);
   if (m_globe) {
-    m_globe->setSpaceLines(m_spaceLines);
+    m_globe->setMarkers(allMarkers());
+  }
+  update();
+}
+
+void GlobeView::setSpaceLines(std::vector<SpaceLine> lines, int32_t group)
+{
+  const std::size_t g = static_cast<std::size_t>(
+      std::clamp(group, 0, GlobeRenderer::spaceLineGroups - 1));
+  m_spaceLines.at(g) = std::move(lines);
+  if (m_globe) {
+    m_globe->setSpaceLines(m_spaceLines.at(g), static_cast<int32_t>(g));
+  }
+  update();
+}
+
+void GlobeView::setSpaceLineTime(double timeS)
+{
+  m_spaceLineTimeS = timeS;
+  if (m_globe) {
+    m_globe->setSpaceLineTime(timeS);
   }
   update();
 }
@@ -715,12 +749,13 @@ int32_t GlobeView::markerAt(QPointF positionPx) const
 {
   int32_t best = -1;
   double bestPx = 0.0;
-  for (std::size_t i = 0; i < m_markers.size(); ++i) {
-    const std::optional<QPointF> at = markerOnScreen(m_markers[i]);
+  const std::vector<GlobeMarker> all = allMarkers();
+  for (std::size_t i = 0; i < all.size(); ++i) {
+    const std::optional<QPointF> at = markerOnScreen(all[i]);
     if (!at) {
       continue;
     }
-    const double reachPx = m_markers[i].radiusPx + 4.0;
+    const double reachPx = all[i].radiusPx + 4.0;
     const double distance = QLineF(*at, positionPx).length();
     if (distance <= reachPx && (best < 0 || distance < bestPx)) {
       best = static_cast<int32_t>(i);
@@ -1487,7 +1522,8 @@ void GlobeView::drawBillboards()
 {
   m_billboardsDrawn = 0;
   m_labelsDrawn = 0;
-  if (m_billboards.empty() && m_satelliteLabels.empty()) {
+  if (m_billboards.empty() && m_satelliteLabels.empty() &&
+      m_aircraftLabels.empty()) {
     return;
   }
   constexpr double cellPx = 6.0;
@@ -1506,8 +1542,12 @@ void GlobeView::drawBillboards()
       QRectF(rect()).adjusted(-marginPx, -marginPx, marginPx, marginPx);
   // Satellites' labels first: KML icons can't then crowd them out.
   std::vector<const BillboardDraw*> all;
-  all.reserve(m_satelliteLabels.size() + m_billboards.size());
+  all.reserve(m_satelliteLabels.size() + m_aircraftLabels.size() +
+              m_billboards.size());
   for (const BillboardDraw& billboard : m_satelliteLabels) {
+    all.push_back(&billboard);
+  }
+  for (const BillboardDraw& billboard : m_aircraftLabels) {
     all.push_back(&billboard);
   }
   for (const BillboardDraw& billboard : m_billboards) {

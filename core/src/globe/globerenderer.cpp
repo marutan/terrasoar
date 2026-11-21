@@ -24,6 +24,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <optional>
 #include <utility>
 
 #include "ts/camera/camera.h"
@@ -933,6 +934,62 @@ void appendLine(const SpaceLine& line, const Camera& camera,
   }
 }
 
+/** Places @p point (ECEF) for @p camera, morphing to the map. */
+Vec3 placeOnMap(const Vec3& point, const Geodetic& where, const Camera& camera,
+                const MapFrame& frame)
+{
+  const Vec3 onGlobe = point - camera.eyeEcef();
+  const Vec3 onMap =
+      camera.mapPlanePoint(frame.offsetOf(where.latDeg, where.lonDeg));
+  return camera.eyeEcef() + onGlobe * (1.0 - camera.morph()) +
+         onMap * camera.morph();
+}
+
+/**
+ * Returns @p marker's instance for @p camera (on the map and during the
+ * morph, placed there): its position, and an aircraft's heading as drawn.
+ * Nothing if it is off a map that ends at its domain.
+ */
+std::optional<MarkerInstance> markerInstance(const GlobeMarker& marker,
+                                             const Camera& camera,
+                                             const MapFrame& frame)
+{
+  const bool morphed = camera.morph() > 0.0;
+  const bool aircraft = marker.shape == MarkerShape::Aircraft;
+  const bool turned = aircraft && std::isfinite(marker.headingDeg);
+  Vec3 position = marker.positionEcef;
+  Vec3 heading{};
+  const Geodetic geodetic =
+      morphed || turned ? ecefToGeodetic(marker.positionEcef) : Geodetic();
+  if (turned) {
+    const LocalFrame local = localFrame(geodetic.latDeg, geodetic.lonDeg);
+    const double h = degToRad(marker.headingDeg);
+    heading = local.northEcef * std::cos(h) + local.eastEcef * std::sin(h);
+  }
+  if (morphed) {
+    if (!frame.projection->contains(geodetic.latDeg, geodetic.lonDeg)) {
+      // Off a map that ends at its domain (it would sit on the edge).
+      return std::nullopt;
+    }
+    position = placeOnMap(marker.positionEcef, geodetic, camera, frame);
+    if (turned) {
+      // The heading as it is drawn: towards a point a kilometre on.
+      const Vec3 aheadEcef = marker.positionEcef + heading * 1000.0;
+      const Vec3 d =
+          placeOnMap(aheadEcef, ecefToGeodetic(aheadEcef), camera, frame) -
+          position;
+      heading = length(d) > 0.0 ? d * (1.0 / length(d)) : Vec3{};
+    }
+  }
+  const SplitVec3 split = splitVec3(position);
+  return MarkerInstance{
+      {split.highX, split.highY, split.highZ, split.lowX, split.lowY,
+       split.lowZ, static_cast<float>(marker.radiusPx)},
+      marker.rgba,
+      {static_cast<float>(heading.x), static_cast<float>(heading.y),
+       static_cast<float>(heading.z), aircraft ? 1.0F : 0.0F}};
+}
+
 } // namespace
 
 void GlobeRenderer::uploadSpaceLines(const Camera& camera)
@@ -954,7 +1011,7 @@ void GlobeRenderer::uploadSpaceLines(const Camera& camera)
   m_spaceLinesProjection = frame.projection;
   Resources& r = *m_resources;
   for (std::size_t g = 0; g < m_spaceLineGroups.size(); ++g) {
-    SpaceLineGroup& group = m_spaceLineGroups[g];
+    SpaceLineGroup& group = m_spaceLineGroups.at(g);
     if (!group.dirty && !everything) {
       continue;
     }
@@ -981,6 +1038,19 @@ void GlobeRenderer::uploadSpaceLines(const Camera& camera)
   }
 }
 
+void GlobeRenderer::drawSpaceLines()
+{
+  const Resources& r = *m_resources;
+  for (const Resources::LineBuffer& buffer : r.lines) {
+    if (buffer.count > 0 && buffer.instances) {
+      m_device.setPipeline(*r.linePipeline);
+      m_device.setVertexBuffer(0, *r.markerCorners, 0);
+      m_device.setVertexBuffer(1, *buffer.instances, 0);
+      m_device.draw(4, 0, buffer.count);
+    }
+  }
+}
+
 void GlobeRenderer::uploadMarkers(const Camera& camera)
 {
   // On the map and during the morph markers move with the camera, so
@@ -995,48 +1065,11 @@ void GlobeRenderer::uploadMarkers(const Camera& camera)
   instances.reserve(m_markers.size());
   const MapFrame frame = morphed ? camera.mapFrame() : MapFrame();
   for (const GlobeMarker& marker : m_markers) {
-    Vec3 position = marker.positionEcef;
-    const bool aircraft = marker.shape == MarkerShape::Aircraft;
-    const bool turned = aircraft && std::isfinite(marker.headingDeg);
-    Vec3 heading{};
-    Geodetic geodetic;
-    if (morphed || turned) {
-      geodetic = ecefToGeodetic(marker.positionEcef);
+    const std::optional<MarkerInstance> instance =
+        markerInstance(marker, camera, frame);
+    if (instance) {
+      instances.push_back(*instance);
     }
-    if (turned) {
-      const LocalFrame local = localFrame(geodetic.latDeg, geodetic.lonDeg);
-      const double h = degToRad(marker.headingDeg);
-      heading = local.northEcef * std::cos(h) + local.eastEcef * std::sin(h);
-    }
-    if (morphed) {
-      if (!frame.projection->contains(geodetic.latDeg, geodetic.lonDeg)) {
-        // Off a map that ends at its domain (it would sit on the edge).
-        continue;
-      }
-      const std::function<Vec3(const Vec3&, const Geodetic&)> place =
-          [&camera, &frame](const Vec3& ecef, const Geodetic& where) {
-            const Vec3 onGlobe = ecef - camera.eyeEcef();
-            const Vec3 onMap = camera.mapPlanePoint(
-                frame.offsetOf(where.latDeg, where.lonDeg));
-            return camera.eyeEcef() + onGlobe * (1.0 - camera.morph()) +
-                   onMap * camera.morph();
-          };
-      position = place(marker.positionEcef, geodetic);
-      if (turned) {
-        // The heading as it is drawn: towards a point a kilometre on.
-        const Vec3 aheadEcef = marker.positionEcef + heading * 1000.0;
-        const Vec3 ahead = place(aheadEcef, ecefToGeodetic(aheadEcef));
-        const Vec3 d = ahead - position;
-        heading = length(d) > 0.0 ? d * (1.0 / length(d)) : Vec3{};
-      }
-    }
-    const SplitVec3 split = splitVec3(position);
-    instances.push_back(MarkerInstance{
-        {split.highX, split.highY, split.highZ, split.lowX, split.lowY,
-         split.lowZ, static_cast<float>(marker.radiusPx)},
-        marker.rgba,
-        {static_cast<float>(heading.x), static_cast<float>(heading.y),
-         static_cast<float>(heading.z), aircraft ? 1.0F : 0.0F}});
   }
   if (instances.size() > r.markerCapacity) {
     r.markerCapacity = std::max<std::size_t>(instances.size(), 16);
@@ -1298,14 +1331,7 @@ void GlobeRenderer::render(const Camera& camera, const PassDesc& pass,
     }
   }
 
-  for (const Resources::LineBuffer& buffer : r.lines) {
-    if (buffer.count > 0 && buffer.instances) {
-      m_device.setPipeline(*r.linePipeline);
-      m_device.setVertexBuffer(0, *r.markerCorners, 0);
-      m_device.setVertexBuffer(1, *buffer.instances, 0);
-      m_device.draw(4, 0, buffer.count);
-    }
-  }
+  drawSpaceLines();
   if (r.markerCount > 0 && r.markerInstances) {
     m_device.setPipeline(*r.markerPipeline);
     m_device.setVertexBuffer(0, *r.markerCorners, 0);

@@ -37,6 +37,7 @@
 
 #include <QJsonObject>
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <QStringList>
 #include <QThreadPool>
@@ -233,7 +234,8 @@ private:
   void drawSatellite(const TaskInfo& info, const SatelliteState& state,
                      const SatelliteTrack& track, const SatelliteStyle& style);
 
-  ProgramClock* m_clock;
+  /** Guarded: the window may destroy the clock first. */
+  QPointer<ProgramClock> m_clock;
   NetworkSource m_network;
   ElementDownloadSettings m_download;
   std::vector<SatelliteLayerEntry> m_layers;

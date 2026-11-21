@@ -344,6 +344,7 @@ private:
 
   void uploadMarkers(const Camera& camera);
   void uploadSpaceLines(const Camera& camera);
+  void drawSpaceLines();
   std::vector<std::size_t> writeGraticuleUniforms(double fade,
                                                   double devicePixelRatio);
   void drawGraticule(std::size_t index);

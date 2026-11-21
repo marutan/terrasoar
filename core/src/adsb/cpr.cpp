@@ -45,7 +45,7 @@ std::array<double, 60> transitionLatitudes()
   std::array<double, 60> latitudes{};
   const double a = 1.0 - std::cos(pi / (2.0 * zones));
   for (int32_t n = 2; n < 60; ++n) {
-    latitudes[static_cast<std::size_t>(n)] =
+    latitudes.at(static_cast<std::size_t>(n)) =
         radToDeg(std::acos(std::sqrt(a / (1.0 - std::cos(2.0 * pi / n)))));
   }
   return latitudes;
@@ -70,8 +70,7 @@ struct PairLatitudes {
   double odd = 0.0;
 };
 
-PairLatitudes pairLatitudes(const CprFrame& even, const CprFrame& odd,
-                            double span)
+PairLatitudes pairLatitudes(CprFrame even, CprFrame odd, double span)
 {
   const double latEven = even.lat / scale;
   const double latOdd = odd.lat / scale;
@@ -83,8 +82,10 @@ PairLatitudes pairLatitudes(const CprFrame& even, const CprFrame& odd,
 }
 
 /** The longitude of a pair at latitude @p latDeg, in [0, span). */
-double pairLongitude(const CprFrame& even, const CprFrame& odd, bool oddNewer,
-                     double latDeg, double span)
+// A latitude, then the world's span, as named.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+double pairLongitude(CprFrame even, CprFrame odd, bool oddNewer, double latDeg,
+                     double span)
 {
   const int32_t nl = cprLongitudeZones(latDeg);
   const double lonEven = even.lon / scale;
@@ -102,15 +103,15 @@ int32_t cprLongitudeZones(double latDeg)
   static const std::array<double, 60> transitions = transitionLatitudes();
   const double lat = std::fabs(latDeg);
   for (int32_t n = 59; n >= 2; --n) {
-    if (lat < transitions[static_cast<std::size_t>(n)]) {
+    if (lat < transitions.at(static_cast<std::size_t>(n))) {
       return n;
     }
   }
   return 1;
 }
 
-std::optional<CprPosition> cprGlobalAirborne(const CprFrame& even,
-                                             const CprFrame& odd, bool oddNewer)
+std::optional<CprPosition> cprGlobalAirborne(CprFrame even, CprFrame odd,
+                                             bool oddNewer)
 {
   PairLatitudes lat = pairLatitudes(even, odd, 360.0);
   if (lat.even >= 270.0) {
@@ -130,9 +131,9 @@ std::optional<CprPosition> cprGlobalAirborne(const CprFrame& even,
   return position;
 }
 
-std::optional<CprPosition> cprGlobalSurface(const CprFrame& even,
-                                            const CprFrame& odd, bool oddNewer,
-                                            const CprPosition& reference)
+std::optional<CprPosition> cprGlobalSurface(CprFrame even, CprFrame odd,
+                                            bool oddNewer,
+                                            CprPosition reference)
 {
   const PairLatitudes lat = pairLatitudes(even, odd, 90.0);
   // Each latitude is the northern solution; the southern is 90° less.
@@ -152,7 +153,7 @@ std::optional<CprPosition> cprGlobalSurface(const CprFrame& even,
   return position;
 }
 
-CprPosition cprLocal(const CprFrame& frame, const CprPosition& reference)
+CprPosition cprLocal(CprFrame frame, CprPosition reference)
 {
   const double span = frame.surface ? 90.0 : 360.0;
   const double i = frame.odd ? 1.0 : 0.0;

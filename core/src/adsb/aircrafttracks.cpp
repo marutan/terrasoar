@@ -78,11 +78,35 @@ AircraftTrackBuilder::AircraftTrackBuilder(AircraftHeightSettings settings)
 {
 }
 
+namespace
+{
+
+/** @p info with what @p r says of the aircraft. */
+AircraftInfo withReport(AircraftInfo info, const AircraftReport& r)
+{
+  if (r.callsign && !r.callsign->isEmpty()) {
+    info.callsign = *r.callsign;
+  }
+  info.squawk = r.squawk.value_or(info.squawk);
+  info.registration = r.registration.value_or(info.registration);
+  info.aircraftType = r.aircraftType.value_or(info.aircraftType);
+  info.category = r.category.value_or(info.category);
+  info.emergency = r.emergency.value_or(info.emergency);
+  if (r.onGround) {
+    info.onGround = r.onGround;
+  }
+  return info;
+}
+
+} // namespace
+
 void AircraftTrackBuilder::add(const AircraftReport& r)
 {
   ++m_reports;
   Aircraft& a = m_aircraft[r.address];
   const double t = r.timeS;
+  a.lastS = std::max(a.lastS, t);
+  m_changed.insert(r.address);
   if (r.baroAltitudeFt) {
     a.baroFt = r.baroAltitudeFt;
     a.baroTimeS = t;
@@ -92,62 +116,43 @@ void AircraftTrackBuilder::add(const AircraftReport& r)
     a.geometricTimeS = t;
   }
   if (r.groundSpeedKt || r.trackDeg || r.verticalRateFtMin) {
-    if (r.groundSpeedKt) {
-      a.speedKt = r.groundSpeedKt;
-    }
-    if (r.trackDeg) {
-      a.trackDeg = r.trackDeg;
-    }
-    if (r.verticalRateFtMin) {
-      a.verticalRateFtMin = r.verticalRateFtMin;
-    }
+    a.speedKt = r.groundSpeedKt ? r.groundSpeedKt : a.speedKt;
+    a.trackDeg = r.trackDeg ? r.trackDeg : a.trackDeg;
+    a.verticalRateFtMin =
+        r.verticalRateFtMin ? r.verticalRateFtMin : a.verticalRateFtMin;
     a.motionTimeS = t;
   }
-  AircraftInfo info = a.current;
-  if (r.callsign && !r.callsign->isEmpty()) {
-    info.callsign = *r.callsign;
-  }
-  if (r.squawk) {
-    info.squawk = *r.squawk;
-  }
-  if (r.registration) {
-    info.registration = *r.registration;
-  }
-  if (r.aircraftType) {
-    info.aircraftType = *r.aircraftType;
-  }
-  if (r.category) {
-    info.category = *r.category;
-  }
-  if (r.emergency) {
-    info.emergency = *r.emergency;
-  }
-  if (r.onGround) {
-    info.onGround = r.onGround;
-  }
+  AircraftInfo info = withReport(a.current, r);
   if (a.info.empty() || !info.sameAs(a.current)) {
     info.timeS = t;
     a.info.push_back(info);
     a.current = info;
   }
-  if (!r.position) {
-    return;
+  if (r.position) {
+    ++m_positions;
+    a.points.push_back(pointOf(a, t, *r.position));
   }
-  ++m_positions;
+}
+
+AircraftTrackBuilder::Point
+AircraftTrackBuilder::pointOf(const Aircraft& a, double t,
+                              CprPosition position) const
+{
   Point p;
   p.point.timeS = t;
-  p.point.latDeg = r.position->latDeg;
-  p.point.lonDeg = r.position->lonDeg;
+  p.point.latDeg = position.latDeg;
+  p.point.lonDeg = position.lonDeg;
   const double kept = m_settings.altitudeKeptS;
-  const bool baro = a.baroFt && std::fabs(t - a.baroTimeS) <= kept;
-  const bool geometric =
-      a.geometricFt && std::fabs(t - a.geometricTimeS) <= kept;
+  const std::optional<double> baro =
+      std::fabs(t - a.baroTimeS) <= kept ? a.baroFt : std::nullopt;
+  const std::optional<double> geometric =
+      std::fabs(t - a.geometricTimeS) <= kept ? a.geometricFt : std::nullopt;
   if (baro) {
-    p.altitudes.baroFt = static_cast<float>(*a.baroFt);
+    p.altitudes.baroFt = static_cast<float>(*baro);
   }
   if (geometric) {
-    p.altitudes.geometricFt = static_cast<float>(*a.geometricFt);
-    p.point.heightM = *a.geometricFt * feetToMetres;
+    p.altitudes.geometricFt = static_cast<float>(*geometric);
+    p.point.heightM = *geometric * feetToMetres;
   } else if (baro) {
     double undulation =
         m_settings.undulation
@@ -156,7 +161,7 @@ void AircraftTrackBuilder::add(const AircraftReport& r)
     if (std::isnan(undulation)) {
       undulation = 0.0;
     }
-    p.point.heightM = pressureAltitudeToHeightM(*a.baroFt) + undulation;
+    p.point.heightM = pressureAltitudeToHeightM(*baro) + undulation;
     p.point.heightApproximate = true;
   }
   if (std::fabs(t - a.motionTimeS) <= kept) {
@@ -171,10 +176,10 @@ void AircraftTrackBuilder::add(const AircraftReport& r)
           *a.verticalRateFtMin * feetPerMinuteToMetresPerSecond);
     }
   }
-  a.points.push_back(p);
+  return p;
 }
 
-AircraftTrack AircraftTrackBuilder::build(uint32_t address, Aircraft&& aircraft)
+AircraftTrack AircraftTrackBuilder::build(uint32_t address, Aircraft aircraft)
 {
   std::vector<Point> points = std::move(aircraft.points);
   std::stable_sort(points.begin(), points.end(),
@@ -218,7 +223,36 @@ std::vector<AircraftTrack> AircraftTrackBuilder::finish()
   }
   m_reports = 0;
   m_positions = 0;
+  m_changed.clear();
   return tracks;
+}
+
+std::vector<AircraftTrack> AircraftTrackBuilder::buildChanged()
+{
+  std::vector<AircraftTrack> tracks;
+  tracks.reserve(m_changed.size());
+  for (const uint32_t address : m_changed) {
+    const std::unordered_map<uint32_t, Aircraft>::const_iterator found =
+        m_aircraft.find(address);
+    if (found != m_aircraft.end()) {
+      tracks.push_back(build(address, found->second));
+    }
+  }
+  m_changed.clear();
+  return tracks;
+}
+
+void AircraftTrackBuilder::forgetBefore(double timeS)
+{
+  for (std::unordered_map<uint32_t, Aircraft>::iterator i = m_aircraft.begin();
+       i != m_aircraft.end();) {
+    if (i->second.lastS < timeS) {
+      m_changed.erase(i->first);
+      i = m_aircraft.erase(i);
+    } else {
+      ++i;
+    }
+  }
 }
 
 } // namespace ts

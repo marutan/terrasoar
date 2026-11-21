@@ -428,7 +428,7 @@ constexpr double aircraftFixtureStartS = 1795176000.0;
  * The fixture flights at @p timeS as the program draws them: markers,
  * drop lines and trails coloured by altitude.
  */
-void aircraftScene(double timeS, const ts::TrailSettings& trail,
+void aircraftScene(double timeS, ts::TrailSettings trail,
                    std::vector<ts::GlobeMarker>& markers,
                    std::vector<ts::SpaceLine>& lines)
 {
@@ -2830,11 +2830,17 @@ private slots:
         camera.project(ts::geodeticToEcef(ts::Geodetic{0.0, 15.0, 10000.0}));
     QVERIFY(west && centre && east && east15);
     // From 10° W to 0° (with the line's half width and caps at the ends).
-    QVERIFY(std::abs(a.first - static_cast<int32_t>(west->xPx)) <= 3);
-    QVERIFY(std::abs(a.second - static_cast<int32_t>(centre->xPx)) <= 3);
+    QVERIFY(std::abs(a.first - static_cast<int32_t>(
+                                   west.value_or(ts::ScreenPoint()).xPx)) <= 3);
+    QVERIFY(std::abs(a.second - static_cast<int32_t>(
+                                    centre.value_or(ts::ScreenPoint()).xPx)) <=
+            3);
     // From 5° E to 15° E.
-    QVERIFY(std::abs(b.first - static_cast<int32_t>(east->xPx)) <= 3);
-    QVERIFY(std::abs(b.second - static_cast<int32_t>(east15->xPx)) <= 3);
+    QVERIFY(std::abs(b.first - static_cast<int32_t>(
+                                   east.value_or(ts::ScreenPoint()).xPx)) <= 3);
+    QVERIFY(std::abs(b.second - static_cast<int32_t>(
+                                    east15.value_or(ts::ScreenPoint()).xPx)) <=
+            3);
     // Before the line starts: nothing.
     QCOMPARE(c.second, -1);
     // Four times as long (40 s against 10 s).
@@ -2859,9 +2865,12 @@ private slots:
     QFETCH(QString, mode);
     QFETCH(bool, map);
     ts::TrailSettings trail;
-    trail.mode = mode == QLatin1String("off")    ? ts::TrailMode::Off
-                 : mode == QLatin1String("span") ? ts::TrailMode::Span
-                                                 : ts::TrailMode::All;
+    trail.mode = ts::TrailMode::All;
+    if (mode == QLatin1String("off")) {
+      trail.mode = ts::TrailMode::Off;
+    } else if (mode == QLatin1String("span")) {
+      trail.mode = ts::TrailMode::Span;
+    }
     trail.spanS = 60.0;
     std::vector<ts::GlobeMarker> markers;
     std::vector<ts::SpaceLine> lines;
@@ -2901,6 +2910,87 @@ private slots:
     const QString failure = ts::test::checkGolden(
         image, QString::fromLatin1(QTest::currentDataTag()), goldenTolerance);
     QVERIFY2(failure.isEmpty(), qPrintable(failure));
+  }
+
+  void aircraftHoldFrameRate()
+  {
+    // A busy live view: 1000 aircraft, each with an hour of trail (all
+    // the data, 1800 reports each, simplified), playing: the clock moves
+    // every frame, which moves the markers and cuts the trails in the
+    // shader, uploading no trail. Frames on the globe (tilted) and the map
+    // within the software budget.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    std::vector<ts::SpaceLine> trails;
+    std::vector<ts::MovingTrack> tracks(1000);
+    ts::TrackTiming timing;
+    ts::TrailSettings all;
+    all.mode = ts::TrailMode::All;
+    ts::TrailLook look;
+    look.colourOf = [](const ts::TrackSample& p) {
+      return ts::altitudeColour(p.heightM);
+    };
+    for (std::size_t a = 0; a < tracks.size(); ++a) {
+      for (int32_t i = 0; i < 1800; ++i) {
+        ts::TrackSample p;
+        p.timeS = 1.8e9 + 2.0 * i;
+        const double phase = 0.0005 * i + static_cast<double>(a);
+        p.latDeg = 35.0 + 15.0 * std::sin(0.37 * static_cast<double>(a)) +
+                   2.0 * std::sin(phase);
+        p.lonDeg = -10.0 + 30.0 * std::cos(0.71 * static_cast<double>(a)) +
+                   3.0 * std::cos(0.8 * phase);
+        p.heightM = 3000.0 +
+                    8000.0 * std::fabs(std::sin(0.13 * static_cast<double>(a)));
+        p.trackDeg = static_cast<float>(std::fmod(40.0 * phase, 360.0));
+        tracks[a].add(p);
+      }
+      tracks[a].finish();
+      for (ts::SpaceLine& line : ts::trailLines(tracks[a], timing, all, look)) {
+        trails.push_back(std::move(line));
+      }
+    }
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines(trails, 1);
+    for (const double morph : {0.0, 1.0}) {
+      ts::Camera camera =
+          morph > 0.0 ? makeCamera(ts::CameraPose{40.0, 0.0, 6.0e6, 0.0, 0.0})
+                      : makeCamera(ts::CameraPose{40.0, 0.0, 4.0e6, 0.0, 40.0});
+      camera.setMapProjection(ts::projectionById(QStringLiteral("mercator")));
+      camera.setMorph(morph);
+      m_renderer->setSpaceLineTime(1.8e9 + 1800.0);
+      render(camera);
+      const int64_t uploads = m_renderer->spaceLineUploads();
+      std::vector<double> timesS;
+      for (int32_t frame = 0; frame < 20; ++frame) {
+        const double timeS = 1.8e9 + 1800.0 + 10.0 * frame;
+        std::vector<ts::GlobeMarker> markers;
+        markers.reserve(tracks.size());
+        for (const ts::MovingTrack& track : tracks) {
+          const std::optional<ts::TrackSample> at = track.at(timeS, timing);
+          if (at) {
+            markers.push_back(
+                ts::aircraftMarker(*at, 0.0, {255, 230, 0, 255}, 8.0));
+          }
+        }
+        QElapsedTimer one;
+        one.start();
+        m_renderer->setSpaceLineTime(timeS);
+        render(camera, markers);
+        timesS.push_back(static_cast<double>(one.nsecsElapsed()) * 1e-9);
+      }
+      // The trails were placed once (the view didn't move).
+      QCOMPARE(m_renderer->spaceLineUploads(), uploads);
+      std::sort(timesS.begin(), timesS.end());
+      const double quartileS = timesS.at(timesS.size() / 4);
+      qInfo("aircraft %s (%d segments): fastest quarter within %.1f ms, "
+            "slowest %.1f ms",
+            morph > 0.0 ? "map" : "globe", m_renderer->spaceSegmentsDrawn(),
+            quartileS * 1000.0, timesS.back() * 1000.0);
+      QVERIFY2(quartileS < 0.1, qPrintable(QString::number(quartileS)));
+    }
+    m_gl->makeCurrent();
+    m_renderer->setSpaceLines({}, 1);
+    m_renderer->setMarkers({});
+    QCOMPARE(m_gl->device().takeErrors(), QString());
   }
 
   void satellitesHoldFrameRate()

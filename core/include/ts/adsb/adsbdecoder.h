@@ -130,9 +130,9 @@ private:
     double gnssMinusBaroTimeS = 0.0;
   };
 
-  std::optional<CprPosition>
-  decodePosition(Aircraft& aircraft, const CprFrame& frame, double timeS);
-  bool withinRange(const CprPosition& position) const;
+  std::optional<CprPosition> decodePosition(Aircraft& aircraft, CprFrame frame,
+                                            double timeS);
+  bool withinRange(CprPosition position) const;
 
   AdsbDecoderSettings m_settings;
   std::unordered_map<uint32_t, Aircraft> m_aircraft;
@@ -140,7 +140,7 @@ private:
 };
 
 /** Returns the distance between two positions, nautical miles. */
-double distanceNm(const CprPosition& a, const CprPosition& b);
+double distanceNm(CprPosition a, CprPosition b);
 
 } // namespace ts
 

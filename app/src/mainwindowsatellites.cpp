@@ -290,7 +290,12 @@ void MainWindow::selectSatellite(const QString& nodeId, int32_t catalogueNumber)
 void MainWindow::satelliteMarkerClicked(int32_t index)
 {
   const std::vector<DrawnSatellite>& drawn = m_satellites->drawn();
-  if (index < 0 || static_cast<std::size_t>(index) >= drawn.size()) {
+  if (index < 0) {
+    return;
+  }
+  // Aircraft's markers come after the satellites'.
+  if (static_cast<std::size_t>(index) >= drawn.size()) {
+    aircraftMarkerClicked(index - static_cast<int32_t>(drawn.size()));
     return;
   }
   const DrawnSatellite& satellite = drawn[static_cast<std::size_t>(index)];

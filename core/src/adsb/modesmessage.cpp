@@ -34,14 +34,15 @@ namespace
 constexpr uint32_t generator = 0xFFF409U;
 
 /** The 6-bit character set of callsigns ('#' for none). */
-constexpr char callsignCharacters[] =
-    "#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######";
+constexpr std::array<char, 65> callsignCharacters = {
+    "#ABCDEFGHIJKLMNOPQRSTUVWXYZ##### ###############0123456789######"};
 
 /** Bits of a message by position (1 is the first bit). */
 class Bits
 {
 public:
-  explicit Bits(const QByteArray& bytes) : m_bytes(bytes) {}
+  /** Reads @p bytes, which must outlive it. */
+  explicit Bits(const QByteArray& bytes) : m_bytes(&bytes) {}
 
   /** Returns @p count bits (at most 32) from bit @p first on. */
   uint32_t get(int32_t first, int32_t count) const
@@ -49,7 +50,7 @@ public:
     uint32_t value = 0;
     for (int32_t i = 0; i < count; ++i) {
       const int32_t bit = first - 1 + i;
-      const uint8_t byte = static_cast<uint8_t>(m_bytes.at(bit / 8));
+      const uint8_t byte = static_cast<uint8_t>(m_bytes->at(bit / 8));
       value =
           (value << 1U) | ((byte >> static_cast<uint32_t>(7 - bit % 8)) & 1U);
     }
@@ -57,7 +58,7 @@ public:
   }
 
 private:
-  const QByteArray& m_bytes;
+  const QByteArray* m_bytes;
 };
 
 int32_t messageBits(int32_t downlinkFormat)
@@ -81,11 +82,11 @@ uint32_t fromGray(uint32_t value)
   return result;
 }
 
-void decodeIdentification(const Bits& me, ModeSMessage& message)
+void decodeIdentification(Bits me, ModeSMessage& message)
 {
   QString callsign;
   for (int32_t i = 0; i < 8; ++i) {
-    const char c = callsignCharacters[me.get(9 + 6 * i, 6)];
+    const char c = callsignCharacters.at(me.get(9 + 6 * i, 6));
     if (c != '#') {
       callsign.append(QLatin1Char(c));
     }
@@ -99,7 +100,7 @@ void decodeIdentification(const Bits& me, ModeSMessage& message)
   }
 }
 
-void decodePosition(const Bits& me, ModeSMessage& message)
+void decodePosition(Bits me, ModeSMessage& message)
 {
   const int32_t tc = message.typeCode;
   CprFrame frame;
@@ -126,32 +127,45 @@ void decodePosition(const Bits& me, ModeSMessage& message)
   message.cpr = frame;
 }
 
-void decodeVelocity(const Bits& me, ModeSMessage& message)
+/** Velocity subtypes 1 and 2: ground speed and track. */
+void decodeGroundVelocity(Bits me, uint32_t subtype, ModeSMessage& message)
+{
+  const uint32_t vew = me.get(15, 10);
+  const uint32_t vns = me.get(26, 10);
+  if (vew == 0 || vns == 0) {
+    return;
+  }
+  const double factor = subtype == 2 ? 4.0 : 1.0;
+  const double vx = (me.get(14, 1) != 0 ? -1.0 : 1.0) * factor * (vew - 1);
+  const double vy = (me.get(25, 1) != 0 ? -1.0 : 1.0) * factor * (vns - 1);
+  message.groundSpeedKt = std::hypot(vx, vy);
+  double track = std::atan2(vx, vy) * 180.0 / 3.14159265358979323846;
+  if (track < 0.0) {
+    track += 360.0;
+  }
+  message.trackDeg = track;
+}
+
+/** Velocity subtypes 3 and 4: heading and airspeed. */
+void decodeAirVelocity(Bits me, uint32_t subtype, ModeSMessage& message)
+{
+  if (me.get(14, 1) != 0) {
+    message.headingDeg = 360.0 * me.get(15, 10) / 1024.0;
+  }
+  const uint32_t airspeed = me.get(26, 10);
+  if (airspeed != 0) {
+    message.airspeedKt = (subtype == 4 ? 4.0 : 1.0) * (airspeed - 1);
+    message.trueAirspeed = me.get(25, 1) != 0;
+  }
+}
+
+void decodeVelocity(Bits me, ModeSMessage& message)
 {
   const uint32_t subtype = me.get(6, 3);
   if (subtype == 1 || subtype == 2) {
-    const uint32_t vew = me.get(15, 10);
-    const uint32_t vns = me.get(26, 10);
-    if (vew != 0 && vns != 0) {
-      const double factor = subtype == 2 ? 4.0 : 1.0;
-      const double vx = (me.get(14, 1) != 0 ? -1.0 : 1.0) * factor * (vew - 1);
-      const double vy = (me.get(25, 1) != 0 ? -1.0 : 1.0) * factor * (vns - 1);
-      message.groundSpeedKt = std::hypot(vx, vy);
-      double track = std::atan2(vx, vy) * 180.0 / 3.14159265358979323846;
-      if (track < 0.0) {
-        track += 360.0;
-      }
-      message.trackDeg = track;
-    }
+    decodeGroundVelocity(me, subtype, message);
   } else if (subtype == 3 || subtype == 4) {
-    if (me.get(14, 1) != 0) {
-      message.headingDeg = 360.0 * me.get(15, 10) / 1024.0;
-    }
-    const uint32_t airspeed = me.get(26, 10);
-    if (airspeed != 0) {
-      message.airspeedKt = (subtype == 4 ? 4.0 : 1.0) * (airspeed - 1);
-      message.trueAirspeed = me.get(25, 1) != 0;
-    }
+    decodeAirVelocity(me, subtype, message);
   } else {
     return;
   }
@@ -168,7 +182,7 @@ void decodeVelocity(const Bits& me, ModeSMessage& message)
   }
 }
 
-void decodeStatus(const Bits& me, ModeSMessage& message)
+void decodeStatus(Bits me, ModeSMessage& message)
 {
   if (me.get(6, 3) != 1) {
     return;
@@ -181,7 +195,7 @@ void decodeStatus(const Bits& me, ModeSMessage& message)
 }
 
 /** Decodes an extended squitter's ME field (bits 33 to 88). */
-bool decodeExtendedSquitter(const Bits& bits, const QByteArray& bytes,
+bool decodeExtendedSquitter(Bits bits, const QByteArray& bytes,
                             ModeSMessage& message)
 {
   const QByteArray meBytes = bytes.mid(4, 7);
@@ -269,7 +283,7 @@ std::optional<int32_t> decodeAltitudeCode(uint32_t code13)
   // Gillham code: C1 A1 C2 A2 C4 A4 M B1 Q B2 D2 B4 D4 (bit 12 down to 0).
   std::array<uint32_t, 13> bit{};
   for (uint32_t i = 0; i < 13; ++i) {
-    bit[i] = (code13 >> (12U - i)) & 1U;
+    bit.at(i) = (code13 >> (12U - i)) & 1U;
   }
   const uint32_t c1 = bit[0];
   const uint32_t a1 = bit[1];

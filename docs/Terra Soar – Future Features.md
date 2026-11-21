@@ -495,6 +495,14 @@ Goal: satellites shown where they are, where they have been and where they are g
 
 Goal: ADS-B data imported from files (and, as a second step, from a live receiver) shows aircraft in 3D at their altitude above the globe, with optional trails behind them: none, over a chosen time span, or the whole of the data.
 
+**Status (2026-11-21):** delivered except airplanes.live (17a to 17e on one branch, one pull request): the decoder (17a), the readers, the shared `ts/tracks` store and heights (17b), aircraft markers and timed trails drawn by the GPU (17c), aircraft layers in the program (17d) and live receivers (17e). Design: `docs/design/adsb.md`; for users: `docs/user/aircraft.md`. Differences from the plan below:
+- **airplanes.live is left out** until its access and terms are agreed (open question 7); it will reuse the readsb JSON reader and the receivers' polling.
+- No aircraft database pack: registrations and types are shown when the data has them (readsb JSON and traces); no suitably licensed database was chosen.
+- Live receivers also take raw AVR (port 30002). Reports from a receiver are timed when they arrive, not by its clock. Raw and Beast sessions are recorded as timed raw messages (`time,hex`), which read back as a recording.
+- Aircraft are a simple shape (no Phase 14 models yet), sized in pixels. Labels are the callsign (or address), optionally with altitude and speed.
+- The altitude and area filters, which change with the clock, hide markers only; trails follow the callsign, address and hidden filters.
+- Untimed AVR files (`*…;` with no counter) can be read, but all their messages are placed at the start time; the layer says so.
+
 **Approach (proposed)**: a `core` subsection (`ts/adsb`) with its own unit test project (`tests/adsb`). It has:
 - readers for the common ADS-B formats;
 - our own Mode S/ADS-B message decoder for raw data, including CPR position decoding;
@@ -1046,6 +1054,6 @@ These need a decision before the phases they affect:
 4. **Translations**: which languages first, and who reviews them?
 5. **Update notice**: is a version check (opt-in, no automatic download) wanted at all?
 6. ~~**SGP4 implementation** (Phase 15)~~: decided 2026-11-17. Terra Soar writes its own, with a full test suite (see Phase 15's Decisions).
-7. **airplanes.live access** (Phase 17): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this.
+7. **airplanes.live access** (Phase 17): its API asks programs to contact airplanes.live (contact@airplanes.live) with a description of the project before use. Contact them and confirm their terms for an open-source desktop program: request rate, storing recordings and attribution. Only the project's owner can do this. Phase 17 was delivered without it (2026-11-21); it is built once this is settled.
 8. ~~**Turning and tilting the flat map** (Phase 20)~~: decided 2026-11-17. The flat map turns and tilts (see Phase 20's Decisions).
 9. **VMAP0 terms and hosting** (Phase 21): confirm the release terms of the VMAP0 edition used (public release, any NGA disclaimers on boundaries and names), and approve the pack sizes before publishing to `marutan/terrasoar-packs`.

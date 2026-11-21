@@ -75,10 +75,13 @@ double TrailSettings::shownS() const
 QJsonObject TrailSettings::toJson() const
 {
   QJsonObject json;
-  json.insert(QStringLiteral("mode"),
-              mode == TrailMode::Off    ? QStringLiteral("off")
-              : mode == TrailMode::Span ? QStringLiteral("span")
-                                        : QStringLiteral("all"));
+  QString id = QStringLiteral("all");
+  if (mode == TrailMode::Off) {
+    id = QStringLiteral("off");
+  } else if (mode == TrailMode::Span) {
+    id = QStringLiteral("span");
+  }
+  json.insert(QStringLiteral("mode"), id);
   json.insert(QStringLiteral("spanS"), spanS);
   return json;
 }
@@ -183,7 +186,7 @@ std::optional<std::size_t> MovingTrack::indexAtOrBefore(double timeS) const
 }
 
 std::optional<TrackSample> MovingTrack::at(double timeS,
-                                           const TrackTiming& timing) const
+                                           TrackTiming timing) const
 {
   const std::optional<std::size_t> index = indexAtOrBefore(timeS);
   if (!index) {
@@ -205,7 +208,7 @@ std::optional<TrackSample> MovingTrack::at(double timeS,
   return point;
 }
 
-std::vector<TrackPiece> MovingTrack::pieces(const TrackTiming& timing) const
+std::vector<TrackPiece> MovingTrack::pieces(TrackTiming timing) const
 {
   std::vector<TrackPiece> result;
   if (m_points.empty()) {
@@ -224,9 +227,50 @@ std::vector<TrackPiece> MovingTrack::pieces(const TrackTiming& timing) const
   return result;
 }
 
+namespace
+{
+
+/**
+ * Returns the part of @p piece of @p points within [@p from, @p timeS]:
+ * its reports there, with the points interpolated at the ends.
+ */
+// Two times, as named.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+std::vector<TrackSample> trailRun(const std::vector<TrackSample>& points,
+                                  TrackPiece piece, double from, double timeS)
+// NOLINTEND(bugprone-easily-swappable-parameters)
+{
+  std::vector<TrackSample> run;
+  for (std::size_t i = piece.first; i <= piece.last; ++i) {
+    const TrackSample& p = points.at(i);
+    if (p.timeS < from) {
+      continue;
+    }
+    const bool after = p.timeS > timeS;
+    if (i > piece.first && (after || (run.empty() && p.timeS > from))) {
+      // Between the report before and this one: where the span starts
+      // (when nothing is in the run yet), and the head at the time.
+      const TrackSample& a = points.at(i - 1);
+      const double dt = p.timeS - a.timeS;
+      if (run.empty()) {
+        run.push_back(interpolate(a, p, (from - a.timeS) / dt));
+      }
+      if (after) {
+        run.push_back(interpolate(a, p, (timeS - a.timeS) / dt));
+      }
+    }
+    if (after) {
+      break;
+    }
+    run.push_back(p);
+  }
+  return run;
+}
+
+} // namespace
+
 std::vector<std::vector<TrackSample>>
-MovingTrack::trail(double timeS, const TrailSettings& trail,
-                   const TrackTiming& timing) const
+MovingTrack::trail(double timeS, TrailSettings trail, TrackTiming timing) const
 {
   std::vector<std::vector<TrackSample>> runs;
   if (trail.mode == TrailMode::Off) {
@@ -234,38 +278,12 @@ MovingTrack::trail(double timeS, const TrailSettings& trail,
   }
   const double from = timeS - trail.shownS();
   for (const TrackPiece& piece : pieces(timing)) {
-    const TrackSample& first = m_points[piece.first];
-    const TrackSample& last = m_points[piece.last];
+    const TrackSample& first = m_points.at(piece.first);
+    const TrackSample& last = m_points.at(piece.last);
     if (first.timeS > timeS || last.timeS < from || piece.first == piece.last) {
       continue;
     }
-    std::vector<TrackSample> run;
-    for (std::size_t i = piece.first; i <= piece.last; ++i) {
-      const TrackSample& p = m_points[i];
-      if (p.timeS < from) {
-        continue;
-      }
-      if (p.timeS > timeS) {
-        // The head, between the last report and this one.
-        if (i > piece.first) {
-          const TrackSample& a = m_points[i - 1];
-          const double dt = p.timeS - a.timeS;
-          if (run.empty()) {
-            // The whole span lies between these two reports.
-            run.push_back(interpolate(a, p, (from - a.timeS) / dt));
-          }
-          run.push_back(interpolate(a, p, (timeS - a.timeS) / dt));
-        }
-        break;
-      }
-      if (run.empty() && i > piece.first && p.timeS > from) {
-        // The start, between the report before the span and this one.
-        const TrackSample& a = m_points[i - 1];
-        run.push_back(
-            interpolate(a, p, (from - a.timeS) / (p.timeS - a.timeS)));
-      }
-      run.push_back(p);
-    }
+    std::vector<TrackSample> run = trailRun(m_points, piece, from, timeS);
     if (run.size() >= 2) {
       runs.push_back(std::move(run));
     }

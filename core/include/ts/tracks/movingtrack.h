@@ -97,15 +97,12 @@ struct TrailSettings {
   /** Reads the JSON form; nothing if it isn't one. */
   static std::optional<TrailSettings> fromJson(const QJsonObject& json);
   /** Equality. */
-  bool operator==(const TrailSettings& other) const
+  bool operator==(TrailSettings other) const
   {
     return mode == other.mode && spanS == other.spanS;
   }
   /** Inequality. */
-  bool operator!=(const TrailSettings& other) const
-  {
-    return !(*this == other);
-  }
+  bool operator!=(TrailSettings other) const { return !(*this == other); }
 };
 
 /** A run of reports without a gap: indices [first, last]. */
@@ -155,13 +152,13 @@ public:
    * report. Nothing before the first report, after the last by more than
    * the stale time, or within a gap after the stale time.
    */
-  std::optional<TrackSample> at(double timeS, const TrackTiming& timing) const;
+  std::optional<TrackSample> at(double timeS, TrackTiming timing) const;
 
   /** Returns the index of the last report at or before @p timeS, if any. */
   std::optional<std::size_t> indexAtOrBefore(double timeS) const;
 
   /** Returns the runs of reports with no gap of @p timing's gapS. */
-  std::vector<TrackPiece> pieces(const TrackTiming& timing) const;
+  std::vector<TrackPiece> pieces(TrackTiming timing) const;
 
   /**
    * Returns the trail at @p timeS as runs of points: the reports in
@@ -170,9 +167,8 @@ public:
    * position at @p timeS (if that piece is where it is now). What a
    * shader time filter on pieces() draws, worked out on the CPU.
    */
-  std::vector<std::vector<TrackSample>> trail(double timeS,
-                                              const TrailSettings& trail,
-                                              const TrackTiming& timing) const;
+  std::vector<std::vector<TrackSample>> trail(double timeS, TrailSettings trail,
+                                              TrackTiming timing) const;
 
 private:
   std::vector<TrackSample> m_points;

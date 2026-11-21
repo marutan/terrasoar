@@ -49,9 +49,12 @@ Vec3 trackSampleEcef(const TrackSample& point, double groundM)
                std::isnan(point.heightM) ? groundM : point.heightM});
 }
 
+// A tolerance, then a height, as named.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 std::vector<std::size_t> simplifyTrack(const std::vector<TrackSample>& points,
                                        std::size_t first, std::size_t last,
                                        double toleranceM, double groundM)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   std::vector<std::size_t> kept;
   if (last < first || last >= points.size()) {
@@ -65,24 +68,28 @@ std::vector<std::size_t> simplifyTrack(const std::vector<TrackSample>& points,
     return kept;
   }
   // Greedy: from the last kept point, go on while every point skipped
-  // stays within the tolerance of the line to the next candidate.
-  Vec3 anchor = trackSampleEcef(points[first], groundM);
-  std::size_t from = first;
-  std::size_t i = first + 1;
-  while (i < last) {
-    const Vec3 next = trackSampleEcef(points[i + 1], groundM);
+  // stays within the tolerance of the line to the next candidate. Each
+  // point's position is worked out once.
+  std::vector<Vec3> ecef;
+  ecef.reserve(last - first + 1);
+  for (std::size_t i = first; i <= last; ++i) {
+    ecef.push_back(trackSampleEcef(points[i], groundM));
+  }
+  std::size_t from = 0;
+  std::size_t i = 1;
+  const std::size_t n = last - first;
+  while (i < n) {
+    const Vec3& next = ecef[i + 1];
     bool within = true;
     for (std::size_t k = from + 1; k <= i; ++k) {
-      if (distanceToSegment(trackSampleEcef(points[k], groundM), anchor, next) >
-          toleranceM) {
+      if (distanceToSegment(ecef[k], ecef[from], next) > toleranceM) {
         within = false;
         break;
       }
     }
     // Long runs are cut regardless, so the check stays cheap.
     if (!within || i - from >= 64) {
-      kept.push_back(i);
-      anchor = trackSampleEcef(points[i], groundM);
+      kept.push_back(first + i);
       from = i;
     }
     ++i;
@@ -93,10 +100,8 @@ std::vector<std::size_t> simplifyTrack(const std::vector<TrackSample>& points,
   return kept;
 }
 
-std::vector<SpaceLine> trailLines(const MovingTrack& track,
-                                  const TrackTiming& timing,
-                                  const TrailSettings& trail,
-                                  const TrailLook& look)
+std::vector<SpaceLine> trailLines(const MovingTrack& track, TrackTiming timing,
+                                  TrailSettings trail, const TrailLook& look)
 {
   std::vector<SpaceLine> lines;
   if (trail.mode == TrailMode::Off) {

@@ -133,11 +133,11 @@ uint32_t modeSParity(const QByteArray& message);
 QByteArray modeSFromHex(const QByteArray& hex);
 
 /**
- * Decodes @p message (7 or 14 bytes). Returns nothing if it is neither
+ * Decodes @p bytes (7 or 14). Returns nothing if it is neither
  * length for its downlink format, or fails its parity (DF 11, 17, 18),
  * or is a format or ADS-B type Terra Soar doesn't read.
  */
-std::optional<ModeSMessage> decodeModeS(const QByteArray& message);
+std::optional<ModeSMessage> decodeModeS(const QByteArray& bytes);
 
 /**
  * Returns the altitude in feet from a 13-bit altitude code (with the M

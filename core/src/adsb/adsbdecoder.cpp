@@ -35,7 +35,7 @@ constexpr double earthRadiusNm = 6371008.8 / 1852.0;
 
 } // namespace
 
-double distanceNm(const CprPosition& a, const CprPosition& b)
+double distanceNm(CprPosition a, CprPosition b)
 {
   const double lat1 = degToRad(a.latDeg);
   const double lat2 = degToRad(b.latDeg);
@@ -69,15 +69,14 @@ std::optional<AircraftReport> AdsbDecoder::decode(const QByteArray& message,
   return decode(*decoded, timeS);
 }
 
-bool AdsbDecoder::withinRange(const CprPosition& position) const
+bool AdsbDecoder::withinRange(CprPosition position) const
 {
   return !m_settings.receiver || distanceNm(position, *m_settings.receiver) <=
                                      m_settings.maximumRangeNm;
 }
 
-std::optional<CprPosition> AdsbDecoder::decodePosition(Aircraft& aircraft,
-                                                       const CprFrame& frame,
-                                                       double timeS)
+std::optional<CprPosition>
+AdsbDecoder::decodePosition(Aircraft& aircraft, CprFrame frame, double timeS)
 {
   // Locally from where it last was, if that is recent.
   if (aircraft.position &&

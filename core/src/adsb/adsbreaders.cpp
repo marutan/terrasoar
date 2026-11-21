@@ -108,7 +108,7 @@ std::optional<AdsbEmergency> emergencyFromName(const QString& name)
 /** The first line of @p text (all of it if it has one line). */
 QByteArray firstLine(const QByteArray& text)
 {
-  const qsizetype end = text.indexOf('\n');
+  const int32_t end = static_cast<int32_t>(text.indexOf('\n'));
   return (end < 0 ? text : text.left(end)).trimmed();
 }
 
@@ -167,15 +167,15 @@ void readAircraftObject(const QJsonObject& ac, AircraftReport& report)
 class LineReader
 {
 public:
-  explicit LineReader(QIODevice& device) : m_device(device) {}
+  explicit LineReader(QIODevice& device) : m_device(&device) {}
 
   /** Reads the next line (without its end) into @p line. */
   bool next(QByteArray& line)
   {
-    if (m_device.atEnd()) {
+    if (m_device->atEnd()) {
       return false;
     }
-    line = m_device.readLine();
+    line = m_device->readLine();
     while (!line.isEmpty() && (line.endsWith('\n') || line.endsWith('\r'))) {
       line.chop(1);
     }
@@ -186,7 +186,7 @@ public:
   int64_t line() const { return m_line; }
 
 private:
-  QIODevice& m_device;
+  QIODevice* m_device;
   int64_t m_line = 0;
 };
 
@@ -194,8 +194,8 @@ private:
 class Progress
 {
 public:
-  Progress(QIODevice& device, const std::function<bool(qint64)>& progress)
-      : m_device(device), m_progress(progress)
+  Progress(QIODevice& device, std::function<bool(qint64)> progress)
+      : m_device(&device), m_progress(std::move(progress))
   {
   }
 
@@ -204,12 +204,12 @@ public:
     if (!m_progress || ++m_count % 4096 != 0) {
       return true;
     }
-    return m_progress(m_device.pos());
+    return m_progress(m_device->pos());
   }
 
 private:
-  QIODevice& m_device;
-  const std::function<bool(qint64)>& m_progress;
+  QIODevice* m_device;
+  std::function<bool(qint64)> m_progress;
   int64_t m_count = 0;
 };
 
@@ -324,8 +324,11 @@ void readSnapshots(const QJsonValue& value, const AircraftReportSink& sink,
         sink(report);
       };
   if (value.isArray()) {
-    for (const QJsonValue& item : value.toArray()) {
-      readSnapshots(item, sink, line, result);
+    const QJsonArray items = value.toArray();
+    // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
+    // NOLINTNEXTLINE(modernize-loop-convert)
+    for (int32_t i = 0; i < items.size(); ++i) {
+      readSnapshots(items.at(i), sink, line, result);
     }
     return;
   }
@@ -388,7 +391,11 @@ void readTrace(QIODevice& device, const AircraftReportSink& sink,
   const QString registration = trace.value(QLatin1String("r")).toString();
   const QString type = trace.value(QLatin1String("t")).toString();
   int64_t index = 0;
-  for (const QJsonValue& item : trace.value(QLatin1String("trace")).toArray()) {
+  const QJsonArray points = trace.value(QLatin1String("trace")).toArray();
+  // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t at = 0; at < points.size(); ++at) {
+    const QJsonValue item = points.at(at);
     ++index;
     ++result.records;
     const QJsonArray point = item.toArray();
@@ -460,6 +467,91 @@ std::optional<double> parseCsvTime(const QString& text, CsvTime format)
   return static_cast<double>(time.toMSecsSinceEpoch()) / 1000.0;
 }
 
+/** The field in @p column of @p fields, or empty. */
+QString csvField(const QStringList& fields, int32_t column)
+{
+  return column >= 0 && column < fields.size() ? fields.at(column) : QString();
+}
+
+/** Sets @p report's altitude from @p value, meant as @p kind. */
+void setCsvAltitude(AircraftReport& report, double value, CsvAltitude kind)
+{
+  switch (kind) {
+  case CsvAltitude::BaroFeet:
+    report.baroAltitudeFt = value;
+    break;
+  case CsvAltitude::BaroMetres:
+    report.baroAltitudeFt = value / feetToMetres;
+    break;
+  case CsvAltitude::GeometricFeet:
+    report.geometricAltitudeFt = value;
+    break;
+  case CsvAltitude::GeometricMetres:
+    report.geometricAltitudeFt = value / feetToMetres;
+    break;
+  }
+}
+
+/** Returns a speed in @p unit in knots. */
+double csvSpeedKt(double value, CsvSpeed unit)
+{
+  switch (unit) {
+  case CsvSpeed::Knots:
+    break;
+  case CsvSpeed::MetresPerSecond:
+    return value / knotsToMetresPerSecond;
+  case CsvSpeed::KilometresPerHour:
+    return value / 3.6 / knotsToMetresPerSecond;
+  }
+  return value;
+}
+
+/** One CSV row as a report, or nothing and why (@p error). */
+std::optional<AircraftReport> csvReport(const QStringList& fields,
+                                        const CsvColumns& c, QString& error)
+{
+  const std::optional<double> time =
+      parseCsvTime(csvField(fields, c.time), c.timeFormat);
+  const std::optional<uint32_t> address =
+      parseIcaoAddress(csvField(fields, c.address));
+  const std::optional<double> lat = toDouble(csvField(fields, c.latitude));
+  const std::optional<double> lon = toDouble(csvField(fields, c.longitude));
+  if (!time) {
+    error = QCoreApplication::translate("ts::AdsbReader",
+                                        "The time can't be read.");
+    return std::nullopt;
+  }
+  if (!address) {
+    error = QCoreApplication::translate("ts::AdsbReader",
+                                        "The ICAO address can't be read.");
+    return std::nullopt;
+  }
+  if (!lat || !lon || std::fabs(*lat) > 90.0) {
+    error = QCoreApplication::translate("ts::AdsbReader",
+                                        "The position can't be read.");
+    return std::nullopt;
+  }
+  AircraftReport report;
+  report.timeS = *time;
+  report.address = *address;
+  report.position = CprPosition{*lat, normaliseLonDeg(*lon)};
+  const std::optional<double> altitude = toDouble(csvField(fields, c.altitude));
+  if (altitude) {
+    setCsvAltitude(report, *altitude, c.altitudeKind);
+  }
+  report.trackDeg = toDouble(csvField(fields, c.heading));
+  const std::optional<double> speed = toDouble(csvField(fields, c.speed));
+  if (speed) {
+    report.groundSpeedKt = csvSpeedKt(*speed, c.speedUnit);
+  }
+  report.verticalRateFtMin = toDouble(csvField(fields, c.verticalRate));
+  const QString callsign = csvField(fields, c.callsign).trimmed();
+  if (!callsign.isEmpty()) {
+    report.callsign = callsign;
+  }
+  return report;
+}
+
 void readCsv(QIODevice& device, const AdsbReadOptions& options,
              const AircraftReportSink& sink, Progress& progress,
              AdsbReadResult& result)
@@ -480,11 +572,6 @@ void readCsv(QIODevice& device, const AdsbReadOptions& options,
       std::max({c.time, c.address, c.latitude, c.longitude, c.altitude,
                 c.heading, c.speed, c.callsign, c.verticalRate}) +
       1;
-  const std::function<QString(const QStringList&, int32_t)> field =
-      [](const QStringList& fields, int32_t column) {
-        return column >= 0 && column < fields.size() ? fields.at(column)
-                                                     : QString();
-      };
   while (lines.next(line) && progress.ok()) {
     if (line.trimmed().isEmpty()) {
       continue;
@@ -498,65 +585,14 @@ void readCsv(QIODevice& device, const AdsbReadOptions& options,
           QCoreApplication::translate("ts::AdsbReader", "Too few columns."));
       continue;
     }
-    const std::optional<double> time =
-        parseCsvTime(field(fields, c.time), c.timeFormat);
-    const std::optional<uint32_t> address =
-        parseIcaoAddress(field(fields, c.address));
-    const std::optional<double> lat = toDouble(field(fields, c.latitude));
-    const std::optional<double> lon = toDouble(field(fields, c.longitude));
-    if (!time) {
-      result.addProblem(lines.line(),
-                        QCoreApplication::translate("ts::AdsbReader",
-                                                    "The time can't be read."));
+    QString error;
+    const std::optional<AircraftReport> report = csvReport(fields, c, error);
+    if (!report) {
+      result.addProblem(lines.line(), error);
       continue;
-    }
-    if (!address) {
-      result.addProblem(lines.line(), QCoreApplication::translate(
-                                          "ts::AdsbReader",
-                                          "The ICAO address can't be read."));
-      continue;
-    }
-    if (!lat || !lon || std::fabs(*lat) > 90.0) {
-      result.addProblem(lines.line(),
-                        QCoreApplication::translate(
-                            "ts::AdsbReader", "The position can't be read."));
-      continue;
-    }
-    AircraftReport report;
-    report.timeS = *time;
-    report.address = *address;
-    report.position = CprPosition{*lat, normaliseLonDeg(*lon)};
-    if (const std::optional<double> altitude =
-            toDouble(field(fields, c.altitude))) {
-      switch (c.altitudeKind) {
-      case CsvAltitude::BaroFeet:
-        report.baroAltitudeFt = *altitude;
-        break;
-      case CsvAltitude::BaroMetres:
-        report.baroAltitudeFt = *altitude / feetToMetres;
-        break;
-      case CsvAltitude::GeometricFeet:
-        report.geometricAltitudeFt = *altitude;
-        break;
-      case CsvAltitude::GeometricMetres:
-        report.geometricAltitudeFt = *altitude / feetToMetres;
-        break;
-      }
-    }
-    report.trackDeg = toDouble(field(fields, c.heading));
-    if (const std::optional<double> speed = toDouble(field(fields, c.speed))) {
-      report.groundSpeedKt = c.speedUnit == CsvSpeed::Knots ? *speed
-                             : c.speedUnit == CsvSpeed::MetresPerSecond
-                                 ? *speed / knotsToMetresPerSecond
-                                 : *speed / 3.6 / knotsToMetresPerSecond;
-    }
-    report.verticalRateFtMin = toDouble(field(fields, c.verticalRate));
-    const QString callsign = field(fields, c.callsign).trimmed();
-    if (!callsign.isEmpty()) {
-      report.callsign = callsign;
     }
     ++result.reports;
-    sink(report);
+    sink(*report);
   }
 }
 
@@ -689,6 +725,31 @@ QStringList splitCsvLine(const QString& line, QChar separator)
   return fields;
 }
 
+namespace
+{
+
+/** A column and the header names that mean it. */
+struct ColumnNames {
+  int32_t CsvColumns::*column;
+  std::vector<const char*> names;
+};
+
+/** Returns the column of @p names (lower case) named one of @p options. */
+int32_t columnNamed(const QStringList& names,
+                    const std::vector<const char*>& options)
+{
+  for (int32_t i = 0; i < names.size(); ++i) {
+    for (const char* option : options) {
+      if (names.at(i) == QLatin1String(option)) {
+        return i;
+      }
+    }
+  }
+  return -1;
+}
+
+} // namespace
+
 CsvColumns guessCsvColumns(const QByteArray& head)
 {
   CsvColumns c;
@@ -701,66 +762,56 @@ CsvColumns guessCsvColumns(const QByteArray& head)
       c.separator = QLatin1Char(separator);
     }
   }
-  const QStringList names = splitCsvLine(QString::fromUtf8(first), c.separator);
+  QStringList names = splitCsvLine(QString::fromUtf8(first), c.separator);
+  for (QString& name : names) {
+    name = name.trimmed().toLower();
+  }
+  static const std::vector<ColumnNames> table = {
+      {&CsvColumns::time,
+       {"time", "timestamp", "ts", "datetime", "date_time", "unixtime",
+        "time_s", "time_ms"}},
+      {&CsvColumns::address,
+       {"icao", "icao24", "hex", "address", "icao_address", "modes", "mode_s"}},
+      {&CsvColumns::latitude, {"lat", "latitude"}},
+      {&CsvColumns::longitude, {"lon", "lng", "long", "longitude"}},
+      {&CsvColumns::altitude,
+       {"alt", "altitude", "baroaltitude", "alt_baro", "altitude_ft", "alt_ft",
+        "baro_altitude"}},
+      {&CsvColumns::heading, {"heading", "track", "trk", "hdg"}},
+      {&CsvColumns::speed,
+       {"speed", "gs", "gs_kt", "speed_kt", "groundspeed", "ground_speed",
+        "velocity"}},
+      {&CsvColumns::callsign, {"callsign", "flight", "call_sign", "ident"}},
+      {&CsvColumns::verticalRate,
+       {"vertical_rate", "vertrate", "vr", "vr_ftmin", "baro_rate",
+        "verticalrate"}},
+  };
   bool named = false;
-  for (int32_t i = 0; i < names.size(); ++i) {
-    const QString name = names.at(i).trimmed().toLower();
-    const std::function<bool(std::initializer_list<const char*>)> is =
-        [&name](std::initializer_list<const char*> options) {
-          return std::any_of(options.begin(), options.end(),
-                             [&name](const char* option) {
-                               return name == QLatin1String(option);
-                             });
-        };
-    int32_t* target = nullptr;
-    if (is({"time", "timestamp", "ts", "datetime", "date_time", "unixtime",
-            "time_s", "time_ms"})) {
-      target = &c.time;
-      if (name.endsWith(QLatin1String("ms"))) {
-        c.timeFormat = CsvTime::UnixMilliseconds;
-      }
-    } else if (is({"icao", "icao24", "hex", "address", "icao_address", "modes",
-                   "mode_s"})) {
-      target = &c.address;
-    } else if (is({"lat", "latitude"})) {
-      target = &c.latitude;
-    } else if (is({"lon", "lng", "long", "longitude"})) {
-      target = &c.longitude;
-    } else if (is({"alt", "altitude", "baroaltitude", "alt_baro", "altitude_ft",
-                   "alt_ft", "baro_altitude"})) {
-      target = &c.altitude;
-    } else if (is({"geoaltitude", "alt_geom", "geo_altitude"})) {
-      if (c.altitude < 0) {
-        target = &c.altitude;
-        c.altitudeKind = CsvAltitude::GeometricFeet;
-      }
-    } else if (is({"heading", "track", "trk", "hdg"})) {
-      target = &c.heading;
-    } else if (is({"speed", "gs", "gs_kt", "speed_kt", "groundspeed",
-                   "ground_speed", "velocity"})) {
-      target = &c.speed;
-      if (name == QLatin1String("velocity")) {
-        c.speedUnit = CsvSpeed::MetresPerSecond; // OpenSky's state vectors
-      }
-    } else if (is({"callsign", "flight", "call_sign", "ident"})) {
-      target = &c.callsign;
-    } else if (is({"vertical_rate", "vertrate", "vr", "vr_ftmin", "baro_rate",
-                   "verticalrate"})) {
-      target = &c.verticalRate;
-    }
-    if (target != nullptr && *target < 0) {
-      *target = i;
-      named = true;
-    }
+  for (const ColumnNames& entry : table) {
+    c.*entry.column = columnNamed(names, entry.names);
+    named = named || c.*entry.column >= 0;
+  }
+  // Geometric altitudes when there are no barometric ones.
+  if (c.altitude < 0) {
+    c.altitude =
+        columnNamed(names, {"geoaltitude", "alt_geom", "geo_altitude"});
+    c.altitudeKind = CsvAltitude::GeometricFeet;
+    named = named || c.altitude >= 0;
   }
   c.header = named;
-  // OpenSky's state vectors give altitudes in metres.
-  if (names.contains(QStringLiteral("baroaltitude")) && c.altitude >= 0 &&
-      c.altitudeKind == CsvAltitude::BaroFeet) {
+  if (c.time >= 0 && names.at(c.time).endsWith(QLatin1String("ms"))) {
+    c.timeFormat = CsvTime::UnixMilliseconds;
+  }
+  // OpenSky's state vectors: speeds in metres a second, altitudes in
+  // metres.
+  if (c.speed >= 0 && names.at(c.speed) == QLatin1String("velocity")) {
+    c.speedUnit = CsvSpeed::MetresPerSecond;
+  }
+  if (c.altitude >= 0 &&
+      names.at(c.altitude) == QLatin1String("baroaltitude")) {
     c.altitudeKind = CsvAltitude::BaroMetres;
   }
-  if (names.contains(QStringLiteral("geoaltitude")) &&
-      c.altitudeKind == CsvAltitude::GeometricFeet) {
+  if (c.altitude >= 0 && names.at(c.altitude) == QLatin1String("geoaltitude")) {
     c.altitudeKind = CsvAltitude::GeometricMetres;
   }
   return c;
@@ -921,6 +972,66 @@ AdsbReadResult readAdsbFile(const QString& path, AdsbFormat format,
   return readAdsb(file, format, options, sink, progress);
 }
 
+std::optional<double> SbsParser::sbsTime(const QByteArray& dateText,
+                                         const QByteArray& timeText) const
+{
+  // "yyyy/MM/dd" and "HH:mm:ss[.zzz]", read by hand: a QDateTime for each
+  // line is slow. When the hour began (in local time, with its offset from
+  // UTC) is kept from the line before.
+  const QByteArray date = dateText.trimmed();
+  const QByteArray time = timeText.trimmed();
+  if (date.size() != 10 || date.at(4) != '/' || date.at(7) != '/' ||
+      time.size() < 8 || time.at(2) != ':' || time.at(5) != ':') {
+    return std::nullopt;
+  }
+  bool ok = true;
+  const std::function<int32_t(const QByteArray&, int32_t, int32_t)> digits =
+      [&ok](const QByteArray& text, int32_t at, int32_t count) {
+        int32_t value = 0;
+        for (int32_t i = at; i < at + count; ++i) {
+          const char c = text.at(i);
+          if (c < '0' || c > '9') {
+            ok = false;
+            return 0;
+          }
+          value = value * 10 + (c - '0');
+        }
+        return value;
+      };
+  const int32_t hour = digits(time, 0, 2);
+  const int32_t minute = digits(time, 3, 2);
+  const int32_t second = digits(time, 6, 2);
+  double fraction = 0.0;
+  if (time.size() > 9 && time.at(8) == '.') {
+    double scale = 0.1;
+    for (int32_t i = 9; i < static_cast<int32_t>(time.size()); ++i) {
+      const char c = time.at(i);
+      if (c < '0' || c > '9') {
+        ok = false;
+        break;
+      }
+      fraction += (c - '0') * scale;
+      scale /= 10.0;
+    }
+  }
+  if (!ok || hour > 23 || minute > 59 || second > 60) {
+    return std::nullopt;
+  }
+  if (date != m_lastDate || hour != m_lastHour) {
+    const QDate day(digits(date, 0, 4), digits(date, 5, 2), digits(date, 8, 2));
+    if (!ok || !day.isValid()) {
+      return std::nullopt;
+    }
+    const QDateTime start =
+        m_localTime ? QDateTime(day, QTime(hour, 0))
+                    : QDateTime(day, QTime(hour, 0), QTimeZone::utc());
+    m_lastDate = date;
+    m_lastHour = hour;
+    m_hourStartS = static_cast<double>(start.toMSecsSinceEpoch()) / 1000.0;
+  }
+  return m_hourStartS + 60.0 * minute + second + fraction;
+}
+
 std::optional<AircraftReport> SbsParser::parse(const QByteArray& line,
                                                QString* error) const
 {
@@ -957,20 +1068,12 @@ std::optional<AircraftReport> SbsParser::parse(const QByteArray& line,
                                             "The ICAO address can't be read."));
   }
   report.address = *address;
-  const QDate date = QDate::fromString(QString::fromLatin1(f.at(6)),
-                                       QStringLiteral("yyyy/MM/dd"));
-  QString timeText = QString::fromLatin1(f.at(7));
-  const QTime time =
-      QTime::fromString(timeText, timeText.contains(QLatin1Char('.'))
-                                      ? QStringLiteral("HH:mm:ss.zzz")
-                                      : QStringLiteral("HH:mm:ss"));
-  if (!date.isValid() || !time.isValid()) {
+  const std::optional<double> when = sbsTime(f.at(6), f.at(7));
+  if (!when) {
     return fail(QCoreApplication::translate("ts::AdsbReader",
                                             "The date or time can't be read."));
   }
-  const QDateTime when = m_localTime ? QDateTime(date, time)
-                                     : QDateTime(date, time, QTimeZone::utc());
-  report.timeS = static_cast<double>(when.toMSecsSinceEpoch()) / 1000.0;
+  report.timeS = *when;
   const QString callsign = QString::fromLatin1(f.at(10)).trimmed();
   if (!callsign.isEmpty()) {
     report.callsign = callsign;
@@ -1005,71 +1108,148 @@ std::optional<AircraftReport> SbsParser::parse(const QByteArray& line,
   return report;
 }
 
+namespace
+{
+
+/**
+ * Reads an AVR line ("*HEX;" or "@COUNTERHEX;") into @p message's counter
+ * and @p hex; false if it isn't one.
+ */
+bool readAvr(const QByteArray& text, TimedMessage& message, QByteArray& hex)
+{
+  if (!text.endsWith(';')) {
+    return false;
+  }
+  hex = text.mid(1, text.size() - 2);
+  if (text.startsWith('@')) {
+    if (hex.size() < 12 || !isHex(hex.left(12))) {
+      return false;
+    }
+    bool ok = false;
+    message.counter = hex.left(12).toULongLong(&ok, 16);
+    hex = hex.mid(12);
+  }
+  return true;
+}
+
+/**
+ * Reads "TIME,HEX", "TIME HEX" or "TIME *HEX;" into @p message's time and
+ * @p hex; false if it isn't one.
+ */
+bool readTimedHex(const QByteArray& text, TimedMessage& message,
+                  QByteArray& hex)
+{
+  int32_t split = static_cast<int32_t>(text.indexOf(','));
+  if (split < 0) {
+    split = static_cast<int32_t>(text.indexOf(' '));
+  }
+  if (split <= 0) {
+    return false;
+  }
+  message.timeS = toDouble(QString::fromLatin1(text.left(split)));
+  if (!message.timeS) {
+    return false;
+  }
+  hex = text.mid(split + 1).trimmed();
+  if (hex.startsWith('*') && hex.endsWith(';')) {
+    hex = hex.mid(1, hex.size() - 2);
+  }
+  return true;
+}
+
+} // namespace
+
 std::optional<TimedMessage> parseRawLine(const QByteArray& line, QString* error)
 {
   const QByteArray text = line.trimmed();
-  const std::function<std::optional<TimedMessage>()> fail = [error, &text]() {
+  TimedMessage message;
+  QByteArray hex;
+  const bool avr = text.startsWith('*') || text.startsWith('@');
+  const bool read = !text.isEmpty() && (avr ? readAvr(text, message, hex)
+                                            : readTimedHex(text, message, hex));
+  if (read && hex.size() == 4 && isHex(hex)) {
+    // A Mode A/C reply: not used.
+    return std::nullopt;
+  }
+  if (read) {
+    message.bytes = modeSFromHex(hex);
+  }
+  if (!read || message.bytes.isEmpty()) {
     if (error != nullptr && !text.isEmpty()) {
       *error = QCoreApplication::translate("ts::AdsbReader",
                                            "Not a Mode S message.");
     }
-    return std::optional<TimedMessage>();
-  };
-  if (text.isEmpty()) {
-    return fail();
-  }
-  TimedMessage message;
-  QByteArray hex;
-  if (text.startsWith('*') || text.startsWith('@')) {
-    if (!text.endsWith(';')) {
-      return fail();
-    }
-    hex = text.mid(1, text.size() - 2);
-    if (text.startsWith('@')) {
-      if (hex.size() < 12 || !isHex(hex.left(12))) {
-        return fail();
-      }
-      bool ok = false;
-      message.counter = hex.left(12).toULongLong(&ok, 16);
-      hex = hex.mid(12);
-    }
-  } else {
-    // "TIME,HEX", "TIME HEX" or "TIME *HEX;".
-    int32_t split = static_cast<int32_t>(text.indexOf(','));
-    if (split < 0) {
-      split = static_cast<int32_t>(text.indexOf(' '));
-    }
-    if (split <= 0) {
-      return fail();
-    }
-    const std::optional<double> time =
-        toDouble(QString::fromLatin1(text.left(split)));
-    if (!time) {
-      return fail();
-    }
-    message.timeS = *time;
-    hex = text.mid(split + 1).trimmed();
-    if (hex.startsWith('*') && hex.endsWith(';')) {
-      hex = hex.mid(1, hex.size() - 2);
-    }
-  }
-  if (hex.size() == 4 && isHex(hex)) {
-    // A Mode A/C reply: not used.
     return std::nullopt;
-  }
-  message.bytes = modeSFromHex(hex);
-  if (message.bytes.isEmpty()) {
-    return fail();
   }
   return message;
 }
+
+namespace
+{
+
+/** The bytes of a Beast frame's message by its type; 0 if not a type. */
+int32_t beastLength(char type)
+{
+  switch (type) {
+  case '1':
+    return 2;
+  case '2':
+    return 7;
+  case '3':
+  case '4':
+    return 14;
+  default:
+    break;
+  }
+  return 0;
+}
+
+/** How unescaping a frame went. */
+enum class Unescaped : uint8_t {
+  Done,     ///< The frame is whole.
+  NeedMore, ///< The data ends inside it.
+  Broken,   ///< A new frame starts inside it.
+};
+
+/**
+ * Unescapes @p want bytes of @p data from @p at on (0x1a doubled) into
+ * @p frame; @p at is left after them.
+ */
+Unescaped unescapeFrame(const QByteArray& data, int32_t& at, int32_t want,
+                        QByteArray& frame)
+{
+  const int32_t n = static_cast<int32_t>(data.size());
+  frame.clear();
+  frame.reserve(want);
+  while (frame.size() < want) {
+    if (at >= n) {
+      return Unescaped::NeedMore;
+    }
+    const char c = data.at(at);
+    if (c == '\x1a') {
+      if (at + 1 >= n) {
+        return Unescaped::NeedMore;
+      }
+      if (data.at(at + 1) != '\x1a') {
+        return Unescaped::Broken;
+      }
+      ++at;
+    }
+    frame.append(c);
+    ++at;
+  }
+  return Unescaped::Done;
+}
+
+} // namespace
 
 std::vector<TimedMessage> BeastParser::feed(const QByteArray& data)
 {
   m_pending.append(data);
   std::vector<TimedMessage> messages;
-  qsizetype i = 0;
-  const qsizetype n = m_pending.size();
+  // Positions as int32_t: QByteArray takes int on Qt 5.
+  int32_t i = 0;
+  const int32_t n = static_cast<int32_t>(m_pending.size());
   while (i < n) {
     if (m_pending.at(i) != '\x1a') {
       ++i;
@@ -1080,56 +1260,29 @@ std::vector<TimedMessage> BeastParser::feed(const QByteArray& data)
       break;
     }
     const char type = m_pending.at(i + 1);
-    qsizetype length = 0;
-    switch (type) {
-    case '1':
-      length = 2;
-      break;
-    case '2':
-      length = 7;
-      break;
-    case '3':
-    case '4':
-      length = 14;
-      break;
-    default:
+    const int32_t length = beastLength(type);
+    if (length == 0) {
       // Not a frame start (or a doubled 0x1a out of step): skip it.
-      i += 1;
+      ++i;
       ++m_skipped;
       continue;
     }
-    // Unescape 6 + 1 + length bytes.
+    // A 6-byte counter, a signal byte, then the message.
     QByteArray frame;
-    frame.reserve(7 + length);
-    qsizetype j = i + 2;
-    bool broken = false;
-    while (frame.size() < 7 + length && j < n) {
-      const char c = m_pending.at(j);
-      if (c == '\x1a') {
-        if (j + 1 >= n) {
-          break;
-        }
-        if (m_pending.at(j + 1) != '\x1a') {
-          broken = true; // a new frame started early
-          break;
-        }
-        ++j;
-      }
-      frame.append(c);
-      ++j;
+    int32_t j = i + 2;
+    const Unescaped result = unescapeFrame(m_pending, j, 7 + length, frame);
+    if (result == Unescaped::NeedMore) {
+      break;
     }
-    if (broken) {
+    if (result == Unescaped::Broken) {
       m_skipped += j - i;
       i = j;
       continue;
     }
-    if (frame.size() < 7 + length) {
-      break; // more data needed
-    }
     if (type == '2' || type == '3') {
       TimedMessage message;
       uint64_t counter = 0;
-      for (qsizetype k = 0; k < 6; ++k) {
+      for (int32_t k = 0; k < 6; ++k) {
         counter = (counter << 8U) | static_cast<uint8_t>(frame.at(k));
       }
       message.counter = counter;
@@ -1179,8 +1332,11 @@ std::optional<double> readReadsbSnapshot(const QJsonObject& snapshot,
   if (*now > 1.0e11) {
     *now /= 1000.0;
   }
-  for (const QJsonValue& item : list.toArray()) {
-    const QJsonObject ac = item.toObject();
+  const QJsonArray aircraft = list.toArray();
+  // An index loop: QJsonArray's iterator differs between Qt 5 and Qt 6.
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < aircraft.size(); ++i) {
+    const QJsonObject ac = aircraft.at(i).toObject();
     const std::optional<uint32_t> address =
         parseIcaoAddress(ac.value(QLatin1String("hex")).toString());
     if (!address) {
@@ -1217,7 +1373,7 @@ std::optional<double> readReadsbSnapshot(const QJsonObject& snapshot,
       sink(report);
     }
   }
-  return *now;
+  return now;
 }
 
 } // namespace ts

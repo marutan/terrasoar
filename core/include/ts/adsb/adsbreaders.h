@@ -223,7 +223,7 @@ QByteArray gunzipIfCompressed(const QByteArray& data, bool* ok = nullptr);
 /**
  * Reads SBS lines one at a time (files and port 30003).
  *
- * @reentrant
+ * @reentrant (a parser keeps the last date it read: one per thread)
  */
 class SbsParser
 {
@@ -240,7 +240,15 @@ public:
                                       QString* error = nullptr) const;
 
 private:
+  /** The Unix time of an SBS date and time, if they can be read. */
+  std::optional<double> sbsTime(const QByteArray& date,
+                                const QByteArray& time) const;
+
   bool m_localTime;
+  /** The last date and hour read, and when that hour began. */
+  mutable QByteArray m_lastDate;
+  mutable int32_t m_lastHour = -1;
+  mutable double m_hourStartS = 0.0;
 };
 
 /** A raw message and its receiver time. */

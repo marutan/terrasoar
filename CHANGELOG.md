@@ -9,6 +9,22 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- Aircraft from ADS-B (File → Import ADS-B Data…, and dragging a file
+  onto the window): SBS, raw Mode S messages (AVR, timed), Beast,
+  dump1090/readsb aircraft.json, tar1090 traces and CSV with chosen
+  columns, decoded by Terra Soar's own Mode S/ADS-B decoder. Aircraft are
+  drawn at their height above the globe, turned to their heading, with
+  callsigns (and altitudes and speeds), optional lines to the ground, and
+  trails: off, a time span before the clock, or all the data, coloured by
+  aircraft, altitude (with a legend) or vertical rate, broken at gaps.
+  Recordings play on the clock, with the time slider spanning them. A
+  list to find, show, hide and give aircraft their own trails; details on
+  click; following an aircraft; filters by callsign, address, altitude
+  and area; tracks exported as KML, GPX or CSV.
+- Live aircraft from a receiver (File → Connect to ADS-B Receiver…):
+  dump1090 or readsb over SBS, raw AVR or Beast, or their aircraft.json,
+  reconnecting when the receiver drops, and recording the session for
+  replay.
 - Satellites (File → Add Satellites…): CelesTrak's groups (kept for use
   offline), TLE and OMM files, or TLEs pasted in, shown where they are
   at the clock's time with their names, past tracks fading with age and

@@ -35,10 +35,13 @@ HEADERS += \
     include/ts/adsb/adsbdecoder.h \
     include/ts/adsb/adsbreaders.h \
     include/ts/adsb/aircraftdraws.h \
+    include/ts/adsb/aircraftexport.h \
+    include/ts/adsb/aircraftlayer.h \
     include/ts/adsb/aircraftreport.h \
     include/ts/adsb/aircrafttracks.h \
     include/ts/adsb/cpr.h \
     include/ts/adsb/modesmessage.h \
+    include/ts/adsb/receiverfeed.h \
     include/ts/base/buildinfo.h \
     include/ts/camera/camera.h \
     include/ts/camera/cameracontroller.h \
@@ -167,10 +170,13 @@ SOURCES += \
     src/adsb/adsbdecoder.cpp \
     src/adsb/adsbreaders.cpp \
     src/adsb/aircraftdraws.cpp \
+    src/adsb/aircraftexport.cpp \
+    src/adsb/aircraftlayer.cpp \
     src/adsb/aircraftreport.cpp \
     src/adsb/aircrafttracks.cpp \
     src/adsb/cpr.cpp \
     src/adsb/modesmessage.cpp \
+    src/adsb/receiverfeed.cpp \
     src/base/buildinfo.cpp \
     src/camera/camera.cpp \
     src/camera/cameracontroller.cpp \

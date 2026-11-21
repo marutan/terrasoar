@@ -65,6 +65,9 @@ namespace ts
 
 class BalloonWindow;
 class ClockWidget;
+class AircraftInfoWindow;
+class AircraftLayers;
+class AircraftListDialog;
 class SatelliteInfoWindow;
 class SatelliteLayers;
 class SatelliteListDialog;
@@ -420,6 +423,57 @@ public:
   /** Returns the satellite details window, or null before the first. */
   SatelliteInfoWindow* satelliteInfoWindow() const { return m_satelliteInfo; }
 
+  /** Returns the aircraft of the layer tree. */
+  AircraftLayers* aircraft() const { return m_aircraft; }
+
+  /** Opens the Import ADS-B Data dialog (for @p path, if given). */
+  void importAdsbData(const QString& path = QString());
+
+  /** Opens the Connect to ADS-B Receiver dialog. */
+  void connectAdsbReceiver();
+
+  /**
+   * Adds the aircraft layer @p definition, visible, at the top of the
+   * layer tree; returns its node id.
+   */
+  QString addAircraftLayer(const LayerDefinition& definition);
+
+  /**
+   * Adds the recording @p path as an aircraft layer if its format can be
+   * told and read without asking (SBS, timed raw messages, readsb JSON,
+   * traces); otherwise opens the import dialog for it. False (with
+   * @p errorString) if it isn't ADS-B data.
+   */
+  bool openAdsbFile(const QString& path, QString* errorString);
+
+  /**
+   * Shows the list of the aircraft of layer @p nodeId (not modal) and
+   * returns it; null if it isn't an aircraft layer.
+   */
+  AircraftListDialog* showAircraftList(const QString& nodeId);
+
+  /** Selects aircraft @p address of layer @p nodeId, its details shown. */
+  void selectAircraft(const QString& nodeId, std::optional<uint32_t> address);
+
+  /** Returns the aircraft details window, or null before the first. */
+  AircraftInfoWindow* aircraftInfoWindow() const { return m_aircraftInfo; }
+
+  /** Makes the camera follow the selected aircraft (or stop). */
+  void setFollowingAircraft(bool follow);
+
+  /** Returns true while the camera follows the selected aircraft. */
+  bool isFollowingAircraft() const { return m_followAircraft; }
+
+  /** Opens layer @p nodeId's aircraft properties (modal). */
+  void showAircraftProperties(const QString& nodeId);
+
+  /**
+   * Exports aircraft @p address of layer @p nodeId's track to @p path
+   * (KML, GPX or CSV by its suffix); false with @p errorString if not.
+   */
+  bool exportAircraftTrack(const QString& nodeId, uint32_t address,
+                           const QString& path, QString* errorString);
+
   /**
    * Asks the visible WMS layers that can be queried what they have at
    * @p point (GetFeatureInfo, at the scale of @p degreesPerPixel) and shows
@@ -517,6 +571,14 @@ private:
   std::vector<QAction*> satelliteNodeActions(const QString& id,
                                              QObject* parent);
   void showSatelliteProperties(const QString& nodeId);
+  void createAircraft();
+  void refreshAircraftLayers(const LayerStack& stack);
+  void aircraftDrawn();
+  void aircraftTrailsChanged();
+  void aircraftSetChanged(const QJsonObject& source);
+  void aircraftMarkerClicked(int32_t index);
+  void updateAircraftInfo();
+  std::vector<QAction*> aircraftNodeActions(const QString& id, QObject* parent);
   void openKmlDialog();
   void addKmlFeature(const KmlDocument& document, const KmlFeature& container,
                      const QString& featurePath, const QModelIndex& parent,
@@ -692,6 +754,14 @@ private:
   QTimer* m_satellitePointerTimer = nullptr;
   /** Old elements already pointed out, by source. */
   std::set<QString> m_oldSatelliteNotes;
+  AircraftLayers* m_aircraft = nullptr;
+  AircraftInfoWindow* m_aircraftInfo = nullptr;
+  QPointer<AircraftListDialog> m_aircraftList;
+  QAction* m_importAdsbAction = nullptr;
+  QAction* m_connectReceiverAction = nullptr;
+  bool m_followAircraft = false;
+  /** Recordings whose start the clock was moved to, by source. */
+  std::set<QString> m_aircraftStarted;
   /** The imagery sources last drawn, as drawn at the clock's time. */
   QJsonArray m_drawnImagery;
   /** True once the time slider was shown for a layer with times. */
