@@ -7,6 +7,8 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+## [0.0.3] – 2026-11-22
+
 ### Added
 
 - Google Maps (road map, satellite and hybrid) in the XYZ catalogue
@@ -88,6 +90,17 @@ All notable changes to Terra Soar. The format follows
   and pause, faster and slower (backwards too), steps, and jumping to a
   date and time. Projects keep it.
 
+- KML and KMZ (File → Open KML or KMZ…, dragging files onto the window,
+  or Open With): folders as collections in the Layers panel, places with
+  their icons and names, paths and areas in their styles and at their
+  heights (with walls where the file asks), pictures on the ground and on
+  the screen, places and tracks shown by the program's clock, network
+  links (refreshed, and offline from the last copy), regions, and a
+  balloon for each place with Fly There. Documents of your own (KML →
+  New KML Document) and opened files can be edited: placemarks, paths,
+  polygons and holes drawn on the view, properties, undo and redo, the
+  clipboard; saved as KML or as a KMZ with its pictures, and kept in
+  projects. The elevation profile and offline regions export as KML.
 - File → Add XYZ Tile Layer…: web maps served as `{z}/{x}/{y}` tiles
   (OpenStreetMap, OpenTopoMap, USGS imagery, NASA GIBS, EMODnet), TMS row
   order and subdomains, from a catalogue or typed in; cached and kept
@@ -247,6 +260,7 @@ The first public build: everything below is new.
   and the third-party notices.
 - English text throughout, ready for translation (Qt Linguist).
 
-[Unreleased]: https://github.com/marutan/terrasoar/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/marutan/terrasoar/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/marutan/terrasoar/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/marutan/terrasoar/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/marutan/terrasoar/releases/tag/v0.0.1
