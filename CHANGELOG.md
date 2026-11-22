@@ -86,10 +86,11 @@ All notable changes to Terra Soar. The format follows
   next pass on click; old elements marked, with Refresh Elements.
   Positions come from Terra Soar's own SGP4/SDP4, checked against the
   reference test set. Whole constellations such as Starlink can be shown.
-- A clock in the status bar (and View → Clock): real time at first, play
-  and pause, faster and slower (backwards too), steps, and jumping to a
-  date and time. Projects keep it.
-
+- A clock in the status bar (and View → Clock): real time at first
+  (shown to the minute, so an idle program stays idle; to the second when
+  paused or at another speed), play and pause, faster and slower
+  (backwards too), steps, and jumping to a date and time. Projects keep
+  it.
 - KML and KMZ (File → Open KML or KMZ…, dragging files onto the window,
   or Open With): folders as collections in the Layers panel, places with
   their icons and names, paths and areas in their styles and at their

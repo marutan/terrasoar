@@ -24,6 +24,7 @@
 #include <atomic>
 #include <cmath>
 #include <utility>
+#include <vector>
 
 #include <QBuffer>
 #include <QCoreApplication>
@@ -879,7 +880,7 @@ QByteArray gunzipIfCompressed(const QByteArray& data, bool* ok)
   QByteArray out;
   bool good = file != nullptr;
   if (file != nullptr) {
-    std::array<char, 65536> buffer{};
+    std::vector<char> buffer(static_cast<std::size_t>(65536));
     size_t read = 0;
     while ((read = VSIFReadL(buffer.data(), 1, buffer.size(), file)) > 0) {
       out.append(buffer.data(), static_cast<int32_t>(read));

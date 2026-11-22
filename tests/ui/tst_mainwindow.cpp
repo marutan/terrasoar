@@ -5260,7 +5260,14 @@ private slots:
     ts::ProgramClock* clock = window.clock();
     QVERIFY(clock->isRealTime());
     QCOMPARE(widget->rateText(), QStringLiteral("Real time"));
-    QVERIFY(widget->timeText().endsWith(QLatin1String(" UTC")));
+    // In real time to the minute (an idle program repaints once a minute).
+    const QString minute =
+        clock->time().toString(QStringLiteral("yyyy-MM-dd HH:mm")) +
+        QStringLiteral(" UTC");
+    QVERIFY2(widget->timeText() == minute ||
+                 widget->timeText() < minute, // the minute may just have turned
+             qPrintable(widget->timeText()));
+    QCOMPARE(widget->timeText().size(), minute.size());
     widget->playAction()->trigger();
     QVERIFY(!clock->isRunning());
     const QDateTime paused = clock->time();
