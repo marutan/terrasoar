@@ -340,7 +340,7 @@ private slots:
   {
     // The catalogue that comes with the program reads; every entry credits
     // its source and links its terms; OpenStreetMap's volunteer-run tile
-    // servers forbid bulk downloads.
+    // servers and Google's unofficial one forbid bulk downloads.
     QFile file(QStringLiteral(TS_REPO_DATA_DIR "/xyz-catalogue.json"));
     QVERIFY(file.open(QIODevice::ReadOnly));
     const QByteArray json = file.readAll();
@@ -371,6 +371,10 @@ private slots:
         ts::bulkDownloadPolicy(
             QUrl(QStringLiteral("https://a.tile.opentopomap.org/")), services),
         ts::BulkDownloadPolicy::Forbidden);
+    // Google's tile server isn't a published API: browsing only.
+    QCOMPARE(ts::bulkDownloadPolicy(
+                 QUrl(QStringLiteral("https://mt1.google.com/")), services),
+             ts::BulkDownloadPolicy::Forbidden);
 
     // Not a catalogue, another kind, a newer version; unusable entries are
     // skipped.

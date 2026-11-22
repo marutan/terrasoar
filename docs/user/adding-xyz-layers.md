@@ -51,10 +51,19 @@ your own work.
 | USGS The National Map: imagery | Aerial and satellite imagery of the United States |
 | NASA GIBS: Blue Marble with bathymetry | The whole Earth with shaded relief and sea depths |
 | EMODnet Bathymetry | Depths of the European seas and the oceans. Not for navigation |
+| Google Maps | Google's road map |
+| Google Maps - Satellite | Google's satellite and aerial imagery |
+| Google Maps - Hybrid | Google's imagery with roads, places and borders |
 
 OpenStreetMap's and OpenTopoMap's tile servers are run by volunteers on
 donated resources. Their terms allow looking at the map, not downloading
 areas of it: Terra Soar won't keep them as offline regions.
+
+The Google Maps entries use Google's own tile server, which is not a
+published service: Google's terms allow its maps only through Google's
+own products, so read them before using these layers, and expect the
+address to stop working without notice. Terra Soar won't keep them as
+offline regions either.
 
 ## Credits, saved tiles and working offline
 

@@ -91,7 +91,12 @@ address is the template's scheme and host (`ts::xyzServiceUrl()`,
 entry can forbid bulk downloads but, as for WMS, a match by host alone
 can't allow them (`bulkDownloadPolicy()`). OpenStreetMap's and
 OpenTopoMap's tile usage policies forbid bulk downloading; their entries
-say so, and Terra Soar refuses to download regions of them.
+say so, and Terra Soar refuses to download regions of them. The Google
+Maps entries (road map, satellite, hybrid: `mt1.google.com/vt`, added at
+the project owner's request) are Google's own tile server, not a
+published API: Google's terms allow its maps only through its own
+services. They forbid bulk downloads, and their descriptions say that
+the address is unofficial and may stop working.
 
 The network client sends Terra Soar's own User-Agent with every request,
 as OpenStreetMap's tile policy requires.
