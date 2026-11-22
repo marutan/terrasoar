@@ -35,6 +35,8 @@
 #include <QJsonObject>
 #include <QString>
 
+#include "featurepipeline.h"
+
 namespace ts
 {
 class GeoPackageFeatureWriter;
@@ -92,22 +94,8 @@ struct Vmap0Class {
   std::vector<Vmap0Filter> filters;
 };
 
-/** One level of detail: tables cut to one level and simplified. */
-struct Vmap0Lod {
-  /** Quadtree level the features are cut to. */
-  int32_t storageLevel = 0;
-  /** Shallowest display level served. */
-  int32_t minLevel = 0;
-  /** Deepest display level served, -1 for every deeper level. */
-  int32_t maxLevel = -1;
-  /**
-   * Lines and polygons are simplified within this, degrees (0 keeps
-   * every vertex). Below the finest level of detail, polygons smaller
-   * than a square of twice this side and lines shorter than it are left
-   * out.
-   */
-  double toleranceDeg = 0.0;
-};
+/** A level of detail (see FeatureLod). */
+using Vmap0Lod = FeatureLod;
 
 /** What to convert. */
 struct Vmap0Options {
@@ -129,43 +117,8 @@ struct Vmap0Options {
   std::function<void(const QString&)> progress;
 };
 
-/** What became of one feature class. */
-struct Vmap0ClassStats {
-  /** Its table name before the storage level. */
-  QString table;
-  /** Feature rows read from the libraries. */
-  int64_t sourceFeatures = 0;
-  /** Of those, left out by the filters. */
-  int64_t filtered = 0;
-  /** Of those, without usable geometry (see vpf::ReadStats). */
-  int64_t skipped = 0;
-  /**
-   * Of those, read but degenerate: faces whose rings enclose nothing or
-   * edges of one point (a known kind of VMAP0 error), left out and
-   * reported.
-   */
-  int64_t degenerate = 0;
-  /** Pieces joined into another across a tile edge. */
-  int64_t joined = 0;
-  /**
-   * Features after joining: sourceFeatures − filtered − skipped −
-   * degenerate − joined.
-   */
-  int64_t features = 0;
-  /** Polygons GEOS found invalid and repaired. */
-  int64_t repaired = 0;
-  /** Vertices read. */
-  int64_t sourceVertices = 0;
-  /** Rows written, per level of detail (0 where the class isn't shown). */
-  std::vector<int64_t> rows;
-  /** Vertices written, per level of detail. */
-  std::vector<int64_t> vertices;
-  /** Features left out as too small, per level of detail. */
-  std::vector<int64_t> dropped;
-
-  /** Returns the statistics as JSON. */
-  QJsonObject toJson() const;
-};
+/** One class's statistics (see FeatureClassStats). */
+using Vmap0ClassStats = FeatureClassStats;
 
 /**
  * Converts the feature classes of @p options into @p writer: for each

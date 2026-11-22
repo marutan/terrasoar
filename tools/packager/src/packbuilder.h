@@ -85,6 +85,16 @@ struct ImagerySpec {
   QString variantOf;
   /** Which variant (PackDataset::variant). */
   QString variant;
+  /**
+   * The image's file inside the source, if it is a zip (Natural Earth's
+   * rasters); empty for a source that is the image itself.
+   */
+  QString member;
+  /**
+   * For a dataset of the pack's own ("imageryDatasets"): the name of the
+   * imagery layer the manifest offers on it; empty for none.
+   */
+  QString layerName;
   /** Tiling. */
   ImageryTilerOptions tiling;
 };
@@ -240,6 +250,12 @@ struct PackConfig {
    * pack dataset (Blue Marble's months).
    */
   std::vector<ImagerySpec> imageryVariants;
+  /**
+   * Imagery datasets of the pack's own ("imageryDatasets"), neither
+   * replacing nor a variant of a base pack dataset, each with its layer
+   * (Black Marble, Natural Earth's rasters).
+   */
+  std::vector<ImagerySpec> imageryDatasets;
   /** Shoreline dataset, if any. */
   std::optional<ShorelineSpec> shoreline;
   /** Country outlines, if any. */

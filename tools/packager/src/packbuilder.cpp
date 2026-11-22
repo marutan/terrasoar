@@ -268,6 +268,8 @@ std::optional<ImagerySpec> readImagery(const PackConfig& config,
   spec.replaces = text(entry, "replaces");
   spec.variantOf = text(entry, "variantOf");
   spec.variant = text(entry, "variant");
+  spec.member = text(entry, "member");
+  spec.layerName = text(entry, "layer");
   spec.tiling.maxLevel = integer(entry, "maxLevel", 4);
   spec.tiling.tileSizePx = integer(entry, "tileSize", 256);
   spec.tiling.jpegQuality = integer(entry, "jpegQuality", 85);
@@ -438,6 +440,22 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
       return std::nullopt;
     }
     config.imageryVariants.push_back(*spec);
+  }
+  const QJsonArray own =
+      json.value(QStringLiteral("imageryDatasets")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < own.size(); ++i) {
+    const std::optional<ImagerySpec> spec =
+        readImagery(config, own.at(i).toObject());
+    if (!spec || !spec->replaces.isEmpty() || !spec->variantOf.isEmpty() ||
+        spec->layerName.isEmpty()) {
+      fail(errorString, QStringLiteral("Bad imagery dataset %1 (one of the "
+                                       "pack's own needs a layer, and "
+                                       "replaces nothing)")
+                            .arg(i));
+      return std::nullopt;
+    }
+    config.imageryDatasets.push_back(*spec);
   }
 
   const QJsonObject shoreline =
@@ -644,9 +662,13 @@ private:
     if (m_config->imagery && !buildImagery(*m_config->imagery)) {
       return false;
     }
-    return std::all_of(
-        m_config->imageryVariants.begin(), m_config->imageryVariants.end(),
-        [this](const ImagerySpec& spec) { return buildImagery(spec); });
+    const auto build = [this](const ImagerySpec& spec) {
+      return buildImagery(spec);
+    };
+    return std::all_of(m_config->imageryVariants.begin(),
+                       m_config->imageryVariants.end(), build) &&
+           std::all_of(m_config->imageryDatasets.begin(),
+                       m_config->imageryDatasets.end(), build);
   }
 
   bool buildImagery(const ImagerySpec& spec)
@@ -660,8 +682,14 @@ private:
                    .arg(source.file)
                    .arg(width)
                    .arg(width / 2));
-    const QImage mosaic = readEquirectangular(
-        gdalPath(m_sources.filePath(source.file)), width, width / 2, m_error);
+    const QString path =
+        spec.member.isEmpty()
+            ? gdalPath(m_sources.filePath(source.file))
+            : QStringLiteral("/vsizip/%1/%2")
+                  .arg(QFileInfo(m_sources.filePath(source.file))
+                           .absoluteFilePath(),
+                       spec.member);
+    const QImage mosaic = readEquirectangular(path, width, width / 2, m_error);
     if (mosaic.isNull()) {
       return false;
     }
@@ -690,6 +718,19 @@ private:
     dataset.replaces = spec.replaces;
     dataset.variantOf = spec.variantOf;
     dataset.variant = spec.variant;
+    if (!spec.layerName.isEmpty()) {
+      QJsonObject layerSource;
+      layerSource.insert(QStringLiteral("kind"), QStringLiteral("basepack"));
+      layerSource.insert(QStringLiteral("dataset"), spec.dataset);
+      QJsonObject definition;
+      definition.insert(QStringLiteral("id"),
+                        QStringLiteral("pack:%1:image").arg(spec.dataset));
+      definition.insert(QStringLiteral("origin"), QStringLiteral("catalogue"));
+      definition.insert(QStringLiteral("type"), QStringLiteral("imagery"));
+      definition.insert(QStringLiteral("name"), spec.layerName);
+      definition.insert(QStringLiteral("source"), layerSource);
+      m_manifest.layers.append(definition);
+    }
     return true;
   }
 
