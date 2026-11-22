@@ -2836,6 +2836,120 @@ private slots:
     QCOMPARE(m_gl->device().takeErrors(), QString());
   }
 
+  void fetchesOnlyWhatShows()
+  {
+    // Imagery that can't be seen isn't fetched: a layer hidden under an
+    // opaque one (not under a translucent one, nor under one at partial
+    // opacity), and coarse stand-ins for tiles that already show finer
+    // ones. While the camera moves fast only stand-ins are asked for;
+    // the detail once it settles. A test clock: frames are 50 ms apart
+    // unless said otherwise.
+    TS_TEST_REQUIRE_GL(*m_gl);
+    m_gl->makeCurrent();
+    double clockS = 0.0;
+    ts::TileRendererSettings settings;
+    settings.clock = [&clockS]() { return clockS; };
+    ts::GlobeRenderer renderer(m_gl->device(), settings);
+    QString error;
+    QVERIFY2(renderer.initialise(&error), qPrintable(error));
+    const std::function<ts::TileStatistics(const ts::CameraPose&, double)>
+        frame = [&](const ts::CameraPose& pose, double stepS) {
+          clockS += stepS;
+          ts::Camera camera;
+          camera.setViewportSize(imageWidthPx, imageHeightPx);
+          camera.setPose(pose);
+          ts::PassDesc pass;
+          pass.target = m_target.get();
+          pass.viewportPx = QRect(0, 0, imageWidthPx, imageHeightPx);
+          m_gl->makeCurrent();
+          renderer.render(camera, pass, 1.0);
+          return renderer.tileStatistics();
+        };
+    const std::function<ts::TileStatistics(const ts::CameraPose&)> settle =
+        [&](const ts::CameraPose& pose) {
+          ts::TileStatistics last;
+          const bool settled = QTest::qWaitFor(
+              [&]() {
+                last = frame(pose, 0.05);
+                return !renderer.isBusy();
+              },
+              30000);
+          if (!settled) {
+            qWarning("never settled");
+          }
+          return frame(pose, 0.05);
+        };
+    const ts::CameraPose here{48.0, 10.0, 2.0e6, 0.0, 0.0};
+    const std::shared_ptr<ts::ImageryProvider> bottom =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(0, 0, 255), 64);
+    const std::shared_ptr<ts::ImageryProvider> opaque =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(255, 0, 0), 64);
+    const std::shared_ptr<ts::ImageryProvider> translucent =
+        std::make_shared<ts::SolidColorImageryProvider>(QColor(255, 0, 0, 128),
+                                                        64);
+
+    // Under an opaque layer: nothing of the bottom one is wanted.
+    renderer.setImageryLayers({ts::ImageryLayerDraw{bottom, 1.0, -1},
+                               ts::ImageryLayerDraw{opaque, 1.0, -1}},
+                              {});
+    ts::TileStatistics tiles = settle(here);
+    QVERIFY(tiles.rendered > 4);
+    QCOMPARE(tiles.hiddenSkipped, tiles.rendered);
+    QCOMPARE(tiles.requested, 0);
+    // The opaque layer at partial opacity, or a translucent one: it is.
+    renderer.setImageryLayers({ts::ImageryLayerDraw{bottom, 1.0, -1},
+                               ts::ImageryLayerDraw{opaque, 0.9, -1}},
+                              {});
+    tiles = settle(here);
+    QCOMPARE(tiles.hiddenSkipped, 0);
+    renderer.setImageryLayers({ts::ImageryLayerDraw{bottom, 1.0, -1},
+                               ts::ImageryLayerDraw{translucent, 1.0, -1}},
+                              {});
+    tiles = settle(here);
+    QCOMPARE(tiles.hiddenSkipped, 0);
+    // A layer at no opacity isn't fetched either.
+    renderer.setImageryLayers({ts::ImageryLayerDraw{bottom, 1.0, -1},
+                               ts::ImageryLayerDraw{translucent, 0.0, -1}},
+                              {});
+    tiles = settle(here);
+    QCOMPARE(tiles.hiddenSkipped, tiles.rendered);
+
+    // Zooming in a level: the tiles shown already are finer than the new
+    // tiles' stand-ins, which aren't asked for.
+    renderer.setImageryLayers({ts::ImageryLayerDraw{bottom, 1.0, -1}}, {});
+    settle(here);
+    ts::CameraPose closer = here;
+    closer.rangeM = 0.5 * here.rangeM;
+    tiles = frame(closer, 1.0);
+    QVERIFY(!tiles.detailHeld);
+    QVERIFY2(tiles.standInsSkipped >= tiles.rendered / 2,
+             qPrintable(QStringLiteral("%1 of %2")
+                            .arg(tiles.standInsSkipped)
+                            .arg(tiles.rendered)));
+
+    // Flying fast (60 frames a second): the detail waits.
+    settle(closer);
+    ts::CameraPose flying = closer;
+    bool held = false;
+    for (int32_t i = 0; i < 10; ++i) {
+      flying.targetLonDeg += 1.0; // about 4 screen heights a second
+      tiles = frame(flying, 1.0 / 60.0);
+      held = held || tiles.detailHeld;
+      if (i >= 1) {
+        QVERIFY2(tiles.detailHeld, qPrintable(QString::number(i)));
+        QVERIFY(renderer.isBusy());
+      }
+    }
+    QVERIFY(held);
+    // Stopped: held a little longer, then the detail is asked for.
+    tiles = frame(flying, 0.1);
+    QVERIFY(tiles.detailHeld);
+    tiles = frame(flying, 0.1);
+    QVERIFY(!tiles.detailHeld);
+    QVERIFY(tiles.requested > 0);
+    settle(flying);
+  }
+
   void horizonOneMetreAboveSurface()
   {
     // Looking towards the horizon from 1 m up. The horizon row from the

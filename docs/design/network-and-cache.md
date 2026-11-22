@@ -41,15 +41,33 @@ reported (see `tests/tsan.supp`).
 
 ## The life of a request
 
-1. **Queued.** At most `maximumInFlight` (6) requests hold a slot; the rest
-   wait in order. The limit is the roadmap's "network requests in flight"
-   budget, and what servers expect from one client.
+1. **Queued.** At most `maximumInFlight` (16) requests hold a slot, and
+   at most `maximumPerServer` (6) of them to one server (scheme, host and
+   port): as many connections as Qt opens to one, and what servers expect
+   from one client. The rest wait in order, except that a request to a
+   server at its limit lets those to other servers behind it go first:
+   imagery, terrain and vector layers from different servers load side by
+   side instead of queueing behind each other. The total is the roadmap's
+   "network requests in flight" budget.
 2. **On the wire.** User-Agent `TerraSoar/<version>`; no HTTP cache in
    Qt (the disk cache does that); redirects followed unless from https to
-   http. HTTP/1.1 only: with Qt 6.4, a server closing an HTTP/2
-   connection while a redirect was followed (GitHub's release downloads
-   do) left the next request on it hanging past its timeout, and Qt's six
-   connections per host already match the in-flight limit.
+   http. HTTP/2 only for requests that allow it (`HttpRequest::
+   allowHttp2`): the tile fetchers' (`CachedTileFetcher`, every web
+   imagery, terrain and WFS source and region downloads), and only over
+   https, where TLS negotiates it. On plain http, Qt 5 tries an upgrade
+   (h2c) with the first request and holds the server's other requests
+   back until it is answered (`loaderCancelsTilesLeavingTheView` caught
+   it: with a slow server, one tile was fetched to the end). Over HTTP/2 one
+   connection carries all of a server's requests at once; over HTTP/1.1
+   each of six connections carries one at a time. Measured with Apache on
+   localhost: 200 tiles from 8 threads, 6 connections over HTTP/1.1, one
+   over HTTP/2 (`HttpResponse::http2` says which was used). Everything
+   else, pack downloads first, stays on HTTP/1.1: with Qt 6.4, a server
+   closing an HTTP/2 connection while a redirect was followed (GitHub's
+   release downloads do) left the next request on it hanging past its
+   timeout, and no later Qt is known to fix it. Tile servers rarely
+   redirect; if one does and hangs, the request times out and is retried
+   like any other.
 3. **Answered.** Any HTTP status is a response (`NetworkError::None`); the
    caller decides what a 404 means. Except a redirect cut short: a 3xx
    that comes with a transport error (the connection closed while
@@ -64,6 +82,23 @@ reported (see `tests/tsan.supp`).
 6. **Cancelled** at any point: a queued request is dropped, one on the
    wire has its connection aborted (the server sees the client go), one
    waiting to retry is finished. The caller gets `Cancelled`.
+
+   **Finished late.** Aborting an HTTP/1.1 response closes its connection,
+   since there is no other way to stop one part-way, so the next request
+   to that server pays for a new connection and TLS handshake. A tile is
+   small and is usually most of the way there by then, so a request with
+   `HttpRequest::finishIfCancelled` (every tile fetched by
+   `CachedTileFetcher::fetch()`) isn't aborted when it is cancelled while
+   its response is arriving (its headers are in). `fetch()` waits for it,
+   at most 1 s (`lateFinishLimit`) and while at most 256 KB are still to
+   come (`lateFinishMaximumBytes`), and returns it. The fetcher keeps it
+   in the disk cache, so coming back to it costs nothing, and reports
+   the tile `Cancelled`. A request still waiting for the server's answer
+   is dropped at once as before: a slow server rendering a tile would
+   otherwise hold a loader thread. How much has arrived comes from
+   `readyRead`; Qt 6.4 emits `downloadProgress` only every few hundred
+   milliseconds. `lateFinishes()` counts them. Region downloads don't
+   ask for it: **Cancel** there drops everything at once.
 
 When the client is destroyed, everything open finishes as cancelled.
 
@@ -169,7 +204,14 @@ much, redirect or act as a proxy):
 - Cancellation drops the connection (the server sees the client go) and
   `fetch()` returns at once; tickets polled and cancelled; queued
   requests cancelled without being sent.
+- Finishing late (`cancelledWhileArrivingFinishes`): a response arriving
+  when cancelled finishes with its connection kept; it is aborted if not
+  asked for, slower than the limit, with too much still to come, or not
+  yet begun. `tests/xyz`'s `providerKeepsATileCancelledWhileArriving`:
+  the tile lands in the disk cache.
 - The in-flight limit (12 requests, never more than 3 at the server);
+  the per-server limit (`limitsRequestsPerServer`: requests to a second
+  server go past those queued for a busy one);
   requests through a proxy; destruction cancels what is open; many
   threads sharing a client (TSan).
 - HTTP dates in all three formats; freshness for every rule above.

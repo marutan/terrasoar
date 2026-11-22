@@ -47,6 +47,16 @@ namespace ts::test
 struct MockWmsBehaviour {
   /** Delay before each GetMap answer, ms. */
   std::atomic<int32_t> delayMs{0};
+  /**
+   * Send half of each tile, then the rest this much later, ms (XYZ only,
+   * MockHttpResponse::restDelayMs).
+   */
+  std::atomic<int32_t> restDelayMs{0};
+  /**
+   * Largest GetMap image drawn, pixels a side (0: any up to 4096); larger
+   * ones get a ServiceException, as servers answer past their MaxWidth.
+   */
+  std::atomic<int32_t> maximumImagePx{0};
   /** Answer GetMap with this HTTP status instead (0: normally). */
   std::atomic<int32_t> failStatus{0};
   /** Answer GetMap with a ServiceExceptionReport (status 200). */
@@ -408,6 +418,21 @@ mockWmsHandler(const std::shared_ptr<MockWmsBehaviour>& behaviour,
     if (query.queryItemValue(QStringLiteral("REQUEST")) ==
         QLatin1String("GetFeatureInfo")) {
       return mockWmsFeatureInfo(query);
+    }
+    const int32_t largest = behaviour->maximumImagePx.load();
+    if (largest > 0 &&
+        std::max(query.queryItemValue(QStringLiteral("WIDTH")).toInt(),
+                 query.queryItemValue(QStringLiteral("HEIGHT")).toInt()) >
+            largest) {
+      MockHttpResponse response;
+      response.status = 200;
+      response.headers.emplace_back("Content-Type",
+                                    "application/vnd.ogc.se_xml");
+      response.body =
+          "<?xml version=\"1.0\"?><ServiceExceptionReport version=\"1.3.0\">"
+          "<ServiceException>Image too large</ServiceException>"
+          "</ServiceExceptionReport>";
+      return response;
     }
     return mockWmsGetMap(request, query, *behaviour);
   };

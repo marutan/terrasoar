@@ -117,6 +117,7 @@ mockXyzHandler(const std::shared_ptr<MockWmtsBehaviour>& behaviour)
     }
     MockHttpResponse response;
     response.delayMs = behaviour->wms.delayMs.load();
+    response.restDelayMs = behaviour->wms.restDelayMs.load();
     // The mock WMTS's GoogleMapsCompatible set: its matrix z is zoom z.
     const QImage image =
         mockWmtsTile(mockWmtsSets().at(1), tile->z, tile->x, tile->row);

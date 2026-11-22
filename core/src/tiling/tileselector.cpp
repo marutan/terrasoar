@@ -27,6 +27,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include "ts/camera/camera.h"
@@ -706,6 +707,78 @@ double TileSelector::mapGeometryErrorM(const MapFrame& frame, TileKey key) const
   const double middleM =
       projection.forward(0.5 * (outerDeg + innerDeg), 0.0).yM;
   return std::abs(middleM - 0.5 * (outerM + innerM));
+}
+
+double TileSelector::offCentreRad(const Camera& camera, TileKey key)
+{
+  return offCentreRad(View(camera), key);
+}
+
+double TileSelector::offCentreRad(const View& view, TileKey key)
+{
+  const Camera& camera = *view.camera;
+  // The point of the tile nearest the middle of the view (the camera's
+  // target), in latitude and longitude: the target itself when the tile
+  // holds it. Not the tile's own middle: a coarse tile mostly on the far
+  // side of the globe has that behind the Earth, near the line of sight.
+  const CameraPose pose = camera.pose();
+  const GeoRect rect = key.bounds();
+  if (pose.tiltDeg > Camera::orbitTiltDeg && view.morph <= 0.0) {
+    // Looking up past the orbit: the target is below the view, and only
+    // tiles near the eye are drawn. Their middles.
+    const Vec3& forward = camera.forwardEcef();
+    const Vec3 offset = geodeticToEcef(Geodetic{rect.centreLatDeg(),
+                                                rect.centreLonDeg(), 0.0}) -
+                        camera.eyeEcef();
+    return std::atan2(length(cross(forward, offset)), dot(forward, offset));
+  }
+  const double latDeg =
+      std::clamp(pose.targetLatDeg, rect.southDeg, rect.northDeg);
+  double lonDeg = pose.targetLonDeg;
+  // How far east of the tile's west edge, in [0, 360).
+  const double fromWestDeg =
+      normaliseLonDeg(lonDeg - rect.westDeg - 180.0) + 180.0;
+  if (fromWestDeg > rect.widthDeg()) {
+    // Outside: the nearer edge, either way round.
+    lonDeg = 360.0 - fromWestDeg < fromWestDeg - rect.widthDeg() ? rect.westDeg
+                                                                 : rect.eastDeg;
+  }
+  const Vec3 globeOffset =
+      geodeticToEcef(Geodetic{latDeg, lonDeg, 0.0}) - camera.eyeEcef();
+  Vec3 offset = globeOffset;
+  if (view.morph > 0.0 && view.frame.projection != nullptr) {
+    // Where the renderer draws it now, between globe and map; on the map
+    // the copy of the world nearest the middle.
+    const Geodetic inside =
+        view.frame.projection->clampToDomain(latDeg, lonDeg);
+    const Vec3 mapOffset =
+        camera.mapPlanePoint(view.frame.offsetOf(inside.latDeg, inside.lonDeg));
+    offset = globeOffset * (1.0 - view.morph) + mapOffset * view.morph;
+  }
+  const Vec3& forward = camera.forwardEcef();
+  return std::atan2(length(cross(forward, offset)), dot(forward, offset));
+}
+
+void TileSelector::orderFromViewCentre(const Camera& camera,
+                                       std::vector<TileKey>& keys)
+{
+  const View view(camera);
+  std::vector<std::pair<double, TileKey>> ranked;
+  ranked.reserve(keys.size());
+  for (const TileKey& key : keys) {
+    ranked.emplace_back(offCentreRad(view, key), key);
+  }
+  std::stable_sort(ranked.begin(), ranked.end(),
+                   [](const std::pair<double, TileKey>& a,
+                      const std::pair<double, TileKey>& b) {
+                     if (a.first != b.first) {
+                       return a.first < b.first;
+                     }
+                     return a.second.level < b.second.level;
+                   });
+  for (std::size_t i = 0; i < keys.size(); ++i) {
+    keys[i] = ranked[i].second;
+  }
 }
 
 TileSelection TileSelector::select(

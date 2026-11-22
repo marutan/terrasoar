@@ -24,6 +24,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <thread>
 #include <vector>
 
 #include <QFile>
@@ -488,6 +489,48 @@ private slots:
     flipped.tms = true;
     QVERIFY(ts::webCacheFileName(flipped.id()) !=
             ts::webCacheFileName(source.id()));
+  }
+
+  void providerKeepsATileCancelledWhileArriving()
+  {
+    // A tile cancelled while it arrives (the camera moved on) finishes and
+    // goes into the cache: its connection is kept, and coming back to it
+    // costs no request.
+    std::shared_ptr<MockWmtsBehaviour> behaviour =
+        std::make_shared<MockWmtsBehaviour>();
+    behaviour->wms.maxAgeS = 3600;
+    behaviour->wms.restDelayMs = 300;
+    MockHttpServer server;
+    server.setHandler(ts::test::mockXyzHandler(behaviour));
+    QTemporaryDir cache;
+    ts::WebTileSettings settings;
+    settings.cacheDirectory = cache.path();
+    const ts::XyzSource source = mockSource(server);
+    const ts::TileKey key{3, 4, 2};
+    {
+      ts::XyzImageryProvider provider(
+          source, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+      std::atomic<bool> cancelled{false};
+      std::thread canceller([&cancelled]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        cancelled.store(true);
+      });
+      QCOMPARE(provider.loadTileImage(key, cancelled).outcome,
+               ts::ImageLoadResult::Outcome::Cancelled);
+      canceller.join();
+    }
+    QCOMPARE(server.cutOffCount(), 0);
+    const int32_t asked = server.requestCount();
+    QVERIFY(asked > 0);
+    // What arrived is in the cache: the same tile again asks only for the
+    // pieces never started.
+    behaviour->wms.restDelayMs = 0;
+    ts::XyzImageryProvider again(
+        source, std::make_shared<ts::NetworkClient>(testNetwork()), settings);
+    const std::atomic<bool> notCancelled{false};
+    QCOMPARE(again.loadTileImage(key, notCancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QVERIFY(again.statistics().cacheHits >= asked);
   }
 
   void providerOutcomes()

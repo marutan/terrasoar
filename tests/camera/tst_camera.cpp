@@ -211,7 +211,7 @@ private slots:
   void poseIsClamped()
   {
     ts::Camera camera;
-    camera.setPose(ts::CameraPose{95.0, 190.0, 1.0e9, -30.0, 120.0});
+    camera.setPose(ts::CameraPose{95.0, 190.0, 1.0e9, -30.0, 200.0});
     const ts::CameraPose& pose = camera.pose();
     QVERIFY(pose.targetLatDeg < 90.0 && pose.targetLatDeg > 89.99);
     QCOMPARE(pose.targetLonDeg, -170.0);
@@ -220,12 +220,57 @@ private slots:
     QCOMPARE(pose.tiltDeg, ts::Camera::maximumTiltDeg);
   }
 
+  void looksUpPastTheOrbit()
+  {
+    // Up to orbitTiltDeg the eye circles the target; past it the eye
+    // stays put and the view turns up: along the ground at 90°, straight
+    // up at 180°.
+    const ts::CameraPose base{47.0, 8.0, 2000.0, 30.0,
+                              ts::Camera::orbitTiltDeg};
+    ts::Camera orbit;
+    orbit.setViewportSize(800, 600);
+    orbit.setPose(base);
+    const ts::Vec3 eye = orbit.eyeEcef();
+    const ts::Vec3 up = ts::localFrame(47.0, 8.0).upEcef;
+    for (const double tiltDeg : {90.0, 120.0, 150.0, 180.0}) {
+      ts::CameraPose pose = base;
+      pose.tiltDeg = tiltDeg;
+      ts::Camera camera;
+      camera.setViewportSize(800, 600);
+      camera.setPose(pose);
+      QCOMPARE(camera.pose().tiltDeg, tiltDeg);
+      QVERIFY(ts::length(camera.eyeEcef() - eye) < 1e-6);
+      // The view's angle above the target's horizontal.
+      const double aboveDeg =
+          std::asin(std::clamp(ts::dot(camera.forwardEcef(), up), -1.0, 1.0)) *
+          180.0 / 3.14159265358979323846;
+      QVERIFY2(std::abs(aboveDeg - (tiltDeg - 90.0)) < 1e-6,
+               qPrintable(QString::number(aboveDeg)));
+      // A right-handed, orthonormal frame.
+      QVERIFY(std::abs(ts::dot(camera.forwardEcef(), camera.upEcef())) < 1e-9);
+    }
+    // Looking up, the middle of the screen is sky; the ground is below it.
+    ts::CameraPose upward = base;
+    upward.tiltDeg = 120.0;
+    ts::Camera sky;
+    sky.setViewportSize(800, 600);
+    sky.setPose(upward);
+    QVERIFY(!sky.pickGeodetic(400.0, 300.0));
+    ts::CameraPose level = base;
+    level.tiltDeg = 95.0;
+    ts::Camera horizon;
+    horizon.setViewportSize(800, 600);
+    horizon.setPose(level);
+    QVERIFY(horizon.pickGeodetic(400.0, 599.0).has_value());
+  }
+
   void minimumEyeHeight_data()
   {
     QTest::addColumn<double>("tiltDeg");
     QTest::newRow("down") << 0.0;
     QTest::newRow("tilted") << 60.0;
     QTest::newRow("grazing") << 85.0;
+    QTest::newRow("looking up") << 150.0;
   }
 
   void minimumEyeHeight()

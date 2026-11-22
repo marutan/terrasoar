@@ -143,6 +143,7 @@ HEADERS += \
     include/ts/render/glrenderdevice.h \
     include/ts/render/renderdevice.h \
     include/ts/tiling/lrucache.h \
+    include/ts/tiling/motionhold.h \
     include/ts/tiling/tilekey.h \
     include/ts/tiling/tileloader.h \
     include/ts/tiling/tilemesh.h \
@@ -280,6 +281,7 @@ SOURCES += \
     src/regions/regiongeometry.cpp \
     src/render/framepacer.cpp \
     src/render/glrenderdevice.cpp \
+    src/tiling/motionhold.cpp \
     src/tiling/tilekey.cpp \
     src/tiling/tileloader.cpp \
     src/tiling/tilemesh.cpp \

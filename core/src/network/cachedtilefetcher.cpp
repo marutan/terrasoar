@@ -104,6 +104,7 @@ RegionTileResult CachedTileFetcher::fetchForRegion(
 
   HttpRequest request;
   request.url = url;
+  request.allowHttp2 = true;
   if (cached) {
     request.headers = revalidationHeaders(cached->etag, cached->lastModified);
   }
@@ -301,6 +302,77 @@ void CachedTileFetcher::store(TileKey key, const HttpResponse& response,
   }
 }
 
+bool CachedTileFetcher::fromFreshCache(
+    TileKey key, const std::function<bool(const QByteArray&)>& accept)
+{
+  const std::optional<CachedTile> cached =
+      m_cache ? m_cache->find(key) : std::nullopt;
+  if (!cached || now() >= cached->expiresS || !accept(cached->data)) {
+    return false;
+  }
+  const std::lock_guard<std::mutex> lock(m_mutex);
+  ++m_statistics.cacheHits;
+  return true;
+}
+
+BlockFetch CachedTileFetcher::fetchBlock(
+    const QUrl& url,
+    const std::function<std::vector<BlockPiece>(const QByteArray&)>& split,
+    const std::atomic<bool>& cancelled)
+{
+  BlockFetch result;
+  if (leftAlone()) {
+    return result;
+  }
+  HttpRequest request;
+  request.url = url;
+  request.allowHttp2 = true;
+  request.finishIfCancelled = true;
+  countRequest();
+  {
+    const std::lock_guard<std::mutex> lock(m_mutex);
+    ++m_statistics.blockRequests;
+  }
+  const int64_t nowS = now();
+  const HttpResponse response = m_network->fetch(request, cancelled);
+  if (response.error == NetworkError::Cancelled) {
+    result.outcome = FetchOutcome::Cancelled;
+    return result;
+  }
+  const bool late = cancelled.load();
+  if (response.error == NetworkError::TooLarge) {
+    result.refused = true;
+    return result;
+  }
+  if (response.error != NetworkError::None) {
+    noteUnreachable(response.errorString);
+    return result;
+  }
+  if (response.status < 200 || response.status >= 300) {
+    result.refused = true;
+    return result;
+  }
+  const std::vector<BlockPiece> pieces = split(response.body);
+  if (pieces.empty()) {
+    result.refused = true;
+    return result;
+  }
+  noteSuccess();
+  const HttpFreshness freshness =
+      httpFreshness(response, nowS, m_settings.defaultLifetimeS);
+  if (m_cache && freshness.storable) {
+    for (const BlockPiece& piece : pieces) {
+      // Without the block's validators: they don't belong to the piece.
+      m_cache->store(
+          piece.key,
+          CachedTile{
+              piece.data, piece.contentType, freshness.expiresS, {}, {}});
+    }
+  }
+  result.outcome = late ? FetchOutcome::Cancelled : FetchOutcome::Data;
+  return result;
+}
+
 FetchOutcome
 CachedTileFetcher::fetch(TileKey key, const QUrl& url,
                          const std::function<bool(const QByteArray&)>& accept,
@@ -323,14 +395,28 @@ CachedTileFetcher::fetch(TileKey key, const QUrl& url,
 
   HttpRequest request;
   request.url = url;
+  request.allowHttp2 = true;
   if (cached) {
     request.headers = revalidationHeaders(cached->etag, cached->lastModified);
   }
+  // A tile cancelled while it arrives is let finish, and kept in the
+  // cache: aborting it would close its connection.
+  request.finishIfCancelled = true;
   countRequest();
   const HttpResponse response = m_network->fetch(request, cancelled);
-  if (response.error == NetworkError::Cancelled || cancelled.load()) {
+  if (response.error == NetworkError::Cancelled) {
     return FetchOutcome::Cancelled;
   }
+  const bool late = cancelled.load();
+  const FetchOutcome outcome = answered(key, cached, response, nowS, accept);
+  return late ? FetchOutcome::Cancelled : outcome;
+}
+
+FetchOutcome CachedTileFetcher::answered(
+    TileKey key, const std::optional<CachedTile>& cached,
+    const HttpResponse& response, int64_t nowS,
+    const std::function<bool(const QByteArray&)>& accept)
+{
   if (response.error == NetworkError::TooLarge) {
     noteServerError(QCoreApplication::translate(
         "ts::CachedTileFetcher",

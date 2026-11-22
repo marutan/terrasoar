@@ -650,8 +650,7 @@ void VectorRenderer::select(Source& source, const Camera& camera) const
       requests.push_back(s);
     }
   }
-  std::stable_sort(requests.begin(), requests.end(),
-                   [](TileKey a, TileKey b) { return a.level < b.level; });
+  TileSelector::orderFromViewCentre(camera, requests);
   source.loader->setRequests(requests);
 }
 

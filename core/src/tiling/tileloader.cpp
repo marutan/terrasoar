@@ -29,6 +29,30 @@
 namespace ts
 {
 
+bool isFullyOpaque(const QImage& image)
+{
+  if (image.isNull()) {
+    return false;
+  }
+  if (!image.hasAlphaChannel()) {
+    return true;
+  }
+  const QImage argb =
+      image.format() == QImage::Format_ARGB32 ||
+              image.format() == QImage::Format_ARGB32_Premultiplied
+          ? image
+          : image.convertToFormat(QImage::Format_ARGB32);
+  for (int32_t y = 0; y < argb.height(); ++y) {
+    const QRgb* row = reinterpret_cast<const QRgb*>(argb.constScanLine(y));
+    for (int32_t x = 0; x < argb.width(); ++x) {
+      if (qAlpha(row[x]) != 255) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 TileLoader::TileLoader(std::shared_ptr<ImageryProvider> provider,
                        const TileLoaderSettings& settings)
     : m_provider(std::move(provider)), m_settings(settings),
@@ -193,6 +217,7 @@ std::optional<LoadedTile> TileLoader::load(TileKey key,
                      static_cast<std::size_t>(tile.image.sizeInBytes()));
     }
   }
+  tile.opaque = isFullyOpaque(tile.image);
   if (m_settings.buildMeshes && !cancelled.load()) {
     tile.mesh = buildTileMesh(key, m_settings.meshSegments);
   }

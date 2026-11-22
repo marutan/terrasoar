@@ -21,7 +21,11 @@
 #include "ts/wms/wmsimageryprovider.h"
 
 #include <cstdint>
+#include <functional>
+#include <utility>
+#include <vector>
 
+#include <QBuffer>
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -185,6 +189,10 @@ WmsImageryProvider::loadTileImage(TileKey key,
   if (url.isEmpty()) {
     return outcome(ImageLoadResult::Outcome::NoData);
   }
+  if (std::optional<ImageLoadResult> fromBlock =
+          loadFromBlock(key, cancelled)) {
+    return std::move(*fromBlock);
+  }
   QImage image;
   const FetchOutcome fetched = m_fetcher->fetch(
       key, url,
@@ -204,6 +212,136 @@ WmsImageryProvider::loadTileImage(TileKey key,
     break;
   }
   return outcome(ImageLoadResult::Outcome::Failed);
+}
+
+bool WmsImageryProvider::usesBlocks(TileKey key) const
+{
+  return m_fetcher->settings().blocks && !m_blocksRefused.load() &&
+         key.level >= 1 &&
+         m_source.imageProjection() == TileImageProjection::Geographic &&
+         2 * m_source.tileSizePx <= 4096;
+}
+
+WmsImageryProvider::BlockWait WmsImageryProvider::waitForBlock(
+    const QString& blockId, TileKey key,
+    const std::function<bool(const QByteArray&)>& accept,
+    const std::atomic<bool>& cancelled)
+{
+  // Another thread fetching this block: wait for it, then look again.
+  std::unique_lock<std::mutex> lock(m_blocksMutex);
+  while (m_blocksInFlight.count(blockId) != 0) {
+    m_blockDone.wait_for(lock, std::chrono::milliseconds(20));
+    if (cancelled.load()) {
+      return BlockWait::Cancelled;
+    }
+    if (m_blocksInFlight.count(blockId) == 0) {
+      lock.unlock();
+      if (m_fetcher->fromFreshCache(key, accept)) {
+        return BlockWait::Cached;
+      }
+      lock.lock(); // it failed: try it here
+    }
+  }
+  m_blocksInFlight.insert(blockId);
+  return BlockWait::Fetch;
+}
+
+void WmsImageryProvider::blockDone(const QString& blockId)
+{
+  {
+    const std::lock_guard<std::mutex> lock(m_blocksMutex);
+    m_blocksInFlight.erase(blockId);
+  }
+  m_blockDone.notify_all();
+}
+
+std::vector<BlockPiece> WmsImageryProvider::cutBlock(const QByteArray& data,
+                                                     TileKey key,
+                                                     QImage& mine) const
+{
+  // The block is the tile's parent; the image covers its four children.
+  const TileKey block = key.parent();
+  const int32_t sizePx = m_source.tileSizePx;
+  std::vector<BlockPiece> pieces;
+  const QImage blockImage = decode(data);
+  if (blockImage.width() != 2 * sizePx || blockImage.height() != 2 * sizePx) {
+    return pieces;
+  }
+  const bool jpeg = m_source.format.contains(QLatin1String("jpeg")) ||
+                    m_source.format.contains(QLatin1String("jpg"));
+  const GeoRect whole = block.bounds();
+  for (int32_t i = 0; i < 4; ++i) {
+    const TileKey child = block.child(i);
+    const GeoRect rect = child.bounds();
+    // North up, west on the left.
+    const int32_t column = rect.westDeg > whole.centreLonDeg() - 1e-9 ? 1 : 0;
+    const int32_t row = rect.northDeg < whole.northDeg - 1e-9 ? 1 : 0;
+    const QImage part =
+        blockImage.copy(column * sizePx, row * sizePx, sizePx, sizePx);
+    if (child == key) {
+      mine = part;
+    }
+    BlockPiece piece;
+    piece.key = child;
+    QBuffer buffer(&piece.data);
+    buffer.open(QIODevice::WriteOnly);
+    part.save(&buffer, jpeg ? "JPG" : "PNG", jpeg ? 92 : -1);
+    piece.contentType =
+        jpeg ? QByteArrayLiteral("image/jpeg") : QByteArrayLiteral("image/png");
+    pieces.push_back(std::move(piece));
+  }
+  return pieces;
+}
+
+std::optional<ImageLoadResult>
+WmsImageryProvider::loadFromBlock(TileKey key,
+                                  const std::atomic<bool>& cancelled)
+{
+  if (!usesBlocks(key)) {
+    return std::nullopt;
+  }
+  QImage image;
+  const std::function<bool(const QByteArray&)> accept =
+      [&image](const QByteArray& data) {
+        image = decode(data);
+        return !image.isNull();
+      };
+  // Fresh in the cache: from an earlier block, or on its own.
+  if (m_fetcher->fromFreshCache(key, accept)) {
+    return imageResult(std::move(image));
+  }
+  const TileKey block = key.parent();
+  WmsSource doubled = m_source;
+  doubled.tileSizePx = 2 * m_source.tileSizePx;
+  const QUrl url = getMapUrl(doubled, block);
+  if (url.isEmpty()) {
+    return std::nullopt;
+  }
+  const QString blockId = url.toString();
+  switch (waitForBlock(blockId, key, accept, cancelled)) {
+  case BlockWait::Cancelled:
+    return outcome(ImageLoadResult::Outcome::Cancelled);
+  case BlockWait::Cached:
+    return imageResult(std::move(image));
+  case BlockWait::Fetch:
+    break;
+  }
+  QImage mine;
+  const BlockFetch fetched = m_fetcher->fetchBlock(
+      url, [&](const QByteArray& data) { return cutBlock(data, key, mine); },
+      cancelled);
+  blockDone(blockId);
+  if (fetched.outcome == FetchOutcome::Data && !mine.isNull()) {
+    return imageResult(std::move(mine));
+  }
+  if (fetched.outcome == FetchOutcome::Cancelled) {
+    return outcome(ImageLoadResult::Outcome::Cancelled);
+  }
+  if (fetched.refused) {
+    m_blocksRefused.store(true);
+  }
+  // Single tiles (which also show a stale saved tile when offline).
+  return std::nullopt;
 }
 
 std::optional<GeoRect> WmsImageryProvider::dataBounds() const

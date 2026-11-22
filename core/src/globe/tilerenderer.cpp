@@ -348,6 +348,8 @@ struct TileRenderer::GpuMesh {
 struct TileRenderer::GpuImage {
   /** Null when the provider has no image for the tile. */
   std::unique_ptr<GpuTexture> texture;
+  /** Every pixel is opaque: it hides the layers below. */
+  bool opaque = false;
   std::size_t bytes = 0;
   std::uint64_t lastUsedFrame = 0;
 };
@@ -390,8 +392,15 @@ struct TileRenderer::DrawTile {
 TileRenderer::TileRenderer(RenderDevice& device,
                            const TileRendererSettings& settings)
     : m_device(device), m_settings(settings),
-      m_heights(settings.heightCacheBytes)
+      m_heights(settings.heightCacheBytes), m_motion(settings.motion)
 {
+  if (!m_settings.clock) {
+    m_settings.clock = []() {
+      return std::chrono::duration<double>(
+                 std::chrono::steady_clock::now().time_since_epoch())
+          .count();
+    };
+  }
   m_settings.loader.buildMeshes = false;
   m_settings.selection.minimumMapLevel = m_settings.minimumMapLevel;
   m_settings.selection.meshSegments = m_settings.loader.meshSegments;
@@ -724,12 +733,14 @@ void TileRenderer::takeHeights()
   }
 }
 
-void TileRenderer::requestHeights(const TileSelection& selection)
+void TileRenderer::requestHeights(const Camera& camera,
+                                  const TileSelection& selection)
 {
   if (!m_heightLoader) {
     return;
   }
-  // Drawn tiles first, then the ones about to be: the selection's order.
+  // Drawn tiles and the ones about to be, from the middle of the view
+  // outwards.
   std::vector<TileKey> wanted;
   const std::chrono::steady_clock::time_point now =
       std::chrono::steady_clock::now();
@@ -772,6 +783,7 @@ void TileRenderer::requestHeights(const TileSelection& selection)
       ++it;
     }
   }
+  TileSelector::orderFromViewCentre(camera, wanted);
   m_heightLoader->setRequests(wanted);
 }
 
@@ -802,7 +814,9 @@ void TileRenderer::setTilesReadyCallback(std::function<void()> callback)
 
 bool TileRenderer::isBusy() const
 {
-  if (m_meshesPending ||
+  // Detail held back while the camera moves: frames go on until it has
+  // settled and the detail is asked for.
+  if (m_meshesPending || m_motion.isHolding() ||
       (m_heightLoader && m_heightLoader->outstanding() > 0)) {
     return true;
   }
@@ -834,6 +848,7 @@ void TileRenderer::uploadImages()
           image.texture = m_device.createTexture(desc);
           if (image.texture) {
             image.texture->upload(tile.image);
+            image.opaque = tile.opaque;
             // RGBA8 plus a third for the mipmaps.
             image.bytes = static_cast<std::size_t>(desc.width) *
                           static_cast<std::size_t>(desc.height) * 4 * 4 / 3;
@@ -910,47 +925,145 @@ void TileRenderer::uploadMesh(TileKey key)
   }
 }
 
-void TileRenderer::requestImages()
+TileKey TileRenderer::sourceKey(const Source& source, TileKey key)
 {
-  // Coarse first: for every drawn tile a stand-in a few levels up, so
-  // something shows quickly everywhere; then the tiles themselves, in
-  // level order.
-  std::vector<TileKey> drawn;
-  drawn.reserve(m_drawTiles.size());
-  for (const DrawTile& tile : m_drawTiles) {
-    drawn.push_back(tile.key);
+  while (key.level > source.provider->maximumLevel()) {
+    key = key.parent();
   }
-  std::stable_sort(drawn.begin(), drawn.end(),
-                   [](TileKey a, TileKey b) { return a.level < b.level; });
+  return key;
+}
+
+double TileRenderer::effectiveAlpha(const Layer& layer) const
+{
+  return layer.alpha *
+         (layer.group >= 0
+              ? m_groupAlphas.at(static_cast<std::size_t>(layer.group))
+              : 1.0);
+}
+
+bool TileRenderer::hidesBelow(const Layer& layer, TileKey tile) const
+{
+  // Its own image (not a stretched ancestor's, whose detail may yet be
+  // transparent), opaque, at full opacity, covering the whole tile (a Web
+  // Mercator image ends at the map's latitude limit).
+  static const WebMercatorProjection mercator;
+  if (effectiveAlpha(layer) < 1.0) {
+    return false;
+  }
+  const std::unordered_map<TileKey, GpuImage, TileKeyHash>::const_iterator own =
+      layer.source->images.find(sourceKey(*layer.source, tile));
+  if (own == layer.source->images.end() || !own->second.opaque ||
+      !own->second.texture) {
+    return false;
+  }
+  const GeoRect rect = tile.bounds();
+  return !layer.source->webMercator ||
+         (rect.northDeg <= mercator.maximumLatDeg() &&
+          rect.southDeg >= -mercator.maximumLatDeg());
+}
+
+std::unordered_map<const TileRenderer::Source*, std::vector<bool>>
+TileRenderer::neededImages(const std::vector<TileKey>& drawn)
+{
+  // Which sources need which drawn tiles: no layer hidden under an opaque
+  // one above that has its own image there, nor invisible. Topmost first.
+  std::unordered_map<const Source*, std::vector<bool>> needed;
   for (const std::unique_ptr<Source>& source : m_sources) {
-    const int32_t deepest = source->provider->maximumLevel();
-    std::vector<TileLoadRequest> requests;
-    std::unordered_set<TileKey, TileKeyHash> seen;
-    for (int32_t pass = 0; pass < 2; ++pass) {
-      for (const TileKey& key : drawn) {
-        TileKey wanted = key;
-        while (wanted.level > deepest) {
+    needed[source.get()].assign(drawn.size(), false);
+  }
+  for (std::size_t t = 0; t < drawn.size(); ++t) {
+    bool hidden = false;
+    for (std::size_t i = m_layers.size(); i-- > 0;) {
+      const Layer& layer = m_layers[i];
+      if (!hidden && effectiveAlpha(layer) > 0.0) {
+        needed[layer.source][t] = true;
+      } else {
+        ++m_statistics.hiddenSkipped;
+      }
+      hidden = hidden || hidesBelow(layer, drawn[t]);
+    }
+  }
+  return needed;
+}
+
+bool TileRenderer::showsFinerThanStandIn(Source& source, TileKey key,
+                                         int32_t coarseLevel) const
+{
+  // Its own image, or one between it and the stand-in (after zooming in,
+  // the last view's tiles). Keep that one.
+  for (; key.level > coarseLevel; key = key.parent()) {
+    const std::unordered_map<TileKey, GpuImage, TileKeyHash>::iterator there =
+        source.images.find(key);
+    if (there != source.images.end()) {
+      there->second.lastUsedFrame = m_frame;
+      return true;
+    }
+  }
+  return false;
+}
+
+void TileRenderer::requestSourceImages(Source& source,
+                                       const std::vector<TileKey>& drawn,
+                                       const std::vector<bool>& wantedHere,
+                                       bool holdDetail)
+{
+  std::vector<TileLoadRequest> requests;
+  std::unordered_set<TileKey, TileKeyHash> seen;
+  for (int32_t pass = 0; pass < (holdDetail ? 1 : 2); ++pass) {
+    for (std::size_t t = 0; t < drawn.size(); ++t) {
+      if (!wantedHere[t]) {
+        continue;
+      }
+      TileKey wanted = sourceKey(source, drawn[t]);
+      if (pass == 0) {
+        // A stand-in, unless the tile shows an image as fine already.
+        const int32_t coarseLevel = std::max(0, wanted.level - coarseLevels);
+        if (showsFinerThanStandIn(source, wanted, coarseLevel)) {
+          ++m_statistics.standInsSkipped;
+          continue;
+        }
+        while (wanted.level > coarseLevel) {
           wanted = wanted.parent();
         }
-        if (pass == 0) {
-          const int32_t coarseLevel = std::max(0, wanted.level - coarseLevels);
-          while (wanted.level > coarseLevel) {
-            wanted = wanted.parent();
-          }
-        }
-        const std::unordered_map<TileKey, GpuImage, TileKeyHash>::iterator
-            present = source->images.find(wanted);
-        if (present != source->images.end()) {
-          // Wanted and here: keep it (a stand-in no tile is drawn with yet
-          // would otherwise be evicted, then asked for again).
-          present->second.lastUsedFrame = m_frame;
-        } else if (seen.insert(wanted).second) {
-          requests.push_back(TileLoadRequest{wanted, 0.0});
-        }
+      }
+      const std::unordered_map<TileKey, GpuImage, TileKeyHash>::iterator
+          present = source.images.find(wanted);
+      if (present != source.images.end()) {
+        // Wanted and here: keep it (a stand-in no tile is drawn with yet
+        // would otherwise be evicted, then asked for again).
+        present->second.lastUsedFrame = m_frame;
+      } else if (seen.insert(wanted).second) {
+        requests.push_back(TileLoadRequest{wanted, 0.0});
       }
     }
-    m_statistics.requested += static_cast<int32_t>(requests.size());
-    source->loader->setRequests(requests);
+  }
+  m_statistics.requested += static_cast<int32_t>(requests.size());
+  source.loader->setRequests(requests);
+}
+
+void TileRenderer::requestImages(const Camera& camera)
+{
+  // Coarse first: for every drawn tile a stand-in a few levels up, so
+  // something shows quickly everywhere; then the tiles themselves. Both
+  // from the middle of the view outwards.
+  std::vector<TileKey> drawn;
+  drawn.reserve(m_drawTiles.size());
+  std::unordered_set<TileKey, TileKeyHash> once;
+  for (const DrawTile& tile : m_drawTiles) {
+    // A tile is drawn once for each copy of the world it shows in.
+    if (once.insert(tile.key).second) {
+      drawn.push_back(tile.key);
+    }
+  }
+  TileSelector::orderFromViewCentre(camera, drawn);
+  // While the camera moves fast, detail would be on screen for a moment
+  // only: just the stand-ins until it settles.
+  const bool holdDetail = m_motion.isHolding();
+  m_statistics.detailHeld = holdDetail;
+  const std::unordered_map<const Source*, std::vector<bool>> needed =
+      neededImages(drawn);
+  for (const std::unique_ptr<Source>& source : m_sources) {
+    requestSourceImages(*source, drawn, needed.at(source.get()), holdDetail);
   }
 }
 
@@ -1103,6 +1216,7 @@ void TileRenderer::prepare(const Camera& camera)
   m_drawTiles.clear();
   m_morph = camera.morph();
   m_drawStrips = drawsStrips(camera);
+  m_motion.update(camera, m_settings.clock());
   // The map's surface and graticule are drawn on the tiles too, so it
   // needs them even without imagery.
   if (m_layers.empty() && m_morph <= 0.0 && !terrainShown()) {
@@ -1195,7 +1309,7 @@ void TileRenderer::prepare(const Camera& camera)
       }
     }
   }
-  requestHeights(selection);
+  requestHeights(camera, selection);
   buildMeshes(selection.load, rebuild, builds);
   if (!rebuild.empty()) {
     // A rebuilt mesh replaced the one the draw list points to.
@@ -1204,7 +1318,7 @@ void TileRenderer::prepare(const Camera& camera)
     }
   }
   bindImages();
-  requestImages();
+  requestImages(camera);
   evict();
 
   m_statistics.rendered = static_cast<int32_t>(m_drawTiles.size());

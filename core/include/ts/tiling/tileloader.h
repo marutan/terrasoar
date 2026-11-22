@@ -58,9 +58,22 @@ struct LoadedTile {
   TileKey key;
   /** Its imagery; null if the provider has none there. */
   QImage image;
+  /**
+   * True if every pixel of the image is opaque, so that it hides the
+   * layers below it entirely (isFullyOpaque()).
+   */
+  bool opaque = false;
   /** Its mesh. */
   TileMesh mesh;
 };
+
+/**
+ * Returns true if @p image is not null and every pixel of it is fully
+ * opaque.
+ *
+ * @threadsafe
+ */
+bool isFullyOpaque(const QImage& image);
 
 /** Settings of a TileLoader. */
 struct TileLoaderSettings {

@@ -83,6 +83,11 @@ struct MockHttpResponse {
   bool hangUp = false;
   /** Never answer (until the client gives up). */
   bool stall = false;
+  /**
+   * When above 0: send the headers and the first half of the body, then
+   * the rest this much later (a response that is arriving).
+   */
+  int32_t restDelayMs = 0;
 };
 
 /**
@@ -162,6 +167,12 @@ public:
   /** Returns how many clients hung up before their answer was sent. */
   int32_t abandonedCount() const { return m_abandoned.load(); }
 
+  /**
+   * Returns how many clients hung up while the body was being sent
+   * (MockHttpResponse::restDelayMs): an aborted response.
+   */
+  int32_t cutOffCount() const { return m_cutOff.load(); }
+
   /** Returns the most requests that waited for an answer at once. */
   int32_t peakWaiting() const { return m_peakWaiting.load(); }
 
@@ -171,6 +182,7 @@ public:
     const std::lock_guard<std::mutex> lock(m_mutex);
     m_requests.clear();
     m_abandoned.store(0);
+    m_cutOff.store(0);
     m_peakWaiting.store(0);
   }
 
@@ -286,9 +298,35 @@ private:
               out += header.first + ": " + header.second + "\r\n";
             }
             out += "\r\n";
-            out += response.body;
+            if (response.restDelayMs <= 0) {
+              out += response.body;
+              guarded->write(out);
+              guarded->disconnectFromHost();
+              return;
+            }
+            const int32_t half = static_cast<int32_t>(response.body.size() / 2);
+            out += response.body.left(half);
             guarded->write(out);
-            guarded->disconnectFromHost();
+            std::shared_ptr<bool> complete = std::make_shared<bool>(false);
+            QObject::connect(guarded.data(), &QTcpSocket::disconnected,
+                             guarded.data(), [this, complete]() {
+                               if (!*complete) {
+                                 *complete = true;
+                                 m_owner.m_cutOff.fetch_add(1);
+                               }
+                             });
+            const QByteArray rest = response.body.mid(half);
+            QTimer::singleShot(response.restDelayMs, guarded.data(),
+                               [guarded, complete, rest]() {
+                                 if (!guarded || *complete ||
+                                     guarded->state() !=
+                                         QAbstractSocket::ConnectedState) {
+                                   return;
+                                 }
+                                 *complete = true;
+                                 guarded->write(rest);
+                                 guarded->disconnectFromHost();
+                               });
           });
     }
 
@@ -304,6 +342,7 @@ private:
   std::atomic<int32_t> m_waiting{0};
   std::atomic<int32_t> m_peakWaiting{0};
   std::atomic<int32_t> m_abandoned{0};
+  std::atomic<int32_t> m_cutOff{0};
   std::unique_ptr<Thread> m_thread;
 };
 

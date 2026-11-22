@@ -26,6 +26,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <thread>
@@ -46,6 +47,7 @@
 #include "ts/projection/projection.h"
 #include "ts/providers/testproviders.h"
 #include "ts/tiling/lrucache.h"
+#include "ts/tiling/motionhold.h"
 #include "ts/tiling/tilekey.h"
 #include "ts/tiling/tileloader.h"
 #include "ts/tiling/tilemesh.h"
@@ -159,6 +161,10 @@ public:
   QImage loadImage(ts::TileKey key, const std::atomic<bool>& cancelled) override
   {
     ++loads;
+    {
+      const std::lock_guard<std::mutex> lock(mutex);
+      started.push_back(key);
+    }
     for (int32_t i = 0; i < delayLoops && !cancelled.load(); ++i) {
       std::this_thread::sleep_for(std::chrono::microseconds(100));
     }
@@ -167,8 +173,19 @@ public:
     return image;
   }
 
+  /** The tiles loaded so far, in the order they were started. */
+  std::vector<ts::TileKey> startedKeys()
+  {
+    const std::lock_guard<std::mutex> lock(mutex);
+    return started;
+  }
+
+  /** How many loads began, and how long each takes unless cancelled. */
   std::atomic<int32_t> loads{0};
   int32_t delayLoops = 0;
+  /** The keys started, in order (under mutex; see startedKeys()). */
+  std::mutex mutex;
+  std::vector<ts::TileKey> started;
 };
 
 } // namespace
@@ -749,6 +766,164 @@ private slots:
     QVERIFY(cold.load.front().distanceM < 0.25 * farthest);
   }
 
+  void fetchOrderFromViewCentre()
+  {
+    // Tiles are fetched from the middle of the view outwards: on the
+    // globe and the map, looking straight down, turned and tilted.
+    struct View {
+      const char* name;
+      ts::Camera camera;
+      bool tilted;
+    };
+    const std::vector<View> views = {
+        {"globe", makeCamera(ts::CameraPose{48.0, 10.0, 2.0e6, 0.0, 0.0}),
+         false},
+        {"globe, whole Earth",
+         makeCamera(ts::CameraPose{-20.0, 140.0, 2.0e7, 0.0, 0.0}), false},
+        {"globe, tilted",
+         makeCamera(ts::CameraPose{51.5, -0.1, 2.0e4, 30.0, 60.0}), true},
+        {"map",
+         makeMapCamera("web-mercator",
+                       ts::CameraPose{40.0, -100.0, 3.0e6, 0.0, 0.0}),
+         false},
+        {"map, across the date line",
+         makeMapCamera("web-mercator",
+                       ts::CameraPose{0.0, 179.5, 1.0e6, 0.0, 0.0}),
+         false},
+        {"map, turned and tilted",
+         makeMapCamera("web-mercator",
+                       ts::CameraPose{51.5, -0.1, 2.0e4, 30.0, 45.0}),
+         true},
+    };
+    const ts::TileSelector selector;
+    for (const View& view : views) {
+      std::vector<ts::TileKey> keys =
+          selector.select(view.camera, everythingRenderable).render;
+      QVERIFY2(keys.size() > 8, view.name);
+      ts::TileSelector::orderFromViewCentre(view.camera, keys);
+      double previous = -1.0;
+      for (const ts::TileKey& key : keys) {
+        const double angle = ts::TileSelector::offCentreRad(view.camera, key);
+        QVERIFY2(angle >= previous, view.name);
+        previous = angle;
+      }
+      // The tile under the middle of the screen comes first (in a tilted
+      // view, where tiles shrink towards the eye, among the first few).
+      const ts::CameraPose pose = view.camera.pose();
+      const std::vector<ts::TileKey>::const_iterator middle =
+          std::find_if(keys.begin(), keys.end(), [&pose](ts::TileKey key) {
+            return key.bounds().contains(pose.targetLatDeg, pose.targetLonDeg);
+          });
+      QVERIFY2(middle != keys.end(), view.name);
+      const std::ptrdiff_t place = middle - keys.begin();
+      QVERIFY2(place <= (view.tilted ? 3 : 0),
+               qPrintable(QStringLiteral("%1: %2 of %3")
+                              .arg(QLatin1String(view.name))
+                              .arg(place)
+                              .arg(keys.size())));
+      // And the corners of the screen come last: the last tile is
+      // farther out than nine in ten of them.
+      std::vector<double> angles;
+      angles.reserve(keys.size());
+      for (const ts::TileKey& key : keys) {
+        angles.push_back(ts::TileSelector::offCentreRad(view.camera, key));
+      }
+      QVERIFY2(angles.back() >= angles[angles.size() * 9 / 10], view.name);
+      QVERIFY2(angles.front() < 0.25 * angles.back(), view.name);
+      if (pose.targetLonDeg > 179.0) {
+        // Across the date line: the tiles just east of it, at -180°, are
+        // among the first, not last for their longitude.
+        const std::vector<ts::TileKey>::const_iterator east =
+            std::find_if(keys.begin(), keys.end(), [](ts::TileKey key) {
+              return key.bounds().westDeg < -179.0;
+            });
+        QVERIFY(east != keys.end());
+        QVERIFY2(east - keys.begin() <= 4,
+                 qPrintable(QString::number(east - keys.begin())));
+      }
+    }
+  }
+
+  void motionHoldsDetailWhileFast()
+  {
+    // Fast for two frames: hold. Slow again: the hold ends settleS after
+    // the last fast frame. A single jump doesn't hold.
+    ts::MotionHold motion;
+    ts::Camera camera = makeCamera(ts::CameraPose{0.0, 0.0, 1.0e6, 0.0, 0.0});
+    const double screenM = 2.0 * 1.0e6 * camera.tanHalfFovY();
+    double t = 0.0;
+    double lonDeg = 0.0;
+    // One screen height is about this many degrees of longitude here.
+    const double screenDeg = screenM / 111320.0;
+    const std::function<void(double, double)> frame = [&](double screensPerS,
+                                                          double dtS) {
+      t += dtS;
+      lonDeg += screensPerS * screenDeg * dtS;
+      camera.setPose(ts::CameraPose{0.0, lonDeg, 1.0e6, 0.0, 0.0});
+      motion.update(camera, t);
+    };
+    frame(0.0, 0.016);
+    QVERIFY(!motion.isHolding());
+    // Slow panning never holds.
+    for (int32_t i = 0; i < 20; ++i) {
+      frame(0.5, 0.016);
+      QVERIFY(!motion.isHolding());
+    }
+    QVERIFY(motion.screensPerS() > 0.4 && motion.screensPerS() < 0.6);
+    // A jump: one fast frame.
+    frame(50.0, 0.016);
+    QVERIFY(!motion.isHolding());
+    frame(0.0, 0.016);
+    QVERIFY(!motion.isHolding());
+    // Flying fast.
+    frame(5.0, 0.016);
+    frame(5.0, 0.016);
+    QVERIFY(motion.isHolding());
+    for (int32_t i = 0; i < 10; ++i) {
+      frame(5.0, 0.016);
+      QVERIFY(motion.isHolding());
+    }
+    // Stopped: still held for settleS (0.15 s), then not.
+    frame(0.0, 0.1);
+    QVERIFY(motion.isHolding());
+    frame(0.0, 0.1);
+    QVERIFY(!motion.isHolding());
+    // Zooming fast counts too.
+    double rangeM = 1.0e6;
+    for (int32_t i = 0; i < 3; ++i) {
+      t += 0.016;
+      rangeM *= 0.8;
+      camera.setPose(ts::CameraPose{0.0, lonDeg, rangeM, 0.0, 0.0});
+      motion.update(camera, t);
+    }
+    QVERIFY(motion.isHolding());
+  }
+
+  void opaqueImages()
+  {
+    QVERIFY(!ts::isFullyOpaque(QImage()));
+    QImage rgb(8, 8, QImage::Format_RGB32);
+    rgb.fill(Qt::red);
+    QVERIFY(ts::isFullyOpaque(rgb));
+    QImage argb(8, 8, QImage::Format_ARGB32);
+    argb.fill(QColor(0, 0, 255, 255));
+    QVERIFY(ts::isFullyOpaque(argb));
+    argb.setPixelColor(7, 7, QColor(0, 0, 255, 254));
+    QVERIFY(!ts::isFullyOpaque(argb));
+    QImage rgba(8, 8, QImage::Format_RGBA8888);
+    rgba.fill(QColor(10, 20, 30, 255));
+    QVERIFY(ts::isFullyOpaque(rgba));
+    rgba.setPixelColor(0, 3, Qt::transparent);
+    QVERIFY(!ts::isFullyOpaque(rgba));
+    // A palette PNG with a transparent entry.
+    QImage indexed(8, 8, QImage::Format_Indexed8);
+    indexed.setColorTable({qRgba(255, 0, 0, 255), qRgba(0, 0, 0, 0)});
+    indexed.fill(0);
+    QVERIFY(ts::isFullyOpaque(indexed));
+    indexed.setPixel(2, 2, 1);
+    QVERIFY(!ts::isFullyOpaque(indexed));
+  }
+
   void tiltedSelectionWithinBudget()
   {
     // Selections at the tilt limits, with terrain heights allowed for,
@@ -1260,6 +1435,51 @@ private slots:
         10000));
     QVERIFY2(provider->loads.load() < 10,
              qPrintable(QString::number(provider->loads.load())));
+  }
+
+  void loaderFetchesInOrderAndDropsUnwanted()
+  {
+    // One worker: tiles are fetched in the order asked for. When the
+    // camera moves on, the queued tiles it no longer wants are never
+    // fetched; the new ones are, in their order.
+    const std::shared_ptr<CountingProvider> provider =
+        std::make_shared<CountingProvider>();
+    provider->delayLoops = 200; // 20 ms per tile unless cancelled
+    ts::TileLoaderSettings settings;
+    settings.threads = 1;
+    ts::TileLoader loader(provider, settings);
+    std::vector<ts::TileLoadRequest> first;
+    first.reserve(20);
+    for (int32_t x = 0; x < 20; ++x) {
+      first.push_back(ts::TileLoadRequest{ts::TileKey{5, x, 3}, 0.0});
+    }
+    loader.setRequests(first);
+    QVERIFY(
+        QTest::qWaitFor([&]() { return provider->loads.load() >= 2; }, 10000));
+    // The new view: one tile of the old one's tail, then new ones.
+    std::vector<ts::TileLoadRequest> second = {first.back()};
+    for (int32_t x = 0; x < 6; ++x) {
+      second.push_back(ts::TileLoadRequest{ts::TileKey{6, x, 9}, 0.0});
+    }
+    loader.setRequests(second);
+    // Everything started before now was of the first view.
+    const int32_t before = provider->loads.load();
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          loader.takeLoaded(100);
+          return loader.outstanding() == 0;
+        },
+        10000));
+    const std::vector<ts::TileKey> started = provider->startedKeys();
+    QCOMPARE(static_cast<int32_t>(started.size()),
+             before + static_cast<int32_t>(second.size()));
+    for (int32_t i = 0; i < before; ++i) {
+      QCOMPARE(started[static_cast<std::size_t>(i)],
+               first[static_cast<std::size_t>(i)].key);
+    }
+    for (std::size_t i = 0; i < second.size(); ++i) {
+      QCOMPARE(started[static_cast<std::size_t>(before) + i], second[i].key);
+    }
   }
 
   void loaderStressWhileCameraMoves()

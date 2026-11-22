@@ -170,6 +170,22 @@ public:
   double screenSpaceErrorPx(const Camera& camera, TileKey key) const;
 
   /**
+   * Returns the angle, radians, between the middle of @p camera's view
+   * (its target) and the point of @p key nearest it, where that is drawn
+   * (on the globe, on the map or between them; the copy of the world
+   * nearest the middle on the map). 0 for the tile under the middle of
+   * the screen; it grows outwards from there, whichever way.
+   */
+  static double offCentreRad(const Camera& camera, TileKey key);
+
+  /**
+   * Orders @p keys for fetching: the middle of @p camera's view first,
+   * outwards from there (offCentreRad()); equally far, coarse first.
+   */
+  static void orderFromViewCentre(const Camera& camera,
+                                  std::vector<TileKey>& keys);
+
+  /**
    * Returns how far the mesh of @p key is from the projection's true
    * shape on the flat map of @p camera, in pixels (see
    * TileSelectionSettings::maximumMapGeometryErrorPx).
@@ -180,6 +196,7 @@ private:
   struct View;
 
   double mapGeometryErrorM(const MapFrame& frame, TileKey key) const;
+  static double offCentreRad(const View& view, TileKey key);
   static double loadDistanceM(const View& view, TileKey key,
                               const TileBounds& bounds);
   double screenSpaceErrorPx(const View& view, TileKey key) const;

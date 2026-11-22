@@ -64,7 +64,8 @@ layers says so.
 
 One GetMap per quadtree tile ([tiling.md](tiling.md)), 256 × 256 pixels
 unless the server's MaxWidth or MaxHeight is smaller (then the largest
-power of two that fits). `ts::getMapUrl()` builds it:
+power of two that fits), or one per **block** of four (below).
+`ts::getMapUrl()` builds it:
 
 ```
 <GetMap address>?<its own query items>&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap
@@ -160,6 +161,24 @@ the image, and the WMS-specific error messages:
    - **No answer** (connection failed, timeout): the layer is offline; a
      saved copy if there is one, else failed.
    - **Cancelled** (the tile left the view): given up at once.
+
+**Blocks.** In a geographic CRS (EPSG:4326, CRS:84), a tile not fresh in
+the cache comes with its three siblings: one GetMap for their parent's
+area at twice the size (512 × 512), cut into the four, each stored in the
+cache as a tile of its own (PNG, or JPEG at quality 92 for JPEG sources)
+with the block's freshness but not its validators. A quarter of the
+requests, for little more data where the view ends; WMS servers draw each
+request, so requests are what cost them. The pixels are those of the
+single tiles: each pixel of the block covers the same ground as one of a
+tile (`providerFetchesBlocks` compares them exactly). A tile wanted while
+another loader thread fetches its block waits for that block instead of
+asking again. If the server refuses the larger image (an error, or not
+an image of that size, as past its MaxWidth), the source goes back to
+single tiles, starting with that one. Not in Web Mercator, whose rows
+aren't evenly spaced in latitude, so a block's middle row isn't the edge
+between its tiles; not for region downloads, which keep single tiles.
+Stale pieces are fetched again rather than revalidated. Off with
+`WebTileSettings::blocks` (tests of single tiles do that).
 
 A **failed** tile isn't delivered to the renderer, which keeps showing a
 coarser image where it has one; the loader asks again after 30 s if the

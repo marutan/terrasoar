@@ -11,19 +11,28 @@ above the ground. Code: `core/include/ts/camera/`,
 
 | Field | Meaning | Limits |
 | --- | --- | --- |
-| `targetLatDeg`, `targetLonDeg` | The point looked at, on the surface (height 0); always at the centre of the view | latitude ±89.999 999° (heading is undefined at a pole) |
+| `targetLatDeg`, `targetLonDeg` | The point looked at, on the surface (height 0); at the centre of the view up to 85° of tilt | latitude ±89.999 999° (heading is undefined at a pole) |
 | `rangeM` | Distance from the eye to the target | at most 5 × 10⁷ m; at least what keeps the eye 1 m above the ellipsoid |
 | `headingDeg` | Direction the camera faces, clockwise from north | [0, 360) |
-| `tiltDeg` | 0 looks straight down, towards 90 looks at the horizon | [0, 85] |
+| `tiltDeg` | 0 looks straight down, 90 along the ground, 180 straight up | [0, 180] on the globe, [0, 70] on the flat map |
 
 With the target's east-north-up frame (E, N, U) and h = sin ψ E + cos ψ N
 for heading ψ and tilt τ:
 
-    eye     = target + range (cos τ U − sin τ h)
+    eye     = target + range (cos τₒ U − sin τₒ h),  τₒ = min(τ, 85°)
     forward = sin τ h − cos τ U
     up      = cos τ h + sin τ U
     right   = forward × up
 
+Up to 85° (`Camera::orbitTiltDeg`) the eye circles the target, which stays
+in the middle of the view. Past it the eye stays where it is at 85° and
+only the view turns on up, through the horizon to the zenith at 180°:
+looking up at the sky from the ground. Circling on to 90° would bring the
+eye down to the ground at the target's horizon, where keeping it 1 m up
+would push it kilometres away. Past 85° the target is below the view;
+turning still circles the eye about it, and zooming still moves the eye
+along the line to it. Tiles are then fetched from the middle of the view
+by their own middles (`TileSelector::offCentreRad()`).
 `ts::Camera` turns the pose and the viewport (logical pixels, 45° vertical
 field of view) into all of that in double precision, plus:
 
@@ -36,7 +45,9 @@ field of view) into all of that in double precision, plus:
 - `viewRotation()`, `projection()`: matrices for **eye-relative** ECEF
   offsets. No matrix ever contains the eye's translation (see below).
 - Near and far planes: near is half the eye height (0.05 m minimum), far
-  is past the horizon of the polar-radius sphere plus 50 km.
+  is past the horizon of the polar-radius sphere plus 50 km; looking up
+  past 85°, 10⁸ m, beyond geostationary orbit, so satellites aren't cut
+  off (the depth is logarithmic, so that costs little precision).
 
 The camera also has a **morph factor** between the globe (0) and a flat
 map (1) and the map's projection. On the map the same pose applies, seen

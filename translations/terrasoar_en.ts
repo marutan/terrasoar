@@ -3816,10 +3816,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Tilt up</translation>
         </message>
         <message>
-            <source>Tilt towards the horizon; hold to keep tilting (R)</source>
-            <translation>Tilt towards the horizon; hold to keep tilting (R)</translation>
-        </message>
-        <message>
             <source>Tilt down</source>
             <translation>Tilt down</translation>
         </message>
@@ -3834,6 +3830,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Click or drag to tilt; double-click for straight down</source>
             <translation>Click or drag to tilt; double-click for straight down</translation>
+        </message>
+        <message>
+            <source>Tilt up, towards the horizon and on the globe beyond it; hold to keep tilting (R)</source>
+            <translation>Tilt up, towards the horizon and on the globe beyond it; hold to keep tilting (R)</translation>
         </message>
     </context>
     <context>

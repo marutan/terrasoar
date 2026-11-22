@@ -72,7 +72,7 @@ struct NavigationState {
   /** Tilt, degrees from straight down. */
   double tiltDeg = 0.0;
   /** The largest tilt now (the globe's or the map's), degrees. */
-  double maximumTiltDeg = 85.0;
+  double maximumTiltDeg = 180.0;
   /** Where the zoom slider stands: 0 farthest out, 1 nearest in. */
   double zoomFraction = 0.0;
   /** The height (globe) or scale (map) the slider shows, as text. */

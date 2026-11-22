@@ -47,6 +47,12 @@ constexpr double farMarginM = 5.0e4;
 /** Extra far distance while the map unrolls (the far edges swing out). */
 constexpr double morphFarMarginM = 5.0e7;
 
+/**
+ * The far plane looking up past Camera::orbitTiltDeg, metres: beyond
+ * geostationary orbit (42,164 km from the centre) seen from anywhere.
+ */
+constexpr double lookingUpFarM = 1.0e8;
+
 /** Eye-relative camera axes for a pose. */
 struct PoseFrame {
   Vec3 target;
@@ -60,15 +66,18 @@ PoseFrame poseFrame(const CameraPose& pose)
   const LocalFrame local = localFrame(pose.targetLatDeg, pose.targetLonDeg);
   const double heading = degToRad(pose.headingDeg);
   const double tilt = degToRad(pose.tiltDeg);
+  // The eye circles the target up to orbitTiltDeg and stays there beyond,
+  // where only the view turns on up (Camera::maximumTiltDeg).
+  const double orbit = degToRad(std::min(pose.tiltDeg, Camera::orbitTiltDeg));
   const Vec3 horizontal =
       local.eastEcef * std::sin(heading) + local.northEcef * std::cos(heading);
   const Vec3 towardsEye =
-      local.upEcef * std::cos(tilt) - horizontal * std::sin(tilt);
+      local.upEcef * std::cos(orbit) - horizontal * std::sin(orbit);
   PoseFrame frame;
   frame.target =
       geodeticToEcef(Geodetic{pose.targetLatDeg, pose.targetLonDeg, 0.0});
   frame.eye = frame.target + towardsEye * pose.rangeM;
-  frame.forward = -towardsEye;
+  frame.forward = horizontal * std::sin(tilt) - local.upEcef * std::cos(tilt);
   frame.up = horizontal * std::cos(tilt) + local.upEcef * std::sin(tilt);
   return frame;
 }
@@ -81,7 +90,8 @@ double eyeHeightM(const CameraPose& pose)
 /**
  * Returns the range at which the eye is at @p heightM above the ellipsoid
  * for @p pose's target, heading and tilt. The height grows with the range
- * for any tilt below 90°, so bisection finds it.
+ * for any tilt below 90°, and the eye never goes past orbitTiltDeg, so
+ * bisection finds it.
  */
 double rangeForEyeHeight(CameraPose pose, double heightM)
 {
@@ -515,6 +525,11 @@ void Camera::update()
     m_farM = 2.0 * m_pose.rangeM;
   } else if (m_morph > 0.0) {
     m_farM = std::max(m_farM, 2.0 * m_pose.rangeM) + morphFarMarginM;
+  } else if (m_pose.tiltDeg > orbitTiltDeg) {
+    // Looking up: the sky beyond the horizon, out past geostationary
+    // orbit (satellites). The depth is logarithmic, so this costs little
+    // precision near the eye.
+    m_farM = std::max(m_farM, lookingUpFarM);
   }
 }
 
