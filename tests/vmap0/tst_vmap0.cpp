@@ -1989,7 +1989,9 @@ private slots:
     QVERIFY2(provider, qPrintable(error));
     QCOMPARE(registry.attribution(airports),
              QStringLiteral("Vector Map Level 0 (VMAP0), NGA"));
-    // Airports show from level 5, stored at level 4.
+    // Airports show from level 5, stored at level 4: a level-5 tile is
+    // loaded as itself (from the level-4 rows), not as the level-4 tile,
+    // which has no airports.
     const ts::TileKey key =
         ts::TileKey::containing(5, ts::Geodetic{20.9, -17.0, 0.0});
     const std::optional<ts::FeatureTile> tile =
@@ -1997,7 +1999,7 @@ private slots:
     if (!tile) {
       QFAIL("no tile");
     }
-    QCOMPARE(tile->key.level, 4);
+    QCOMPARE(tile->key, key);
     QVERIFY(!tile->features.empty());
     for (const ts::Feature& feature : tile->features) {
       QCOMPARE(feature.type, ts::Feature::Type::Points);

@@ -206,7 +206,11 @@ public:
   /** Returns the file's base name (layers have their own names). */
   QString name() const override;
 
-  /** The deepest storage level; deeper keys get that level's features. */
+  /**
+   * The deepest level whose features differ from its parent's: the deepest
+   * storage level, or a table's first level if deeper (VMAP0's contours,
+   * stored at 6, are shown from 7). Deeper keys get that level's features.
+   */
   int32_t maximumLevel() const override { return m_maximumLevel; }
 
   std::optional<FeatureTile>

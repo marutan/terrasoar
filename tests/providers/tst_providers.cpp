@@ -586,6 +586,75 @@ private slots:
     QVERIFY(shoreline.featuresAt(ts::GeoPoint{15.0, 15.0}, 1.0).empty());
   }
 
+  void geoPackageTablesFirstShownBelowStorage()
+  {
+    // Rivers stored at level 6 and shown from 6, places stored at 6 but
+    // shown from 7 (VMAP0's contours, the names pack's places): the
+    // renderer must go to level 7, and level 7 must not share level 6's
+    // load, which has no places (it did, and they were never drawn).
+    const QTemporaryDir dir;
+    const QString path = dir.filePath(QStringLiteral("deep.gpkg"));
+    const ts::TileKey storage =
+        ts::TileKey::containing(6, ts::Geodetic{60.0, 102.0, 0.0});
+    {
+      ts::GeoPackageFeatureWriter writer(path, false);
+      ts::FeatureTableSpec rivers;
+      rivers.name = QStringLiteral("rivers_6");
+      rivers.geometry = ts::FeatureTableSpec::Geometry::Lines;
+      rivers.storageLevel = 6;
+      rivers.minLevel = 6;
+      rivers.attributes = {QStringLiteral("feature_id")};
+      ts::FeatureTableSpec places = rivers;
+      places.name = QStringLiteral("places_6");
+      places.geometry = ts::FeatureTableSpec::Geometry::Points;
+      places.minLevel = 7;
+      QVERIFY(writer.addTable(rivers));
+      QVERIFY(writer.addTable(places));
+      QVERIFY(writer.putFeature(
+          rivers.name, storage,
+          Wkb().lineString({101.5, 61.0, 103.5, 59.5}).bytes(),
+          {std::optional<int64_t>(1)}, {}));
+      QVERIFY(writer.putFeature(places.name, storage,
+                                Wkb().point(102.0, 60.0).bytes(),
+                                {std::optional<int64_t>(2)}, {}));
+      QVERIFY2(writer.finish(), qPrintable(writer.errorString()));
+    }
+    ts::GeoPackageFeatureProvider provider(path);
+    QVERIFY2(provider.isValid(), qPrintable(provider.errorString()));
+    QCOMPARE(provider.maximumLevel(), 7);
+    QCOMPARE(provider.storedKey(storage), storage);
+    const ts::TileKey here =
+        ts::TileKey::containing(7, ts::Geodetic{60.0, 102.0, 0.0});
+    const ts::TileKey deeper = here.child(3);
+    QCOMPARE(provider.storedKey(here), here);
+    QCOMPARE(provider.storedKey(deeper), here);
+    // Level 6: the river only.
+    const std::optional<ts::FeatureTile> coarse =
+        provider.loadFeatures(storage, notCancelled);
+    QVERIFY(coarse.has_value());
+    QCOMPARE(coarse->key, storage);
+    QCOMPARE(coarse->features.size(), std::size_t{1});
+    // Level 7: the river and the place, from the level-6 rows, as the tile
+    // at level 7; a neighbour gets the river crossing it, not the place.
+    const std::optional<ts::FeatureTile> fine =
+        provider.loadFeatures(deeper, notCancelled);
+    QVERIFY(fine.has_value());
+    QCOMPARE(fine->key, here);
+    QCOMPARE(fine->features.size(), std::size_t{2});
+    for (int32_t i = 0; i < 4; ++i) {
+      const ts::TileKey sibling = storage.child(i);
+      if (sibling == here) {
+        continue;
+      }
+      const std::optional<ts::FeatureTile> other =
+          provider.loadFeatures(sibling, notCancelled);
+      QVERIFY(other.has_value());
+      for (const ts::Feature& feature : other->features) {
+        QCOMPARE(feature.type, ts::Feature::Type::LineStrings);
+      }
+    }
+  }
+
   void geoPackageWriterRefusesBadInput()
   {
     const QTemporaryDir dir;
