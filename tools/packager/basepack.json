@@ -8,6 +8,7 @@
       "id": "gshhg",
       "file": "gshhg-shp-2.3.7.zip",
       "url": "https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-shp-2.3.7.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gshhg-2.3.7/gshhg-shp-2.3.7.zip",
       "sha256": "8dbbe7e071e77e9e75f2d639239099ebca8d5c16d6a07df8169729d49f15cf41",
       "name": "GSHHG (Global Self-consistent, Hierarchical, High-resolution Geography Database), shapefiles",
       "version": "2.3.7",
@@ -18,6 +19,7 @@
       "id": "bmng",
       "file": "world.topo.bathy.200407.3x21600x10800.jpg",
       "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/bmng-2004-07-full/world.topo.bathy.200407.3x21600x10800.jpg",
       "sha256": "d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0",
       "name": "Blue Marble Next Generation with topography and bathymetry",
       "version": "2004-07"
@@ -26,6 +28,7 @@
       "id": "naturalearth",
       "file": "ne_10m_admin_0_countries-5.1.2.geojson",
       "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_0_countries.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-admin0-countries-5.1.2/ne_10m_admin_0_countries-5.1.2.geojson",
       "sha256": "239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255",
       "name": "Natural Earth 1:10m Cultural Vectors, Admin 0 – Countries",
       "version": "5.1.2"
@@ -34,6 +37,7 @@
       "id": "etopo",
       "file": "ETOPO_2022_v1_60s_N90W180_surface.tif",
       "url": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/60s/60s_surface_elev_gtif/ETOPO_2022_v1_60s_N90W180_surface.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/etopo-2022-v1-60s-surface/ETOPO_2022_v1_60s_N90W180_surface.tif",
       "sha256": "9d27d4b8ea8e76977e2988bca667d7c8fa68b927355feffcddd6b4875a7fd08e",
       "name": "ETOPO 2022 Global Relief Model, 60 arc-second, surface elevation",
       "version": "2022 v1"
@@ -42,6 +46,7 @@
       "id": "egm2008",
       "file": "us_nga_egm08_25.tif",
       "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/egm2008-2.5min/us_nga_egm08_25.tif",
       "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
       "name": "EGM2008 geoid undulation grid, 2.5 arc-minute (PROJ data)",
       "version": "2008"
@@ -50,6 +55,7 @@
       "id": "egm96",
       "file": "us_nga_egm96_15.tif",
       "url": "https://cdn.proj.org/us_nga_egm96_15.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/egm96-15min/us_nga_egm96_15.tif",
       "sha256": "db493027562c9b004d7220fa881f5603adada4e1c5029b933fa7de4547b0e78d",
       "name": "EGM96 geoid undulation grid, 15 arc-minute (PROJ data)",
       "version": "1996"

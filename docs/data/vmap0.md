@@ -31,8 +31,11 @@ downloaded on 2026-11-21:
 | `sasaus.zip` | SASAUS, South Asia and Australia | 238 665 319 | `b1af09093af52aa9d92edd91465f6311f28d94c7ef4d3b9b4e438a2ed337fbef` |
 
 The configurations pin them (saved as `vmap0-<library>.zip`), and
-`fetch_sources.py` downloads and checks them as it does every source;
-they are not in the repository. Each zip also holds the reference library
+`fetch_sources.py` downloads and checks them as it does every source,
+from the release `vmap0-5.0` of `marutan/terrasoar-packs-sources`, which
+keeps them unchanged with README1.TXT and FGDC_DAT.TXT (ESRI's agreement
+allows that for non-commercial use, with those files alongside); they are
+not in this repository. Each zip also holds the reference library
 `RFERENCE` (a coarse world overview), which is never used.
 
 ## Terms

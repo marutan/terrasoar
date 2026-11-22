@@ -96,7 +96,11 @@ carries its licence texts, the manifest names the exact source file and
 checksum, and the packager's source (this repository) is the "source" of
 the modified form.
 
-URLs and SHA-256 sums are pinned in `tools/packager/basepack.json`.
+URLs and SHA-256 sums are pinned in `tools/packager/basepack.json`. The
+files are downloaded from their copies in `marutan/terrasoar-packs-sources`,
+kept there with their licences
+([packs.md](../design/packs.md#where-the-source-data-is-kept)); the
+URLs above are where each was first published.
 
 ## Size budget
 

@@ -79,6 +79,50 @@ Their packager configurations are `tools/packager/packs/*.json`; `make packs`
 builds them with their release files and index entries
 ([docs/tools/packager.md](../tools/packager.md#extra-packs)).
 
+## Where the source data is kept
+
+**Decided 2026-11-22.** Two repositories hold the packs' data, and every
+pack, the base pack and any new one, uses them:
+
+- **`marutan/terrasoar-packs-sources`** keeps the **raw source data**:
+  every file a pack configuration's `"sources"` names, unchanged, with
+  where it was downloaded from, when, its SHA-256 and the licence or terms
+  it was distributed under. The files are release assets (several are
+  larger than the 100 MB a git file may be), one release per dataset
+  (`vmap0-5.0`, `gshhg-2.3.7`, …); the repository's `sources.json`
+  catalogues them and `sources/<release>/` holds each one's `SOURCE.md`
+  and licence texts, which its release also carries.
+- **`marutan/terrasoar-packs`** keeps the **built packs** and their
+  `index.json`, as before ([The first packs](#the-first-packs)).
+
+The packager reads only from the first. Each source in a configuration has
+its `"mirror"`, the release asset in `terrasoar-packs-sources`, which
+`fetch_sources.py` downloads and checks against the pinned `"sha256"`,
+and its `"url"`, where the file was first published, which the pack's
+manifest records as the source. A source without a mirror in that
+repository is an error, even when the file is already on disk.
+
+**Why**: upstream sites move and disappear (NGA's WVS download went, and
+VMAP0 is now only on a university's server), change files under the same
+name, and rate-limit or block automated downloads. With every source kept
+alongside its terms, any pack can be rebuilt exactly, years on, from one
+place we control, and what each file may be used for is recorded next to
+it.
+
+**Adding a source** (for a new pack, or a new version of a source):
+
+1. Pin it in the configuration with `"url"` (upstream) and `"sha256"`,
+   and download it with `fetch_sources.py --upstream`.
+2. Check its licence or terms allow it to be redistributed. Then create
+   the release `<dataset>-<version>` in `marutan/terrasoar-packs-sources`
+   with the file and its licence texts attached. Add `sources/<release>/`
+   (`SOURCE.md` and the licence texts) and its entry in `sources.json`,
+   and commit them.
+3. Add `"mirror"` to the configuration, and build without `--upstream`.
+
+A source whose terms don't allow redistribution can't be kept there, and
+so can't be a pack's source.
+
 ## Variants
 
 A dataset may instead be one of several pictures of a base pack dataset

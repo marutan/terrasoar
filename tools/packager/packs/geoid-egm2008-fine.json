@@ -13,6 +13,7 @@
       "id": "egm08",
       "file": "us_nga_egm08_25.tif",
       "url": "https://cdn.proj.org/us_nga_egm08_25.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/egm2008-2.5min/us_nga_egm08_25.tif",
       "sha256": "4191d471eefebf24091b56dbc604353cb3b8cf8cc70e448bb9ae56a272bef17a",
       "name": "EGM2008 geoid undulations, 2.5′ grid (NGA, as distributed by PROJ)",
       "version": "2008"

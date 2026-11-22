@@ -13,6 +13,7 @@
       "id": "bmng",
       "file": "world.topo.bathy.200407.3x21600x10800.jpg",
       "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-topography-bathymetry/july/world.topo.bathy.200407.3x21600x10800.jpg",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/bmng-2004-07-full/world.topo.bathy.200407.3x21600x10800.jpg",
       "sha256": "d225f1f35a6448a4d1d8f6de6e48f3433e470085b70a35800e64f384f269a7b0",
       "name": "Blue Marble Next Generation with topography and bathymetry",
       "version": "2004-07"
