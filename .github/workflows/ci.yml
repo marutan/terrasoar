@@ -347,8 +347,9 @@ jobs:
           version: ${{ env.QT6_VERSION }}
           cache: true
 
-      # The sources (about 176 MB) change only with basepack.json, which
-      # pins them by SHA-256; fetch_sources.py checks them either way.
+      # The sources (about 740 MB, from marutan/terrasoar-packs-sources)
+      # change only with basepack.json, which pins them by SHA-256;
+      # fetch_sources.py checks them either way.
       - name: Restore the pack's sources
         id: sources
         uses: actions/cache/restore@v6

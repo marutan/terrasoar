@@ -14,6 +14,7 @@
       "id": "vmap0-sasaus",
       "file": "vmap0-sasaus.zip",
       "url": "https://geo.lib.umn.edu/gisdata/vmap0/sasaus.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/vmap0-5.0/vmap0-sasaus.zip",
       "sha256": "b1af09093af52aa9d92edd91465f6311f28d94c7ef4d3b9b4e438a2ed337fbef",
       "name": "Vector Map Level 0 (VMAP0) edition 5, library SASAUS (South Asia and Australia)",
       "version": "5.0",

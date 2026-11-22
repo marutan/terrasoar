@@ -20,18 +20,25 @@
 
 """Downloads the sources of a data pack and checks their SHA-256.
 
-Usage: fetch_sources.py [--config basepack.json] <sources-directory>
+Usage: fetch_sources.py [--config basepack.json] [--upstream] <sources-directory>
 
 Reads the "sources" list of the pack configuration (default: basepack.json
 next to this script) and makes sure each file is in <sources-directory>
 with the pinned SHA-256: files already there with the right checksum are
 kept, others are downloaded again. A download whose checksum differs is
-deleted and the script fails, so a changed or tampered upstream file never
-reaches the pack.
+deleted and the script fails, so a changed or tampered file never reaches
+the pack.
+
+Each source is downloaded from its "mirror": a release asset of
+marutan/terrasoar-packs-sources, the repository that keeps every pack's
+source data with where it came from and its licence. Its "url" is where the
+file was first downloaded from; the packager records it in the pack.
+--upstream downloads from "url" instead, to add a new source to the
+repository (docs/design/packs.md, "Where the source data is kept").
 
 GitHub release assets are fetched with `gh release download` when the GitHub
 CLI is installed (it authenticates, so CI is not rate limited), otherwise
-over plain HTTPS like every other source. See docs/tools/packager.md.
+over plain HTTPS. See docs/tools/packager.md.
 """
 
 import argparse
@@ -47,6 +54,7 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CHUNK = 1 << 20
+SOURCES_REPOSITORY = "marutan/terrasoar-packs-sources"
 GITHUB_ASSET = re.compile(
     r"^https://github\.com/([^/]+/[^/]+)/releases/download/([^/]+)/([^/]+)$")
 
@@ -81,7 +89,28 @@ def download_github(url, target):
     return True
 
 
-def fetch(source, directory):
+def mirror_problem(source):
+    """Why the source's "mirror" is unusable, or None if it is fine."""
+    mirror = source.get("mirror")
+    if not mirror:
+        return ("no \"mirror\": add the file to "
+                f"{SOURCES_REPOSITORY} first (docs/design/packs.md)")
+    match = GITHUB_ASSET.match(mirror)
+    if (not match or match.group(1) != SOURCES_REPOSITORY
+            or match.group(3) != source["file"]):
+        return (f"\"mirror\" {mirror} is not a release asset of "
+                f"{SOURCES_REPOSITORY} named {source['file']}")
+    return None
+
+
+def fetch(source, directory, upstream=False):
+    # Checked even when the file is already there, so a configuration
+    # without its mirror fails on every machine, not only on a clean one.
+    problem = None if upstream else mirror_problem(source)
+    if problem:
+        print(f"{source['file']}: {problem}", file=sys.stderr)
+        return False
+    url = source["url"] if upstream else source["mirror"]
     path = os.path.join(directory, source["file"])
     expected = source["sha256"].lower()
     if os.path.isfile(path):
@@ -89,11 +118,11 @@ def fetch(source, directory):
             print(f"{source['file']}: present, checksum OK")
             return True
         print(f"{source['file']}: checksum differs, downloading again")
-    print(f"{source['file']}: downloading {source['url']}")
+    print(f"{source['file']}: downloading {url}")
     with tempfile.TemporaryDirectory(dir=directory) as scratch:
         partial = os.path.join(scratch, source["file"])
-        if not download_github(source["url"], partial):
-            download_https(source["url"], partial)
+        if not download_github(url, partial):
+            download_https(url, partial)
         actual = sha256_of(partial)
         if actual != expected:
             print(f"{source['file']}: SHA-256 {actual}, expected {expected}; "
@@ -107,6 +136,9 @@ def fetch(source, directory):
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--config", default=os.path.join(HERE, "basepack.json"))
+    parser.add_argument("--upstream", action="store_true",
+                        help="download from each source's \"url\", where it "
+                        "was first published, instead of its \"mirror\"")
     parser.add_argument("directory")
     args = parser.parse_args(argv)
     with open(args.config, encoding="utf-8") as handle:
@@ -115,7 +147,7 @@ def main(argv):
     ok = True
     for source in config["sources"]:
         try:
-            ok = fetch(source, args.directory) and ok
+            ok = fetch(source, args.directory, args.upstream) and ok
         except (OSError, subprocess.CalledProcessError) as error:
             print(f"{source['file']}: {error}", file=sys.stderr)
             ok = False

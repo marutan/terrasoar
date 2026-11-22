@@ -15,10 +15,11 @@ make basepack
 
 This runs `tools/packager/build_basepack.py`, which
 
-1. downloads the sources listed in `tools/packager/basepack.json` into
-   `$TS_BASEPACK_SOURCES` (default `<build>/basepack-sources`), about
-   740 MB (466 MB of it the ETOPO 2022 GeoTIFF), and checks each against its pinned SHA-256; files already there
-   with the right checksum are kept;
+1. downloads the sources listed in `tools/packager/basepack.json` from
+   `marutan/terrasoar-packs-sources` into `$TS_BASEPACK_SOURCES` (default
+   `<build>/basepack-sources`), about 740 MB (466 MB of it the ETOPO 2022
+   GeoTIFF), and checks each against its pinned SHA-256; files already
+   there with the right checksum are kept;
 2. runs the packager into `<build>/basepack.new`;
 3. replaces `<build>/basepack` with it if the packager succeeded.
 
@@ -34,11 +35,32 @@ python3 tools/packager/fetch_sources.py ~/terrasoar-sources
     --sources ~/terrasoar-sources --output /tmp/basepack --report report.json
 ```
 
+### Where the sources come from
+
+Every source in a configuration names two places:
+
+```json
+{"id": "gshhg", "file": "gshhg-shp-2.3.7.zip",
+ "url": "https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-shp-2.3.7.zip",
+ "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gshhg-2.3.7/gshhg-shp-2.3.7.zip",
+ "sha256": "8dbbe7e0…", …}
+```
+
+`mirror` is the copy in `marutan/terrasoar-packs-sources`, the repository
+that keeps every pack's raw source data with where it came from and its
+licence; `fetch_sources.py` downloads only from there. `url` is where the
+file was first published; the packager writes it into the pack's manifest
+as the source, and `fetch_sources.py --upstream` downloads from it, to add
+a new source to the repository. A source without a mirror there fails,
+and `tools/checks/check_pack_sources.py` (part of `run_all.py`) checks
+every configuration has one. The decision, and how to add a source, are in
+[docs/design/packs.md](../design/packs.md#where-the-source-data-is-kept).
+
 `fetch_sources.py` uses `gh release download` for GitHub release assets
 when the GitHub CLI is installed (authenticated, so CI is not rate
 limited), and plain HTTPS otherwise. A download whose checksum differs is
-deleted and the script fails: a changed upstream file never reaches the
-pack silently.
+deleted and the script fails: a changed file never reaches the pack
+silently.
 
 ## Extra packs
 
@@ -108,7 +130,8 @@ python3 tools/packager/build_pack.py --build-dir <build> \
     --sources ~/vmap0-sources --index ~/terrasoar-packs/index.json
 ```
 
-The sources are the four VMAP0 CD-ROMs as zips (920 MB together);
+The sources are the four VMAP0 CD-ROMs as zips (920 MB together), the
+release `vmap0-5.0` of `marutan/terrasoar-packs-sources`;
 `fetch_sources.py` downloads and checks them like every other source. The
 packager reads them straight from the zips through GDAL's `/vsizip/`,
 without unpacking.

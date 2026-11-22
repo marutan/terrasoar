@@ -14,6 +14,7 @@
       "id": "vmap0-eurnasia",
       "file": "vmap0-eurnasia.zip",
       "url": "https://geo.lib.umn.edu/gisdata/vmap0/eurnasia.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/vmap0-5.0/vmap0-eurnasia.zip",
       "sha256": "bd2cad4328851023ede844c4e125ca1e0de10c2813c3d0c07ada25023b55e8f0",
       "name": "Vector Map Level 0 (VMAP0) edition 5, library EURNASIA (Europe and North Asia)",
       "version": "5.0",

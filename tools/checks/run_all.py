@@ -19,7 +19,8 @@
 # along with this program; if not, see <https://www.gnu.org/licenses/>.
 
 """Runs every style check CI runs: clang-format, include order, `auto`,
-translatable strings, translation file up to date, and Doxygen warnings.
+translatable strings, licence notices, pack sources, the user guide,
+translation file up to date, and Doxygen warnings.
 
 Usage: run_all.py [--skip-doxygen] [--skip-translations]
 """
@@ -40,6 +41,7 @@ def main(argv):
         [sys.executable, os.path.join(HERE, "check_int_types.py")],
         [sys.executable, os.path.join(HERE, "check_translatable.py")],
         [sys.executable, os.path.join(HERE, "check_notices.py")],
+        [sys.executable, os.path.join(HERE, "check_pack_sources.py")],
         [sys.executable, os.path.join(HERE, "check_user_guide.py")],
     ]
     if "--skip-translations" not in argv:
