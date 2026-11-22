@@ -361,13 +361,17 @@ private slots:
     QTest::addColumn<int32_t>("delayMs");
     QTest::addColumn<int32_t>("restDelayMs");
     QTest::addColumn<bool>("finishes");
-    // Cancelled at 100 ms in each case.
+    // Cancelled 300 ms after the first half of the answer is out (for it
+    // to reach the client), or at 300 ms when there is no answer. The
+    // client lets a late one finish for 3 s. Wide margins: the sanitizer
+    // builds on CI are slow.
     QTest::newRow("arriving, finishes soon")
-        << true << 20000 << 0 << 300 << true;
-    QTest::newRow("not asked to finish") << false << 20000 << 0 << 300 << false;
-    QTest::newRow("too slow to finish") << true << 20000 << 0 << 3000 << false;
+        << true << 20000 << 0 << 1500 << true;
+    QTest::newRow("not asked to finish")
+        << false << 20000 << 0 << 1500 << false;
+    QTest::newRow("too slow to finish") << true << 20000 << 0 << 6000 << false;
     QTest::newRow("too much still to come")
-        << true << 2000000 << 0 << 600 << false;
+        << true << 2000000 << 0 << 1500 << false;
     QTest::newRow("server still working")
         << true << 20000 << 3000 << 0 << false;
   }
@@ -391,7 +395,9 @@ private slots:
           response.restDelayMs = restDelayMs;
           return response;
         });
-    ts::NetworkClient client(testSettings());
+    ts::NetworkSettings settings = testSettings();
+    settings.lateFinishLimit = std::chrono::milliseconds(3000);
+    ts::NetworkClient client(settings);
     std::atomic<bool> cancelled{false};
     // Not by the clock alone: under the sanitizers the answer can take
     // longer than that to begin.
@@ -402,20 +408,25 @@ private slots:
              std::chrono::steady_clock::now() < giveUp) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
       cancelled.store(true);
     });
     ts::HttpRequest request{server.url(), {}};
     request.finishIfCancelled = finishIfCancelled;
+    QElapsedTimer timer;
+    timer.start();
     const ts::HttpResponse response = client.fetch(request, cancelled);
     canceller.join();
+    const QString what = QStringLiteral("error %1 after %2 ms")
+                             .arg(static_cast<int32_t>(response.error))
+                             .arg(timer.elapsed());
     if (finishes) {
-      QCOMPARE(response.error, ts::NetworkError::None);
+      QVERIFY2(response.error == ts::NetworkError::None, qPrintable(what));
       QCOMPARE(response.body, body);
       QCOMPARE(client.lateFinishes(), 1);
       QCOMPARE(server.cutOffCount(), 0);
     } else {
-      QCOMPARE(response.error, ts::NetworkError::Cancelled);
+      QVERIFY2(response.error == ts::NetworkError::Cancelled, qPrintable(what));
       QCOMPARE(client.lateFinishes(), 0);
       QVERIFY(QTest::qWaitFor(
           [&]() { return server.cutOffCount() + server.abandonedCount() == 1; },
