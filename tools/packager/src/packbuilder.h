@@ -260,6 +260,11 @@ struct VectorSpec {
   std::vector<QString> classSources;
   /** Each class's file inside its source, if the source is a zip. */
   std::vector<QString> classMembers;
+  /**
+   * Each class's GDAL driver, if it must be named ("CSV" for the names
+   * files, which are .txt): the path is then given as "<driver>:<path>".
+   */
+  std::vector<QString> classDrivers;
   /** The layers the pack offers, as for VMAP0. */
   QJsonArray layers;
 };

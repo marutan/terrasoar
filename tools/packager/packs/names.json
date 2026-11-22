@@ -1,0 +1,421 @@
+{
+  "id": "names",
+  "version": "2026.1",
+  "index": {
+    "name": "Place names",
+    "description": "Names of populated places and major features (mountains and ranges, lakes, bays and seas, islands, capes, glaciers, falls) as labels: the US Board on Geographic Names' names, from USGS GNIS for the United States and NGA GNS for the rest of the world. Main names only.",
+    "licence": "Public domain (USGS, NGA)"
+  },
+  "sizeLimitBytes": 400000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "gnis",
+      "file": "DomesticNames_National_Text-2026-11-02.zip",
+      "url": "https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/DomesticNames/DomesticNames_National_Text.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gnis-domestic-names-2026-11-02/DomesticNames_National_Text-2026-11-02.zip",
+      "sha256": "1ccd7aaa8f50ba7e2340e131bce815154e6c8288df72bbff01e0e99033ac9acd",
+      "name": "GNIS Domestic Names, national file (USGS)",
+      "version": "2026-11-02"
+    }
+  ],
+  "vector": {
+    "dataset": "names",
+    "name": "Place names",
+    "licence": "Public domain (USGS, NGA)",
+    "attribution": "Names: USGS GNIS, NGA GNS",
+    "sourceName": "GNIS Domestic Names; GEOnet Names Server",
+    "sourceVersion": "2026-11-02",
+    "sourceUrl": "https://www.usgs.gov/tools/geographic-names-information-system-gnis",
+    "lods": [
+      {
+        "storageLevel": 3,
+        "minLevel": 3,
+        "maxLevel": 5
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1
+      }
+    ],
+    "classes": [
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Sea' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_seas",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Sea"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Range' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_ranges",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Range"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Populated Place' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_places",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Populated Place"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Island' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_islands",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Island"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Isthmus' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_isthmuses",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Isthmus"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Glacier' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_glaciers",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Glacier"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Summit' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_summits",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Summit"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Lake' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_lakes",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Lake"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Bay' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_bays",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Bay"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Cape' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_capes",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Cape"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gnis",
+        "member": "Text/DomesticNames_National.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=PIPE",
+          "AUTODETECT_TYPE=YES",
+          "X_POSSIBLE_NAMES=prim_long_dec",
+          "Y_POSSIBLE_NAMES=prim_lat_dec"
+        ],
+        "geometry": "points",
+        "where": "feature_class = 'Falls' AND prim_lat_dec <> 0 AND feature_name NOT LIKE '%(historical)%'",
+        "table": "us_falls",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "feature_name",
+            "name": "name"
+          },
+          {
+            "name": "feature",
+            "value": "Falls"
+          },
+          {
+            "column": "state_name",
+            "name": "region"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "places",
+        "name": "Place Names",
+        "tables": [
+          "us_places"
+        ],
+        "style": {
+          "outline": "#fff3e0ff",
+          "pointSizePx": 3,
+          "labels": "name"
+        }
+      },
+      {
+        "id": "features",
+        "name": "Feature Names (Mountains, Lakes, Islands…)",
+        "tables": [
+          "us_seas",
+          "us_ranges",
+          "us_islands",
+          "us_isthmuses",
+          "us_glaciers",
+          "us_summits",
+          "us_lakes",
+          "us_bays",
+          "us_capes",
+          "us_falls"
+        ],
+        "style": {
+          "outline": "#c5e1a5ff",
+          "pointSizePx": 3,
+          "labels": "name"
+        },
+        "styleRules": [
+          {
+            "attribute": "feature",
+            "equals": "Summit",
+            "outline": "#ffe0b2ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Lake",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Bay",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Sea",
+            "outline": "#90caf9ff"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1266,6 +1266,287 @@ private slots:
     QVERIFY(error.contains(QLatin1String("variant")));
   }
 
+  void vectorDataset()
+  {
+    // A "vector" dataset from OGR sources: CSV points with a filter, text,
+    // number and constant attributes; runways as lines from their ends'
+    // columns; GeoJSON lines dissolved by name; a table shared by two
+    // classes, one per level of detail.
+    const QTemporaryDir dir;
+    const QDir root(dir.path());
+    root.mkpath(QStringLiteral("sources"));
+    const auto put = [&root](const char* name, const QByteArray& contents) {
+      QFile file(
+          root.filePath(QStringLiteral("sources/") + QLatin1String(name)));
+      return file.open(QIODevice::WriteOnly) &&
+             file.write(contents) == contents.size();
+    };
+    QVERIFY(put("places.csv", "name,kind,lon,lat,height\n"
+                              "Alpha,big,10.5,50.25,100\n"
+                              "Beta,small,20,40,\n"
+                              "Gamma,big,,,5\n"));
+    QVERIFY(put("runways.csv", "id,x1,y1,x2,y2\n"
+                               "1,0.01,0.01,0.02,0.03\n"
+                               "2,,,1,1\n"));
+    QVERIFY(put("rivers.geojson",
+                "{\"type\": \"FeatureCollection\", \"features\": ["
+                "{\"type\": \"Feature\", \"properties\": {\"name\": \"Long\"},"
+                " \"geometry\": {\"type\": \"LineString\", \"coordinates\":"
+                " [[1, 1], [2, 2]]}},"
+                "{\"type\": \"Feature\", \"properties\": {\"name\": \"Long\"},"
+                " \"geometry\": {\"type\": \"LineString\", \"coordinates\":"
+                " [[2, 2], [3, 1]]}},"
+                "{\"type\": \"Feature\", \"properties\": {\"name\": \"Short\"},"
+                " \"geometry\": {\"type\": \"LineString\", \"coordinates\":"
+                " [[5, 5], [5.5, 5.5]]}}]}"));
+    const QByteArray zero =
+        "\"sha256\": \"0000000000000000000000000000000000000000000000000000000"
+        "000000000\"";
+    const QByteArray points =
+        "\"open\": [\"X_POSSIBLE_NAMES=lon\", \"Y_POSSIBLE_NAMES=lat\"]";
+    const QByteArray configJson =
+        "{\"id\": \"test\", \"version\": \"1\","
+        "\"sizeLimitBytes\": 10000000, \"reservedBytes\": 0,"
+        "\"sources\": ["
+        "{\"id\": \"places\", \"file\": \"places.csv\", \"url\": "
+        "\"https://e.org/p.csv\", " +
+        zero +
+        "},"
+        "{\"id\": \"runways\", \"file\": \"runways.csv\", \"url\": "
+        "\"https://e.org/r.csv\", " +
+        zero +
+        "},"
+        "{\"id\": \"rivers\", \"file\": \"rivers.geojson\", \"url\": "
+        "\"https://e.org/r.geojson\", " +
+        zero +
+        "}],"
+        "\"vector\": {\"dataset\": \"test\", \"name\": \"Test\","
+        "\"lods\": [{\"storageLevel\": 0, \"maxLevel\": 3, "
+        "\"toleranceDeg\": 0.01}, {\"storageLevel\": 4}],"
+        "\"classes\": ["
+        "{\"source\": \"places\", " +
+        points +
+        ", \"where\": \"kind = 'big'\", \"geometry\": \"points\", "
+        "\"table\": \"big\", \"attributes\": [{\"column\": \"name\", "
+        "\"name\": \"name\"}, {\"column\": \"height\", \"name\": \"height\", "
+        "\"kind\": \"number\"}, {\"name\": \"feature\", \"value\": "
+        "\"town\"}]},"
+        "{\"source\": \"places\", " +
+        points +
+        ", \"where\": \"kind = 'small'\", \"geometry\": \"points\", "
+        "\"table\": \"small\", \"minLevel\": 2, \"attributes\": "
+        "[{\"column\": \"name\", \"name\": \"name\"}]},"
+        "{\"source\": \"runways\", \"geometry\": \"lines\", \"table\": "
+        "\"runways\", \"lods\": [1], \"lineColumns\": [\"x1\", \"y1\", "
+        "\"x2\", \"y2\"]},"
+        "{\"source\": \"rivers\", \"geometry\": \"lines\", \"table\": "
+        "\"rivers\", \"dissolve\": true, \"attributes\": [{\"column\": "
+        "\"name\", \"name\": \"name\"}]},"
+        "{\"source\": \"rivers\", \"geometry\": \"lines\", \"table\": "
+        "\"shared\", \"lods\": [0], \"where\": \"name = 'Short'\"},"
+        "{\"source\": \"rivers\", \"geometry\": \"lines\", \"table\": "
+        "\"shared\", \"lods\": [1], \"where\": \"name = 'Long'\"}],"
+        "\"layers\": [{\"id\": \"places\", \"name\": \"Places\", "
+        "\"tables\": [\"big\", \"small\"], \"style\": {\"labels\": "
+        "\"name\"}}]}}";
+    QString error;
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::fromJson(
+            QJsonDocument::fromJson(configJson).object(), &error);
+    if (!config) {
+      QFAIL(qPrintable(error));
+    }
+    ts::packager::BuildOptions options;
+    options.sourcesDirectory = root.filePath(QStringLiteral("sources"));
+    options.configDirectory = root.path();
+    options.outputDirectory = root.filePath(QStringLiteral("pack"));
+    options.verifySources = false;
+    ts::packager::BuildReport report;
+    QVERIFY2(ts::packager::buildPack(*config, options, &report, &error),
+             qPrintable(error));
+    QCOMPARE(report.vector.size(), std::size_t{6});
+    // Gamma has no position: read, left out as without geometry.
+    QCOMPARE(report.vector.at(0).sourceFeatures, int64_t{2});
+    QCOMPARE(report.vector.at(0).filtered, int64_t{1});
+    QCOMPARE(report.vector.at(0).features, int64_t{1});
+    QCOMPARE(report.vector.at(1).features, int64_t{1});
+    // The second runway has no ends.
+    QCOMPARE(report.vector.at(2).filtered, int64_t{1});
+    QCOMPARE(report.vector.at(2).features, int64_t{1});
+    // The two pieces of "Long" are joined.
+    QCOMPARE(report.vector.at(3).joined, int64_t{1});
+    QCOMPARE(report.vector.at(3).features, int64_t{2});
+    for (const ts::packager::FeatureClassStats& cls : report.vector) {
+      QCOMPARE(cls.skipped, int64_t{0});
+    }
+
+    const QString gpkg =
+        QDir(options.outputDirectory).filePath(QStringLiteral("test.gpkg"));
+    GDALDatasetH dataset = GDALOpenEx(gpkg.toUtf8().constData(), GDAL_OF_VECTOR,
+                                      nullptr, nullptr, nullptr);
+    QVERIFY(dataset != nullptr);
+    QStringList tables;
+    for (int32_t i = 0; i < GDALDatasetGetLayerCount(dataset); ++i) {
+      tables.append(
+          QString::fromUtf8(OGR_L_GetName(GDALDatasetGetLayer(dataset, i))));
+    }
+    tables.sort();
+    QCOMPARE(tables.join(QLatin1Char(' ')),
+             QStringLiteral("big_0 big_4 rivers_0 rivers_4 runways_4 shared_0 "
+                            "shared_4 small_0 small_4 ts_feature_tables"));
+    OGRLayerH big = GDALDatasetGetLayerByName(dataset, "big_4");
+    QCOMPARE(OGR_L_GetFeatureCount(big, 1), GIntBig{1});
+    OGR_L_ResetReading(big);
+    OGRFeatureH feature = OGR_L_GetNextFeature(big);
+    QVERIFY(feature != nullptr);
+    QCOMPARE(QString::fromUtf8(OGR_F_GetFieldAsString(
+                 feature, OGR_F_GetFieldIndex(feature, "name"))),
+             QStringLiteral("Alpha"));
+    QCOMPARE(OGR_F_GetFieldAsInteger64(feature,
+                                       OGR_F_GetFieldIndex(feature, "height")),
+             GIntBig{100});
+    QCOMPARE(QString::fromUtf8(OGR_F_GetFieldAsString(
+                 feature, OGR_F_GetFieldIndex(feature, "feature"))),
+             QStringLiteral("town"));
+    // Points are stored as multipoints, a tile's pieces of a feature.
+    OGRGeometryH point = OGR_F_GetGeometryRef(feature);
+    QCOMPARE(wkbFlatten(OGR_G_GetGeometryType(point)), wkbMultiPoint);
+    QCOMPARE(OGR_G_GetGeometryCount(point), 1);
+    point = OGR_G_GetGeometryRef(point, 0);
+    QCOMPARE(OGR_G_GetX(point, 0), 10.5);
+    QCOMPARE(OGR_G_GetY(point, 0), 50.25);
+    OGR_F_Destroy(feature);
+    // One table, a class for each level of detail.
+    QCOMPARE(OGR_L_GetFeatureCount(
+                 GDALDatasetGetLayerByName(dataset, "shared_0"), 1),
+             GIntBig{1});
+    QCOMPARE(OGR_L_GetFeatureCount(
+                 GDALDatasetGetLayerByName(dataset, "shared_4"), 1),
+             GIntBig{2}); // "Long" in two pieces: not dissolved
+    GDALClose(dataset);
+
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(options.outputDirectory, &error);
+    if (!manifest) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(manifest->datasets.size(), std::size_t{1});
+    QCOMPARE(manifest->datasets.at(0).kind, ts::PackDataset::Kind::Features);
+    QCOMPARE(manifest->layers.size(), 1);
+    QCOMPARE(
+        manifest->layers.at(0).toObject().value(QLatin1String("id")).toString(),
+        QStringLiteral("pack:test:places"));
+
+    // Classes writing one table differently are refused.
+    QJsonObject json = QJsonDocument::fromJson(configJson).object();
+    QJsonObject vector = json.value(QStringLiteral("vector")).toObject();
+    QJsonArray classes = vector.value(QStringLiteral("classes")).toArray();
+    QJsonObject other = classes.at(5).toObject();
+    other.insert(QStringLiteral("attributes"),
+                 QJsonArray{QJsonObject{
+                     {QStringLiteral("column"), QStringLiteral("name")},
+                     {QStringLiteral("name"), QStringLiteral("name")}}});
+    other.insert(QStringLiteral("lods"), QJsonArray{0});
+    classes.replace(5, other);
+    vector.insert(QStringLiteral("classes"), classes);
+    json.insert(QStringLiteral("vector"), vector);
+    const std::optional<ts::packager::PackConfig> clash =
+        ts::packager::PackConfig::fromJson(json, &error);
+    QVERIFY(clash.has_value());
+    options.outputDirectory = root.filePath(QStringLiteral("clash"));
+    QVERIFY(!ts::packager::buildPack(*clash, options, &report, &error));
+    QVERIFY2(error.contains(QLatin1String("shared_0")), qPrintable(error));
+    // A line class needs four columns; an unknown geometry is refused.
+    for (const char* bad :
+         {"\"lineColumns\": [\"x1\", \"y1\"]", "\"geometry\": \"blobs\""}) {
+      QJsonObject broken = QJsonDocument::fromJson(configJson).object();
+      QJsonObject brokenVector =
+          broken.value(QStringLiteral("vector")).toObject();
+      QJsonArray brokenClasses =
+          brokenVector.value(QStringLiteral("classes")).toArray();
+      QJsonObject cls = brokenClasses.at(2).toObject();
+      const QJsonObject patch =
+          QJsonDocument::fromJson(QByteArray("{") + bad + "}").object();
+      for (const QString& key : patch.keys()) {
+        cls.insert(key, patch.value(key));
+      }
+      brokenClasses.replace(2, cls);
+      brokenVector.insert(QStringLiteral("classes"), brokenClasses);
+      broken.insert(QStringLiteral("vector"), brokenVector);
+      QVERIFY2(!ts::packager::PackConfig::fromJson(broken, &error), bad);
+    }
+  }
+
+  void ownImageryDatasets()
+  {
+    // "imageryDatasets": imagery of the pack's own, here from a grey
+    // (one-band) image, each with an imagery layer in the manifest.
+    const QTemporaryDir dir;
+    const QDir root(dir.path());
+    root.mkpath(QStringLiteral("sources"));
+    ts::initialiseGdal();
+    const QString tif = root.filePath(QStringLiteral("sources/grey.tif"));
+    GDALDatasetH image =
+        GDALCreate(GDALGetDriverByName("GTiff"), tif.toUtf8().constData(), 512,
+                   256, 1, GDT_Byte, nullptr);
+    QVERIFY(image != nullptr);
+    std::vector<std::uint8_t> values(512 * 256, 0);
+    for (std::size_t i = 0; i < values.size(); ++i) {
+      values[i] = static_cast<std::uint8_t>((i % 512) / 2);
+    }
+    QCOMPARE(GDALRasterIO(GDALGetRasterBand(image, 1), GF_Write, 0, 0, 512, 256,
+                          values.data(), 512, 256, GDT_Byte, 0, 0),
+             CE_None);
+    GDALClose(image);
+    const QByteArray configJson =
+        "{\"id\": \"grey\", \"version\": \"1\","
+        "\"sizeLimitBytes\": 10000000, \"reservedBytes\": 0,"
+        "\"sources\": [{\"id\": \"g\", \"file\": \"grey.tif\", \"url\": "
+        "\"https://e.org/g.tif\", \"sha256\": \"000000000000000000000000000"
+        "0000000000000000000000000000000000000\"}],"
+        "\"imageryDatasets\": [{\"dataset\": \"grey\", \"source\": \"g\", "
+        "\"layer\": \"Grey relief\", \"name\": \"Grey\", \"maxLevel\": 0}]}";
+    QString error;
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::fromJson(
+            QJsonDocument::fromJson(configJson).object(), &error);
+    if (!config) {
+      QFAIL(qPrintable(error));
+    }
+    ts::packager::BuildOptions options;
+    options.sourcesDirectory = root.filePath(QStringLiteral("sources"));
+    options.configDirectory = root.path();
+    options.outputDirectory = root.filePath(QStringLiteral("pack"));
+    options.verifySources = false;
+    ts::packager::BuildReport report;
+    QVERIFY2(ts::packager::buildPack(*config, options, &report, &error),
+             qPrintable(error));
+    QCOMPARE(report.imagery.tiles, 2); // level 0: two tiles
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(options.outputDirectory, &error);
+    if (!manifest) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(manifest->datasets.size(), std::size_t{1});
+    QVERIFY(manifest->datasets.at(0).replaces.isEmpty());
+    QCOMPARE(manifest->layers.size(), 1);
+    const QJsonObject layer = manifest->layers.at(0).toObject();
+    QCOMPARE(layer.value(QLatin1String("id")).toString(),
+             QStringLiteral("pack:grey:image"));
+    QCOMPARE(layer.value(QLatin1String("type")).toString(),
+             QStringLiteral("imagery"));
+    QCOMPARE(layer.value(QLatin1String("name")).toString(),
+             QStringLiteral("Grey relief"));
+    // A dataset of the pack's own needs its layer.
+    QJsonObject json = QJsonDocument::fromJson(configJson).object();
+    QJsonArray own = json.value(QStringLiteral("imageryDatasets")).toArray();
+    QJsonObject entry = own.at(0).toObject();
+    entry.remove(QStringLiteral("layer"));
+    own.replace(0, entry);
+    json.insert(QStringLiteral("imageryDatasets"), own);
+    QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+  }
+
   void basePack()
   {
     // The real base pack, when TS_BASEPACK_DIR names one (CI's base pack

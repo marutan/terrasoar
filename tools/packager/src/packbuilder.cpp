@@ -485,6 +485,7 @@ bool readVectorClass(const PackConfig& config, const QJsonObject& entry,
   spec->classes.push_back(cls);
   spec->classSources.push_back(source);
   spec->classMembers.push_back(text(entry, "member"));
+  spec->classDrivers.push_back(text(entry, "driver"));
   return true;
 }
 
@@ -1058,6 +1059,10 @@ private:
               : QStringLiteral("/vsizip/%1/%2")
                     .arg(QFileInfo(path).absoluteFilePath(),
                          spec.classMembers[c]);
+      if (!spec.classDrivers[c].isEmpty()) {
+        options.classes[c].path =
+            spec.classDrivers[c] + QLatin1Char(':') + options.classes[c].path;
+      }
     }
     GeoPackageFeatureWriter writer(m_output.filePath(file), false);
     if (!writer.errorString().isEmpty() ||
