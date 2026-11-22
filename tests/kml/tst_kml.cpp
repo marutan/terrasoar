@@ -706,7 +706,9 @@ private slots:
     QCOMPARE(ts::kmlContainer(*document, QString()), &document->root);
     const ts::KmlFeature* shapes =
         ts::kmlContainer(*document, QStringLiteral("0"));
-    QVERIFY(shapes != nullptr);
+    if (shapes == nullptr) {
+      QFAIL("shapes is null");
+    }
     QCOMPARE(shapes->name, QStringLiteral("Shapes"));
     QVERIFY(ts::kmlContainer(*document, QStringLiteral("9")) == nullptr);
     QVERIFY(ts::kmlContainer(*document, QStringLiteral("x")) == nullptr);
@@ -769,7 +771,9 @@ private slots:
     QCOMPARE(point.labelColor, QColor(255, 255, 0));
     QCOMPARE(point.labelScale, 0.8);
     QCOMPARE(point.lonDeg, -1.8904);
-    QVERIFY(point.placemark != nullptr);
+    if (point.placemark == nullptr) {
+      QFAIL("point.placemark is null");
+    }
     QVERIFY(!shapes.billboards().at(1).label.isEmpty());
     QVERIFY(shapes.billboards().at(2).label.isEmpty());
     // Points come as billboards, not as dots in tiles; picking still finds
@@ -1133,7 +1137,9 @@ private slots:
         shared(QStringLiteral("everything.kml"));
     const ts::KmlFeature* track =
         ts::kmlContainer(*document, QStringLiteral("1.2"));
-    QVERIFY(track != nullptr && track->geometry.has_value());
+    if (track == nullptr || !track->geometry.has_value()) {
+      QFAIL("no track geometry");
+    }
     const ts::KmlGeometry& geometry =
         track->geometry.value_or(ts::KmlGeometry{});
     const QDateTime start(QDate(2026, 11, 20), QTime(10, 0), QTimeZone::utc());
@@ -1321,7 +1327,9 @@ private slots:
       if (!document) {
         QFAIL(qPrintable(name + QStringLiteral(": ") + error));
       }
-      QVERIFY2(document->sourceText != nullptr, qPrintable(name));
+      if (document->sourceText == nullptr) {
+        QFAIL(qPrintable(name));
+      }
       QCOMPARE(withoutDeclaration(ts::writeKml(*document)),
                withoutDeclaration(original));
     }
@@ -1382,7 +1390,9 @@ private slots:
     }
     const ts::KmlFeature* renamed =
         find(again->root, QStringLiteral("Renamed & moved"));
-    QVERIFY(renamed != nullptr);
+    if (renamed == nullptr) {
+      QFAIL("renamed is null");
+    }
     QCOMPARE(renamed->geometry.value_or(ts::KmlGeometry{})
                  .coordinates.front()
                  .lonDeg,
@@ -1508,7 +1518,9 @@ private slots:
     }
     QVERIFY(again->kmz);
     const ts::KmlFeature* legend = find(again->root, QStringLiteral("Legend"));
-    QVERIFY(legend != nullptr);
+    if (legend == nullptr) {
+      QFAIL("legend is null");
+    }
     QCOMPARE(legend->iconHref, QStringLiteral("files/legend.png"));
     QVERIFY(
         !QImage::fromData(ts::readKmlResource(*again, legend->iconHref, &error))
@@ -1539,7 +1551,9 @@ private slots:
         ts::writeKmlFile(read(QStringLiteral("heights.kml")), path, &error));
     GDALDatasetH dataset = GDALOpenEx(path.toUtf8().constData(), GDAL_OF_VECTOR,
                                       nullptr, nullptr, nullptr);
-    QVERIFY(dataset != nullptr);
+    if (dataset == nullptr) {
+      QFAIL("dataset is null");
+    }
     int64_t features = 0;
     std::vector<QString> types;
     for (int32_t l = 0; l < GDALDatasetGetLayerCount(dataset); ++l) {
@@ -1714,7 +1728,10 @@ private slots:
       QCOMPARE(countPlacemarks(document.root), 11);
       const ts::KmlFeature* polygon =
           find(document.root, QStringLiteral("A polygon with a hole"));
-      QVERIFY2(polygon != nullptr, qPrintable(name));
+      if (polygon == nullptr) {
+        qWarning("%s", qPrintable(name));
+        QFAIL("no polygon with a hole");
+      }
       const ts::KmlGeometry geometry =
           polygon->geometry.value_or(ts::KmlGeometry{});
       QCOMPARE(geometry.kind, ts::KmlGeometry::Kind::Polygon);

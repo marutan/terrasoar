@@ -4348,7 +4348,9 @@ private slots:
     const QList<QAction*> packMenus = packs->actions();
     QCOMPARE(packMenus.size(), 1);
     QMenu* menu = packMenus.front()->menu();
-    QVERIFY(menu != nullptr);
+    if (menu == nullptr) {
+      QFAIL("the pack's entry has no menu");
+    }
     QCOMPARE(withoutMnemonic(menu->title()), QStringLiteral("VMAP0 test"));
     QStringList names;
     for (QAction* action : menu->actions()) {
