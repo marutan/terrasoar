@@ -173,6 +173,12 @@ public:
    */
   int32_t cutOffCount() const { return m_cutOff.load(); }
 
+  /**
+   * Returns how many responses were begun and are to be finished later
+   * (MockHttpResponse::restDelayMs): their headers and first half sent.
+   */
+  int32_t partlySentCount() const { return m_partlySent.load(); }
+
   /** Returns the most requests that waited for an answer at once. */
   int32_t peakWaiting() const { return m_peakWaiting.load(); }
 
@@ -307,6 +313,7 @@ private:
             const int32_t half = static_cast<int32_t>(response.body.size() / 2);
             out += response.body.left(half);
             guarded->write(out);
+            m_owner.m_partlySent.fetch_add(1);
             std::shared_ptr<bool> complete = std::make_shared<bool>(false);
             QObject::connect(guarded.data(), &QTcpSocket::disconnected,
                              guarded.data(), [this, complete]() {
@@ -343,6 +350,7 @@ private:
   std::atomic<int32_t> m_peakWaiting{0};
   std::atomic<int32_t> m_abandoned{0};
   std::atomic<int32_t> m_cutOff{0};
+  std::atomic<int32_t> m_partlySent{0};
   std::unique_ptr<Thread> m_thread;
 };
 
