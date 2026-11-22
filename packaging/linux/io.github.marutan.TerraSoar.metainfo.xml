@@ -79,6 +79,16 @@
     <category>Geography</category>
   </categories>
   <releases>
+    <release version="0.0.3" date="2026-11-22">
+      <description>
+        <p>KML and KMZ files, shown and edited; satellites, aircraft from
+        ADS-B and ships from AIS, recorded or live, on a program clock;
+        XYZ, WFS and time-dependent web layers; NGA's Vector Map Level 0
+        as data packs; many more map projections, the UK National Grid and
+        RPF charts; the flat map turned and tilted; and navigation
+        controls on the view.</p>
+      </description>
+    </release>
     <release version="0.0.2" date="2026-11-19">
       <description>
         <p>WMTS layers, including national grids such as the British

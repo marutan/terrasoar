@@ -25,6 +25,7 @@
 #include <vector>
 
 #include <QAction>
+#include <QDateTime>
 #include <QDateTimeEdit>
 #include <QDialogButtonBox>
 #include <QEvent>
@@ -46,6 +47,21 @@ namespace ts
 
 namespace
 {
+
+/** How often a clock not in real time is shown again, ms. */
+constexpr int32_t refreshMs = 250;
+
+/**
+ * Returns the milliseconds from @p time to the start of the next minute,
+ * and a little more, so the minute shown has changed when it comes.
+ */
+int32_t msToNextMinute(const QDateTime& time)
+{
+  const int64_t ms = time.toMSecsSinceEpoch();
+  const int64_t minuteMs = 60000;
+  const int64_t marginMs = 20;
+  return static_cast<int32_t>(minuteMs - (ms % minuteMs) + marginMs);
+}
 
 /** The steps offered, seconds. */
 const std::vector<double>& stepChoices()
@@ -201,7 +217,7 @@ ClockWidget::ClockWidget(ProgramClock* clock, QWidget* parent)
   m_nowButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
   layout->addWidget(m_nowButton);
 
-  m_refresh->setInterval(250);
+  m_refresh->setInterval(refreshMs);
   connect(m_refresh, &QTimer::timeout, this, &ClockWidget::updateTime);
   connect(m_clock, &ProgramClock::timeChanged, this, &ClockWidget::updateTime);
   connect(m_clock, &ProgramClock::runningChanged, this,
@@ -345,9 +361,7 @@ void ClockWidget::updateState()
   m_fasterAction->setEnabled(m_clock->fasterRate() != m_clock->rate());
   m_slowerAction->setEnabled(m_clock->slowerRate() != m_clock->rate());
   m_realTimeAction->setEnabled(!m_clock->isRealTime());
-  if (running) {
-    m_refresh->start();
-  } else {
+  if (!running) {
     m_refresh->stop();
   }
   updateTime();
@@ -355,11 +369,25 @@ void ClockWidget::updateState()
 
 void ClockWidget::updateTime()
 {
+  // In real time (how the program starts, and stays while left alone) the
+  // clock shows minutes and wakes once a minute: every repaint of the
+  // window costs the whole window's composition (the globe view is
+  // OpenGL), so seconds there would keep an idle program busy. Otherwise
+  // it shows seconds, again every refreshMs while it runs.
+  const QDateTime time = m_clock->time();
+  const bool realTime = m_clock->isRealTime();
   const QString text =
-      m_clock->time().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+      time.toString(realTime ? QStringLiteral("yyyy-MM-dd HH:mm")
+                             : QStringLiteral("yyyy-MM-dd HH:mm:ss"));
   const QString shown = tr("%1 UTC").arg(text);
   if (m_timeButton->text() != shown) {
     m_timeButton->setText(shown);
+  }
+  if (realTime) {
+    m_refresh->start(msToNextMinute(time));
+  } else if (m_clock->isRunning() &&
+             (!m_refresh->isActive() || m_refresh->interval() != refreshMs)) {
+    m_refresh->start(refreshMs);
   }
 }
 

@@ -20,11 +20,11 @@
 #include "ts/kml/kmlreader.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include <QCoreApplication>
 #include <QDir>
@@ -918,7 +918,7 @@ QByteArray readVsi(const QString& path)
     return QByteArray();
   }
   QByteArray data;
-  std::array<char, 65536> buffer{};
+  std::vector<char> buffer(static_cast<std::size_t>(65536));
   size_t read = 0;
   while ((read = VSIFReadL(buffer.data(), 1, buffer.size(), file)) > 0) {
     data.append(buffer.data(), static_cast<int32_t>(read));

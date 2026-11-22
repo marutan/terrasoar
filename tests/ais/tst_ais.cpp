@@ -714,7 +714,9 @@ void TestAis::readersAgree()
     const ts::VesselTrack* track = trackOf(tracks, entry.first);
     if (entry.first >= 235000000U && entry.first < 236000000U) {
       ++vessels;
-      QVERIFY2(track != nullptr, qPrintable(QString::number(entry.first)));
+      if (track == nullptr) {
+        QFAIL(qPrintable(QString::number(entry.first)));
+      }
     }
     if (track == nullptr) {
       continue; // the CSV has vessels only
@@ -735,13 +737,19 @@ void TestAis::readersAgree()
   QCOMPARE(vessels, 5);
   // Names, from type 5 and 24 (NMEA) or the columns (CSV).
   const ts::VesselTrack* cargo = trackOf(tracks, 235000001U);
-  QVERIFY(cargo != nullptr);
+  if (cargo == nullptr) {
+    QFAIL("cargo is null");
+  }
   QCOMPARE(cargo->lastName(), QStringLiteral("TSO CARGO ONE"));
   const ts::VesselTrack* yacht = trackOf(tracks, 235000004U);
-  QVERIFY(yacht != nullptr);
+  if (yacht == nullptr) {
+    QFAIL("yacht is null");
+  }
   QCOMPARE(yacht->lastName(), QStringLiteral("TSO YACHT"));
   const ts::VesselInfo* yachtInfo = yacht->infoAt(fixtureStartS + 300.0);
-  QVERIFY(yachtInfo != nullptr);
+  if (yachtInfo == nullptr) {
+    QFAIL("yachtInfo is null");
+  }
   QVERIFY(yachtInfo->classB);
   QCOMPARE(yachtInfo->shipType, 36);
   QCOMPARE(yachtInfo->dimensions.toBow + yachtInfo->dimensions.toStern, 12);

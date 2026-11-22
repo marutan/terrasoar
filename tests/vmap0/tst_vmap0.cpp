@@ -1381,7 +1381,9 @@ private slots:
     int32_t holes = 0;
     for (const Row& row : lakes) {
       const Geometry geometry(context, fromBlob(context, row.geometry));
-      QVERIFY(geometry.geometry != nullptr);
+      if (geometry.geometry == nullptr) {
+        QFAIL("a lake's geometry does not read");
+      }
       QCOMPARE(GEOSisValid_r(context, geometry.geometry), static_cast<char>(1));
       double part = 0.0;
       GEOSArea_r(context, geometry.geometry, &part);
@@ -1552,7 +1554,9 @@ private slots:
       QFAIL(qPrintable(error));
     }
     const vpf::FeatureClass* cls = opened->featureClass(featureClass);
-    QVERIFY(cls != nullptr);
+    if (cls == nullptr) {
+      QFAIL("no such feature class");
+    }
     std::vector<vpf::Feature> read;
     vpf::ReadStats stats;
     QVERIFY2(opened->readFeatures(*cls, &read, &stats, &error),
@@ -1606,14 +1610,19 @@ private slots:
       QFAIL(qPrintable(error));
     }
     const vpf::Table* areas = dq->table(QStringLiteral("dqarea.aft"), &error);
-    QVERIFY2(areas != nullptr, qPrintable(error));
+    if (areas == nullptr) {
+      qWarning("%s", qPrintable(error));
+      QFAIL("dqarea.aft does not read");
+    }
     QVERIFY(areas->columnIndex(QStringLiteral("source_id")) >= 0);
     QVERIFY(!areas->text(0, areas->columnIndex(QStringLiteral("source_id")))
                  .isEmpty());
     // The fixture's variable-length indexes match their tables.
     const vpf::Table* rivers =
         hydro->table(QStringLiteral("watrcrsl.lft"), &error);
-    QVERIFY(rivers != nullptr);
+    if (rivers == nullptr) {
+      QFAIL(qPrintable(error));
+    }
     const QString edges =
         fixtureDatabase() + QStringLiteral("/SOAMAFR/HYDRO/L/H");
     const std::optional<vpf::Table> edgeTable =
@@ -1783,7 +1792,10 @@ private slots:
       QFAIL(qPrintable(error));
     }
     const vpf::Table* areas = dq->table(QStringLiteral("dqarea.aft"), &error);
-    QVERIFY2(areas != nullptr, qPrintable(error));
+    if (areas == nullptr) {
+      qWarning("%s", qPrintable(error));
+      QFAIL("dqarea.aft does not read");
+    }
     int64_t accuracyM = 0;
     for (int32_t row = 0; row < areas->rowCount(); ++row) {
       accuracyM = std::max(
@@ -1817,7 +1829,9 @@ private slots:
                               static_cast<uint32_t>(land.size())));
     const Geometry united(context, GEOSUnaryUnion_r(context, pieces.geometry));
     const Geometry shore(context, GEOSBoundary_r(context, united.geometry));
-    QVERIFY(shore.geometry != nullptr);
+    if (shore.geometry == nullptr) {
+      QFAIL("no shore line");
+    }
     std::vector<double> distancesKm;
     for (const vpf::Feature& coast : coasts) {
       for (const std::vector<vpf::Coordinate>& part : coast.parts) {

@@ -961,7 +961,9 @@ void TestAdsb::heights()
   QCOMPARE(tracks.at(1).altitudes.front().baroFt, 9500.0F);
   QVERIFY(std::isnan(tracks.at(2).track.points().front().heightM));
   const ts::AircraftInfo* groundInfo = tracks.at(2).infoAt(100.0);
-  QVERIFY(groundInfo != nullptr);
+  if (groundInfo == nullptr) {
+    QFAIL("groundInfo is null");
+  }
   QCOMPARE(groundInfo->onGround.value_or(false), true);
 }
 

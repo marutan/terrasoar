@@ -111,6 +111,8 @@ read again from its file.
 
 The clock in the status bar shows the program's time, in UTC. Satellites
 are drawn where they are at that time. It runs in real time at first.
+In real time it shows the minute; paused, or at any other speed, it shows
+the second too.
 
 - **Play** and **Pause** (Ctrl+Space).
 - **Step back** and **Step forward** (Ctrl+, and Ctrl+.) move it by the
