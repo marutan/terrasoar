@@ -9,6 +9,10 @@ All notable changes to Terra Soar. The format follows
 
 ### Added
 
+- Google Maps (road map, satellite and hybrid) in the XYZ catalogue
+  (Add Layer → XYZ Tile Layer). They use Google's own tile server, not a
+  published service: check Google's terms before use. No offline
+  regions of them.
 - NGA's Vector Map Level 0 (VMAP0, 1:1,000,000) as data packs, in File →
   Data Packs: international boundaries (disputed ones drawn differently),
   hydrography (rivers, lakes, coastlines, canals), transportation (roads

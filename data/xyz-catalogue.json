@@ -51,6 +51,36 @@
             "description": "Depths of the European seas and the oceans from the European Marine Observation and Data Network, as a coloured base map. CC BY 4.0. Not for navigation.",
             "attribution": "EMODnet Bathymetry Consortium",
             "terms": "https://emodnet.ec.europa.eu/en/terms-use-emodnet-online-services-data-and-data-products"
+        },
+        {
+            "title": "Google Maps",
+            "template": "https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+            "minZoom": 0,
+            "maxZoom": 20,
+            "description": "Google's road map of the world: roads, places and borders. The address is Google's own tile server, not a published API: Google's terms allow its maps only through Google's own services, so check them before use; the address may stop working at any time. Browse only: no offline regions.",
+            "attribution": "Map data © Google",
+            "terms": "https://www.google.com/help/terms_maps/",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "Google Maps - Satellite",
+            "template": "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+            "minZoom": 0,
+            "maxZoom": 20,
+            "description": "Google's satellite and aerial imagery of the world, without labels. The address is Google's own tile server, not a published API: Google's terms allow its maps only through Google's own services, so check them before use; the address may stop working at any time. Browse only: no offline regions.",
+            "attribution": "Imagery © Google",
+            "terms": "https://www.google.com/help/terms_maps/",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "Google Maps - Hybrid",
+            "template": "https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+            "minZoom": 0,
+            "maxZoom": 20,
+            "description": "Google's satellite and aerial imagery with roads, places and borders over it. The address is Google's own tile server, not a published API: Google's terms allow its maps only through Google's own services, so check them before use; the address may stop working at any time. Browse only: no offline regions.",
+            "attribution": "Imagery and map data © Google",
+            "terms": "https://www.google.com/help/terms_maps/",
+            "allowBulkDownload": false
         }
     ]
 }
