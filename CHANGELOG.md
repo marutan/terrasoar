@@ -7,6 +7,37 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- On the globe the view tilts up to 180°: past 85° you stay where you
+  are and look up, through the horizon to straight up at the sky (the
+  flat map still tilts to 70°). Keys, dragging and the tilt arc all go
+  that far.
+- Map tiles, terrain heights and vector tiles load from the middle of
+  the view outwards, instead of in an order that could start at an edge
+  of the screen.
+- Fewer map tiles are downloaded: none for a layer hidden under an
+  opaque layer or set fully transparent, no rough preview where a finer
+  image already shows, and, while the view moves fast, only rough
+  previews until it slows down.
+- A tile that leaves the view while it is arriving finishes downloading
+  and is kept in the cache, instead of being cut off: the connection to
+  the server stays open for the next tile.
+- Layers from different servers load side by side: up to 6 requests to
+  each server and 16 in all, instead of 6 in all.
+- Map, terrain and WFS tiles use HTTP/2 where the server offers it, so
+  one connection carries many tiles at once. Data pack downloads keep to
+  HTTP/1.1.
+- WMS layers ask for four tiles at a time (one image twice the size, cut
+  in four), for a quarter of the requests to the server.
+
+### Fixed
+
+- Windows: `--software-gl` makes the bundled software renderer use
+  llvmpipe, as tested. Without that, on a machine with a graphics card it
+  could pick a hardware driver instead, and the program could close at
+  start without a message.
+
 ## [0.0.3] – 2026-11-22
 
 ### Added

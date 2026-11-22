@@ -27,11 +27,14 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
+#include <vector>
 
 #include <QString>
 
@@ -69,6 +72,15 @@ using WmsStatistics = WebTileStatistics;
  * Offline when the server can't be reached (saved tiles shown where there
  * are some); Error with the server's message when it answers with an
  * error or with something that isn't an image.
+ *
+ * A missing tile of a geographic source (EPSG:4326, CRS:84) comes with its
+ * three siblings: one GetMap for their parent's area at twice the size,
+ * cut into the four, which all go into the disk cache (WebTileSettings::
+ * blocks), for a quarter of the requests. A tile wanted while another
+ * thread fetches its block waits for that. If the server refuses a block
+ * (an error, or not an image of that size) the source goes back to single
+ * tiles. Web Mercator images aren't cut: their rows aren't evenly spaced
+ * in latitude, so the middle row isn't the children's edge.
  *
  * Images in Web Mercator are delivered as they are and reprojected when
  * drawn (imageProjection()). See docs/design/wms.md.
@@ -139,8 +151,26 @@ public:
   WmsStatistics statistics() const;
 
 private:
+  enum class BlockWait { Fetch, Cached, Cancelled };
+
+  bool usesBlocks(TileKey key) const;
+  std::optional<ImageLoadResult>
+  loadFromBlock(TileKey key, const std::atomic<bool>& cancelled);
+  BlockWait waitForBlock(const QString& blockId, TileKey key,
+                         const std::function<bool(const QByteArray&)>& accept,
+                         const std::atomic<bool>& cancelled);
+  void blockDone(const QString& blockId);
+  std::vector<BlockPiece> cutBlock(const QByteArray& data, TileKey key,
+                                   QImage& mine) const;
+
   const WmsSource m_source;
   const std::unique_ptr<CachedTileFetcher> m_fetcher;
+  /** Blocks being fetched (their GetMap URLs), for the tiles waiting. */
+  std::mutex m_blocksMutex;
+  std::condition_variable m_blockDone;
+  std::set<QString> m_blocksInFlight;
+  /** The server refused a block: single tiles from now on. */
+  std::atomic<bool> m_blocksRefused{false};
 };
 
 /**

@@ -180,7 +180,11 @@ export CLAZY_RESOURCE_DIR="$(clang-15 -print-resource-dir)"
   OpenGL 3.0 and Qt 6 ships none, so install Mesa llvmpipe: from the
   MinGW x64 build of [mesa-dist-win](https://github.com/pal1000/mesa-dist-win)
   26.2.6 (the version CI uses), copy `x64/opengl32.dll` to Qt's `bin` as
-  `opengl32sw.dll`, and copy `x64/libgallium_wgl.dll` next to it.
+  `opengl32sw.dll`, and copy `x64/libgallium_wgl.dll` next to it. With
+  `--software-gl` the program sets `GALLIUM_DRIVER=llvmpipe` unless it is
+  set already: left to itself, that Mesa may pick a hardware driver on a
+  machine with a graphics card. The installer test starts the installed
+  program without it, as a user does, and requires llvmpipe.
 - `./app/terrasoar --gl-check` reports whether an OpenGL 3.3 core context
   can be created and prints the renderer as JSON.
 

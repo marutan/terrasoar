@@ -1168,6 +1168,7 @@ private slots:
     QTemporaryDir cacheDir;
     ts::WmsProviderSettings settings;
     settings.cacheDirectory = cacheDir.path();
+    settings.blocks = false; // single tiles (blocks: providerFetchesBlocks)
     const ts::TileKey key{3, 9, 2};
     {
       ts::WmsImageryProvider provider(mockSource(server), network, settings);
@@ -1207,6 +1208,95 @@ private slots:
     QCOMPARE(ts::test::mockGetMapCount(server), 1);
   }
 
+  void providerFetchesBlocks()
+  {
+    // A geographic source fetches a missing tile with its three siblings,
+    // one GetMap at twice the size for their parent's area, and keeps all
+    // four: each the image the server draws for that tile on its own.
+    std::shared_ptr<MockWmsBehaviour> behaviour =
+        std::make_shared<MockWmsBehaviour>();
+    MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    std::shared_ptr<ts::NetworkClient> network =
+        std::make_shared<ts::NetworkClient>(testNetwork());
+    QTemporaryDir cacheDir;
+    ts::WmsProviderSettings settings;
+    settings.cacheDirectory = cacheDir.path();
+    ts::WmsImageryProvider provider(mockSource(server), network, settings);
+    const ts::TileKey parent{2, 4, 1};
+    for (int32_t i = 0; i < 4; ++i) {
+      const ts::TileKey key = parent.child(i);
+      const ts::ImageLoadResult result =
+          provider.loadTileImage(key, notCancelled);
+      QCOMPARE(result.outcome, ts::ImageLoadResult::Outcome::Image);
+      QCOMPARE(result.image.convertToFormat(QImage::Format_ARGB32),
+               ts::test::mockWmsImage(
+                   QUrlQuery(ts::getMapUrl(provider.source(), key))));
+    }
+    QCOMPARE(ts::test::mockGetMapCount(server), 1);
+    const QUrlQuery sent(server.requests().back().url);
+    QCOMPARE(sent.queryItemValue(QStringLiteral("WIDTH")),
+             QStringLiteral("512"));
+    ts::WmsSource doubled = provider.source();
+    doubled.tileSizePx = 512;
+    QCOMPARE(sent.queryItemValue(QStringLiteral("BBOX")),
+             QUrlQuery(ts::getMapUrl(doubled, parent))
+                 .queryItemValue(QStringLiteral("BBOX")));
+    QCOMPARE(provider.diskCache()->count(), 4);
+    QCOMPARE(provider.statistics().blockRequests, 1);
+    QCOMPARE(provider.statistics().cacheHits, 3);
+
+    // The four wanted at once on four threads: still one request.
+    server.resetLog();
+    behaviour->delayMs = 200;
+    const ts::TileKey other{2, 6, 1};
+    std::vector<std::thread> threads;
+    threads.reserve(4);
+    std::atomic<int32_t> images{0};
+    for (int32_t i = 0; i < 4; ++i) {
+      threads.emplace_back([&provider, &images, other, i]() {
+        const std::atomic<bool> go{false};
+        if (provider.loadTileImage(other.child(i), go).outcome ==
+            ts::ImageLoadResult::Outcome::Image) {
+          ++images;
+        }
+      });
+    }
+    for (std::thread& thread : threads) {
+      thread.join();
+    }
+    QCOMPARE(images.load(), 4);
+    QCOMPARE(ts::test::mockGetMapCount(server), 1);
+    behaviour->delayMs = 0;
+
+    // A server that won't draw the larger image: single tiles from then on.
+    server.resetLog();
+    behaviour->maximumImagePx = 256;
+    const ts::TileKey refused{3, 2, 2};
+    QCOMPARE(provider.loadTileImage(refused, notCancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QCOMPARE(ts::test::mockGetMapCount(server), 2); // the block, then single
+    QCOMPARE(provider.status().state, ts::ProviderStatus::State::Ok);
+    QCOMPARE(provider.loadTileImage(ts::TileKey{3, 6, 2}, notCancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QCOMPARE(ts::test::mockGetMapCount(server), 3);
+    QCOMPARE(QUrlQuery(server.requests().back().url)
+                 .queryItemValue(QStringLiteral("WIDTH")),
+             QStringLiteral("256"));
+
+    // Web Mercator images aren't cut: single tiles.
+    MockHttpServer mercatorServer(ts::test::mockWmsHandler(
+        std::make_shared<MockWmsBehaviour>(), QStringLiteral("EPSG:3857")));
+    ts::WmsSource mercator = mockSource(mercatorServer);
+    mercator.crs = QStringLiteral("EPSG:3857");
+    ts::WmsImageryProvider flat(mercator, network, settings);
+    QCOMPARE(flat.loadTileImage(ts::TileKey{3, 9, 2}, notCancelled).outcome,
+             ts::ImageLoadResult::Outcome::Image);
+    QCOMPARE(QUrlQuery(mercatorServer.requests().back().url)
+                 .queryItemValue(QStringLiteral("WIDTH")),
+             QStringLiteral("256"));
+    QCOMPARE(flat.statistics().blockRequests, 0);
+  }
+
   void providerHonoursCacheHeaders()
   {
     // max-age 60 with an ETag; a fake clock moves on two minutes: the tile
@@ -1224,6 +1314,8 @@ private slots:
     ts::WmsProviderSettings settings;
     settings.cacheDirectory = cacheDir.path();
     settings.clock = [clock]() { return clock->load(); };
+    // Single tiles: pieces of a block have no validators of their own.
+    settings.blocks = false;
     ts::WmsImageryProvider provider(mockSource(server), network, settings);
     const ts::TileKey key{2, 5, 1};
     QVERIFY(provider.loadTileImage(key, notCancelled).outcome ==
@@ -1368,10 +1460,12 @@ private slots:
         std::make_shared<MockWmsBehaviour>();
     behaviour->delayMs = 3000;
     MockHttpServer server(ts::test::mockWmsHandler(behaviour));
+    ts::WmsProviderSettings single;
+    single.blocks = false; // six requests, not three blocks
     std::shared_ptr<ts::WmsImageryProvider> provider =
         std::make_shared<ts::WmsImageryProvider>(
             mockSource(server),
-            std::make_shared<ts::NetworkClient>(testNetwork()));
+            std::make_shared<ts::NetworkClient>(testNetwork()), single);
     ts::TileLoaderSettings loaderSettings;
     loaderSettings.buildMeshes = false;
     ts::TileLoader loader(provider, loaderSettings);
@@ -1480,7 +1574,9 @@ private slots:
           return ok;
         });
     QCOMPARE(failures, 0);
-    QVERIFY(provider.diskCache()->count() <= 8);
+    // 8 tiles wanted, each fetched with its sibling (the blocks of level
+    // 4, x 0–7, y 3 are 2 × 2, with y 2 too).
+    QVERIFY(provider.diskCache()->count() <= 16);
   }
 
   void benchmarkParseCapabilities()

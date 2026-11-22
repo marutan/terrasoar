@@ -61,7 +61,11 @@ struct CameraPose {
   double rangeM = 2.0e7;
   /** Direction the camera faces, degrees clockwise from north. */
   double headingDeg = 0.0;
-  /** 0 looks straight down; 90 would look at the horizon. Degrees. */
+  /**
+   * 0 looks straight down at the target, 90 along the ground, 180
+   * straight up. Past Camera::orbitTiltDeg the eye stays put and only the
+   * view turns, so the target is then below the view. Degrees.
+   */
   double tiltDeg = 0.0;
 };
 
@@ -196,8 +200,19 @@ public:
   static constexpr double minimumEyeHeightM = 1.0;
   /** Largest range, metres (about eight Earth radii). */
   static constexpr double maximumRangeM = 5.0e7;
-  /** Largest tilt, degrees. */
-  static constexpr double maximumTiltDeg = 85.0;
+  /**
+   * Largest tilt, degrees: straight up. Up to orbitTiltDeg the eye
+   * circles the target; past it the eye stays where it is at orbitTiltDeg
+   * and the view turns up, through the horizon (90° plus the eye's dip)
+   * to the zenith at 180°.
+   */
+  static constexpr double maximumTiltDeg = 180.0;
+  /**
+   * The tilt to which the eye circles the target (the old limit): any
+   * further and it would sink to the ground at the target's horizon, and
+   * be pushed kilometres away to stay above it.
+   */
+  static constexpr double orbitTiltDeg = 85.0;
   /**
    * Largest tilt of the flat map, degrees: short of looking along it,
    * which a plane without a horizon of its own can't end.

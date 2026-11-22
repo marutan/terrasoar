@@ -41,9 +41,12 @@ buttons and keys:
   held, they keep zooming). **The slider** between them shows how high you
   are (the eye's height on the globe, the scale on the map): click or
   drag it to fly to another height.
-- **The tilt buttons** tilt towards the horizon or towards straight
-  down, and **the arc** below them shows the tilt: click or drag on it to
-  tilt; double-click it to look straight down.
+- **The tilt buttons** tilt up or down, and **the arc** beside them shows
+  the tilt, from straight down to straight up: click or drag on it to
+  tilt; double-click it to look straight down. On the globe you can tilt
+  past the horizon and look up into the sky, for satellites or aircraft
+  overhead: up to 85° the view circles the point in the middle; beyond
+  that you stay where you are and only look further up.
 
 The controls are half see-through until the pointer is over them, and
 stay readable over snow, sea, space or a pale map. Their tooltips name the

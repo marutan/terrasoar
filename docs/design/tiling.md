@@ -176,6 +176,44 @@ requests, coarse first, a stand-in four levels above every drawn tile and
 then the drawn tiles themselves. Layers are blended in the tile fragment
 shader, up to 8 per draw; see [layer-model.md](layer-model.md).
 
+Within each of those two passes, and for terrain heights and vector
+tiles too, tiles are fetched from the middle of the view outwards
+(`TileSelector::orderFromViewCentre()`): by the angle, seen from the eye,
+between the camera's target and the point of the tile nearest it, where
+the renderer draws that point (globe, map or between; on the map the copy
+of the world nearest the middle). The tile under the middle of the
+screen scores 0 and comes first. A tile's own middle would not do: a
+coarse tile that shows only at the limb has its middle on the far side
+of the Earth, close to the line of sight, and came first. Meshes, built locally, still go in the selection's order
+(`TileSelection::load`, the largest error first).
+
+What isn't seen isn't fetched (`fetchesOnlyWhatShows` in `tests/globe`;
+`TileStatistics` counts each):
+
+- **Stand-ins already beaten.** A drawn tile's stand-in isn't asked for
+  when the tile shows an image at least as fine already: its own, or one
+  between it and the stand-in's level. After zooming in a level, every
+  new tile shows its parent from the last view, which is finer than the
+  stand-in four levels up (`standInsSkipped`).
+- **Hidden layers.** A layer isn't fetched for a drawn tile when a layer
+  above it has its own image there (not a stretched ancestor's, whose
+  detail may yet have transparent parts), every pixel of it opaque
+  (`isFullyOpaque()`, worked out on the loader thread), at full opacity
+  in a group at full opacity, and covering the whole tile (a Web Mercator
+  image stops at 85.05°). A layer at no opacity isn't fetched either
+  (`hiddenSkipped`). Until the top layer's tile arrives, the ones below
+  are fetched as before, so something shows meanwhile.
+- **Fast moves.** While the camera moves faster than 1.5 screen heights
+  a second (`MotionHold`: how far the eye moves, against the height of
+  ground shown at the target), each source asks only for the stand-ins;
+  the detail is asked for 150 ms after it slows down. A drag or a zoom
+  through many levels then doesn't fetch tiles that would be on screen
+  for a moment. The hold starts after two fast frames in a row, so a
+  jump to a place doesn't wait. While it lasts the renderer counts as
+  busy, so frames keep coming until the detail has been asked for
+  (`detailHeld`). Terrain heights and vector tiles aren't held: they
+  have no stand-ins.
+
 ## From provider to screen
 
 ```
@@ -197,9 +235,13 @@ draw()                                  callback → GUI thread: new frame
 - **Loader** (`ts::TileLoader`, thread-safe): two worker threads by
   default (the reference PC has four hardware threads), more for a
   provider that asks (network sources wait on servers, not the CPU). Each frame the
-  render thread replaces the wanted list; queued tiles not wanted any more
-  are dropped, and tiles being loaded that aren't wanted are told to
-  cancel through their flag. Finished tiles wait until the render thread
+  render thread replaces the wanted list, so the queue is always the
+  current view's, in its order; queued tiles not wanted any more
+  are dropped without being fetched, and tiles being loaded that aren't
+  wanted are told to cancel through their flag, which aborts the HTTP
+  request (or drops it from the network client's own queue, or its wait
+  before a retry). `loaderFetchesInOrderAndDropsUnwanted` in
+  `tests/tiling` checks both. Finished tiles wait until the render thread
   takes them. A tile whose load *failed* (a network error, as opposed to
   a tile with no data) isn't delivered: the renderer keeps showing a
   coarser image there, and the tile is left out of the requests for 30 s

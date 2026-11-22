@@ -32,6 +32,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <vector>
 
 #include <QByteArray>
 #include <QString>
@@ -69,6 +70,12 @@ struct WebTileSettings {
   /** Loader threads, so several requests are in flight. */
   int32_t loaderThreads = 6;
   /**
+   * WMS only: fetch a missing tile with its three siblings as one image
+   * of twice the size, split into the four (WmsImageryProvider), for a
+   * quarter of the requests.
+   */
+  bool blocks = true;
+  /**
    * Seconds since 1970, UTC (for tests); null for the system clock.
    * Called on loader threads.
    */
@@ -89,6 +96,8 @@ struct WebTileStatistics {
   int32_t failures = 0;
   /** Requests skipped while the server is left alone. */
   int32_t skippedOffline = 0;
+  /** Of the requests, those for a block of tiles (fetchBlock()). */
+  int32_t blockRequests = 0;
 };
 
 /** What became of a request for one tile (CachedTileFetcher::fetch()). */
@@ -101,6 +110,28 @@ enum class FetchOutcome {
   Failed,
   /** Given up because it was cancelled. */
   Cancelled,
+};
+
+/** A tile cut from a block (CachedTileFetcher::fetchBlock()). */
+struct BlockPiece {
+  /** The tile. */
+  TileKey key;
+  /** Its image, encoded. */
+  QByteArray data;
+  /** Its MIME type. */
+  QByteArray contentType;
+};
+
+/** What became of a request for a block (CachedTileFetcher::fetchBlock()). */
+struct BlockFetch {
+  /** Data, Cancelled or Failed (NoData never). */
+  FetchOutcome outcome = FetchOutcome::Failed;
+  /**
+   * The server answered, but not with a block: an error, or something
+   * the split refused (too large an image for it, say). Single tiles may
+   * still work.
+   */
+  bool refused = false;
 };
 
 /** What became of one tile of an offline region (fetchForRegion()). */
@@ -183,6 +214,28 @@ public:
                      const std::function<bool(const QByteArray&)>& accept,
                      const std::atomic<bool>& cancelled);
 
+  /**
+   * Calls @p accept with the bytes of tile @p key if it is in the cache
+   * and fresh, and returns what it returned (counted as a cache hit).
+   */
+  bool fromFreshCache(TileKey key,
+                      const std::function<bool(const QByteArray&)>& accept);
+
+  /**
+   * Fetches @p url, an image covering several tiles, and keeps the tiles
+   * @p split cuts from its bytes in the cache, each with the response's
+   * freshness (not its ETag or date: those are the block's). @p split
+   * returns nothing for bytes that aren't such an image. Without
+   * revalidation;
+   * a block that arrives after it was cancelled is kept all the same, as
+   * fetch() keeps a tile, and reported Cancelled. Server errors aren't
+   * reported in status(): the caller tries single tiles next.
+   */
+  BlockFetch fetchBlock(
+      const QUrl& url,
+      const std::function<std::vector<BlockPiece>(const QByteArray&)>& split,
+      const std::atomic<bool>& cancelled);
+
   /** Returns the settings. */
   const WebTileSettings& settings() const { return m_settings; }
 
@@ -230,6 +283,9 @@ private:
   revalidated(TileKey key, const CachedTile& cached,
               const HttpResponse& response, int64_t nowS,
               const std::function<bool(const QByteArray&)>& accept);
+  FetchOutcome answered(TileKey key, const std::optional<CachedTile>& cached,
+                        const HttpResponse& response, int64_t nowS,
+                        const std::function<bool(const QByteArray&)>& accept);
   void store(TileKey key, const HttpResponse& response, int64_t nowS);
   void noteSuccess();
   void noteUnreachable(const QString& detail);

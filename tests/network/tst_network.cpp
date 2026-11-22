@@ -21,6 +21,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -353,6 +354,74 @@ private slots:
     QCOMPARE(server.requestCount(), 1);
   }
 
+  void cancelledWhileArrivingFinishes_data()
+  {
+    QTest::addColumn<bool>("finishIfCancelled");
+    QTest::addColumn<int32_t>("bodyBytes");
+    QTest::addColumn<int32_t>("delayMs");
+    QTest::addColumn<int32_t>("restDelayMs");
+    QTest::addColumn<bool>("finishes");
+    // Cancelled at 100 ms in each case.
+    QTest::newRow("arriving, finishes soon")
+        << true << 20000 << 0 << 300 << true;
+    QTest::newRow("not asked to finish") << false << 20000 << 0 << 300 << false;
+    QTest::newRow("too slow to finish") << true << 20000 << 0 << 3000 << false;
+    QTest::newRow("too much still to come")
+        << true << 2000000 << 0 << 300 << false;
+    QTest::newRow("server still working")
+        << true << 20000 << 3000 << 0 << false;
+  }
+
+  void cancelledWhileArrivingFinishes()
+  {
+    // A request asking to be finished, cancelled while its response
+    // arrives, finishes and keeps its connection, unless that would take
+    // long or much more data; one cancelled before the answer begins is
+    // dropped at once.
+    QFETCH(bool, finishIfCancelled);
+    QFETCH(int32_t, bodyBytes);
+    QFETCH(int32_t, delayMs);
+    QFETCH(int32_t, restDelayMs);
+    QFETCH(bool, finishes);
+    const QByteArray body(bodyBytes, 'x');
+    MockHttpServer server(
+        [&body, delayMs, restDelayMs](const MockHttpRequest&) {
+          MockHttpResponse response = mockResponse(200, body);
+          response.delayMs = delayMs;
+          response.restDelayMs = restDelayMs;
+          return response;
+        });
+    ts::NetworkClient client(testSettings());
+    std::atomic<bool> cancelled{false};
+    std::thread canceller([&cancelled]() {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      cancelled.store(true);
+    });
+    ts::HttpRequest request{server.url(), {}};
+    request.finishIfCancelled = finishIfCancelled;
+    QElapsedTimer timer;
+    timer.start();
+    const ts::HttpResponse response = client.fetch(request, cancelled);
+    canceller.join();
+    const qint64 elapsedMs = timer.elapsed();
+    if (finishes) {
+      QCOMPARE(response.error, ts::NetworkError::None);
+      QCOMPARE(response.body, body);
+      QCOMPARE(client.lateFinishes(), 1);
+      QVERIFY2(elapsedMs < 1000, qPrintable(QString::number(elapsedMs)));
+      QCOMPARE(server.cutOffCount(), 0);
+    } else {
+      QCOMPARE(response.error, ts::NetworkError::Cancelled);
+      QCOMPARE(client.lateFinishes(), 0);
+      // At most the late-finish limit (1 s) after the cancel.
+      QVERIFY2(elapsedMs < 1600, qPrintable(QString::number(elapsedMs)));
+      QVERIFY(QTest::qWaitFor(
+          [&]() { return server.cutOffCount() + server.abandonedCount() == 1; },
+          3000));
+    }
+    QVERIFY(QTest::qWaitFor([&]() { return client.inFlight() == 0; }, 3000));
+  }
+
   void ticketsCanBePolledAndCancelled()
   {
     MockHttpServer server([](const MockHttpRequest& request) {
@@ -418,6 +487,54 @@ private slots:
       QVERIFY(more[i]->waitFor(std::chrono::milliseconds(5000)));
     }
     QCOMPARE(server.requestCount(), 3);
+  }
+
+  void limitsRequestsPerServer()
+  {
+    // At most 3 on the wire to one server; requests to another server,
+    // queued behind them, go at once instead of waiting their turn.
+    const std::function<MockHttpResponse(const MockHttpRequest&)> slow =
+        [](const MockHttpRequest&) {
+          MockHttpResponse response = mockResponse(200, "ok");
+          response.delayMs = 300;
+          return response;
+        };
+    MockHttpServer busy(slow);
+    MockHttpServer other(slow);
+    ts::NetworkSettings settings = testSettings();
+    settings.maximumInFlight = 8;
+    settings.maximumPerServer = 3;
+    ts::NetworkClient client(settings);
+    QElapsedTimer timer;
+    timer.start();
+    std::vector<std::shared_ptr<ts::NetworkTicket>> tickets;
+    tickets.reserve(12);
+    for (int32_t i = 0; i < 12; ++i) {
+      tickets.push_back(client.start(
+          ts::HttpRequest{busy.url(QStringLiteral("/%1").arg(i)), {}}));
+    }
+    std::vector<std::shared_ptr<ts::NetworkTicket>> others;
+    others.reserve(2);
+    for (int32_t i = 0; i < 2; ++i) {
+      others.push_back(client.start(
+          ts::HttpRequest{other.url(QStringLiteral("/%1").arg(i)), {}}));
+    }
+    for (const std::shared_ptr<ts::NetworkTicket>& ticket : others) {
+      QVERIFY(ticket->waitFor(std::chrono::milliseconds(5000)));
+      QCOMPARE(ticket->response().status, 200);
+    }
+    // One round of the other server's answers, not five of the busy one's.
+    const qint64 otherMs = timer.elapsed();
+    QVERIFY2(otherMs < 900, qPrintable(QString::number(otherMs)));
+    for (const std::shared_ptr<ts::NetworkTicket>& ticket : tickets) {
+      QVERIFY(ticket->waitFor(std::chrono::milliseconds(10000)));
+      QCOMPARE(ticket->response().status, 200);
+    }
+    QVERIFY(timer.elapsed() >= 4 * 300 - 50);
+    QCOMPARE(busy.peakWaiting(), 3);
+    QCOMPARE(other.peakWaiting(), 2);
+    QCOMPARE(client.peakInFlight(), 5);
+    QVERIFY(QTest::qWaitFor([&]() { return client.inFlight() == 0; }, 3000));
   }
 
   void usesTheProxy()

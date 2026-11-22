@@ -129,6 +129,18 @@ int32_t main(int32_t argc, char* argv[])
 
   if (findArgument(argc, argv, "--software-gl", false) != nullptr) {
     QCoreApplication::setAttribute(Qt::AA_UseSoftwareOpenGL);
+#ifdef Q_OS_WIN
+    // The Mesa bundled as opengl32sw.dll picks its Gallium driver itself
+    // unless told, and on a machine with a GPU that may be a hardware one
+    // (D3D12, Zink) rather than llvmpipe: not what was asked for, and
+    // never tested. CI and the installer test ran with
+    // GALLIUM_DRIVER=llvmpipe set, so set it here too. Before
+    // QApplication: Mesa reads it when the first context is made. A value
+    // the user set wins.
+    if (!qEnvironmentVariableIsSet("GALLIUM_DRIVER")) {
+      qputenv("GALLIUM_DRIVER", QByteArrayLiteral("llvmpipe"));
+    }
+#endif
   }
   QCoreApplication::setAttribute(Qt::AA_ShareOpenGLContexts);
 #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)

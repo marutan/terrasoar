@@ -40,6 +40,7 @@
 
 #include "ts/render/renderdevice.h"
 #include "ts/tiling/lrucache.h"
+#include "ts/tiling/motionhold.h"
 #include "ts/tiling/tilekey.h"
 #include "ts/tiling/tileloader.h"
 #include "ts/tiling/tileselector.h"
@@ -89,6 +90,16 @@ struct TileRendererSettings {
    * TileSelectionSettings::maximumMapGeometryErrorPx.
    */
   int32_t minimumMapLevel = 2;
+  /**
+   * When the camera moves too fast for detail to be worth fetching: then
+   * only coarse stand-ins are requested until it settles.
+   */
+  MotionHoldSettings motion;
+  /**
+   * The time now, seconds of a steady clock (tests set their own; by
+   * default std::chrono::steady_clock).
+   */
+  std::function<double()> clock;
 };
 
 /** One imagery layer to draw, bottom to top. */
@@ -133,6 +144,19 @@ struct TileStatistics {
   int32_t drawCalls = 0;
   /** Composite groups drawn offscreen. */
   int32_t groupsComposited = 0;
+  /**
+   * Coarse stand-ins not requested because the tile already shows an
+   * image at least as fine.
+   */
+  int32_t standInsSkipped = 0;
+  /**
+   * Layers' tiles not requested, counted per drawn tile and layer: an
+   * opaque layer above hides them there, or the layer is fully
+   * transparent.
+   */
+  int32_t hiddenSkipped = 0;
+  /** True if detail was held back this frame: the camera moves fast. */
+  bool detailHeld = false;
 };
 
 /**
@@ -329,10 +353,20 @@ private:
                    const std::vector<TileKey>& rebuild, int32_t budget);
   void uploadMesh(TileKey key);
   void takeHeights();
-  void requestHeights(const TileSelection& selection);
+  void requestHeights(const Camera& camera, const TileSelection& selection);
   std::shared_ptr<const HeightTile> heightsFor(TileKey key, bool exact);
   void applySelectionSettings();
-  void requestImages();
+  void requestImages(const Camera& camera);
+  static TileKey sourceKey(const Source& source, TileKey key);
+  double effectiveAlpha(const Layer& layer) const;
+  bool hidesBelow(const Layer& layer, TileKey tile) const;
+  std::unordered_map<const Source*, std::vector<bool>>
+  neededImages(const std::vector<TileKey>& drawn);
+  bool showsFinerThanStandIn(Source& source, TileKey key,
+                             int32_t coarseLevel) const;
+  void requestSourceImages(Source& source, const std::vector<TileKey>& drawn,
+                           const std::vector<bool>& wantedHere,
+                           bool holdDetail);
   void bindImages();
   static void setMercatorImage(LayerImage& image, TileKey imageKey);
   void evict();
@@ -388,6 +422,7 @@ private:
   std::vector<double> m_groupAlphas;
   std::vector<DrawTile> m_drawTiles;
   bool m_meshesPending = false;
+  MotionHold m_motion;
   double m_morph = 0.0;
   std::uint64_t m_frame = 0;
   std::size_t m_meshBytes = 0;

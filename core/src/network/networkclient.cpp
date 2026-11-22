@@ -138,6 +138,7 @@ public:
   std::atomic<int32_t> inFlight{0};
   std::atomic<int32_t> attemptsSent{0};
   std::atomic<int32_t> peakInFlight{0};
+  std::atomic<int32_t> lateFinishes{0};
 };
 
 /**
@@ -180,6 +181,18 @@ private:
   std::unordered_map<QNetworkReply*, Active> m_active;
   /** Tickets waiting to retry, holding their slots. */
   std::unordered_set<std::shared_ptr<NetworkTicket>> m_retrying;
+  /** Slots held per server (serverOf()), for maximumPerServer. */
+  std::unordered_map<QString, int32_t> m_perServer;
+
+  /** The server a request goes to: scheme, host and port. */
+  static QString serverOf(const NetworkTicket& ticket)
+  {
+    const QUrl& url = ticket.request().url;
+    return url.scheme() + QStringLiteral("://") + url.host().toLower() +
+           QLatin1Char(':') +
+           QString::number(
+               url.port(url.scheme() == QLatin1String("https") ? 443 : 80));
+  }
 };
 
 void NetworkCore::wake()
@@ -249,9 +262,24 @@ void NetworkDispatcher::drain()
           m_core.inFlight.load() >= m_core.settings.maximumInFlight) {
         return;
       }
-      next = m_core.pending.front();
-      m_core.pending.pop_front();
+      // The oldest whose server has a slot free: one busy server doesn't
+      // hold up the others.
+      const std::deque<std::shared_ptr<NetworkTicket>>::iterator first =
+          std::find_if(
+              m_core.pending.begin(), m_core.pending.end(),
+              [this](const std::shared_ptr<NetworkTicket>& ticket) {
+                const std::unordered_map<QString, int32_t>::const_iterator
+                    busy = m_perServer.find(serverOf(*ticket));
+                return busy == m_perServer.end() ||
+                       busy->second < m_core.settings.maximumPerServer;
+              });
+      if (first == m_core.pending.end()) {
+        return;
+      }
+      next = *first;
+      m_core.pending.erase(first);
     }
+    ++m_perServer[serverOf(*next)];
     const int32_t now = m_core.inFlight.fetch_add(1) + 1;
     int32_t peak = m_core.peakInFlight.load();
     while (now > peak &&
@@ -293,12 +321,20 @@ void NetworkDispatcher::startAttempt(
                               QNetworkRequest::AlwaysNetwork);
   networkRequest.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
                               QNetworkRequest::NoLessSafeRedirectPolicy);
-  // HTTP/1.1 only. With Qt 6.4, a server closing an HTTP/2 connection
-  // while a redirect is followed (GitHub's release downloads) left the
-  // next request on it hanging past its transfer timeout. Qt opens up to
-  // six connections per host, as many as we keep in flight, so HTTP/2's
-  // multiplexing would gain little.
-  networkRequest.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+  // HTTP/1.1 unless the request allows HTTP/2 (tiles do). With Qt 6.4,
+  // a server closing an HTTP/2 connection while a redirect was followed
+  // (GitHub's release downloads) left the next request on it hanging past
+  // its transfer timeout, so pack downloads and the rest stay on HTTP/1.1.
+  // Tile servers rarely redirect, and over HTTP/2 one connection carries
+  // all of a server's requests at once instead of one at a time each.
+  // Over https only, where TLS negotiates it: on plain http Qt 5 tries an
+  // upgrade (h2c) on the first request and holds the server's others
+  // back until it is answered.
+  networkRequest.setAttribute(QNetworkRequest::Http2AllowedAttribute,
+                              request.allowHttp2 && request.url.scheme() ==
+                                                        QLatin1String("https"));
+  ticket->setProgress(0, -1);
+  ticket->setArriving(false);
   QNetworkReply* reply = m_manager.get(networkRequest);
   m_core.attemptsSent.fetch_add(1);
   m_active[reply] = Active{ticket, attempt, false, false};
@@ -306,6 +342,28 @@ void NetworkDispatcher::startAttempt(
           [this, reply](qint64 received, qint64 total) {
             checkSize(reply, received, total);
           });
+  connect(reply, &QNetworkReply::metaDataChanged, this, [this, reply]() {
+    const std::unordered_map<QNetworkReply*, Active>::iterator it =
+        m_active.find(reply);
+    if (it != m_active.end()) {
+      it->second.ticket->setArriving(true);
+    }
+  });
+  // How much has arrived, for a late finish (NetworkClient::fetch()):
+  // from readyRead, since Qt 6.4 emits downloadProgress only every few
+  // hundred milliseconds. Nothing is read until the end, so what is
+  // available is what arrived.
+  connect(reply, &QNetworkReply::readyRead, this, [this, reply]() {
+    const std::unordered_map<QNetworkReply*, Active>::iterator it =
+        m_active.find(reply);
+    if (it != m_active.end()) {
+      bool known = false;
+      const qint64 total = reply->header(QNetworkRequest::ContentLengthHeader)
+                               .toLongLong(&known);
+      it->second.ticket->setProgress(reply->bytesAvailable(),
+                                     known ? total : -1);
+    }
+  });
   connect(reply, &QNetworkReply::finished, this,
           [this, reply]() { onFinished(reply); });
 }
@@ -335,6 +393,7 @@ void NetworkDispatcher::onFinished(QNetworkReply* reply)
   }
   const Active active = it->second;
   m_active.erase(it);
+  active.ticket->setArriving(false);
 
   HttpResponse response;
   response.attempts = active.attempt;
@@ -353,6 +412,8 @@ void NetworkDispatcher::onFinished(QNetworkReply* reply)
     // A response, whatever its status.
     response.error = NetworkError::None;
     response.status = status.toInt();
+    response.http2 =
+        reply->attribute(QNetworkRequest::Http2WasUsedAttribute).toBool();
     response.body = reply->readAll();
     for (const QNetworkReply::RawHeaderPair& header : reply->rawHeaderPairs()) {
       response.headers.emplace_back(header.first.toLower(), header.second);
@@ -416,6 +477,11 @@ void NetworkDispatcher::complete(const std::shared_ptr<NetworkTicket>& ticket,
 {
   ticket->finish(std::move(response));
   m_core.inFlight.fetch_sub(1);
+  const std::unordered_map<QString, int32_t>::iterator server =
+      m_perServer.find(serverOf(*ticket));
+  if (server != m_perServer.end() && --server->second <= 0) {
+    m_perServer.erase(server);
+  }
   drain();
 }
 
@@ -514,6 +580,24 @@ void NetworkTicket::cancel()
   }
 }
 
+qint64 NetworkTicket::bytesToCome() const
+{
+  const qint64 received = m_received.load();
+  const qint64 total = m_total.load();
+  return total >= 0 ? std::max<qint64>(total - received, 0) : -1 - received;
+}
+
+void NetworkTicket::setArriving(bool arriving)
+{
+  m_arriving.store(arriving);
+}
+
+void NetworkTicket::setProgress(qint64 received, qint64 total)
+{
+  m_received.store(received);
+  m_total.store(total);
+}
+
 void NetworkTicket::finish(HttpResponse response)
 {
   {
@@ -579,12 +663,53 @@ HttpResponse NetworkClient::fetch(const HttpRequest& request,
 {
   const std::shared_ptr<NetworkTicket> ticket = start(request);
   while (!ticket->waitFor(cancelPollInterval)) {
-    if (cancelled.load()) {
+    if (!cancelled.load()) {
+      continue;
+    }
+    if (!request.finishIfCancelled) {
       ticket->cancel();
       return cancelledResponse();
     }
+    return finishLate(*ticket);
   }
   return ticket->response();
+}
+
+HttpResponse NetworkClient::finishLate(NetworkTicket& ticket)
+{
+  // Cancelled while its response arrives: let it finish if it does so
+  // soon, not to lose its connection; else drop it. Queued, waiting for
+  // the server or waiting to retry: drop it.
+  const std::chrono::steady_clock::time_point deadline =
+      std::chrono::steady_clock::now() + m_settings.lateFinishLimit;
+  const qint64 limit = m_settings.lateFinishMaximumBytes;
+  for (;;) {
+    const qint64 toCome = ticket.bytesToCome();
+    const bool tooMuch = toCome >= 0 ? toCome > limit : -1 - toCome > limit;
+    if (!ticket.isArriving() || tooMuch ||
+        std::chrono::steady_clock::now() >= deadline) {
+      break;
+    }
+    if (ticket.waitFor(cancelPollInterval)) {
+      m_core->lateFinishes.fetch_add(1);
+      return ticket.response();
+    }
+  }
+  ticket.cancel();
+  // It may have finished meanwhile; that one is kept.
+  if (ticket.waitFor(std::chrono::milliseconds(0))) {
+    HttpResponse response = ticket.response();
+    if (response.error != NetworkError::Cancelled) {
+      m_core->lateFinishes.fetch_add(1);
+      return response;
+    }
+  }
+  return cancelledResponse();
+}
+
+int32_t NetworkClient::lateFinishes() const
+{
+  return m_core->lateFinishes.load();
 }
 
 int32_t NetworkClient::inFlight() const

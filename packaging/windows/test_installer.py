@@ -23,7 +23,8 @@
   1. Installs silently into a folder with spaces in its path; checks the
      files, the Settings > Apps entry, the .terrasoar association and the
      Start menu shortcut.
-  2. Starts the installed program with its own software OpenGL and PROJ's
+  2. Starts the installed program with its own software OpenGL, as a user
+     would (no GALLIUM_DRIVER: --gl-check must report llvmpipe), and PROJ's
      own places emptied (so only the installed proj.db can serve) and
      --measure: the base pack must be found and verified, imagery drawn on
      the globe, PROJ's database usable.
@@ -107,19 +108,36 @@ def start(folder, work):
         os.remove(report)
     no_proj = os.path.join(work, "no-proj-data")
     os.makedirs(no_proj, exist_ok=True)
-    env = dict(os.environ, GALLIUM_DRIVER="llvmpipe", PROJ_DATA=no_proj,
-               PROJ_LIB=no_proj)
+    # As a user starts it: without GALLIUM_DRIVER, which --software-gl
+    # must set itself (else Mesa may pick a hardware driver and the
+    # program exit at start without a word).
+    env = dict(os.environ, PROJ_DATA=no_proj, PROJ_LIB=no_proj)
     env.pop("TS_BASEPACK_DIR", None)
+    env.pop("GALLIUM_DRIVER", None)
+    problems = []
+    check = run([program, "--software-gl", "--gl-check"], env=env,
+                capture_output=True, text=True, timeout=300)
+    try:
+        gl = json.loads(check.stdout)
+    except ValueError:
+        gl = {}
+    print(check.stdout, flush=True)
+    if check.returncode != 0 or not gl.get("ok"):
+        problems.append(f"--software-gl --gl-check: exit code "
+                        f"{check.returncode}, {check.stdout!r} "
+                        f"{check.stderr!r}")
+    elif "llvmpipe" not in str(gl.get("renderer", "")).lower():
+        problems.append(f"--software-gl renderer is {gl.get('renderer')!r},"
+                        " not llvmpipe")
     result = run([program, "--software-gl",
                   "--measure", report, "--idle-seconds", "1"], env=env,
                  timeout=600)
     if result.returncode != 0:
-        return [f"program exit code {result.returncode}"]
+        return problems + [f"program exit code {result.returncode}"]
     with open(report, encoding="utf-8") as stream:
         data = json.load(stream)
     state = data.get("state", data)
     print(json.dumps(state, indent=1))
-    problems = []
     if state.get("base_pack") != "ok":
         problems.append(f"base pack: {state.get('base_pack')}")
     if int(state.get("imagery_tiles_drawn", 0)) <= 0:

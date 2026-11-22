@@ -683,9 +683,20 @@ public:
   {
   }
 
-  /** The pivot (the eye) and the arc's radius. */
-  QPointF pivot() const { return QPointF(0.25 * width(), 0.22 * height()); }
-  double radius() const { return 0.62 * std::min(width(), height()); }
+  /**
+   * The pivot (the eye) and the arc's radius: near the top for an arc down
+   * to the horizon; in the middle for one on up to straight up.
+   */
+  QPointF pivot() const
+  {
+    return QPointF(0.25 * width(), (upward() ? 0.5 : 0.22) * height());
+  }
+  double radius() const
+  {
+    return upward() ? std::min(0.4 * height(), 0.62 * width())
+                    : 0.62 * std::min(width(), height());
+  }
+  bool upward() const { return overlay()->state().maximumTiltDeg > 90.0; }
 
   /** The point of the arc for @p tiltDeg. */
   QPointF pointAt(double tiltDeg) const
@@ -773,7 +784,10 @@ private:
   double tiltAt(QPointF p) const
   {
     const QPointF d = p - pivot();
-    const double tilt = std::atan2(d.x(), d.y()) * 180.0 / pi();
+    double tilt = std::atan2(d.x(), d.y()) * 180.0 / pi();
+    if (tilt < -90.0) {
+      tilt = 180.0; // up and to the left of the eye: past straight up
+    }
     return std::clamp(tilt, 0.0, overlay()->state().maximumTiltDeg);
   }
 };
@@ -1081,7 +1095,8 @@ void NavigationOverlay::retranslate()
           ? tr("Click or drag to fly to a height")
           : tr("%1. Click or drag to fly to a height").arg(m_state.zoomText));
   describe(QStringLiteral("navigationTiltUp"), tr("Tilt up"),
-           tr("Tilt towards the horizon; hold to keep tilting (R)"));
+           tr("Tilt up, towards the horizon and on the globe beyond it; "
+              "hold to keep tilting (R)"));
   describe(QStringLiteral("navigationTiltDown"), tr("Tilt down"),
            tr("Tilt towards straight down; hold to keep tilting (F)"));
   describe(QStringLiteral("navigationTiltArc"), tr("Tilt"),
