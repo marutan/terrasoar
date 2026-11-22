@@ -38,6 +38,7 @@
 #include "elevationbuilder.h"
 #include "imagerytiler.h"
 #include "shorelinebuilder.h"
+#include "vectorbuilder.h"
 #include "vmap0builder.h"
 
 namespace ts::packager
@@ -231,6 +232,38 @@ struct Vmap0Spec {
   QJsonArray layers;
 };
 
+/** A vector dataset read through GDAL/OGR ("vector"). */
+struct VectorSpec {
+  /** Dataset id in the manifest, e.g. "naturalearth-10m". */
+  QString dataset;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+  /** The source as the manifest names it. */
+  QString sourceName;
+  /** Its version. */
+  QString sourceVersion;
+  /** Where it is published. */
+  QString sourceUrl;
+  /** Levels of detail. */
+  std::vector<FeatureLod> lods;
+  /**
+   * The classes, with their paths still the source ids and members
+   * ("source", "member"): resolved against the sources directory when
+   * built.
+   */
+  std::vector<VectorClass> classes;
+  /** Each class's source id. */
+  std::vector<QString> classSources;
+  /** Each class's file inside its source, if the source is a zip. */
+  std::vector<QString> classMembers;
+  /** The layers the pack offers, as for VMAP0. */
+  QJsonArray layers;
+};
+
 /** The whole pack configuration (tools/packager/basepack.json). */
 struct PackConfig {
   /** Pack id. */
@@ -268,6 +301,8 @@ struct PackConfig {
   std::vector<DatumShiftSpec> datumShifts;
   /** A VMAP0 dataset, if any. */
   std::optional<Vmap0Spec> vmap0;
+  /** A vector dataset read through OGR, if any. */
+  std::optional<VectorSpec> vector;
   /**
    * The pack's name in the manifest, under which Add Layer lists its
    * layers: "layerGroup" (regional packs of one theme share it), else the
@@ -311,6 +346,8 @@ struct BuildReport {
   ElevationStats elevation;
   /** VMAP0 results per feature class. */
   std::vector<Vmap0ClassStats> vmap0;
+  /** Vector ("vector") results per class. */
+  std::vector<FeatureClassStats> vector;
   /** The report as JSON, for CI and tests. */
   QJsonObject toJson() const;
 };

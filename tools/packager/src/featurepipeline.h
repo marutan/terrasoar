@@ -129,6 +129,12 @@ struct FeatureClassShape {
   int32_t maxLevel = -1;
   /** Its attribute columns, after feature_id. */
   std::vector<FeatureColumn> columns;
+  /**
+   * The levels of detail (indices) it writes; empty for all. Classes of one
+   * table from different sources, one per level of detail (WDBII's
+   * resolutions), each name theirs.
+   */
+  std::vector<int32_t> lods;
 };
 
 /**

@@ -72,8 +72,15 @@ featureTableSpecs(const FeatureClassShape& shape, int32_t dimension,
 {
   std::vector<FeatureTableSpec> specs;
   specs.reserve(lods.size());
-  for (const FeatureLod& lod : lods) {
+  for (std::size_t index = 0; index < lods.size(); ++index) {
+    const FeatureLod& lod = lods[index];
     FeatureTableSpec spec;
+    if (!shape.lods.empty() &&
+        std::find(shape.lods.begin(), shape.lods.end(),
+                  static_cast<int32_t>(index)) == shape.lods.end()) {
+      specs.push_back(spec); // Not this class's level of detail.
+      continue;
+    }
     const int32_t minLevel = std::max(lod.minLevel, shape.minLevel);
     int32_t maxLevel = lod.maxLevel;
     if (shape.maxLevel >= 0) {
