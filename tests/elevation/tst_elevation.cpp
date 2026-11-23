@@ -1373,26 +1373,27 @@ private slots:
     ts::ProviderRegistry registry;
     registry.setBasePack(root.filePath(QStringLiteral("base")), manifest);
 
-    const auto heightOf = [&registry](const QString& id, double lonDeg,
-                                      QString* error) {
-      const QJsonObject source{
-          {QStringLiteral("kind"), QStringLiteral("basepack")},
-          {QStringLiteral("dataset"), id}};
-      const std::shared_ptr<ts::ElevationProvider> provider =
-          registry.elevation(source, error);
-      if (!provider) {
-        return std::nan("");
-      }
-      const ts::TileKey key =
-          ts::TileKey::containing(2, ts::Geodetic{10.0, lonDeg, 0.0});
-      const std::optional<ts::HeightTile> tile =
-          provider->loadHeights(key, notCancelled);
-      if (!tile) {
-        return std::nan("");
-      }
-      const ts::GeoPoint point = ts::heightSamplePoint(key, 9, 4, 4);
-      return heightAt(*tile, 4, 4) - fixtureHeight(point.latDeg, point.lonDeg);
-    };
+    const std::function<double(const QString&, double, QString*)> heightOf =
+        [&registry](const QString& id, double lonDeg, QString* error) {
+          const QJsonObject source{
+              {QStringLiteral("kind"), QStringLiteral("basepack")},
+              {QStringLiteral("dataset"), id}};
+          const std::shared_ptr<ts::ElevationProvider> provider =
+              registry.elevation(source, error);
+          if (!provider) {
+            return std::nan("");
+          }
+          const ts::TileKey key =
+              ts::TileKey::containing(2, ts::Geodetic{10.0, lonDeg, 0.0});
+          const std::optional<ts::HeightTile> tile =
+              provider->loadHeights(key, notCancelled);
+          if (!tile) {
+            return std::nan("");
+          }
+          const ts::GeoPoint point = ts::heightSamplePoint(key, 9, 4, 4);
+          return heightAt(*tile, 4, 4) -
+                 fixtureHeight(point.latDeg, point.lonDeg);
+        };
     QString error;
     const double base = heightOf(QStringLiteral("elevation"), 20.0, &error);
     QVERIFY2(std::abs(base) < 1.5,

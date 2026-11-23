@@ -828,9 +828,8 @@ private:
     if (m_config->imagery && !buildImagery(*m_config->imagery)) {
       return false;
     }
-    const auto build = [this](const ImagerySpec& spec) {
-      return buildImagery(spec);
-    };
+    const std::function<bool(const ImagerySpec&)> build =
+        [this](const ImagerySpec& spec) { return buildImagery(spec); };
     return std::all_of(m_config->imageryVariants.begin(),
                        m_config->imageryVariants.end(), build) &&
            std::all_of(m_config->imageryDatasets.begin(),
@@ -1070,9 +1069,9 @@ private:
     }
     const QByteArray target =
         QStringLiteral("/vsimem/%1.vrt").arg(spec.dataset).toUtf8();
-    int failed = 0;
+    int32_t failed = 0;
     GDALDatasetH vrt =
-        GDALBuildVRT(target.constData(), static_cast<int>(names.size()),
+        GDALBuildVRT(target.constData(), static_cast<int32_t>(names.size()),
                      nullptr, names.data(), nullptr, &failed);
     if (vrt == nullptr || failed != 0) {
       fail(m_error, QStringLiteral("Cannot mosaic the DEM's files: %1")

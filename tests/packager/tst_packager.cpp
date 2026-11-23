@@ -24,6 +24,7 @@
 #include <cinttypes>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -1281,12 +1282,13 @@ private slots:
     const QTemporaryDir dir;
     const QDir root(dir.path());
     root.mkpath(QStringLiteral("sources"));
-    const auto put = [&root](const char* name, const QByteArray& contents) {
-      QFile file(
-          root.filePath(QStringLiteral("sources/") + QLatin1String(name)));
-      return file.open(QIODevice::WriteOnly) &&
-             file.write(contents) == contents.size();
-    };
+    const std::function<bool(const char*, const QByteArray&)> put =
+        [&root](const char* name, const QByteArray& contents) {
+          QFile file(
+              root.filePath(QStringLiteral("sources/") + QLatin1String(name)));
+          return file.open(QIODevice::WriteOnly) &&
+                 file.write(contents) == contents.size();
+        };
     QVERIFY(put("places.csv", "name,kind,lon,lat,height\n"
                               "Alpha,big,10.5,50.25,100\n"
                               "Beta,small,20,40,\n"

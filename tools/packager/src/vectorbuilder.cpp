@@ -22,6 +22,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -131,7 +132,7 @@ public:
     if (dataset == nullptr) {
       return false;
     }
-    auto* const handle = static_cast<GDALDatasetH>(dataset.get());
+    GDALDatasetH const handle = static_cast<GDALDatasetH>(dataset.get());
     OGRLayerH layer = m_class->layer.isEmpty()
                           ? GDALDatasetGetLayer(handle, 0)
                           : GDALDatasetGetLayerByName(
@@ -163,9 +164,10 @@ private:
   /** Finds the fields of the attributes and line ends. */
   bool findFields(OGRFeatureDefnH definition, QString* errorString)
   {
-    const auto find = [definition](const QString& name) {
-      return OGR_FD_GetFieldIndex(definition, name.toUtf8().constData());
-    };
+    const std::function<int32_t(const QString&)> find =
+        [definition](const QString& name) {
+          return OGR_FD_GetFieldIndex(definition, name.toUtf8().constData());
+        };
     for (const VectorAttribute& attribute : m_class->attributes) {
       const int32_t index =
           attribute.column.isEmpty() ? -1 : find(attribute.column);
