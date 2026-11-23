@@ -775,6 +775,116 @@ def names(out):
     write(cfg, os.path.join(out, "names.json"))
 
 
+ETOPO_30S = {
+    "id": "etopo-30s",
+    "file": "ETOPO_2022_v1_30s_N90W180_surface.tif",
+    "url": ("https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/30s/"
+            "30s_surface_elev_gtif/ETOPO_2022_v1_30s_N90W180_surface.tif"),
+    "mirror": MIRROR + ("/etopo-2022-v1-30s-surface/"
+                        "ETOPO_2022_v1_30s_N90W180_surface.tif"),
+    "sha256": "8630abc401cc6bdd30b507a68d3eb9eda5b65f5636f7199e4b1eefd476b5a9e2",
+    "name": "ETOPO 2022 Global Relief Model, 30 arc-second, surface elevation",
+    "version": "2022 v1",
+}
+
+
+def etopo_30s(out):
+    """ETOPO 2022 at 30″ in place of the base pack's 2.64′ terrain."""
+    cfg = {
+        "id": "elevation-etopo-30s",
+        "version": "2022.1",
+        "index": {
+            "name": "Terrain, finer (ETOPO 2022)",
+            "description": "The Earth's land and sea floor heights from "
+            "ETOPO 2022 at 30″, about 0.9 km, instead of the base pack's 4.9 km: "
+            "the Terrain layer shows mountains, valleys and the sea floor "
+            "in more detail. Replaces the base pack's terrain while "
+            "installed.",
+            "licence": "CC0-1.0 (NOAA)",
+        },
+        "sizeLimitBytes": 1500000000,
+        "reservedBytes": 0,
+        "sources": [ETOPO_30S],
+        "elevation": {
+            "dataset": "elevation-etopo-30s", "source": "etopo-30s",
+            "replaces": "elevation", "name": "Elevation, finer",
+            "licence": "CC0-1.0 (NOAA)",
+            "attribution": "Elevation: ETOPO 2022, NOAA NCEI",
+            # 85 samples a side: 84 intervals of a level-8 tile are 30.1″,
+            # the source's spacing (65 would be 40″).
+            "maxLevel": 8, "samples": 85, "verticalDatum": "egm2008",
+        },
+    }
+    write(cfg, os.path.join(out, "elevation-etopo-30s.json"))
+
+
+GEBCO = {
+    "id": "gebco",
+    "file": "gebco_2026_geotiff.zip",
+    "url": ("https://dap.ceda.ac.uk/bodc/gebco/global/gebco_2026/"
+            "ice_surface_elevation/geotiff/gebco_2026_geotiff.zip"),
+    "mirror": MIRROR + "/gebco-2026/gebco_2026_geotiff.zip",
+    # 4.2 GB, more than a release asset may be: kept in three parts.
+    "parts": 3,
+    "sha256": "39bb6eb45a785101da606749a00cf0ec3217f32160d25859b48fd5db9c6d9368",
+    "name": "The GEBCO_2026 Grid, ice surface elevation, Data GeoTIFF",
+    "version": "2026",
+    "notices": ["GEBCO_Grid_terms_of_use.pdf"],
+}
+GEBCO_TILES = [f"gebco_2026_n{n}_s{s}_w{w}_e{e}_geotiff.tif"
+               for n, s in (("90.0", "0.0"), ("0.0", "-90.0"))
+               for w, e in (("-180.0", "-90.0"), ("-90.0", "0.0"),
+                            ("0.0", "90.0"), ("90.0", "180.0"))]
+# The regional packs: id suffix, region, name.
+GEBCO_REGIONS = [
+    ("w180-w90", (-180, -90), "180° W to 90° W: the eastern Pacific and "
+     "western North and South America"),
+    ("w90-0", (-90, 0), "90° W to 0°: eastern North and South America and "
+     "the Atlantic"),
+    ("0-e90", (0, 90), "0° to 90° E: Europe, Africa, the Middle East and "
+     "the Indian Ocean"),
+    ("e90-e180", (90, 180), "90° E to 180°: East and Southeast Asia, "
+     "Australia and the western Pacific"),
+]
+
+
+def gebco(out):
+    """GEBCO 2026 at 15″, land and sea floor, in four regional packs of one
+    dataset, shown as a layer of its own above the Terrain layer."""
+    for suffix, (west, east), where in GEBCO_REGIONS:
+        cfg = {
+            "id": "gebco-" + suffix,
+            "version": "2026.1",
+            "layerGroup": "GEBCO 2026 terrain",
+            "index": {
+                "name": "GEBCO terrain and sea floor, " + where.split(":")[0],
+                "description": "The GEBCO 2026 Grid at 15″ (about 460 m): "
+                "the sea floor and the land, in more detail than the Terrain "
+                "layer, for " + where.split(": ")[1] + ". One of four "
+                "regional packs; their GEBCO layer shows every region "
+                "installed, above the Terrain layer. Not for navigation.",
+                "licence": "Public domain (GEBCO)",
+            },
+            "sizeLimitBytes": 1900000000,
+            "reservedBytes": 0,
+            "sources": [GEBCO],
+            "elevation": {
+                "dataset": "gebco-2026", "source": "gebco",
+                "members": GEBCO_TILES,
+                "layer": "GEBCO 2026 terrain and sea floor",
+                "name": "GEBCO 2026",
+                "licence": "Public domain (GEBCO)",
+                "attribution": "Bathymetry: GEBCO Compilation Group (2026) "
+                "GEBCO 2026 Grid",
+                # 84 intervals of a level-9 tile are 15.1″, the grid's
+                # spacing; levels 0 to 1 come from the Terrain layer.
+                "minLevel": 1, "maxLevel": 9, "samples": 85,
+                "region": [west, east], "verticalDatum": "egm2008",
+            },
+        }
+        write(cfg, os.path.join(out, "gebco-" + suffix + ".json"))
+
+
 def main(argv):
     out = argv[1] if len(argv) > 1 else os.path.join(HERE, "packs")
     wdbii(out)
@@ -783,6 +893,8 @@ def main(argv):
     naturalearth_rasters(out)
     black_marble(out)
     names(out)
+    etopo_30s(out)
+    gebco(out)
     return 0
 
 

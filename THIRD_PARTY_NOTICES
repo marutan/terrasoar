@@ -228,8 +228,23 @@ ourairports: OurAirports' airports, runways and navigation aids as of
 
 names: populated places and major features from the US Board on
   Geographic Names' databases: for the United States, USGS GNIS Domestic
-  Names of 2026-11-02 (DomesticNames_National_Text.zip), a US government
-  work, public domain. Attribution: "Names: USGS GNIS, NGA GNS"
+  Names of 2026-11-02 (DomesticNames_National_Text.zip); elsewhere, NGA's
+  GEOnet Names Server feature class files of 2026-09-03
+  (Populated_Places.zip, Hypsographic.zip, Hydrographic.zip, Undersea.zip),
+  with NGA's disclaimer (in the pack's licences/ folder). US government
+  works, public domain. Attribution: "Names: USGS GNIS, NGA GNS"
+
+elevation-etopo-30s: ETOPO 2022 Global Relief Model, 30 arc-second surface
+  elevation, version 1 (ETOPO_2022_v1_30s_N90W180_surface.tif), resampled
+  to 30.1″ tiles; NOAA NCEI, CC0 1.0. Attribution: "Elevation: ETOPO 2022,
+  NOAA NCEI"
+
+gebco-w180-w90, gebco-w90-0, gebco-0-e90, gebco-e90-e180: the GEBCO_2026
+  Grid, ice surface elevation (gebco_2026_geotiff.zip), a quarter of the
+  world each, resampled to 15.1″ tiles; GEBCO Compilation Group, public
+  domain, not for navigation (GEBCO_Grid_terms_of_use.pdf in each pack's
+  licences/ folder). Attribution: "Bathymetry: GEBCO Compilation Group
+  (2026) GEBCO 2026 Grid"
 
 The raw files of every pack are kept, with their licences, in
 https://github.com/marutan/terrasoar-packs-sources.

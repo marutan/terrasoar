@@ -1,0 +1,53 @@
+{
+  "id": "gebco-e90-e180",
+  "version": "2026.1",
+  "layerGroup": "GEBCO 2026 terrain",
+  "index": {
+    "name": "GEBCO terrain and sea floor, 90° E to 180°",
+    "description": "The GEBCO 2026 Grid at 15″ (about 460 m): the sea floor and the land, in more detail than the Terrain layer, for East and Southeast Asia, Australia and the western Pacific. One of four regional packs; their GEBCO layer shows every region installed, above the Terrain layer. Not for navigation.",
+    "licence": "Public domain (GEBCO)"
+  },
+  "sizeLimitBytes": 1900000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "gebco",
+      "file": "gebco_2026_geotiff.zip",
+      "url": "https://dap.ceda.ac.uk/bodc/gebco/global/gebco_2026/ice_surface_elevation/geotiff/gebco_2026_geotiff.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gebco-2026/gebco_2026_geotiff.zip",
+      "parts": 3,
+      "sha256": "39bb6eb45a785101da606749a00cf0ec3217f32160d25859b48fd5db9c6d9368",
+      "name": "The GEBCO_2026 Grid, ice surface elevation, Data GeoTIFF",
+      "version": "2026",
+      "notices": [
+        "GEBCO_Grid_terms_of_use.pdf"
+      ]
+    }
+  ],
+  "elevation": {
+    "dataset": "gebco-2026",
+    "source": "gebco",
+    "members": [
+      "gebco_2026_n90.0_s0.0_w-180.0_e-90.0_geotiff.tif",
+      "gebco_2026_n90.0_s0.0_w-90.0_e0.0_geotiff.tif",
+      "gebco_2026_n90.0_s0.0_w0.0_e90.0_geotiff.tif",
+      "gebco_2026_n90.0_s0.0_w90.0_e180.0_geotiff.tif",
+      "gebco_2026_n0.0_s-90.0_w-180.0_e-90.0_geotiff.tif",
+      "gebco_2026_n0.0_s-90.0_w-90.0_e0.0_geotiff.tif",
+      "gebco_2026_n0.0_s-90.0_w0.0_e90.0_geotiff.tif",
+      "gebco_2026_n0.0_s-90.0_w90.0_e180.0_geotiff.tif"
+    ],
+    "layer": "GEBCO 2026 terrain and sea floor",
+    "name": "GEBCO 2026",
+    "licence": "Public domain (GEBCO)",
+    "attribution": "Bathymetry: GEBCO Compilation Group (2026) GEBCO 2026 Grid",
+    "minLevel": 1,
+    "maxLevel": 9,
+    "samples": 85,
+    "region": [
+      90,
+      180
+    ],
+    "verticalDatum": "egm2008"
+  }
+}

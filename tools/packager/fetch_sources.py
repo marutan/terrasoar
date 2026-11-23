@@ -36,6 +36,10 @@ file was first downloaded from; the packager records it in the pack.
 --upstream downloads from "url" instead, to add a new source to the
 repository (docs/design/packs.md, "Where the source data is kept").
 
+A file larger than a release asset may be (2 GB; GEBCO's grid) is kept as
+"parts" pieces, <mirror>.part00, .part01, …: they are downloaded in turn and
+joined, and the whole file is checked.
+
 GitHub release assets are fetched with `gh release download` when the GitHub
 CLI is installed (it authenticates, so CI is not rate limited), otherwise
 over plain HTTPS. See docs/tools/packager.md.
@@ -89,6 +93,19 @@ def download_github(url, target):
     return True
 
 
+def download_parts(url, count, target):
+    """Downloads <url>.part00 … and joins them into @p target."""
+    with open(target, "wb") as out:
+        for index in range(count):
+            piece = f"{target}.part{index:02d}"
+            part_url = f"{url}.part{index:02d}"
+            if not download_github(part_url, piece):
+                download_https(part_url, piece)
+            with open(piece, "rb") as handle:
+                shutil.copyfileobj(handle, out, CHUNK)
+            os.remove(piece)
+
+
 def mirror_problem(source):
     """Why the source's "mirror" is unusable, or None if it is fine."""
     mirror = source.get("mirror")
@@ -96,6 +113,9 @@ def mirror_problem(source):
         return ("no \"mirror\": add the file to "
                 f"{SOURCES_REPOSITORY} first (docs/design/packs.md)")
     match = GITHUB_ASSET.match(mirror)
+    parts = source.get("parts", 0)
+    if not isinstance(parts, int) or parts < 0 or parts == 1:
+        return f"\"parts\" {parts!r} is not a number of pieces (2 or more)"
     if (not match or match.group(1) != SOURCES_REPOSITORY
             or match.group(3) != source["file"]):
         return (f"\"mirror\" {mirror} is not a release asset of "
@@ -118,10 +138,14 @@ def fetch(source, directory, upstream=False):
             print(f"{source['file']}: present, checksum OK")
             return True
         print(f"{source['file']}: checksum differs, downloading again")
-    print(f"{source['file']}: downloading {url}")
+    parts = 0 if upstream else int(source.get("parts", 0))
+    print(f"{source['file']}: downloading {url}"
+          + (f" in {parts} parts" if parts else ""))
     with tempfile.TemporaryDirectory(dir=directory) as scratch:
         partial = os.path.join(scratch, source["file"])
-        if not download_github(url, partial):
+        if parts:
+            download_parts(url, parts, partial)
+        elif not download_github(url, partial):
             download_https(url, partial)
         actual = sha256_of(partial)
         if actual != expected:
