@@ -57,6 +57,10 @@ versions ignore the field.
 | `bluemarble-monthly` | (variants of `bluemarble`, see [Variants](#variants)) | Blue Marble for each month of 2004 (5400 × 2700 px each), tiled to level 3: the seasons follow the program's clock | 24.9 MB |
 | `geoid-osgm15` ("UK grids") | (a datum of its own, `osgm15`) | Ordnance Survey's OSGM15 for Ordnance Datum Newlyn (PROJ's `uk_os_OSGM15_GB.tif`, shipped as it is, BSD-2-Clause); from version 2015.2 also OSTN15 (PROJ's `uk_os_OSTN15_NTv2_OSGBtoETRS.tif`, BSD-2-Clause) for the UK National Grid projection | 4.5 MB |
 | `vmap0-*` (17 packs) | (datasets of their own, see [Pack layers](#pack-layers)) | NGA's Vector Map Level 0 by theme: boundaries, hydrography, transportation, population, elevation, vegetation and other themes; hydrography, elevation and vegetation as four regional packs each; the ESRI-owned administrative areas apart. Details in [docs/data/vmap0.md](../data/vmap0.md) | 4–150 MB each |
+| `naturalearth-10m`, `wdbii`, `ourairports`, `names` | (vector datasets of their own) | Natural Earth's map layers; WDBII borders and rivers; airports, runways and navaids; place names (GNS and GNIS). Details in [docs/data/more-packs.md](../data/more-packs.md) | 16–309 MB |
+| `naturalearth-relief`, `-hypsometric`, `-shaded-relief`, `blackmarble` | (imagery of their own, a layer each) | Natural Earth's raster maps; Black Marble 2012 and 2016 | 18–72 MB |
+| `elevation-etopo-30s` | `elevation` | ETOPO 2022 at 30″ for the Terrain layer instead of the base pack's 2.64′ | 461 MB |
+| `gebco-*` (4 packs) | (an elevation dataset of their own, regional) | GEBCO 2026 at 15″, a quarter of the world each, read together as one layer | 385 MB each |
 
 A geoid pack replacing a base pack geoid makes every elevation source on
 that datum use the finer grid (the registry keys providers by the grid in
@@ -195,6 +199,25 @@ one layer shows whichever regions are installed, and Add Layer lists the
 theme once. The regions' tables are alike (the same levels), which the
 composite needs; where two regions meet, each has its own features cut at
 the library edge.
+
+Elevation works the same way (Phase 26): GEBCO's four packs each hold
+`gebco-2026` for a quarter of the world, whole level-1 tiles, and the
+registry reads the installed ones together
+(`ts::CompositeElevationProvider`: each tile from the pack that has it).
+A pack's elevation dataset that `replaces` the base pack's `elevation`
+(ETOPO 2022 at 30″) is what the Terrain layer reads while it is
+installed; one of its own is offered as an elevation layer
+(`pack:<dataset>:terrain`) to put above Terrain.
+
+**Tables shown below their storage level.** A table's first level may be
+deeper than its storage level (VMAP0's airports, stored at 4 and shown
+from 5; the names pack's places, stored at 6 and shown from 7). The
+provider's maximum level then includes that first level, and a key whose
+tables differ from its storage level's is loaded as its own tile (from
+the storage rows, keeping the features that reach it), not as the storage
+tile: keys sharing a load must get the same features
+(`GeoPackageFeatureProvider::storedKey()`). Before Phase 26 such tables
+were never drawn.
 
 ## The index
 
