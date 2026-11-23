@@ -180,6 +180,27 @@ no statement on any boundary or name. The administrative areas pack is
 licensed by ESRI for internal or non-commercial use only; the others are
 public domain.
 
+### More map layers
+
+These packs also bring layers of their own, added from **Add Layer → Data
+Packs** like VMAP0's:
+
+| Pack | What you get | Download |
+| --- | --- | --- |
+| Natural Earth map layers | Rivers and lakes, towns and cities, roads and ferries, railways, airports, ports, time zones, state and province borders, and peaks, with names; each from the zoom level that suits it | 70 MB |
+| Natural Earth I relief map | A map-like picture of the Earth: land cover in soft natural colours, shaded relief and a pale blue sea (about 1.9 km per pixel) | 72 MB |
+| Natural Earth hypsometric map | Lowlands to highlands in greens to browns, with shaded relief and the relief of the ocean floor | 67 MB |
+| Natural Earth shaded relief | Grey shaded relief of the land: a quiet background, or under a half-transparent layer | 39 MB |
+| Black Marble (Earth at night) | The Earth's city lights at night, for 2012 and for 2016, each as its own layer | 18 MB |
+| WDBII borders and rivers | National, internal and maritime borders, rivers by size, intermittent rivers and canals, down to a detailed resolution (the borders are those of the 1980s) | 89 MB |
+| Airports (OurAirports) | About 72,000 airports, heliports and seaplane bases with their names, runways, and navigation aids (VOR, NDB, DME) | 16 MB |
+| Place names | Names of towns, villages and neighbourhoods and of major features (mountains and ranges, lakes, bays, seas, islands, capes, glaciers, falls), shown as you zoom in | |
+
+The picture packs are layers like Blue Marble: put one at the bottom of
+the tree to use it as the background instead. OurAirports is community
+data, not for navigation; only runways whose ends are recorded are drawn
+(about a third of them).
+
 ## Limits
 
 - Only WMS, WMTS, XYZ and WFS layers can be kept this way. The built-in layers need no

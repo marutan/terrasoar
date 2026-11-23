@@ -199,6 +199,41 @@ vmap0-admin: the first-order administrative boundaries and named
 Every VMAP0 pack carries README1.TXT and FGDC_DAT.TXT of each library it
 uses, unchanged, and tools/packager/notices/vmap0.txt.
 
+wdbii: the World Data Bank II borders and rivers distributed with GSHHG
+  2.3.7 above (gshhg-shp-2.3.7.zip, its WDBII_shp folder). GNU LGPL v3 or
+  later. Attribution: "Borders and rivers: WDBII via GSHHG 2.3.7,
+  P. Wessel and W. H. F. Smith (LGPL)"
+
+naturalearth-10m: Natural Earth 1:10m vectors, version 5.1.2
+  (ne_10m_rivers_lake_centerlines.geojson ne_10m_lakes.geojson
+  ne_10m_populated_places.geojson ne_10m_roads.geojson
+  ne_10m_railroads.geojson ne_10m_airports.geojson ne_10m_ports.geojson
+  ne_10m_time_zones.geojson ne_10m_admin_1_states_provinces_lines.geojson
+  ne_10m_geography_regions_elevation_points.geojson), simplified and
+  tiled. Public domain. Attribution: "Made with Natural Earth"
+
+naturalearth-relief, naturalearth-hypsometric, naturalearth-shaded-relief:
+  Natural Earth's 1:10m raster maps, version 2.0.0, 21600 x 10800 pixels
+  (NE1_HR_LC_SR_W_DR.zip, HYP_HR_SR_OB_DR.zip, SR_HR.zip), tiled. Public
+  domain. Attribution: "Made with Natural Earth"
+
+blackmarble: Black Marble, the Earth at night, NASA Earth Observatory from
+  Suomi NPP VIIRS data, 2012 and 2016 at 3 km (BlackMarble_2012_3km_geo.tif,
+  BlackMarble_2016_3km_geo.tif), tiled. Public domain (NASA). Attribution:
+  "Black Marble: NASA Earth Observatory"
+
+ourairports: OurAirports' airports, runways and navigation aids as of
+  2026-11-22 (airports.csv, runways.csv, navaids.csv), dedicated to the
+  public domain under the Unlicense. Attribution: "Airports: OurAirports"
+
+names: populated places and major features from the US Board on
+  Geographic Names' databases: for the United States, USGS GNIS Domestic
+  Names of 2026-11-02 (DomesticNames_National_Text.zip), a US government
+  work, public domain. Attribution: "Names: USGS GNIS, NGA GNS"
+
+The raw files of every pack are kept, with their licences, in
+https://github.com/marutan/terrasoar-packs-sources.
+
 The source tree also has test data that is not distributed:
 tests/data/geodtest-sample.dat, a sample of C. F. F. Karney's "Test set
 for geodesics", CC0 1.0, https://doi.org/10.5281/zenodo.32156; and, in

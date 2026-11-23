@@ -7,6 +7,21 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- New data packs with layers of their own: Natural Earth's map layers
+  (rivers, lakes, places, roads, railways, airports, ports, time zones,
+  state borders, peaks), its relief, hypsometric and shaded relief maps,
+  Black Marble (the Earth at night, 2012 and 2016), WDBII borders and
+  rivers, OurAirports' airports, runways and navigation aids, and place
+  names.
+
+### Fixed
+
+- Features of a data pack that appear only when zoomed in further than
+  their stored detail were never drawn: VMAP0's airports and contour
+  lines now show.
+
 ## [0.0.4] – 2026-11-22
 
 ### Changed
