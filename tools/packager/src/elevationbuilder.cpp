@@ -73,8 +73,11 @@ constexpr std::size_t mappedGridBytes = std::size_t{1} << 30;
 class PointGrid
 {
 public:
+  // Plain dimensions, read everywhere; the samples behind them are private.
+  // NOLINTBEGIN(cppcoreguidelines-non-private-member-variables-in-classes)
   int32_t width = 0;
   int32_t height = 0;
+  // NOLINTEND(cppcoreguidelines-non-private-member-variables-in-classes)
 
   /** Makes it @p columns by @p rows, every sample 0. False on failure. */
   // Columns, then rows, as width and height.
@@ -93,7 +96,8 @@ public:
       return true;
     }
     m_file = std::make_unique<QTemporaryFile>();
-    const qint64 bytes = static_cast<qint64>(count * sizeof(float));
+    const qint64 bytes =
+        static_cast<qint64>(count) * static_cast<qint64>(sizeof(float));
     if (!m_file->open() || !m_file->resize(bytes)) {
       return false;
     }
@@ -410,9 +414,12 @@ std::optional<PointGrid> coarser(const PointGrid& fine, bool wrap)
 
 /** Writes every tile of @p level from its grid, which starts at tile
  *  column @p firstX. */
+// The level, then its first column, then the tile size.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 bool writeLevel(const PointGrid& grid, int32_t level, int32_t firstX,
                 int32_t samples, SqliteTileStoreWriter* writer,
                 ElevationStats* stats, QString* errorString)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   const int32_t intervals = samples - 1;
   const std::size_t n = static_cast<std::size_t>(samples);

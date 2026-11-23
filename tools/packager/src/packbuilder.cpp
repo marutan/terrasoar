@@ -435,7 +435,7 @@ bool readLods(const QJsonObject& entry, std::vector<FeatureLod>* result,
 bool numeric(const QString& text)
 {
   bool ok = false;
-  text.toDouble(&ok);
+  static_cast<void>(text.toDouble(&ok));
   return ok;
 }
 
@@ -545,6 +545,51 @@ bool readVector(const QJsonObject& json, PackConfig* config,
   return true;
 }
 
+/** Reads "imagery", "imageryVariants" and "imageryDatasets" into
+ *  @p config. */
+bool readImageryEntries(const QJsonObject& json, PackConfig* config,
+                        QString* errorString)
+{
+  const QJsonObject imagery = json.value(QStringLiteral("imagery")).toObject();
+  if (!imagery.isEmpty()) {
+    const std::optional<ImagerySpec> spec = readImagery(*config, imagery);
+    if (!spec) {
+      fail(errorString, QStringLiteral("Bad imagery entry"));
+      return false;
+    }
+    config->imagery = spec;
+  }
+  const QJsonArray variants =
+      json.value(QStringLiteral("imageryVariants")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < variants.size(); ++i) {
+    const std::optional<ImagerySpec> spec =
+        readImagery(*config, variants.at(i).toObject());
+    if (!spec || spec->variantOf.isEmpty()) {
+      fail(errorString, QStringLiteral("Bad imagery variant %1").arg(i));
+      return false;
+    }
+    config->imageryVariants.push_back(*spec);
+  }
+  const QJsonArray own =
+      json.value(QStringLiteral("imageryDatasets")).toArray();
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < own.size(); ++i) {
+    const std::optional<ImagerySpec> spec =
+        readImagery(*config, own.at(i).toObject());
+    if (!spec || !spec->replaces.isEmpty() || !spec->variantOf.isEmpty() ||
+        spec->layerName.isEmpty()) {
+      fail(errorString, QStringLiteral("Bad imagery dataset %1 (one of the "
+                                       "pack's own needs a layer, and "
+                                       "replaces nothing)")
+                            .arg(i));
+      return false;
+    }
+    config->imageryDatasets.push_back(*spec);
+  }
+  return true;
+}
+
 } // namespace
 
 std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
@@ -569,42 +614,8 @@ std::optional<PackConfig> PackConfig::fromJson(const QJsonObject& json,
     config.sources.push_back(std::move(*source));
   }
 
-  const QJsonObject imagery = json.value(QStringLiteral("imagery")).toObject();
-  if (!imagery.isEmpty()) {
-    const std::optional<ImagerySpec> spec = readImagery(config, imagery);
-    if (!spec) {
-      fail(errorString, QStringLiteral("Bad imagery entry"));
-      return std::nullopt;
-    }
-    config.imagery = spec;
-  }
-  const QJsonArray variants =
-      json.value(QStringLiteral("imageryVariants")).toArray();
-  // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int32_t i = 0; i < variants.size(); ++i) {
-    const std::optional<ImagerySpec> spec =
-        readImagery(config, variants.at(i).toObject());
-    if (!spec || spec->variantOf.isEmpty()) {
-      fail(errorString, QStringLiteral("Bad imagery variant %1").arg(i));
-      return std::nullopt;
-    }
-    config.imageryVariants.push_back(*spec);
-  }
-  const QJsonArray own =
-      json.value(QStringLiteral("imageryDatasets")).toArray();
-  // NOLINTNEXTLINE(modernize-loop-convert)
-  for (int32_t i = 0; i < own.size(); ++i) {
-    const std::optional<ImagerySpec> spec =
-        readImagery(config, own.at(i).toObject());
-    if (!spec || !spec->replaces.isEmpty() || !spec->variantOf.isEmpty() ||
-        spec->layerName.isEmpty()) {
-      fail(errorString, QStringLiteral("Bad imagery dataset %1 (one of the "
-                                       "pack's own needs a layer, and "
-                                       "replaces nothing)")
-                            .arg(i));
-      return std::nullopt;
-    }
-    config.imageryDatasets.push_back(*spec);
+  if (!readImageryEntries(json, &config, errorString)) {
+    return std::nullopt;
   }
 
   const QJsonObject shoreline =

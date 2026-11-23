@@ -631,14 +631,18 @@ private slots:
     // Level 6: the river only.
     const std::optional<ts::FeatureTile> coarse =
         provider.loadFeatures(storage, notCancelled);
-    QVERIFY(coarse.has_value());
+    if (!coarse) {
+      QFAIL("no level-6 tile");
+    }
     QCOMPARE(coarse->key, storage);
     QCOMPARE(coarse->features.size(), std::size_t{1});
     // Level 7: the river and the place, from the level-6 rows, as the tile
     // at level 7; a neighbour gets the river crossing it, not the place.
     const std::optional<ts::FeatureTile> fine =
         provider.loadFeatures(deeper, notCancelled);
-    QVERIFY(fine.has_value());
+    if (!fine) {
+      QFAIL("no level-7 tile");
+    }
     QCOMPARE(fine->key, here);
     QCOMPARE(fine->features.size(), std::size_t{2});
     for (int32_t i = 0; i < 4; ++i) {
@@ -648,7 +652,9 @@ private slots:
       }
       const std::optional<ts::FeatureTile> other =
           provider.loadFeatures(sibling, notCancelled);
-      QVERIFY(other.has_value());
+      if (!other) {
+        QFAIL("no neighbouring tile");
+      }
       for (const ts::Feature& feature : other->features) {
         QCOMPARE(feature.type, ts::Feature::Type::LineStrings);
       }

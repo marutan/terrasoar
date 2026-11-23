@@ -819,8 +819,11 @@ ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
   return composite;
 }
 
+// The store's path, then the dataset it is (for messages).
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 std::shared_ptr<ElevationProvider> ProviderRegistry::elevationStoreLocked(
     const QString& path, const QString& dataset, QString* errorString)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   // The store names its vertical datum: a geoid dataset of the pack (or a
   // finer one from an installed pack).

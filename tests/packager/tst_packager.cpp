@@ -1309,7 +1309,7 @@ private slots:
         "\"sha256\": \"0000000000000000000000000000000000000000000000000000000"
         "000000000\"";
     const QByteArray points =
-        "\"open\": [\"X_POSSIBLE_NAMES=lon\", \"Y_POSSIBLE_NAMES=lat\"]";
+        R"("open": ["X_POSSIBLE_NAMES=lon", "Y_POSSIBLE_NAMES=lat"])";
     const QByteArray configJson =
         "{\"id\": \"test\", \"version\": \"1\","
         "\"sizeLimitBytes\": 10000000, \"reservedBytes\": 0,"
@@ -1458,13 +1458,15 @@ private slots:
     json.insert(QStringLiteral("vector"), vector);
     const std::optional<ts::packager::PackConfig> clash =
         ts::packager::PackConfig::fromJson(json, &error);
-    QVERIFY(clash.has_value());
+    if (!clash) {
+      QFAIL(qPrintable(error));
+    }
     options.outputDirectory = root.filePath(QStringLiteral("clash"));
     QVERIFY(!ts::packager::buildPack(*clash, options, &report, &error));
     QVERIFY2(error.contains(QLatin1String("shared_0")), qPrintable(error));
     // A line class needs four columns; an unknown geometry is refused.
     for (const char* bad :
-         {"\"lineColumns\": [\"x1\", \"y1\"]", "\"geometry\": \"blobs\""}) {
+         {R"("lineColumns": ["x1", "y1"])", R"("geometry": "blobs")"}) {
       QJsonObject broken = QJsonDocument::fromJson(configJson).object();
       QJsonObject brokenVector =
           broken.value(QStringLiteral("vector")).toObject();
@@ -1496,7 +1498,7 @@ private slots:
         GDALCreate(GDALGetDriverByName("GTiff"), tif.toUtf8().constData(), 512,
                    256, 1, GDT_Byte, nullptr);
     QVERIFY(image != nullptr);
-    std::vector<std::uint8_t> values(512 * 256, 0);
+    std::vector<std::uint8_t> values(std::size_t{512} * 256, 0);
     for (std::size_t i = 0; i < values.size(); ++i) {
       values[i] = static_cast<std::uint8_t>((i % 512) / 2);
     }
@@ -1570,7 +1572,7 @@ private slots:
     QVERIFY(dem != nullptr);
     std::array<double, 6> transform{-180.0, 0.5, 0.0, 90.0, 0.0, -0.5};
     GDALSetGeoTransform(dem, transform.data());
-    std::vector<float> heights(720 * 360);
+    std::vector<float> heights(std::size_t{720} * 360);
     for (std::size_t i = 0; i < heights.size(); ++i) {
       // 10 m per degree east of 180° W.
       heights[i] =
@@ -1652,7 +1654,9 @@ private slots:
     json.insert(QStringLiteral("elevation"), entry);
     const std::optional<ts::packager::PackConfig> half =
         ts::packager::PackConfig::fromJson(json, &error);
-    QVERIFY(half.has_value());
+    if (!half) {
+      QFAIL(qPrintable(error));
+    }
     options.outputDirectory = root.filePath(QStringLiteral("half"));
     QVERIFY(!ts::packager::buildPack(*half, options, &report, &error));
   }

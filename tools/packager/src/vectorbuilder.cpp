@@ -131,7 +131,7 @@ public:
     if (dataset == nullptr) {
       return false;
     }
-    const auto handle = static_cast<GDALDatasetH>(dataset.get());
+    auto* const handle = static_cast<GDALDatasetH>(dataset.get());
     OGRLayerH layer = m_class->layer.isEmpty()
                           ? GDALDatasetGetLayer(handle, 0)
                           : GDALDatasetGetLayerByName(
@@ -247,13 +247,13 @@ private:
     for (std::size_t a = 0; a < m_class->attributes.size(); ++a) {
       const VectorAttribute& attribute = m_class->attributes[a];
       const int32_t field = m_fields[a];
-      const QString text =
-          field < 0
-              ? attribute.value
-              : (OGR_F_IsFieldSetAndNotNull(feature, field) != 0
-                     ? QString::fromUtf8(OGR_F_GetFieldAsString(feature, field))
-                           .trimmed()
-                     : QString());
+      QString text = attribute.value; // a constant
+      if (field >= 0) {
+        text = OGR_F_IsFieldSetAndNotNull(feature, field) != 0
+                   ? QString::fromUtf8(OGR_F_GetFieldAsString(feature, field))
+                         .trimmed()
+                   : QString();
+      }
       item.key += text + QLatin1Char('|');
       if (attribute.number) {
         bool ok = false;
@@ -284,31 +284,14 @@ bool sameTable(const FeatureTableSpec& a, const FeatureTableSpec& b)
          a.attributes == b.attributes && a.textAttributes == b.textAttributes;
 }
 
-} // namespace
-
-int32_t vectorDimension(const QString& name)
+/**
+ * Adds every class's tables to @p writer, which takes features only after
+ * them. Classes may share a table (WDBII's river levels, each a file) if
+ * its columns are the same.
+ */
+bool addTables(const VectorOptions& options, GeoPackageFeatureWriter* writer,
+               QString* errorString)
 {
-  if (name == QLatin1String("points")) {
-    return 0;
-  }
-  if (name == QLatin1String("lines")) {
-    return 1;
-  }
-  if (name == QLatin1String("areas")) {
-    return 2;
-  }
-  return -1;
-}
-
-bool buildVector(const VectorOptions& options, GeoPackageFeatureWriter* writer,
-                 std::vector<FeatureClassStats>* stats, QString* errorString)
-{
-  if (options.lods.empty() || options.classes.empty()) {
-    return fail(errorString, QStringLiteral("No levels of detail or classes"));
-  }
-  // Every table first: the writer takes features only after them. Classes
-  // may share a table (WDBII's river levels, each a file) if its columns
-  // are the same.
   std::map<QString, FeatureTableSpec> tables;
   for (const VectorClass& cls : options.classes) {
     for (const FeatureTableSpec& spec :
@@ -331,6 +314,34 @@ bool buildVector(const VectorOptions& options, GeoPackageFeatureWriter* writer,
         return fail(errorString, writer->errorString());
       }
     }
+  }
+  return true;
+}
+
+} // namespace
+
+int32_t vectorDimension(const QString& name)
+{
+  if (name == QLatin1String("points")) {
+    return 0;
+  }
+  if (name == QLatin1String("lines")) {
+    return 1;
+  }
+  if (name == QLatin1String("areas")) {
+    return 2;
+  }
+  return -1;
+}
+
+bool buildVector(const VectorOptions& options, GeoPackageFeatureWriter* writer,
+                 std::vector<FeatureClassStats>* stats, QString* errorString)
+{
+  if (options.lods.empty() || options.classes.empty()) {
+    return fail(errorString, QStringLiteral("No levels of detail or classes"));
+  }
+  if (!addTables(options, writer, errorString)) {
+    return false;
   }
   const Geos geos;
   int64_t nextId = 1;

@@ -160,10 +160,11 @@ double fixtureHeight(double latDeg, double lonDeg)
  * samples a side; with @p half 0 or 1, only the tiles of that level-0 tile
  * (the western or eastern hemisphere), as a regional pack has.
  */
-// The file, then the datum it names.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+// The file, then the datum it names; the offset, then the hemisphere.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 bool writeFixtureHeights(const QString& path, const QString& verticalDatum,
                          double offsetM = 0.0, int32_t half = -1)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   ts::SqliteTileStoreInfo info;
   info.format = QStringLiteral("heights");
