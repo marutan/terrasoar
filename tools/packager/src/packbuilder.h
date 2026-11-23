@@ -38,6 +38,7 @@
 #include "elevationbuilder.h"
 #include "imagerytiler.h"
 #include "shorelinebuilder.h"
+#include "vectorbuilder.h"
 #include "vmap0builder.h"
 
 namespace ts::packager
@@ -85,6 +86,16 @@ struct ImagerySpec {
   QString variantOf;
   /** Which variant (PackDataset::variant). */
   QString variant;
+  /**
+   * The image's file inside the source, if it is a zip (Natural Earth's
+   * rasters); empty for a source that is the image itself.
+   */
+  QString member;
+  /**
+   * For a dataset of the pack's own ("imageryDatasets"): the name of the
+   * imagery layer the manifest offers on it; empty for none.
+   */
+  QString layerName;
   /** Tiling. */
   ImageryTilerOptions tiling;
 };
@@ -125,8 +136,29 @@ struct ElevationSpec {
   int32_t maxLevel = 6;
   /** Samples along a tile's side. */
   int32_t samples = 65;
-  /** The heights' vertical datum: a geoid dataset of the pack, or empty. */
+  /**
+   * The heights' vertical datum: a geoid dataset of the pack or of the base
+   * pack ("egm2008", "egm96"), or empty.
+   */
   QString verticalDatum;
+  /** The base pack dataset it is a finer DEM of ("elevation"), or empty. */
+  QString replaces;
+  /**
+   * For a DEM of the pack's own: the name of the elevation layer the
+   * manifest offers on it (`pack:<dataset>:terrain`); empty for none.
+   */
+  QString layerName;
+  /** Shallowest level stored (a regional DEM's region is its whole tiles). */
+  int32_t minLevel = 0;
+  /** The region, degrees of longitude from pole to pole. */
+  double westDeg = -180.0;
+  double eastDeg = 180.0;
+  /**
+   * The source's files making one DEM, inside its zip (GEBCO's eight
+   * GeoTIFF tiles), mosaicked as a GDAL VRT; empty for a source that is
+   * the DEM itself.
+   */
+  std::vector<QString> members;
 };
 
 /** A geoid grid of the pack. */
@@ -221,6 +253,43 @@ struct Vmap0Spec {
   QJsonArray layers;
 };
 
+/** A vector dataset read through GDAL/OGR ("vector"). */
+struct VectorSpec {
+  /** Dataset id in the manifest, e.g. "naturalearth-10m". */
+  QString dataset;
+  /** Name for the user. */
+  QString name;
+  /** Licence. */
+  QString licence;
+  /** Attribution. */
+  QString attribution;
+  /** The source as the manifest names it. */
+  QString sourceName;
+  /** Its version. */
+  QString sourceVersion;
+  /** Where it is published. */
+  QString sourceUrl;
+  /** Levels of detail. */
+  std::vector<FeatureLod> lods;
+  /**
+   * The classes, with their paths still the source ids and members
+   * ("source", "member"): resolved against the sources directory when
+   * built.
+   */
+  std::vector<VectorClass> classes;
+  /** Each class's source id. */
+  std::vector<QString> classSources;
+  /** Each class's file inside its source, if the source is a zip. */
+  std::vector<QString> classMembers;
+  /**
+   * Each class's GDAL driver, if it must be named ("CSV" for the names
+   * files, which are .txt): the path is then given as "<driver>:<path>".
+   */
+  std::vector<QString> classDrivers;
+  /** The layers the pack offers, as for VMAP0. */
+  QJsonArray layers;
+};
+
 /** The whole pack configuration (tools/packager/basepack.json). */
 struct PackConfig {
   /** Pack id. */
@@ -240,6 +309,12 @@ struct PackConfig {
    * pack dataset (Blue Marble's months).
    */
   std::vector<ImagerySpec> imageryVariants;
+  /**
+   * Imagery datasets of the pack's own ("imageryDatasets"), neither
+   * replacing nor a variant of a base pack dataset, each with its layer
+   * (Black Marble, Natural Earth's rasters).
+   */
+  std::vector<ImagerySpec> imageryDatasets;
   /** Shoreline dataset, if any. */
   std::optional<ShorelineSpec> shoreline;
   /** Country outlines, if any. */
@@ -252,6 +327,8 @@ struct PackConfig {
   std::vector<DatumShiftSpec> datumShifts;
   /** A VMAP0 dataset, if any. */
   std::optional<Vmap0Spec> vmap0;
+  /** A vector dataset read through OGR, if any. */
+  std::optional<VectorSpec> vector;
   /**
    * The pack's name in the manifest, under which Add Layer lists its
    * layers: "layerGroup" (regional packs of one theme share it), else the
@@ -295,6 +372,8 @@ struct BuildReport {
   ElevationStats elevation;
   /** VMAP0 results per feature class. */
   std::vector<Vmap0ClassStats> vmap0;
+  /** Vector ("vector") results per class. */
+  std::vector<FeatureClassStats> vector;
   /** The report as JSON, for CI and tests. */
   QJsonObject toJson() const;
 };

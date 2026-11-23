@@ -50,6 +50,35 @@ namespace ts
 namespace
 {
 
+/** True if a part of @p feature reaches into @p rect (its bounding box). */
+bool reaches(const Feature& feature, const GeoRect& rect)
+{
+  for (const std::vector<GeoPoint>& part : feature.parts) {
+    for (const GeoPoint& point : part) {
+      if (point.lonDeg >= rect.westDeg && point.lonDeg <= rect.eastDeg &&
+          point.latDeg >= rect.southDeg && point.latDeg <= rect.northDeg) {
+        return true;
+      }
+    }
+  }
+  // A line or area crossing the tile without a vertex in it.
+  double west = 180.0;
+  double east = -180.0;
+  double south = 90.0;
+  double north = -90.0;
+  for (const std::vector<GeoPoint>& part : feature.parts) {
+    for (const GeoPoint& point : part) {
+      west = std::min(west, point.lonDeg);
+      east = std::max(east, point.lonDeg);
+      south = std::min(south, point.latDeg);
+      north = std::max(north, point.latDeg);
+    }
+  }
+  return feature.type != Feature::Type::Points && west <= rect.eastDeg &&
+         east >= rect.westDeg && south <= rect.northDeg &&
+         north >= rect.southDeg;
+}
+
 QString tablesTableName()
 {
   return QStringLiteral("ts_feature_tables"); // ts-notr: table name
@@ -883,7 +912,10 @@ GeoPackageFeatureProvider::GeoPackageFeatureProvider(const QString& path,
     table->spec = spec;
     table->pool =
         std::make_unique<SqliteStatementPool>(m_path, select.toUtf8());
-    m_maximumLevel = std::max(m_maximumLevel, spec.storageLevel);
+    // A table first shown below its storage level adds features there:
+    // the renderer must ask for that level.
+    m_maximumLevel =
+        std::max({m_maximumLevel, spec.storageLevel, spec.minLevel});
     m_tables.push_back(std::move(table));
   }
   sqlite3_finalize(statement);
@@ -918,18 +950,36 @@ QString GeoPackageFeatureProvider::id() const
 
 TileKey GeoPackageFeatureProvider::storedKey(TileKey key) const
 {
+  // The tables of one level share a storage level (the first serving it
+  // decides). Keys share a load only where the same tables serve them: a
+  // table first shown below its storage level (the places of the names
+  // pack, stored at 6 and shown from 7) makes the load that of the
+  // ancestor at that first level, not of the storage tile, which level 6
+  // loads without it.
+  int32_t storage = -1;
+  int32_t first = 0;
   for (const std::unique_ptr<Table>& table : m_tables) {
     const FeatureTableSpec& spec = table->spec;
-    if (key.level >= spec.minLevel &&
-        (spec.maxLevel < 0 || key.level <= spec.maxLevel)) {
-      TileKey stored = key;
-      while (stored.level > spec.storageLevel) {
-        stored = stored.parent();
-      }
-      return stored;
+    if (key.level < spec.minLevel ||
+        (spec.maxLevel >= 0 && key.level > spec.maxLevel)) {
+      continue;
+    }
+    if (storage < 0) {
+      storage = spec.storageLevel;
+    }
+    if (spec.storageLevel == storage) {
+      first = std::max(first, spec.minLevel);
     }
   }
-  return key;
+  if (storage < 0) {
+    return key;
+  }
+  const int32_t level = std::min(key.level, std::max(storage, first));
+  TileKey stored = key;
+  while (stored.level > level) {
+    stored = stored.parent();
+  }
+  return stored;
 }
 
 std::optional<FeatureTile>
@@ -939,7 +989,9 @@ GeoPackageFeatureProvider::loadFeatures(TileKey key,
   if (!m_valid || !key.isValid()) {
     return std::nullopt;
   }
+  const TileKey identity = storedKey(key);
   std::optional<FeatureTile> tile;
+  TileKey storage;
   for (const std::unique_ptr<Table>& table : m_tables) {
     const FeatureTableSpec& spec = table->spec;
     if (key.level < spec.minLevel ||
@@ -950,7 +1002,7 @@ GeoPackageFeatureProvider::loadFeatures(TileKey key,
     while (stored.level > spec.storageLevel) {
       stored = stored.parent();
     }
-    if (tile && tile->key != stored) {
+    if (tile && storage != stored) {
       continue; // Tables of one level share a storage level.
     }
     const SqliteStatementPool::Lease lease = table->pool->acquire();
@@ -959,7 +1011,8 @@ GeoPackageFeatureProvider::loadFeatures(TileKey key,
       continue;
     }
     if (!tile) {
-      tile = FeatureTile{stored, {}};
+      tile = FeatureTile{identity, {}};
+      storage = stored;
     }
     sqlite3_bind_int(statement, 1, stored.level);
     sqlite3_bind_int(statement, 2, stored.x);
@@ -967,6 +1020,17 @@ GeoPackageFeatureProvider::loadFeatures(TileKey key,
     if (!readRows(statement, spec, cancelled, &tile->features)) {
       return std::nullopt;
     }
+  }
+  if (tile && identity.level > storage.level) {
+    // Loaded for a tile inside the storage tile (see storedKey()): only
+    // its features reach it, so a tile's labels and picking are its own.
+    const GeoRect bounds = identity.bounds();
+    tile->features.erase(std::remove_if(tile->features.begin(),
+                                        tile->features.end(),
+                                        [&bounds](const Feature& feature) {
+                                          return !reaches(feature, bounds);
+                                        }),
+                         tile->features.end());
   }
   if (tile) {
     if (!m_rules.empty()) {

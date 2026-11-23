@@ -1,0 +1,1395 @@
+{
+  "id": "wdbii",
+  "version": "2.3.7.1",
+  "index": {
+    "name": "WDBII borders and rivers",
+    "description": "National, internal and maritime boundaries, rivers (permanent and intermittent) and canals from the World Data Bank II, as GSHHG 2.3.7 distributes it, at five resolutions down to the full one. The borders are those of the 1980s.",
+    "licence": "LGPL-3.0-or-later"
+  },
+  "sizeLimitBytes": 150000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "gshhg",
+      "file": "gshhg-shp-2.3.7.zip",
+      "url": "https://github.com/GenericMappingTools/gshhg-gmt/releases/download/2.3.7/gshhg-shp-2.3.7.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gshhg-2.3.7/gshhg-shp-2.3.7.zip",
+      "sha256": "8dbbe7e071e77e9e75f2d639239099ebca8d5c16d6a07df8169729d49f15cf41",
+      "name": "GSHHG (Global Self-consistent, Hierarchical, High-resolution Geography Database), shapefiles",
+      "version": "2.3.7",
+      "notices": [
+        "LICENSE.TXT",
+        "COPYING.LESSERv3"
+      ],
+      "localNotices": [
+        "../notices/gpl-3.0.txt"
+      ]
+    }
+  ],
+  "vector": {
+    "dataset": "wdbii",
+    "name": "WDBII borders and rivers",
+    "licence": "LGPL-3.0-or-later",
+    "attribution": "Borders and rivers: WDBII via GSHHG 2.3.7, P. Wessel and W. H. F. Smith (LGPL)",
+    "sourceName": "GSHHG (Global Self-consistent, Hierarchical, High-resolution Geography Database), shapefiles",
+    "sourceVersion": "2.3.7",
+    "sourceUrl": "https://www.soest.hawaii.edu/pwessel/gshhg/",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": 7
+      },
+      {
+        "storageLevel": 8,
+        "minLevel": 8,
+        "maxLevel": -1
+      }
+    ],
+    "classes": [
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_border_c_L1.shp",
+        "geometry": "lines",
+        "table": "national_borders",
+        "minLevel": 0,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "national"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_border_c_L2.shp",
+        "geometry": "lines",
+        "table": "internal_borders",
+        "minLevel": 3,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "internal"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_border_c_L3.shp",
+        "geometry": "lines",
+        "table": "maritime_borders",
+        "minLevel": 2,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "maritime"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L01.shp",
+        "geometry": "lines",
+        "table": "major_rivers",
+        "minLevel": 0,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "1",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L02.shp",
+        "geometry": "lines",
+        "table": "rivers",
+        "minLevel": 3,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "2",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L03.shp",
+        "geometry": "lines",
+        "table": "small_rivers",
+        "minLevel": 5,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "3",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L04.shp",
+        "geometry": "lines",
+        "table": "minor_rivers",
+        "minLevel": 7,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "4",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L05.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "5",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L06.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "6",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L07.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "7",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L08.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "8",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L09.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "9",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L10.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "10",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/c/WDBII_river_c_L11.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          0
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "11",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_border_l_L1.shp",
+        "geometry": "lines",
+        "table": "national_borders",
+        "minLevel": 0,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "national"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_border_l_L2.shp",
+        "geometry": "lines",
+        "table": "internal_borders",
+        "minLevel": 3,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "internal"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_border_l_L3.shp",
+        "geometry": "lines",
+        "table": "maritime_borders",
+        "minLevel": 2,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "maritime"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L01.shp",
+        "geometry": "lines",
+        "table": "major_rivers",
+        "minLevel": 0,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "1",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L02.shp",
+        "geometry": "lines",
+        "table": "rivers",
+        "minLevel": 3,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "2",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L03.shp",
+        "geometry": "lines",
+        "table": "small_rivers",
+        "minLevel": 5,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "3",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L04.shp",
+        "geometry": "lines",
+        "table": "minor_rivers",
+        "minLevel": 7,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "4",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L05.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "5",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L06.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "6",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L07.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "7",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L08.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "8",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L09.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "9",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L10.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "10",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/l/WDBII_river_l_L11.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          1
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "11",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_border_i_L1.shp",
+        "geometry": "lines",
+        "table": "national_borders",
+        "minLevel": 0,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "national"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_border_i_L2.shp",
+        "geometry": "lines",
+        "table": "internal_borders",
+        "minLevel": 3,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "internal"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_border_i_L3.shp",
+        "geometry": "lines",
+        "table": "maritime_borders",
+        "minLevel": 2,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "maritime"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L01.shp",
+        "geometry": "lines",
+        "table": "major_rivers",
+        "minLevel": 0,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "1",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L02.shp",
+        "geometry": "lines",
+        "table": "rivers",
+        "minLevel": 3,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "2",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L03.shp",
+        "geometry": "lines",
+        "table": "small_rivers",
+        "minLevel": 5,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "3",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L04.shp",
+        "geometry": "lines",
+        "table": "minor_rivers",
+        "minLevel": 7,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "4",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L05.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "5",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L06.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "6",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L07.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "7",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L08.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "8",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L09.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "9",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L10.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "10",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/i/WDBII_river_i_L11.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          2
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "11",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_border_h_L1.shp",
+        "geometry": "lines",
+        "table": "national_borders",
+        "minLevel": 0,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "national"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_border_h_L2.shp",
+        "geometry": "lines",
+        "table": "internal_borders",
+        "minLevel": 3,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "internal"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_border_h_L3.shp",
+        "geometry": "lines",
+        "table": "maritime_borders",
+        "minLevel": 2,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "maritime"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L01.shp",
+        "geometry": "lines",
+        "table": "major_rivers",
+        "minLevel": 0,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "1",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L02.shp",
+        "geometry": "lines",
+        "table": "rivers",
+        "minLevel": 3,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "2",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L03.shp",
+        "geometry": "lines",
+        "table": "small_rivers",
+        "minLevel": 5,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "3",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L04.shp",
+        "geometry": "lines",
+        "table": "minor_rivers",
+        "minLevel": 7,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "4",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L05.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "5",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L06.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "6",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L07.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "7",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L08.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "8",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L09.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "9",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L10.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "10",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/h/WDBII_river_h_L11.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          3
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "11",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_border_f_L1.shp",
+        "geometry": "lines",
+        "table": "national_borders",
+        "minLevel": 0,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "national"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_border_f_L2.shp",
+        "geometry": "lines",
+        "table": "internal_borders",
+        "minLevel": 3,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "internal"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_border_f_L3.shp",
+        "geometry": "lines",
+        "table": "maritime_borders",
+        "minLevel": 2,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "kind",
+            "value": "maritime"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L01.shp",
+        "geometry": "lines",
+        "table": "major_rivers",
+        "minLevel": 0,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "1",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L02.shp",
+        "geometry": "lines",
+        "table": "rivers",
+        "minLevel": 3,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "2",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L03.shp",
+        "geometry": "lines",
+        "table": "small_rivers",
+        "minLevel": 5,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "3",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L04.shp",
+        "geometry": "lines",
+        "table": "minor_rivers",
+        "minLevel": 7,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "4",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L05.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "5",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L06.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "6",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L07.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "7",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L08.shp",
+        "geometry": "lines",
+        "table": "intermittent_rivers",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "8",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L09.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "9",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L10.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "10",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "gshhg",
+        "member": "WDBII_shp/f/WDBII_river_f_L11.shp",
+        "geometry": "lines",
+        "table": "canals",
+        "minLevel": 6,
+        "lods": [
+          4
+        ],
+        "dissolve": false,
+        "attributes": [
+          {
+            "name": "level",
+            "value": "11",
+            "kind": "number"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "national",
+        "name": "WDBII National Borders",
+        "tables": [
+          "national_borders"
+        ],
+        "style": {
+          "outline": "#ffd54fff",
+          "outlineWidthPx": 1.4
+        }
+      },
+      {
+        "id": "internal",
+        "name": "WDBII Internal Borders",
+        "tables": [
+          "internal_borders"
+        ],
+        "style": {
+          "outline": "#e6ee9cff",
+          "outlineWidthPx": 0.9
+        }
+      },
+      {
+        "id": "maritime",
+        "name": "WDBII Maritime Boundaries",
+        "tables": [
+          "maritime_borders"
+        ],
+        "style": {
+          "outline": "#80deeaff",
+          "outlineWidthPx": 1.0
+        }
+      },
+      {
+        "id": "rivers",
+        "name": "WDBII Rivers",
+        "tables": [
+          "major_rivers",
+          "rivers",
+          "small_rivers",
+          "minor_rivers"
+        ],
+        "style": {
+          "outline": "#5aa9ffff",
+          "outlineWidthPx": 0.9
+        },
+        "styleRules": [
+          {
+            "attribute": "level",
+            "equals": "1",
+            "outlineWidthPx": 1.5
+          },
+          {
+            "attribute": "level",
+            "equals": "2",
+            "outlineWidthPx": 1.2
+          }
+        ]
+      },
+      {
+        "id": "intermittent",
+        "name": "WDBII Intermittent Rivers",
+        "tables": [
+          "intermittent_rivers"
+        ],
+        "style": {
+          "outline": "#5aa9ff99",
+          "outlineWidthPx": 0.8
+        }
+      },
+      {
+        "id": "canals",
+        "name": "WDBII Canals",
+        "tables": [
+          "canals"
+        ],
+        "style": {
+          "outline": "#3fd0d0ff",
+          "outlineWidthPx": 0.9
+        }
+      }
+    ]
+  }
+}

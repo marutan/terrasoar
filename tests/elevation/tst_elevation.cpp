@@ -155,10 +155,16 @@ double fixtureHeight(double latDeg, double lonDeg)
   return 1000.0 + 10.0 * lonDeg + 0.0 * latDeg;
 }
 
-/** A heights store of fixtureHeight() at levels 0–2, 9 samples a side. */
-// The file, then the datum it names.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-bool writeFixtureHeights(const QString& path, const QString& verticalDatum)
+/**
+ * A heights store of fixtureHeight() plus @p offsetM at levels 0–2, 9
+ * samples a side; with @p half 0 or 1, only the tiles of that level-0 tile
+ * (the western or eastern hemisphere), as a regional pack has.
+ */
+// The file, then the datum it names; the offset, then the hemisphere.
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
+bool writeFixtureHeights(const QString& path, const QString& verticalDatum,
+                         double offsetM = 0.0, int32_t half = -1)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
   ts::SqliteTileStoreInfo info;
   info.format = QStringLiteral("heights");
@@ -173,13 +179,16 @@ bool writeFixtureHeights(const QString& path, const QString& verticalDatum)
       for (int32_t x = 0; x < static_cast<int32_t>(ts::TileKey::columns(level));
            ++x) {
         const ts::TileKey key{level, x, y};
+        if (half >= 0 && (x >> level) != half) {
+          continue;
+        }
         std::vector<float> heights;
         for (int32_t row = 0; row < 9; ++row) {
           for (int32_t column = 0; column < 9; ++column) {
             const ts::GeoPoint point =
                 ts::heightSamplePoint(key, 9, row, column);
-            heights.push_back(
-                static_cast<float>(fixtureHeight(point.latDeg, point.lonDeg)));
+            heights.push_back(static_cast<float>(
+                fixtureHeight(point.latDeg, point.lonDeg) + offsetM));
           }
         }
         if (!writer.putTile(key, ts::encodeHeightGrid(heights, 9))) {
@@ -1333,6 +1342,98 @@ private slots:
     QVERIFY(!ts::computeElevationProfile(
         provider, {ts::GeoPoint{45.5, 7.5}, ts::GeoPoint{46.5, 8.5}}, 11,
         cancelled));
+  }
+
+  void elevationPacks()
+  {
+    // A pack's finer DEM in place of the base pack's (ETOPO 30″), and a DEM
+    // of a pack's own in regional packs read together (GEBCO's quarters):
+    // here 100 m above the base for the first, 200 m and 300 m for the
+    // western and eastern regions. Heights are stored to the metre.
+    const QTemporaryDir dir;
+    const QDir root(dir.path());
+    for (const char* name : {"base", "finer", "west", "east"}) {
+      QVERIFY(root.mkpath(QLatin1String(name)));
+    }
+    QVERIFY(writeFixtureHeights(
+        root.filePath(QStringLiteral("base/dem.sqlite")), QString()));
+    QVERIFY(writeFixtureHeights(
+        root.filePath(QStringLiteral("finer/finer.sqlite")), QString(), 100.0));
+    QVERIFY(writeFixtureHeights(root.filePath(QStringLiteral("west/r.sqlite")),
+                                QString(), 200.0, 0));
+    QVERIFY(writeFixtureHeights(root.filePath(QStringLiteral("east/r.sqlite")),
+                                QString(), 300.0, 1));
+    ts::PackManifest manifest;
+    manifest.id = QStringLiteral("terrasoar-base");
+    ts::PackDataset dataset;
+    dataset.id = QStringLiteral("elevation");
+    dataset.kind = ts::PackDataset::Kind::Elevation;
+    dataset.file = QStringLiteral("dem.sqlite");
+    manifest.datasets.push_back(dataset);
+    ts::ProviderRegistry registry;
+    registry.setBasePack(root.filePath(QStringLiteral("base")), manifest);
+
+    const std::function<double(const QString&, double, QString*)> heightOf =
+        [&registry](const QString& id, double lonDeg, QString* error) {
+          const QJsonObject source{
+              {QStringLiteral("kind"), QStringLiteral("basepack")},
+              {QStringLiteral("dataset"), id}};
+          const std::shared_ptr<ts::ElevationProvider> provider =
+              registry.elevation(source, error);
+          if (!provider) {
+            return std::nan("");
+          }
+          const ts::TileKey key =
+              ts::TileKey::containing(2, ts::Geodetic{10.0, lonDeg, 0.0});
+          const std::optional<ts::HeightTile> tile =
+              provider->loadHeights(key, notCancelled);
+          if (!tile) {
+            return std::nan("");
+          }
+          const ts::GeoPoint point = ts::heightSamplePoint(key, 9, 4, 4);
+          return heightAt(*tile, 4, 4) -
+                 fixtureHeight(point.latDeg, point.lonDeg);
+        };
+    QString error;
+    const double base = heightOf(QStringLiteral("elevation"), 20.0, &error);
+    QVERIFY2(std::abs(base) < 1.5,
+             qPrintable(QString::number(base) + QLatin1Char(' ') + error));
+
+    ts::InstalledPack finer;
+    finer.directory = root.filePath(QStringLiteral("finer"));
+    finer.manifest.id = QStringLiteral("etopo-30s");
+    dataset.file = QStringLiteral("finer.sqlite");
+    dataset.replaces = QStringLiteral("elevation");
+    dataset.id = QStringLiteral("etopo-30s");
+    finer.manifest.datasets = {dataset};
+    std::vector<ts::InstalledPack> packs{finer};
+    dataset.replaces.clear();
+    dataset.id = QStringLiteral("gebco");
+    dataset.file = QStringLiteral("r.sqlite");
+    for (const char* region : {"west", "east"}) {
+      ts::InstalledPack pack;
+      pack.directory = root.filePath(QLatin1String(region));
+      pack.manifest.id = QStringLiteral("gebco-") + QLatin1String(region);
+      pack.manifest.datasets = {dataset};
+      packs.push_back(pack);
+    }
+    registry.setInstalledPacks(packs);
+    // The Terrain layer reads the finer DEM.
+    QVERIFY(std::abs(heightOf(QStringLiteral("elevation"), 20.0, &error) -
+                     100.0) < 1.5);
+    // The regional DEM: each region's tiles from its pack.
+    QVERIFY2(std::abs(heightOf(QStringLiteral("gebco"), -60.0, &error) -
+                      200.0) < 1.5,
+             qPrintable(error));
+    QVERIFY(std::abs(heightOf(QStringLiteral("gebco"), 60.0, &error) - 300.0) <
+            1.5);
+
+    // Removed: the base pack's DEM, and no regional one.
+    registry.setInstalledPacks({});
+    QVERIFY(std::abs(heightOf(QStringLiteral("elevation"), 20.0, &error)) <
+            1.5);
+    QVERIFY(std::isnan(heightOf(QStringLiteral("gebco"), 60.0, &error)));
+    QVERIFY(!error.isEmpty());
   }
 
   void geoidPacks()

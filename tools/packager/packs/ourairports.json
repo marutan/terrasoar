@@ -1,0 +1,423 @@
+{
+  "id": "ourairports",
+  "version": "2026-11-22.1",
+  "index": {
+    "name": "Airports (OurAirports)",
+    "description": "About 72,000 airports, heliports and seaplane bases, their runways and 11,000 navigation aids (VOR, NDB, DME) from OurAirports, as of 2026-11-22. Community data, not for navigation.",
+    "licence": "Public domain (OurAirports, the Unlicense)"
+  },
+  "sizeLimitBytes": 100000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "ourairports-airports",
+      "file": "ourairports-airports-2026-11-22.csv",
+      "url": "https://raw.githubusercontent.com/davidmegginson/ourairports-data/aaf2fe210c52ac2ff42e64f75b5f051759c61d50/airports.csv",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/ourairports-2026-11-22/ourairports-airports-2026-11-22.csv",
+      "sha256": "60259f22797bf86a11e7ad2e074a91c97cf0e9b5e3ae899f4796ecc15a96e1ee",
+      "name": "OurAirports airports.csv",
+      "version": "2026-11-22"
+    },
+    {
+      "id": "ourairports-runways",
+      "file": "ourairports-runways-2026-11-22.csv",
+      "url": "https://raw.githubusercontent.com/davidmegginson/ourairports-data/aaf2fe210c52ac2ff42e64f75b5f051759c61d50/runways.csv",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/ourairports-2026-11-22/ourairports-runways-2026-11-22.csv",
+      "sha256": "26ebd760c6b0ad593cfb4e3153365e5063d01c7a3008f7f5847296ee10692fce",
+      "name": "OurAirports runways.csv",
+      "version": "2026-11-22"
+    },
+    {
+      "id": "ourairports-navaids",
+      "file": "ourairports-navaids-2026-11-22.csv",
+      "url": "https://raw.githubusercontent.com/davidmegginson/ourairports-data/aaf2fe210c52ac2ff42e64f75b5f051759c61d50/navaids.csv",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/ourairports-2026-11-22/ourairports-navaids-2026-11-22.csv",
+      "sha256": "d7292380662c33a95214945023ec0a5b13189599305fd18be739e167a97a9bd1",
+      "name": "OurAirports navaids.csv",
+      "version": "2026-11-22"
+    }
+  ],
+  "vector": {
+    "dataset": "ourairports",
+    "name": "Airports (OurAirports)",
+    "licence": "Public domain (OurAirports, the Unlicense)",
+    "attribution": "Airports: OurAirports",
+    "sourceName": "OurAirports data",
+    "sourceVersion": "2026-11-22",
+    "sourceUrl": "https://github.com/davidmegginson/ourairports-data",
+    "lods": [
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 5
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1
+      }
+    ],
+    "classes": [
+      {
+        "source": "ourairports-airports",
+        "open": [
+          "X_POSSIBLE_NAMES=longitude_deg",
+          "Y_POSSIBLE_NAMES=latitude_deg",
+          "KEEP_GEOM_COLUMNS=NO"
+        ],
+        "where": "type = 'large_airport'",
+        "geometry": "points",
+        "table": "large_airports",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "ident",
+            "name": "ident"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "municipality",
+            "name": "municipality"
+          },
+          {
+            "column": "iso_country",
+            "name": "country"
+          },
+          {
+            "column": "elevation_ft",
+            "name": "elevation_ft",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "ourairports-airports",
+        "open": [
+          "X_POSSIBLE_NAMES=longitude_deg",
+          "Y_POSSIBLE_NAMES=latitude_deg",
+          "KEEP_GEOM_COLUMNS=NO"
+        ],
+        "where": "type = 'medium_airport'",
+        "geometry": "points",
+        "table": "medium_airports",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "ident",
+            "name": "ident"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "municipality",
+            "name": "municipality"
+          },
+          {
+            "column": "iso_country",
+            "name": "country"
+          },
+          {
+            "column": "elevation_ft",
+            "name": "elevation_ft",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "ourairports-airports",
+        "open": [
+          "X_POSSIBLE_NAMES=longitude_deg",
+          "Y_POSSIBLE_NAMES=latitude_deg",
+          "KEEP_GEOM_COLUMNS=NO"
+        ],
+        "where": "type = 'small_airport'",
+        "geometry": "points",
+        "table": "small_airports",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "ident",
+            "name": "ident"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "municipality",
+            "name": "municipality"
+          },
+          {
+            "column": "iso_country",
+            "name": "country"
+          },
+          {
+            "column": "elevation_ft",
+            "name": "elevation_ft",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "ourairports-airports",
+        "open": [
+          "X_POSSIBLE_NAMES=longitude_deg",
+          "Y_POSSIBLE_NAMES=latitude_deg",
+          "KEEP_GEOM_COLUMNS=NO"
+        ],
+        "where": "type = 'seaplane_base'",
+        "geometry": "points",
+        "table": "seaplane_bases",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "ident",
+            "name": "ident"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "municipality",
+            "name": "municipality"
+          },
+          {
+            "column": "iso_country",
+            "name": "country"
+          },
+          {
+            "column": "elevation_ft",
+            "name": "elevation_ft",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "ourairports-airports",
+        "open": [
+          "X_POSSIBLE_NAMES=longitude_deg",
+          "Y_POSSIBLE_NAMES=latitude_deg",
+          "KEEP_GEOM_COLUMNS=NO"
+        ],
+        "where": "type = 'heliport'",
+        "geometry": "points",
+        "table": "heliports",
+        "minLevel": 8,
+        "attributes": [
+          {
+            "column": "ident",
+            "name": "ident"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "municipality",
+            "name": "municipality"
+          },
+          {
+            "column": "iso_country",
+            "name": "country"
+          },
+          {
+            "column": "elevation_ft",
+            "name": "elevation_ft",
+            "kind": "number"
+          }
+        ]
+      },
+      {
+        "source": "ourairports-runways",
+        "geometry": "lines",
+        "table": "runways",
+        "minLevel": 8,
+        "lods": [
+          1
+        ],
+        "where": "closed = '0'",
+        "lineColumns": [
+          "le_longitude_deg",
+          "le_latitude_deg",
+          "he_longitude_deg",
+          "he_latitude_deg"
+        ],
+        "attributes": [
+          {
+            "column": "airport_ident",
+            "name": "airport"
+          },
+          {
+            "column": "le_ident",
+            "name": "ends"
+          },
+          {
+            "column": "length_ft",
+            "name": "length_ft",
+            "kind": "number"
+          },
+          {
+            "column": "surface",
+            "name": "surface"
+          }
+        ]
+      },
+      {
+        "source": "ourairports-navaids",
+        "open": [
+          "X_POSSIBLE_NAMES=longitude_deg",
+          "Y_POSSIBLE_NAMES=latitude_deg",
+          "KEEP_GEOM_COLUMNS=NO"
+        ],
+        "geometry": "points",
+        "table": "navaids",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "ident",
+            "name": "ident"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "frequency_khz",
+            "name": "frequency_khz",
+            "kind": "number"
+          },
+          {
+            "column": "associated_airport",
+            "name": "airport"
+          }
+        ]
+      }
+    ],
+    "layers": [
+      {
+        "id": "runways",
+        "name": "OurAirports Runways",
+        "tables": [
+          "runways"
+        ],
+        "style": {
+          "outline": "#eceff1ff",
+          "outlineWidthPx": 3.0
+        }
+      },
+      {
+        "id": "airports",
+        "name": "OurAirports Airports",
+        "tables": [
+          "large_airports",
+          "medium_airports",
+          "small_airports",
+          "seaplane_bases"
+        ],
+        "style": {
+          "outline": "#ff7ad9ff",
+          "pointSizePx": 5,
+          "labels": "name"
+        },
+        "styleRules": [
+          {
+            "attribute": "type",
+            "equals": "large_airport",
+            "pointSizePx": 8
+          },
+          {
+            "attribute": "type",
+            "equals": "medium_airport",
+            "pointSizePx": 6
+          },
+          {
+            "attribute": "type",
+            "equals": "seaplane_base",
+            "outline": "#4fc3f7ff"
+          }
+        ]
+      },
+      {
+        "id": "heliports",
+        "name": "OurAirports Heliports",
+        "tables": [
+          "heliports"
+        ],
+        "style": {
+          "outline": "#ce93d8ff",
+          "pointSizePx": 4,
+          "labels": "ident"
+        }
+      },
+      {
+        "id": "navaids",
+        "name": "OurAirports Navigation Aids",
+        "tables": [
+          "navaids"
+        ],
+        "style": {
+          "outline": "#80cbc4ff",
+          "pointSizePx": 5,
+          "labels": "ident"
+        },
+        "styleRules": [
+          {
+            "attribute": "type",
+            "equals": "NDB",
+            "outline": "#ffab91ff"
+          }
+        ]
+      }
+    ]
+  }
+}

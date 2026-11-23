@@ -304,6 +304,8 @@ area and GSHHG's area.
 | `geoids[]` | `dataset`, `source` (a PROJ GeoTIFF geoid grid), `name`, `licence`, `attribution`, `step` (keep every step-th sample), `replaces` (extra packs: the base pack geoid it is a finer grid of), `copy` (true: ship the grid as it is, for small regional grids with no-data cells; otherwise it is written as 16-bit centimetres) |
 | `datumShifts[]` | `dataset` (the id projections ask for, e.g. `ostn15`; the file is `<dataset>.tif`), `source` (a PROJ GeoTIFF horizontal offset grid, shipped as it is), `name`, `licence`, `attribution`; listed in the manifest's `datumShifts` |
 | `vmap0` | `dataset`, `sources[]` (the source ids of the VMAP0 zips), `libraries[]` (empty: all but `rference`), `name`, `licence`, `attribution`, `sourceName`, `sourceVersion`, `sourceUrl` (the manifest's dataset source), `lods[]` (`storageLevel`, `minLevel`, `maxLevel`, `toleranceDeg`), `classes[]` (`coverage`, `class`, `table`, `minLevel`, `maxLevel`, `attributes[]` with `column`, `name`, `kind` (`decoded`, `text` or `number`), `filters[]` with `column`, `values`, `exclude`), `layers[]` (`id`, `name`, `tables`, `style` with `labels`, `styleRules`): see [VMAP0 packs](#vmap0-packs-phase-21) |
+| `imageryDatasets` | Imagery of the pack's own (Natural Earth's rasters, Black Marble): a list of imagery entries as above, without `replaces` or `variantOf`, each with `layer` (the name of the imagery layer the manifest offers on it, `pack:<dataset>:image`) and optionally `member` (the image's file inside a zip source). A grey (one-band) image is read into all three channels |
+| `vector` | A vector dataset of the pack's own read through GDAL/OGR: `dataset`, `name`, `licence`, `attribution`, `sourceName`, `sourceVersion`, `sourceUrl`, `lods[]` (as `vmap0`'s), `classes[]`, `layers[]` (as `vmap0`'s); see [Vector datasets](#vector-datasets) |
 | `layerGroup` | (top level) The pack's name in the manifest, under which Add Layer lists its layers; regional packs of one theme share it. Default: `index.name` |
 | `elevation` | `dataset`, `source` (a global geographic DEM), `name`, `licence`, `attribution`, `maxLevel` (6), `samples` (65 per tile side), `verticalDatum` (a geoid dataset of `geoids`, written to the store) |
 
@@ -316,11 +318,49 @@ area and GSHHG's area.
 4. Update [base-pack.md](../data/base-pack.md) (contents, sizes, sources,
    licences) and `THIRD_PARTY_NOTICES`.
 
+## Vector datasets
+
+`vectorbuilder` reads a `"vector"` entry's classes through GDAL/OGR, so
+any source GDAL reads will do: shapefiles (WDBII), GeoJSON (Natural
+Earth), CSV and other delimited text (OurAirports, GNIS). It feeds the
+same pipeline as VMAP0 (`featurepipeline`: dissolve, simplify per level of
+detail, cut down the quadtree, write `<table>_<storage level>`), so the
+packs read alike. The sources must be in longitude and latitude (WGS 84).
+Each class:
+
+| Key | Meaning |
+| --- | --- |
+| `source`, `member` | The source id, and the file inside it if it is a zip (`WDBII_shp/f/WDBII_river_f_L01.shp`) |
+| `driver` | A GDAL driver to name, when the file's extension doesn't say: `"CSV"` for the names files (`.txt`) |
+| `open` | GDAL open options: `"SEPARATOR=PIPE"`, `"X_POSSIBLE_NAMES=longitude_deg"`, `"AUTODETECT_TYPE=YES"`, … |
+| `layer` | The source's layer; the first if left out |
+| `where` | An OGR SQL attribute filter: `"type = 'large_airport'"`, `"min_zoom < 5"` |
+| `geometry` | `points`, `lines` or `areas`; parts of other kinds are left out, and a feature with none is an error |
+| `table`, `minLevel`, `maxLevel` | As VMAP0's classes |
+| `lods` | The levels of detail (indices) the class writes; all if left out. WDBII takes each resolution from its own file: five classes, one per level of detail, write one table |
+| `dissolve` | `true` to join the features with the same attributes (rivers cut into pieces); off by default |
+| `attributes[]` | `column` (the source's field) and `name`, `kind` `text` (default) or `number` (an integer, NULL where empty); or `value` instead of `column`, a constant (WDBII's river level) |
+| `lineColumns` | For tables without geometry: the fields of a line's two ends, longitude and latitude of one, then of the other (OurAirports' runways) |
+
+Features without geometry (a CSV row without a position, a runway without
+its ends) are left out and counted as filtered; unreadable ones fail the
+build. Classes may write one table only with the same columns and levels.
+A table shown from a level deeper than its storage level is fine: the
+program reads it from that level (`GeoPackageFeatureProvider::storedKey()`).
+
+The Phase 26 packs' configurations (Natural Earth's layers and maps, Black
+Marble, WDBII, OurAirports, place names) are written by
+`tools/packager/make_extra_configs.py`, as VMAP0's are by its own script:
+edit it and run it rather than editing the JSON. Their contents, sources
+and sizes are in [docs/data/more-packs.md](../data/more-packs.md).
+
 ## Code and tests
 
 The packager's code is in `tools/packager/src/` (`imagerytiler`,
-`shorelinebuilder`, `countrybuilder`, `vmap0builder`, `packbuilder`, and
-the VPF reader in `vpf/`; `main.cpp` is only the command line);
+`shorelinebuilder`, `countrybuilder`, `featurepipeline` (the vector
+packs' common part), `vmap0builder`, `vectorbuilder` (OGR sources),
+`packbuilder`, and the VPF reader in `vpf/`; `main.cpp` is only the
+command line);
 `packager.pri` shares it with `tests/packager`, `tests/vmap0` and
 `tests/globe` (whose VMAP0 golden images build their packs from the test
 tile). It links `tscore` for the
@@ -338,7 +378,14 @@ directory and fails over budget. A GeoJSON of four countries (one with a
 lake, one split at the antimeridian, one without ISO codes, and
 Antarctica) checks the country outlines: read back with
 `ts::CountryAreas`, the lake is still a hole, the split country is one
-piece, and the coast is covered.
+piece, and the coast is covered. `vectorDataset` builds a
+`"vector"` dataset from a CSV, a runways table and GeoJSON lines and reads
+it back with OGR: filters, text, number and constant attributes, lines
+from their ends' columns, features without geometry counted, pieces
+dissolved, a table shared by classes of different levels of detail, and
+classes writing one table differently refused. `ownImageryDatasets`
+builds a grey image as an imagery dataset of the pack's own with its
+layer.
 
 With `TS_BASEPACK_DIR` set it also checks a real pack: manifest and
 checksums, the budget, the complete pyramid with tiles lining up with

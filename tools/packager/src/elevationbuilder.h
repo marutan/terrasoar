@@ -42,8 +42,20 @@ struct ElevationOptions {
   QString sourcePath;
   /** The tile store to create (format "heights"). */
   QString outputPath;
-  /** Deepest quadtree level stored; levels 0 to this are stored. */
+  /** Deepest quadtree level stored; levels minLevel to this are stored. */
   int32_t maxLevel = 6;
+  /**
+   * Shallowest level stored: a regional DEM (GEBCO's quarters) starts
+   * where its region is whole tiles, and coarser views read the Terrain
+   * layer below it.
+   */
+  int32_t minLevel = 0;
+  /**
+   * The region, degrees of longitude from pole to pole: whole tiles of
+   * minLevel. The default is the whole world.
+   */
+  double westDeg = -180.0;
+  double eastDeg = 180.0;
   /** Samples along a tile's side (edges shared with the neighbours). */
   int32_t samples = 65;
   /** The heights' vertical datum, written to the store (e.g. "egm2008"). */

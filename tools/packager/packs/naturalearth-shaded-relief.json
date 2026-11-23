@@ -1,0 +1,36 @@
+{
+  "id": "naturalearth-shaded-relief",
+  "version": "2.0.0.1",
+  "index": {
+    "name": "Natural Earth shaded relief",
+    "description": "Grey shaded relief of the land, 21600 × 10800 pixels: a neutral background, or under a half-transparent layer.",
+    "licence": "Public domain (Natural Earth)"
+  },
+  "sizeLimitBytes": 120000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "ne-raster",
+      "file": "SR_HR.zip",
+      "url": "https://naciscdn.org/naturalearth/10m/raster/SR_HR.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-rasters-2.0.0/SR_HR.zip",
+      "sha256": "b2619fff2fc73c17152983c066adfaa25c4b626916b822bad2fae8bcd9be41a5",
+      "name": "Natural Earth 1:10m raster SR_HR",
+      "version": "2.0.0"
+    }
+  ],
+  "imageryDatasets": [
+    {
+      "dataset": "naturalearth-shaded-relief",
+      "source": "ne-raster",
+      "member": "SR_HR.tif",
+      "layer": "Natural Earth shaded relief",
+      "name": "Natural Earth shaded relief",
+      "licence": "Public domain (Natural Earth)",
+      "attribution": "Made with Natural Earth",
+      "maxLevel": 6,
+      "tileSize": 256,
+      "jpegQuality": 85
+    }
+  ]
+}

@@ -25,9 +25,11 @@ INCLUDEPATH += $$PWD/src
 HEADERS += \
     $$PWD/src/countrybuilder.h \
     $$PWD/src/elevationbuilder.h \
+    $$PWD/src/featurepipeline.h \
     $$PWD/src/imagerytiler.h \
     $$PWD/src/packbuilder.h \
     $$PWD/src/shorelinebuilder.h \
+    $$PWD/src/vectorbuilder.h \
     $$PWD/src/vmap0builder.h \
     $$PWD/src/vpf/vpfcoverage.h \
     $$PWD/src/vpf/vpftable.h
@@ -35,9 +37,11 @@ HEADERS += \
 SOURCES += \
     $$PWD/src/countrybuilder.cpp \
     $$PWD/src/elevationbuilder.cpp \
+    $$PWD/src/featurepipeline.cpp \
     $$PWD/src/imagerytiler.cpp \
     $$PWD/src/packbuilder.cpp \
     $$PWD/src/shorelinebuilder.cpp \
+    $$PWD/src/vectorbuilder.cpp \
     $$PWD/src/vmap0builder.cpp \
     $$PWD/src/vpf/vpfcoverage.cpp \
     $$PWD/src/vpf/vpftable.cpp

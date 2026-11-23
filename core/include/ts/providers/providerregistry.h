@@ -237,6 +237,9 @@ private:
   std::shared_ptr<ElevationProvider>
   basePackElevationLocked(const QJsonObject& source, QString* errorString);
   std::shared_ptr<ElevationProvider>
+  elevationStoreLocked(const QString& path, const QString& dataset,
+                       QString* errorString);
+  std::shared_ptr<ElevationProvider>
   fileElevationLocked(const QJsonObject& source, QString* errorString);
   std::shared_ptr<ElevationProvider>
   webElevationLocked(const QJsonObject& source, QString* errorString);
@@ -271,6 +274,8 @@ private:
   struct Replacement {
     QString path;
     bool features = false;
+    /** An elevation store (a finer DEM, or regional DEMs of its own). */
+    bool elevation = false;
     QString attribution;
     /**
      * The same dataset's files in further packs (regional packs of a

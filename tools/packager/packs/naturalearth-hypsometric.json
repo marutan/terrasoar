@@ -1,0 +1,36 @@
+{
+  "id": "naturalearth-hypsometric",
+  "version": "2.0.0.1",
+  "index": {
+    "name": "Natural Earth hypsometric map",
+    "description": "Cross-blended hypsometric tints (lowland greens to highland browns, by height and climate) with shaded relief, water bodies and the ocean bottom's relief, 21600 × 10800 pixels.",
+    "licence": "Public domain (Natural Earth)"
+  },
+  "sizeLimitBytes": 120000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "ne-raster",
+      "file": "HYP_HR_SR_OB_DR.zip",
+      "url": "https://naciscdn.org/naturalearth/10m/raster/HYP_HR_SR_OB_DR.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-rasters-2.0.0/HYP_HR_SR_OB_DR.zip",
+      "sha256": "ee2cbbf5b682e8514374c0c318bbf49aa640ecfe60d0a2e09a90e0c575d30a78",
+      "name": "Natural Earth 1:10m raster HYP_HR_SR_OB_DR",
+      "version": "2.0.0"
+    }
+  ],
+  "imageryDatasets": [
+    {
+      "dataset": "naturalearth-hypsometric",
+      "source": "ne-raster",
+      "member": "HYP_HR_SR_OB_DR.tif",
+      "layer": "Natural Earth hypsometric map",
+      "name": "Natural Earth hypsometric map",
+      "licence": "Public domain (Natural Earth)",
+      "attribution": "Made with Natural Earth",
+      "maxLevel": 6,
+      "tileSize": 256,
+      "jpegQuality": 85
+    }
+  ]
+}

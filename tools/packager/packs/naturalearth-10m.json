@@ -1,0 +1,797 @@
+{
+  "id": "naturalearth-10m",
+  "version": "5.1.2.1",
+  "index": {
+    "name": "Natural Earth map layers",
+    "description": "Natural Earth's 1:10m rivers, lakes, populated places, roads, railways, airports, ports, time zones, state and province borders, and peaks, with names, each shown from the zoom Natural Earth suggests for it.",
+    "licence": "Public domain (Natural Earth)"
+  },
+  "sizeLimitBytes": 200000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "ne-admin-1-states-provinces-lines",
+      "file": "ne_10m_admin_1_states_provinces_lines-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_admin_1_states_provinces_lines.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_admin_1_states_provinces_lines-5.1.2.geojson",
+      "sha256": "1a1f30ccaaf4cc9c4bde34266f0b8cbb955d3a4cf254b756912255f2ec7c75b6",
+      "name": "Natural Earth 1:10m, ne_10m_admin_1_states_provinces_lines (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-airports",
+      "file": "ne_10m_airports-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_airports.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_airports-5.1.2.geojson",
+      "sha256": "28892a892f670f1cf654c62253c6169fdc2504b92c956addb4ac8224f50cebe0",
+      "name": "Natural Earth 1:10m, ne_10m_airports (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-geography-regions-elevation-points",
+      "file": "ne_10m_geography_regions_elevation_points-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_geography_regions_elevation_points.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_geography_regions_elevation_points-5.1.2.geojson",
+      "sha256": "f98a16867867146ec4146d6d4b18c823eeedb2825947de666116cf9a4e3f43cb",
+      "name": "Natural Earth 1:10m, ne_10m_geography_regions_elevation_points (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-lakes",
+      "file": "ne_10m_lakes-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_lakes.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_lakes-5.1.2.geojson",
+      "sha256": "2d036f53dedec578001c5c30c2959ee7d4eebc1306900fa4367c49929ec8f2d9",
+      "name": "Natural Earth 1:10m, ne_10m_lakes (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-populated-places",
+      "file": "ne_10m_populated_places-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_populated_places.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_populated_places-5.1.2.geojson",
+      "sha256": "9b8e3de09048ef00dfc70357dbb9fa324493f214b5e0ae4daf1aa79a8d10116b",
+      "name": "Natural Earth 1:10m, ne_10m_populated_places (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-ports",
+      "file": "ne_10m_ports-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_ports.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_ports-5.1.2.geojson",
+      "sha256": "c5a5028f5187a5e1b9fe7f0fab99804a8be7482099a2365d404fb7e9dd6b5457",
+      "name": "Natural Earth 1:10m, ne_10m_ports (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-railroads",
+      "file": "ne_10m_railroads-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_railroads.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_railroads-5.1.2.geojson",
+      "sha256": "a0962d7866060ae3e24df255f6d662389ac9ba7e0df40cf329c2281190b861e6",
+      "name": "Natural Earth 1:10m, ne_10m_railroads (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-rivers-lake-centerlines",
+      "file": "ne_10m_rivers_lake_centerlines-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_rivers_lake_centerlines.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_rivers_lake_centerlines-5.1.2.geojson",
+      "sha256": "bb854a900ecbd3b408df46d5e16e3e0f974ba55993f9d8b5c26e855273c0905a",
+      "name": "Natural Earth 1:10m, ne_10m_rivers_lake_centerlines (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-roads",
+      "file": "ne_10m_roads-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_roads.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_roads-5.1.2.geojson",
+      "sha256": "66a0c7b438e92fd124822cc5921cfa11042f48c294ade5e0f03f2c6640fd0248",
+      "name": "Natural Earth 1:10m, ne_10m_roads (GeoJSON)",
+      "version": "5.1.2"
+    },
+    {
+      "id": "ne-time-zones",
+      "file": "ne_10m_time_zones-5.1.2.geojson",
+      "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_10m_time_zones.geojson",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-vectors-5.1.2/ne_10m_time_zones-5.1.2.geojson",
+      "sha256": "aa52ab97e5f906693f31fe2e625c9d6be78a4e74fcd4142a7261235b355cacfe",
+      "name": "Natural Earth 1:10m, ne_10m_time_zones (GeoJSON)",
+      "version": "5.1.2"
+    }
+  ],
+  "vector": {
+    "dataset": "naturalearth-10m",
+    "name": "Natural Earth map layers",
+    "licence": "Public domain (Natural Earth)",
+    "attribution": "Made with Natural Earth",
+    "sourceName": "Natural Earth 1:10m Cultural and Physical Vectors",
+    "sourceVersion": "5.1.2",
+    "sourceUrl": "https://github.com/nvkelso/natural-earth-vector/tree/v5.1.2",
+    "lods": [
+      {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 1,
+        "toleranceDeg": 0.05
+      },
+      {
+        "storageLevel": 2,
+        "minLevel": 2,
+        "maxLevel": 3,
+        "toleranceDeg": 0.02
+      },
+      {
+        "storageLevel": 4,
+        "minLevel": 4,
+        "maxLevel": 5,
+        "toleranceDeg": 0.005
+      },
+      {
+        "storageLevel": 6,
+        "minLevel": 6,
+        "maxLevel": -1,
+        "toleranceDeg": 0.001
+      }
+    ],
+    "classes": [
+      {
+        "source": "ne-rivers-lake-centerlines",
+        "geometry": "lines",
+        "table": "rivers_major",
+        "minLevel": 0,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom < 3"
+      },
+      {
+        "source": "ne-rivers-lake-centerlines",
+        "geometry": "lines",
+        "table": "rivers",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom >= 3 AND min_zoom < 5"
+      },
+      {
+        "source": "ne-rivers-lake-centerlines",
+        "geometry": "lines",
+        "table": "rivers_minor",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom >= 5 AND min_zoom < 7"
+      },
+      {
+        "source": "ne-rivers-lake-centerlines",
+        "geometry": "lines",
+        "table": "rivers_local",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom >= 7"
+      },
+      {
+        "source": "ne-lakes",
+        "geometry": "areas",
+        "table": "lakes_major",
+        "minLevel": 0,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom < 3"
+      },
+      {
+        "source": "ne-lakes",
+        "geometry": "areas",
+        "table": "lakes",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom >= 3 AND min_zoom < 5"
+      },
+      {
+        "source": "ne-lakes",
+        "geometry": "areas",
+        "table": "lakes_minor",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom >= 5 AND min_zoom < 7"
+      },
+      {
+        "source": "ne-lakes",
+        "geometry": "areas",
+        "table": "lakes_local",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          }
+        ],
+        "where": "min_zoom >= 7"
+      },
+      {
+        "source": "ne-populated-places",
+        "geometry": "points",
+        "table": "places_major",
+        "minLevel": 1,
+        "attributes": [
+          {
+            "column": "NAME",
+            "name": "name"
+          },
+          {
+            "column": "FEATURECLA",
+            "name": "feature"
+          },
+          {
+            "column": "ADM0_A3",
+            "name": "country"
+          },
+          {
+            "column": "POP_MAX",
+            "name": "population",
+            "kind": "number"
+          }
+        ],
+        "where": "MIN_ZOOM < 3"
+      },
+      {
+        "source": "ne-populated-places",
+        "geometry": "points",
+        "table": "places",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "NAME",
+            "name": "name"
+          },
+          {
+            "column": "FEATURECLA",
+            "name": "feature"
+          },
+          {
+            "column": "ADM0_A3",
+            "name": "country"
+          },
+          {
+            "column": "POP_MAX",
+            "name": "population",
+            "kind": "number"
+          }
+        ],
+        "where": "MIN_ZOOM >= 3 AND MIN_ZOOM < 5"
+      },
+      {
+        "source": "ne-populated-places",
+        "geometry": "points",
+        "table": "places_minor",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "NAME",
+            "name": "name"
+          },
+          {
+            "column": "FEATURECLA",
+            "name": "feature"
+          },
+          {
+            "column": "ADM0_A3",
+            "name": "country"
+          },
+          {
+            "column": "POP_MAX",
+            "name": "population",
+            "kind": "number"
+          }
+        ],
+        "where": "MIN_ZOOM >= 5 AND MIN_ZOOM < 7"
+      },
+      {
+        "source": "ne-populated-places",
+        "geometry": "points",
+        "table": "places_local",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "NAME",
+            "name": "name"
+          },
+          {
+            "column": "FEATURECLA",
+            "name": "feature"
+          },
+          {
+            "column": "ADM0_A3",
+            "name": "country"
+          },
+          {
+            "column": "POP_MAX",
+            "name": "population",
+            "kind": "number"
+          }
+        ],
+        "where": "MIN_ZOOM >= 7"
+      },
+      {
+        "source": "ne-roads",
+        "geometry": "lines",
+        "table": "roads_major",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "expressway",
+            "name": "expressway",
+            "kind": "number"
+          }
+        ],
+        "where": "min_zoom < 5 AND featurecla <> 'Ferry'"
+      },
+      {
+        "source": "ne-roads",
+        "geometry": "lines",
+        "table": "roads",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "expressway",
+            "name": "expressway",
+            "kind": "number"
+          }
+        ],
+        "where": "min_zoom >= 5 AND min_zoom < 7 AND featurecla <> 'Ferry'"
+      },
+      {
+        "source": "ne-roads",
+        "geometry": "lines",
+        "table": "roads_minor",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "expressway",
+            "name": "expressway",
+            "kind": "number"
+          }
+        ],
+        "where": "min_zoom >= 7 AND featurecla <> 'Ferry'"
+      },
+      {
+        "source": "ne-roads",
+        "geometry": "lines",
+        "table": "ferries",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          }
+        ],
+        "where": "featurecla = 'Ferry'"
+      },
+      {
+        "source": "ne-railroads",
+        "geometry": "lines",
+        "table": "railways",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "category",
+            "name": "category"
+          }
+        ]
+      },
+      {
+        "source": "ne-airports",
+        "geometry": "points",
+        "table": "airports_major",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "gps_code",
+            "name": "icao"
+          }
+        ],
+        "where": "scalerank < 4"
+      },
+      {
+        "source": "ne-airports",
+        "geometry": "points",
+        "table": "airports",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "type",
+            "name": "type"
+          },
+          {
+            "column": "iata_code",
+            "name": "iata"
+          },
+          {
+            "column": "gps_code",
+            "name": "icao"
+          }
+        ],
+        "where": "scalerank >= 4"
+      },
+      {
+        "source": "ne-ports",
+        "geometry": "points",
+        "table": "ports",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          }
+        ]
+      },
+      {
+        "source": "ne-time-zones",
+        "geometry": "areas",
+        "table": "time_zones",
+        "minLevel": 0,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "zone"
+          },
+          {
+            "column": "time_zone",
+            "name": "offset"
+          },
+          {
+            "column": "places",
+            "name": "places"
+          }
+        ]
+      },
+      {
+        "source": "ne-admin-1-states-provinces-lines",
+        "geometry": "lines",
+        "table": "state_borders_major",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "ADM0_NAME",
+            "name": "country"
+          }
+        ],
+        "where": "MIN_ZOOM < 5"
+      },
+      {
+        "source": "ne-admin-1-states-provinces-lines",
+        "geometry": "lines",
+        "table": "state_borders",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "ADM0_NAME",
+            "name": "country"
+          }
+        ],
+        "where": "MIN_ZOOM >= 5"
+      },
+      {
+        "source": "ne-geography-regions-elevation-points",
+        "geometry": "points",
+        "table": "peaks_major",
+        "minLevel": 3,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          },
+          {
+            "column": "elevation",
+            "name": "elevation_m",
+            "kind": "number"
+          }
+        ],
+        "where": "min_zoom < 5"
+      },
+      {
+        "source": "ne-geography-regions-elevation-points",
+        "geometry": "points",
+        "table": "peaks",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "name",
+            "name": "name"
+          },
+          {
+            "column": "featurecla",
+            "name": "feature"
+          },
+          {
+            "column": "elevation",
+            "name": "elevation_m",
+            "kind": "number"
+          }
+        ],
+        "where": "min_zoom >= 5"
+      }
+    ],
+    "layers": [
+      {
+        "id": "time_zones",
+        "name": "Natural Earth Time Zones",
+        "tables": [
+          "time_zones"
+        ],
+        "style": {
+          "fill": "#00000000",
+          "outline": "#b39ddbcc",
+          "outlineWidthPx": 1.0
+        }
+      },
+      {
+        "id": "lakes",
+        "name": "Natural Earth Lakes",
+        "tables": [
+          "lakes_major",
+          "lakes",
+          "lakes_minor",
+          "lakes_local"
+        ],
+        "style": {
+          "fill": "#3d8fe0b3",
+          "outline": "#5aa9ffff",
+          "outlineWidthPx": 0.6
+        }
+      },
+      {
+        "id": "rivers",
+        "name": "Natural Earth Rivers",
+        "tables": [
+          "rivers_major",
+          "rivers",
+          "rivers_minor",
+          "rivers_local"
+        ],
+        "style": {
+          "outline": "#5aa9ffff",
+          "outlineWidthPx": 1.0
+        },
+        "styleRules": [
+          {
+            "attribute": "feature",
+            "equals": "Lake Centerline",
+            "outline": "#5aa9ff80"
+          }
+        ]
+      },
+      {
+        "id": "state_borders",
+        "name": "Natural Earth State and Province Borders",
+        "tables": [
+          "state_borders_major",
+          "state_borders"
+        ],
+        "style": {
+          "outline": "#e6ee9cff",
+          "outlineWidthPx": 0.8
+        }
+      },
+      {
+        "id": "railways",
+        "name": "Natural Earth Railways",
+        "tables": [
+          "railways"
+        ],
+        "style": {
+          "outline": "#d6604dff",
+          "outlineWidthPx": 1.0
+        }
+      },
+      {
+        "id": "roads",
+        "name": "Natural Earth Roads",
+        "tables": [
+          "roads_major",
+          "roads",
+          "roads_minor",
+          "ferries"
+        ],
+        "style": {
+          "outline": "#f5c46eff",
+          "outlineWidthPx": 1.0
+        },
+        "styleRules": [
+          {
+            "attribute": "type",
+            "equals": "Major Highway",
+            "outline": "#f2a33aff",
+            "outlineWidthPx": 1.8
+          },
+          {
+            "attribute": "expressway",
+            "equals": "1",
+            "outline": "#e8503aff",
+            "outlineWidthPx": 2.0
+          },
+          {
+            "attribute": "table",
+            "equals": "ferries_4",
+            "outline": "#4fc3f7ff",
+            "outlineWidthPx": 1.0
+          },
+          {
+            "attribute": "table",
+            "equals": "ferries_6",
+            "outline": "#4fc3f7ff",
+            "outlineWidthPx": 1.0
+          }
+        ]
+      },
+      {
+        "id": "airports",
+        "name": "Natural Earth Airports",
+        "tables": [
+          "airports_major",
+          "airports"
+        ],
+        "style": {
+          "outline": "#ff7ad9ff",
+          "pointSizePx": 6,
+          "labels": "name"
+        }
+      },
+      {
+        "id": "ports",
+        "name": "Natural Earth Ports",
+        "tables": [
+          "ports"
+        ],
+        "style": {
+          "outline": "#4fc3f7ff",
+          "pointSizePx": 5,
+          "labels": "name"
+        }
+      },
+      {
+        "id": "peaks",
+        "name": "Natural Earth Peaks and Regions",
+        "tables": [
+          "peaks_major",
+          "peaks"
+        ],
+        "style": {
+          "outline": "#ffe0b2ff",
+          "pointSizePx": 4,
+          "labels": "name"
+        }
+      },
+      {
+        "id": "places",
+        "name": "Natural Earth Populated Places",
+        "tables": [
+          "places_major",
+          "places",
+          "places_minor",
+          "places_local"
+        ],
+        "style": {
+          "outline": "#fff3e0ff",
+          "pointSizePx": 4,
+          "labels": "name"
+        },
+        "styleRules": [
+          {
+            "attribute": "feature",
+            "equals": "Admin-0 capital",
+            "outline": "#ffcc80ff",
+            "pointSizePx": 6
+          }
+        ]
+      }
+    ]
+  }
+}

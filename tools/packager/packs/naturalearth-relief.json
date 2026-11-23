@@ -1,0 +1,36 @@
+{
+  "id": "naturalearth-relief",
+  "version": "2.0.0.1",
+  "index": {
+    "name": "Natural Earth I relief map",
+    "description": "Natural Earth I: land cover in natural colours with shaded relief, water bodies and an ocean in soft blue, 21600 × 10800 pixels (about 1.9 km per pixel). A map-like alternative to Blue Marble.",
+    "licence": "Public domain (Natural Earth)"
+  },
+  "sizeLimitBytes": 120000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "ne-raster",
+      "file": "NE1_HR_LC_SR_W_DR.zip",
+      "url": "https://naciscdn.org/naturalearth/10m/raster/NE1_HR_LC_SR_W_DR.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/naturalearth-10m-rasters-2.0.0/NE1_HR_LC_SR_W_DR.zip",
+      "sha256": "8841d08155415f0556462846dcb845a4ccb8f12390b0e0ba36ffde55efadeb56",
+      "name": "Natural Earth 1:10m raster NE1_HR_LC_SR_W_DR",
+      "version": "2.0.0"
+    }
+  ],
+  "imageryDatasets": [
+    {
+      "dataset": "naturalearth-relief",
+      "source": "ne-raster",
+      "member": "NE1_HR_LC_SR_W_DR.tif",
+      "layer": "Natural Earth I relief map",
+      "name": "Natural Earth I relief map",
+      "licence": "Public domain (Natural Earth)",
+      "attribution": "Made with Natural Earth",
+      "maxLevel": 6,
+      "tileSize": 256,
+      "jpegQuality": 85
+    }
+  ]
+}

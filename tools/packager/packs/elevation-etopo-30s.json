@@ -1,0 +1,33 @@
+{
+  "id": "elevation-etopo-30s",
+  "version": "2022.1",
+  "index": {
+    "name": "Terrain, finer (ETOPO 2022)",
+    "description": "The Earth's land and sea floor heights from ETOPO 2022 at 30″, about 0.9 km, instead of the base pack's 4.9 km: the Terrain layer shows mountains, valleys and the sea floor in more detail. Replaces the base pack's terrain while installed.",
+    "licence": "CC0-1.0 (NOAA)"
+  },
+  "sizeLimitBytes": 1500000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "etopo-30s",
+      "file": "ETOPO_2022_v1_30s_N90W180_surface.tif",
+      "url": "https://www.ngdc.noaa.gov/mgg/global/relief/ETOPO2022/data/30s/30s_surface_elev_gtif/ETOPO_2022_v1_30s_N90W180_surface.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/etopo-2022-v1-30s-surface/ETOPO_2022_v1_30s_N90W180_surface.tif",
+      "sha256": "8630abc401cc6bdd30b507a68d3eb9eda5b65f5636f7199e4b1eefd476b5a9e2",
+      "name": "ETOPO 2022 Global Relief Model, 30 arc-second, surface elevation",
+      "version": "2022 v1"
+    }
+  ],
+  "elevation": {
+    "dataset": "elevation-etopo-30s",
+    "source": "etopo-30s",
+    "replaces": "elevation",
+    "name": "Elevation, finer",
+    "licence": "CC0-1.0 (NOAA)",
+    "attribution": "Elevation: ETOPO 2022, NOAA NCEI",
+    "maxLevel": 8,
+    "samples": 85,
+    "verticalDatum": "egm2008"
+  }
+}

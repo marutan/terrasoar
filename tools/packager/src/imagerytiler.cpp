@@ -83,9 +83,13 @@ QImage readEquirectangular(const QString& sourcePath, int32_t widthPx,
                            int32_t heightPx, QString* errorString)
 {
   const GdalDataset dataset(sourcePath);
-  if (!dataset.isOpen() || dataset.rasterBandCount() < 3) {
-    *errorString = QStringLiteral("Cannot read %1 as a three-band image: %2")
-                       .arg(sourcePath, dataset.errorString());
+  // Three bands (red, green, blue) or one, grey (Natural Earth's shaded
+  // relief), read into all three.
+  const int32_t bandCount = dataset.isOpen() ? dataset.rasterBandCount() : 0;
+  if (bandCount != 1 && bandCount < 3) {
+    *errorString =
+        QStringLiteral("Cannot read %1 as a three-band or grey image: %2")
+            .arg(sourcePath, dataset.errorString());
     return QImage();
   }
   GDALDatasetH handle = static_cast<GDALDatasetH>(dataset.handle());
@@ -109,6 +113,9 @@ QImage readEquirectangular(const QString& sourcePath, int32_t widthPx,
   INIT_RASTERIO_EXTRA_ARG(extra);
   extra.eResampleAlg = GRIORA_Average;
   std::array<int32_t, 3> bands = {1, 2, 3};
+  if (bandCount == 1) {
+    bands = {1, 1, 1};
+  }
   CPLErrorReset();
   // Interleaved RGB straight into the QImage rows.
   const CPLErr result = GDALDatasetRasterIOEx(

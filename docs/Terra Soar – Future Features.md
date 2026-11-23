@@ -940,6 +940,17 @@ It is a US Government (NGA) product approved for public release. The exact terms
 
 **Exit criteria**: the VMAP0 packs build from the recorded source with every check passing. They are tested, published with approval and installable from the Data Packs window, and draw correctly and within budget on the globe and the map.
 
+## Phase 26 – More public domain data packs
+
+Goal: downloadable packs from further public domain and open sources, every source kept in `marutan/terrasoar-packs-sources` (decided 2026-11-22, `docs/design/packs.md`).
+
+**Status (2026-11-23):** in progress on one branch; the packs are built and checked locally, not yet published. Contents, sources and sizes: `docs/data/more-packs.md`.
+- **Packs:** Natural Earth's map layers (ten themes) and its three raster maps; Black Marble 2012 and 2016; WDBII borders and rivers; OurAirports; place names (GNS outside the US, GNIS in it); ETOPO 2022 at 30″ for the Terrain layer; GEBCO 2026 at 15″ in four regional packs.
+- **Decided with the owner (2026-11-22):** ETOPO 30″ globally and GEBCO 15″ by region, and no ETOPO 15″, which would duplicate GEBCO. Place names are populated places and major features, main names only. Black Marble is 2012 and 2016 at 3 km. WDBII was added on request.
+- **Decided with the owner (2026-11-23):** mirror the GNS files, as public-domain US government works. NGA's server doesn't answer from the build machine, so they come from the Internet Archive's captures, each matching the archive's SHA-1.
+- **Packager:** a GDAL/OGR vector reader (shapefiles, GeoJSON, CSV) on the pipeline VMAP0 now shares, plus imagery datasets of a pack's own. Elevation can be regional, replacing, or of its own, with sample counts matched to the source (85 a side), grids over 1 GB in a mapped file, and sources over 2 GB kept in parts (GEBCO's 4.2 GB zip, mirrored by a workflow).
+- **Program:** elevation packs now work. A finer DEM replaces the base pack's terrain, and regional DEMs of a pack's own are read together. Tables shown deeper than their storage level are now drawn; VMAP0's airports, contours and some vegetation never were.
+
 ## Phase 22 – Local data files
 
 Goal: users can open their own vector and imagery files, as they already can DEMs.

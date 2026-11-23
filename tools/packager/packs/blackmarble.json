@@ -1,0 +1,55 @@
+{
+  "id": "blackmarble",
+  "version": "2016.1",
+  "index": {
+    "name": "Black Marble (Earth at night)",
+    "description": "NASA's Black Marble: the Earth's city lights at night from the Suomi NPP satellite, for 2012 and for 2016, each as its own layer, at about 3 km per pixel.",
+    "licence": "Public domain (NASA)"
+  },
+  "sizeLimitBytes": 100000000,
+  "reservedBytes": 0,
+  "sources": [
+    {
+      "id": "blackmarble-2012",
+      "file": "BlackMarble_2012_3km_geo.tif",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/imagerecords/144000/144875/BlackMarble_2012_3km_geo.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/blackmarble-3km-2012-2016/BlackMarble_2012_3km_geo.tif",
+      "sha256": "e77d333de16835ab7abbdb3ee67c199de277faf48037dc50552d8e67dfd6897e",
+      "name": "Black Marble 2012, global, 3 km (13500 × 6750)",
+      "version": "2012"
+    },
+    {
+      "id": "blackmarble-2016",
+      "file": "BlackMarble_2016_3km_geo.tif",
+      "url": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/imagerecords/144000/144898/BlackMarble_2016_3km_geo.tif",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/blackmarble-3km-2012-2016/BlackMarble_2016_3km_geo.tif",
+      "sha256": "e915ef2a20d84e2a59e1547d3ad564463ad4bcf22bfa02e0e0b8ed1cd722e9c0",
+      "name": "Black Marble 2016, global, 3 km (13500 × 6750)",
+      "version": "2016"
+    }
+  ],
+  "imageryDatasets": [
+    {
+      "dataset": "blackmarble-2012",
+      "source": "blackmarble-2012",
+      "layer": "Black Marble 2012 (Earth at night)",
+      "name": "Black Marble 2012",
+      "licence": "Public domain (NASA)",
+      "attribution": "Black Marble: NASA Earth Observatory",
+      "maxLevel": 5,
+      "tileSize": 256,
+      "jpegQuality": 85
+    },
+    {
+      "dataset": "blackmarble-2016",
+      "source": "blackmarble-2016",
+      "layer": "Black Marble 2016 (Earth at night)",
+      "name": "Black Marble 2016",
+      "licence": "Public domain (NASA)",
+      "attribution": "Black Marble: NASA Earth Observatory",
+      "maxLevel": 5,
+      "tileSize": 256,
+      "jpegQuality": 85
+    }
+  ]
+}
