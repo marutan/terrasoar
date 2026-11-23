@@ -195,8 +195,8 @@ Packs** like VMAP0's:
 | WDBII borders and rivers | National, internal and maritime borders, rivers by size, intermittent rivers and canals, down to a detailed resolution (the borders are those of the 1980s) | 89 MB |
 | Airports (OurAirports) | About 72,000 airports, heliports and seaplane bases with their names, runways, and navigation aids (VOR, NDB, DME) | 16 MB |
 | Place names | Names of cities, towns, villages and neighbourhoods and of major features (mountains and ranges, lakes, bays, seas, islands, capes, glaciers, falls, undersea features), shown as you zoom in: capitals first, villages close in | 309 MB |
-| Terrain, finer (ETOPO 2022) | The Terrain layer at about 0.9 km instead of 4.9 km: mountains, valleys and the sea floor in more detail. Takes the place of the built-in terrain | |
-| GEBCO terrain and sea floor | The sea floor and the land at about 460 m, as a layer of its own above Terrain; four packs, one per quarter of the world | |
+| Terrain, finer (ETOPO 2022) | The Terrain layer at about 0.9 km instead of 4.9 km: mountains, valleys and the sea floor in more detail. Takes the place of the built-in terrain | 461 MB |
+| GEBCO terrain and sea floor | The sea floor and the land at about 460 m, as a layer of its own above Terrain; four packs, one per quarter of the world | 356–396 MB each |
 
 The picture packs are layers like Blue Marble: put one at the bottom of
 the tree to use it as the background instead. OurAirports is community

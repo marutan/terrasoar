@@ -60,7 +60,7 @@ versions ignore the field.
 | `naturalearth-10m`, `wdbii`, `ourairports`, `names` | (vector datasets of their own) | Natural Earth's map layers; WDBII borders and rivers; airports, runways and navaids; place names (GNS and GNIS). Details in [docs/data/more-packs.md](../data/more-packs.md) | 16–309 MB |
 | `naturalearth-relief`, `-hypsometric`, `-shaded-relief`, `blackmarble` | (imagery of their own, a layer each) | Natural Earth's raster maps; Black Marble 2012 and 2016 | 18–72 MB |
 | `elevation-etopo-30s` | `elevation` | ETOPO 2022 at 30″ for the Terrain layer instead of the base pack's 2.64′ | 461 MB |
-| `gebco-*` (4 packs) | (an elevation dataset of their own, regional) | GEBCO 2026 at 15″, a quarter of the world each, read together as one layer | 385 MB each |
+| `gebco-*` (4 packs) | (an elevation dataset of their own, regional) | GEBCO 2026 at 15″, a quarter of the world each, read together as one layer | 356–396 MB each |
 
 A geoid pack replacing a base pack geoid makes every elevation source on
 that datum use the finer grid (the registry keys providers by the grid in

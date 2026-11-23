@@ -18,8 +18,8 @@ Every source is kept, with its licence, in
 | `wdbii` | WDBII borders and rivers from the GSHHG 2.3.7 zip, five resolutions | LGPL-3.0-or-later | 89 MB | 6 s, 92 MB |
 | `ourairports` | OurAirports airports, runways and navaids of 2026-11-22 | Public domain (Unlicense) | 16 MB | 4 s |
 | `names` | GNS (NGA, outside the US) of 2026-09-03 and GNIS (USGS) of 2026-11-02 | Public domain (US government works) | 309 MB | 12 min, 1.0 GB |
-| `elevation-etopo-30s` | ETOPO 2022 surface elevation at 30″ | CC0-1.0 (NOAA) | | |
-| `gebco-w180-w90`, `-w90-0`, `-0-e90`, `-e90-e180` | The GEBCO 2026 Grid at 15″, one quarter of the world each | Public domain (GEBCO) | | |
+| `elevation-etopo-30s` | ETOPO 2022 surface elevation at 30″ | CC0-1.0 (NOAA) | 461 MB | 7.5 min |
+| `gebco-w180-w90`, `-w90-0`, `-0-e90`, `-e90-e180` | The GEBCO 2026 Grid at 15″, one quarter of the world each | Public domain (GEBCO) | 356, 374, 385 and 396 MB | 7–8 min each, 5.2 GB (most of it the mapped grid) |
 
 Sizes are the packs as downloaded; build times and peak memory on one
 core.
