@@ -141,7 +141,8 @@ QString ProviderRegistry::basePackFile(const QJsonObject& source, bool features,
   const std::unordered_map<QString, Replacement>::const_iterator replacement =
       m_replacements.find(dataset);
   if (replacement != m_replacements.end() &&
-      replacement->second.features == features) {
+      replacement->second.features == features &&
+      !replacement->second.elevation) {
     return replacement->second.path;
   }
   const std::unordered_map<QString, QString>& files =
@@ -333,6 +334,7 @@ void ProviderRegistry::addPackDatasetLocked(const QString& directory,
   Replacement replacement;
   replacement.path = path;
   replacement.features = dataset.kind == PackDataset::Kind::Features;
+  replacement.elevation = dataset.kind == PackDataset::Kind::Elevation;
   replacement.attribution = dataset.attribution;
   if (!dataset.variantOf.isEmpty() && !dataset.variant.isEmpty()) {
     // The first pack with this variant wins.
@@ -347,14 +349,17 @@ void ProviderRegistry::addPackDatasetLocked(const QString& directory,
       m_replacements.find(id);
   if (known != m_replacements.end()) {
     // Regional packs of one dataset of its own (VMAP0's hydrography by
-    // library) are read together; otherwise the first pack wins.
-    if (own && replacement.features && known->second.features) {
+    // library, GEBCO by quarter of the world) are read together; otherwise
+    // the first pack wins.
+    if (own && ((replacement.features && known->second.features) ||
+                (replacement.elevation && known->second.elevation))) {
       known->second.morePaths.push_back(path);
     }
     return;
   }
   if (own && dataset.kind != PackDataset::Kind::Features &&
-      dataset.kind != PackDataset::Kind::Imagery) {
+      dataset.kind != PackDataset::Kind::Imagery &&
+      dataset.kind != PackDataset::Kind::Elevation) {
     return;
   }
   m_replacements.emplace(id, replacement);
@@ -758,10 +763,22 @@ ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
                                           QString* errorString)
 {
   const QString dataset = source.value(QStringLiteral("dataset")).toString();
+  // A pack's finer DEM in place of the base pack's, or a DEM of a pack's
+  // own; regional packs of one (GEBCO's quarters) read together.
+  std::vector<QString> paths;
+  const std::unordered_map<QString, Replacement>::const_iterator replacement =
+      m_replacements.find(dataset);
   const std::unordered_map<QString, QString>::const_iterator file =
       m_basePackElevation.find(dataset);
-  if (!isBasePackSource(source) || m_basePackDirectory.isEmpty() ||
-      file == m_basePackElevation.end()) {
+  if (isBasePackSource(source) && replacement != m_replacements.end() &&
+      replacement->second.elevation) {
+    paths.push_back(replacement->second.path);
+    paths.insert(paths.end(), replacement->second.morePaths.begin(),
+                 replacement->second.morePaths.end());
+  } else if (isBasePackSource(source) && !m_basePackDirectory.isEmpty() &&
+             file != m_basePackElevation.end()) {
+    paths.push_back(QDir(m_basePackDirectory).filePath(file->second));
+  } else {
     if (errorString) {
       *errorString =
           QCoreApplication::translate("ts::ProviderRegistry",
@@ -770,7 +787,41 @@ ProviderRegistry::basePackElevationLocked(const QJsonObject& source,
     }
     return nullptr;
   }
-  const QString path = QDir(m_basePackDirectory).filePath(file->second);
+  std::vector<std::shared_ptr<ElevationProvider>> stores;
+  stores.reserve(paths.size());
+  QStringList ids;
+  for (const QString& path : paths) {
+    std::shared_ptr<ElevationProvider> store =
+        elevationStoreLocked(path, dataset, errorString);
+    if (!store) {
+      return nullptr;
+    }
+    ids << store->id();
+    stores.push_back(std::move(store));
+  }
+  if (stores.size() == 1) {
+    return stores.front();
+  }
+  // Each region's tiles are its own: the composite takes each from the
+  // store that has it.
+  const QString key = ids.join(QLatin1Char('\n'));
+  const std::unordered_map<QString, std::weak_ptr<ElevationProvider>>::iterator
+      it = m_composites.find(key);
+  if (it != m_composites.end()) {
+    std::shared_ptr<ElevationProvider> live = it->second.lock();
+    if (live) {
+      return live;
+    }
+  }
+  std::shared_ptr<ElevationProvider> composite =
+      std::make_shared<CompositeElevationProvider>(std::move(stores));
+  m_composites[key] = composite;
+  return composite;
+}
+
+std::shared_ptr<ElevationProvider> ProviderRegistry::elevationStoreLocked(
+    const QString& path, const QString& dataset, QString* errorString)
+{
   // The store names its vertical datum: a geoid dataset of the pack (or a
   // finer one from an installed pack).
   const QString datum = SqliteTileImageryProvider(path).info().verticalDatum;

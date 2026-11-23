@@ -620,6 +620,97 @@ def gnis_classes():
     return source, classes
 
 
+GNS_DATE = "2026-09-03"
+GNS_RELEASE = "gns-feature-classes-" + GNS_DATE
+# The feature class files used: file stem, its Internet Archive capture
+# (NGA's server answers few networks), SHA-256.
+GNS_FILES = {
+    "Populated_Places": ("20260903061713", "d5d35d2afe119b8b46ab2c3c30e3d78dc68ecd121d9b53a419fd594986495819"),
+    "Hypsographic": ("20260903061805", "d395834fb3c03525a7a5b1c78466d68e902b4eb38d675b56b5582bbc5a10d090"),
+    "Hydrographic": ("20260903061628", "@@H@@"),
+    "Undersea": ("20260903061525", "@@U@@"),
+}
+# Display bands: GNS lists the scale bands a name is shown at, from 1
+# (the largest scale) up; a name shown at band 9 is shown on the smallest
+# scale maps. Lists are contiguous, so "shown at band k or smaller" is
+# "display contains k".
+GNS_LOCAL = ("display LIKE '%5%'")
+GNS_CLASSES = [
+    # file, table, first level, filter (approved names, "nt = 'N'", only)
+    ("Populated_Places", "world_capitals", 2, "desig_cd = 'PPLC'"),
+    ("Populated_Places", "admin_seats", 4, "desig_cd = 'PPLA'"),
+    ("Populated_Places", "places_major", 5,
+     "desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') "
+     "AND display LIKE '%9%'"),
+    ("Populated_Places", "places", 6,
+     "desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') "
+     "AND display LIKE '%7%' AND display NOT LIKE '%9%'"),
+    ("Populated_Places", "places_minor", 7,
+     "desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') "
+     "AND display LIKE '%5%' AND display NOT LIKE '%7%'"),
+    ("Hypsographic", "ranges", 5, "desig_cd = 'MTS' AND " + GNS_LOCAL),
+    ("Hypsographic", "mountains_major", 5,
+     "desig_cd IN ('MT', 'PK', 'VLC') AND display LIKE '%9%'"),
+    ("Hypsographic", "mountains", 6,
+     "desig_cd IN ('MT', 'PK', 'VLC') AND display LIKE '%7%' AND "
+     "display NOT LIKE '%9%'"),
+    ("Hypsographic", "mountains_minor", 7,
+     "desig_cd IN ('MT', 'PK', 'VLC') AND display LIKE '%5%' AND "
+     "display NOT LIKE '%7%'"),
+    ("Hypsographic", "islands_major", 6,
+     "desig_cd IN ('ISL', 'ISLS') AND display LIKE '%7%'"),
+    ("Hypsographic", "islands", 7,
+     "desig_cd IN ('ISL', 'ISLS') AND display LIKE '%5%' AND "
+     "display NOT LIKE '%7%'"),
+    ("Hypsographic", "capes", 7,
+     "desig_cd IN ('CAPE', 'PEN') AND " + GNS_LOCAL),
+    ("Hydrographic", "seas", 4,
+     "desig_cd IN ('SEA', 'GULF', 'BAY', 'STRT') AND display LIKE '%7%'"),
+    ("Hydrographic", "bays", 6,
+     "desig_cd IN ('SEA', 'GULF', 'BAY', 'STRT') AND display LIKE '%5%' AND "
+     "display NOT LIKE '%7%'"),
+    ("Hydrographic", "lakes_major", 6,
+     "desig_cd IN ('LK', 'LKS', 'RSV', 'LGN') AND display LIKE '%7%'"),
+    ("Hydrographic", "lakes", 7,
+     "desig_cd IN ('LK', 'LKS', 'RSV', 'LGN') AND display LIKE '%5%' AND "
+     "display NOT LIKE '%7%'"),
+    ("Hydrographic", "falls_glaciers", 7,
+     "desig_cd IN ('FLLS', 'GLCR') AND " + GNS_LOCAL),
+    ("Undersea", "undersea", 4, "1 = 1"),
+]
+
+
+def gns_classes():
+    """GNS: the world's places and major features outside the US."""
+    sources = []
+    for stem, (capture, sha) in GNS_FILES.items():
+        file = f"gns-{stem}-{GNS_DATE}.zip"
+        sources.append({
+            "id": "gns-" + stem.lower().replace("_", "-"),
+            "file": file,
+            "url": ("https://geonames.nga.mil/geonames/GNSData/fc_files/"
+                    f"{stem}.zip"),
+            "mirror": f"{MIRROR}/{GNS_RELEASE}/{file}",
+            "sha256": sha,
+            "name": f"GEOnet Names Server, feature class {stem} (NGA)",
+            "version": GNS_DATE,
+            "notices": ["disclaimer.txt"],
+        })
+    open_options = ["SEPARATOR=TAB", "X_POSSIBLE_NAMES=long_dd",
+                    "Y_POSSIBLE_NAMES=lat_dd"]
+    classes = []
+    for stem, table, first, where in GNS_CLASSES:
+        classes.append({
+            "source": "gns-" + stem.lower().replace("_", "-"),
+            "member": stem + ".txt", "driver": "CSV", "open": open_options,
+            "geometry": "points", "where": "nt = 'N' AND " + where,
+            "table": table, "minLevel": first,
+            "attributes": [text("full_name", "name"),
+                           text("desig_cd", "feature"),
+                           text("cc_ft", "region")]})
+    return sources, classes
+
+
 def names(out):
     """Place names: populated places and major features, GNIS for the US
     and GNS for the rest of the world."""
@@ -627,24 +718,31 @@ def names(out):
         {"storageLevel": 3, "minLevel": 3, "maxLevel": 5},
         {"storageLevel": 6, "minLevel": 6, "maxLevel": -1},
     ]
-    gnis_source, classes = gnis_classes()
-    sources = [gnis_source]
-    places = [t for _, t, _ in GNIS_CLASSES if t in ("us_places",)]
-    features = [t for _, t, _ in GNIS_CLASSES if t not in places]
+    gnis_source, gnis = gnis_classes()
+    gns_sources, gns = gns_classes()
+    sources = gns_sources + [gnis_source]
+    classes = gns + gnis
+    place_tables = ["world_capitals", "admin_seats", "places_major", "places",
+                    "places_minor", "us_places"]
+    places = [c["table"] for c in classes if c["table"] in place_tables]
+    features = [c["table"] for c in classes if c["table"] not in place_tables]
+    water = ["Lake", "Bay", "Sea", "LK", "LKS", "RSV", "LGN", "SEA", "GULF",
+             "BAY", "STRT"]
+    heights = ["Summit", "MT", "PK", "VLC", "Range", "MTS"]
     layers = [
         {"id": "places", "name": "Place Names", "tables": places,
-         "style": {"outline": "#fff3e0ff", "pointSizePx": 3, "labels": "name"}},
+         "style": {"outline": "#fff3e0ff", "pointSizePx": 3, "labels": "name"},
+         "styleRules": [{"attribute": "feature", "equals": "PPLC",
+                         "outline": "#ffcc80ff", "pointSizePx": 6},
+                        {"attribute": "feature", "equals": "PPLA",
+                         "pointSizePx": 5}]},
         {"id": "features", "name": "Feature Names (Mountains, Lakes, Islands…)",
          "tables": features,
          "style": {"outline": "#c5e1a5ff", "pointSizePx": 3, "labels": "name"},
-         "styleRules": [{"attribute": "feature", "equals": "Summit",
-                         "outline": "#ffe0b2ff"},
-                        {"attribute": "feature", "equals": "Lake",
-                         "outline": "#90caf9ff"},
-                        {"attribute": "feature", "equals": "Bay",
-                         "outline": "#90caf9ff"},
-                        {"attribute": "feature", "equals": "Sea",
-                         "outline": "#90caf9ff"}]},
+         "styleRules": [{"attribute": "feature", "equals": f,
+                         "outline": "#ffe0b2ff"} for f in heights] +
+                       [{"attribute": "feature", "equals": f,
+                         "outline": "#90caf9ff"} for f in water]},
     ]
     cfg = {
         "id": "names",

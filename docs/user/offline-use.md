@@ -187,7 +187,7 @@ Packs** like VMAP0's:
 
 | Pack | What you get | Download |
 | --- | --- | --- |
-| Natural Earth map layers | Rivers and lakes, towns and cities, roads and ferries, railways, airports, ports, time zones, state and province borders, and peaks, with names; each from the zoom level that suits it | 70 MB |
+| Natural Earth map layers | Rivers and lakes, towns and cities, roads and ferries, railways, airports, ports, time zones, state and province borders, and peaks, with names; each from the zoom level that suits it | 76 MB |
 | Natural Earth I relief map | A map-like picture of the Earth: land cover in soft natural colours, shaded relief and a pale blue sea (about 1.9 km per pixel) | 72 MB |
 | Natural Earth hypsometric map | Lowlands to highlands in greens to browns, with shaded relief and the relief of the ocean floor | 67 MB |
 | Natural Earth shaded relief | Grey shaded relief of the land: a quiet background, or under a half-transparent layer | 39 MB |
