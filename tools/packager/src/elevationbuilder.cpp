@@ -211,8 +211,14 @@ float weightedMean(const Weights& weights, const std::vector<double>& sums,
   return total > 0.0 ? static_cast<float>(sum / total) : 0.0F;
 }
 
-/** The deepest level's samples, box-filtered from the source. */
-bool sampleSource(const GdalDataset& source, int32_t intervals, PointGrid* grid,
+/**
+ * The deepest level's samples from @p westDeg eastwards, @p columns of
+ * them, box-filtered from the source.
+ */
+// The intervals of 180°, then the columns wanted.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+bool sampleSource(const GdalDataset& source, int32_t intervals, double westDeg,
+                  int32_t columns, PointGrid* grid,
                   const std::function<void(const QString&)>& progress,
                   QString* errorString)
 {
@@ -232,7 +238,7 @@ bool sampleSource(const GdalDataset& source, int32_t intervals, PointGrid* grid,
   }
   RowReader reader(GDALGetRasterBand(dataset, 1), sourceWidth);
   const double step = 180.0 / intervals;
-  grid->width = 2 * intervals + 1;
+  grid->width = columns;
   grid->height = intervals + 1;
   grid->values.assign(static_cast<std::size_t>(grid->width) *
                           static_cast<std::size_t>(grid->height),
@@ -240,7 +246,7 @@ bool sampleSource(const GdalDataset& source, int32_t intervals, PointGrid* grid,
   // Horizontal weights are the same for every row.
   std::vector<Weights> columnWeights;
   for (int32_t column = 0; column < grid->width; ++column) {
-    const double lon = -180.0 + column * step;
+    const double lon = westDeg + column * step;
     columnWeights.push_back(cellWeights(
         (lon - step / 2.0 - transform[0]) / transform[1],
         (lon + step / 2.0 - transform[0]) / transform[1], sourceWidth, true));
@@ -272,12 +278,18 @@ bool sampleSource(const GdalDataset& source, int32_t intervals, PointGrid* grid,
           columnWeights[static_cast<std::size_t>(column)], sums, totals);
     }
   }
-  flattenPoles(*grid);
+  if (westDeg <= -180.0 && grid->width == 2 * intervals + 1) {
+    flattenPoles(*grid);
+  }
   return true;
 }
 
-/** The next coarser level: [1 2 1] / 4 each way, every other sample. */
-PointGrid coarser(const PointGrid& fine)
+/**
+ * The next coarser level: [1 2 1] / 4 each way, every other sample. Around
+ * the world (@p wrap) the filter wraps east to west; for a region it stops
+ * at the region's edges.
+ */
+PointGrid coarser(const PointGrid& fine, bool wrap)
 {
   PointGrid grid;
   grid.width = (fine.width - 1) / 2 + 1;
@@ -293,34 +305,37 @@ PointGrid coarser(const PointGrid& fine)
         const int32_t y = std::clamp(2 * row + static_cast<int32_t>(i) - 1, 0,
                                      fine.height - 1);
         for (std::size_t j = 0; j < taps.size(); ++j) {
-          const int32_t x =
-              ((2 * column + static_cast<int32_t>(j) - 1) % period + period) %
-              period;
+          const int32_t at = 2 * column + static_cast<int32_t>(j) - 1;
+          const int32_t x = wrap ? (at % period + period) % period
+                                 : std::clamp(at, 0, fine.width - 1);
           sum += taps.at(i) * taps.at(j) * static_cast<double>(fine.at(y, x));
         }
       }
       grid.at(row, column) = static_cast<float>(sum);
     }
   }
-  flattenPoles(grid);
+  if (wrap) {
+    flattenPoles(grid);
+  }
   return grid;
 }
 
-/** Writes every tile of @p level from its grid. */
-bool writeLevel(const PointGrid& grid, int32_t level, int32_t samples,
-                SqliteTileStoreWriter* writer, ElevationStats* stats,
-                QString* errorString)
+/** Writes every tile of @p level from its grid, which starts at tile
+ *  column @p firstX. */
+bool writeLevel(const PointGrid& grid, int32_t level, int32_t firstX,
+                int32_t samples, SqliteTileStoreWriter* writer,
+                ElevationStats* stats, QString* errorString)
 {
   const int32_t intervals = samples - 1;
   const std::size_t n = static_cast<std::size_t>(samples);
   std::vector<float> heights(n * n);
+  const int32_t tiles = (grid.width - 1) / intervals;
   for (int32_t y = 0; y < static_cast<int32_t>(TileKey::rows(level)); ++y) {
-    for (int32_t x = 0; x < static_cast<int32_t>(TileKey::columns(level));
-         ++x) {
+    for (int32_t x = firstX; x < firstX + tiles; ++x) {
       for (int32_t row = 0; row < samples; ++row) {
         for (int32_t column = 0; column < samples; ++column) {
           const float value =
-              grid.at(y * intervals + row, x * intervals + column);
+              grid.at(y * intervals + row, (x - firstX) * intervals + column);
           heights[static_cast<std::size_t>(row) * n +
                   static_cast<std::size_t>(column)] = value;
           const double metres = static_cast<double>(value);
@@ -351,9 +366,19 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
           options.progress(message);
         }
       };
-  if (options.samples < 3 || options.maxLevel < 0 || options.maxLevel > 10) {
+  // The region must be whole tiles of the shallowest level.
+  const double tileDeg = 180.0 / std::pow(2.0, options.minLevel);
+  const double westTiles = (options.westDeg + 180.0) / tileDeg;
+  const double eastTiles = (options.eastDeg + 180.0) / tileDeg;
+  if (options.samples < 3 || options.maxLevel < 0 || options.maxLevel > 10 ||
+      options.minLevel < 0 || options.minLevel > options.maxLevel ||
+      options.westDeg < -180.0 || options.eastDeg > 180.0 ||
+      options.eastDeg <= options.westDeg ||
+      std::abs(westTiles - std::round(westTiles)) > 1e-9 ||
+      std::abs(eastTiles - std::round(eastTiles)) > 1e-9) {
     return fail(errorString, QStringLiteral("Bad elevation options"));
   }
+  const bool world = options.westDeg <= -180.0 && options.eastDeg >= 180.0;
   const GdalDataset source(options.sourcePath);
   if (!source.isOpen()) {
     return fail(errorString,
@@ -361,8 +386,13 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
                     .arg(options.sourcePath, source.errorString()));
   }
   const int32_t intervals = (options.samples - 1) << options.maxLevel;
+  const int32_t columns =
+      static_cast<int32_t>(std::lround((options.eastDeg - options.westDeg) /
+                                       180.0 * intervals)) +
+      1;
   PointGrid grid;
-  if (!sampleSource(source, intervals, &grid, progress, errorString)) {
+  if (!sampleSource(source, intervals, options.westDeg, columns, &grid,
+                    progress, errorString)) {
     return false;
   }
   const std::pair<std::vector<float>::const_iterator,
@@ -374,7 +404,7 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
   SqliteTileStoreInfo info;
   info.format = QStringLiteral("heights");
   info.tileSizePx = options.samples;
-  info.minLevel = 0;
+  info.minLevel = options.minLevel;
   info.maxLevel = options.maxLevel;
   info.name = options.name;
   info.verticalDatum = options.verticalDatum;
@@ -382,14 +412,16 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
   if (!writer.errorString().isEmpty()) {
     return fail(errorString, writer.errorString());
   }
-  for (int32_t level = options.maxLevel; level >= 0; --level) {
+  for (int32_t level = options.maxLevel; level >= options.minLevel; --level) {
     progress(QStringLiteral("Writing elevation level %1").arg(level));
-    if (!writeLevel(grid, level, options.samples, &writer, stats,
+    const int32_t firstX = static_cast<int32_t>(
+        std::lround((options.westDeg + 180.0) / (180.0 / (1 << level))));
+    if (!writeLevel(grid, level, firstX, options.samples, &writer, stats,
                     errorString)) {
       return false;
     }
-    if (level > 0) {
-      grid = coarser(grid);
+    if (level > options.minLevel) {
+      grid = coarser(grid, world);
     }
   }
   if (!writer.finish()) {

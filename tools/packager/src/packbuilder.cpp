@@ -37,7 +37,10 @@
 #include <QJsonValue>
 #include <QStringList>
 
+#include <cpl_error.h>
 #include <cpl_vsi.h>
+#include <gdal.h>
+#include <gdal_utils.h>
 
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
@@ -153,6 +156,8 @@ std::optional<SourceSpec> readSource(const QJsonObject& entry)
   return source;
 }
 
+std::vector<QString> strings(const QJsonValue& value);
+
 /** Reads the optional "geoids", "datumShifts" and "elevation" entries into
  *  @p config. */
 bool readElevation(const QJsonObject& json, PackConfig* config,
@@ -207,15 +212,30 @@ bool readElevation(const QJsonObject& json, PackConfig* config,
   spec.maxLevel = integer(elevation, "maxLevel", 6);
   spec.samples = integer(elevation, "samples", 65);
   spec.verticalDatum = text(elevation, "verticalDatum");
+  spec.replaces = text(elevation, "replaces");
+  spec.layerName = text(elevation, "layer");
+  spec.minLevel = integer(elevation, "minLevel", 0);
+  const QJsonArray region = elevation.value(QStringLiteral("region")).toArray();
+  if (region.size() == 2) {
+    spec.westDeg = region.at(0).toDouble();
+    spec.eastDeg = region.at(1).toDouble();
+  }
+  spec.members = strings(elevation.value(QStringLiteral("members")));
+  // A pack's own geoid, or the base pack's (a finer DEM or a regional one
+  // installed with it).
   const bool datumKnown =
       spec.verticalDatum.isEmpty() ||
+      spec.verticalDatum == QLatin1String("egm2008") ||
+      spec.verticalDatum == QLatin1String("egm96") ||
       std::any_of(config->geoids.begin(), config->geoids.end(),
                   [&spec](const GeoidSpec& geoid) {
                     return geoid.dataset == spec.verticalDatum;
                   });
   if (findSource(*config, spec.source) == nullptr || spec.dataset.isEmpty() ||
       spec.maxLevel < 0 || spec.maxLevel > 10 || spec.samples < 3 ||
-      !datumKnown) {
+      spec.minLevel < 0 || spec.minLevel > spec.maxLevel ||
+      (!region.isEmpty() && region.size() != 2) ||
+      (!spec.replaces.isEmpty() && !spec.layerName.isEmpty()) || !datumKnown) {
     return fail(errorString, QStringLiteral("Bad elevation entry"));
   }
   config->elevation = spec;
@@ -979,8 +999,18 @@ private:
     const QString file = spec.dataset + QStringLiteral(".sqlite");
     ElevationOptions options;
     options.sourcePath = m_sources.filePath(source.file);
+    if (!spec.members.empty()) {
+      // One DEM in several files of a zip (GEBCO's tiles): a mosaic.
+      options.sourcePath = mosaic(spec, gdalPath(options.sourcePath));
+      if (options.sourcePath.isEmpty()) {
+        return false;
+      }
+    }
     options.outputPath = m_output.filePath(file);
     options.maxLevel = spec.maxLevel;
+    options.minLevel = spec.minLevel;
+    options.westDeg = spec.westDeg;
+    options.eastDeg = spec.eastDeg;
     options.samples = spec.samples;
     options.verticalDatum = spec.verticalDatum;
     options.name = spec.name;
@@ -993,7 +1023,51 @@ private:
     dataset.name = spec.name;
     dataset.licence = spec.licence;
     dataset.attribution = spec.attribution;
+    dataset.replaces = spec.replaces;
+    if (!spec.layerName.isEmpty()) {
+      QJsonObject layerSource;
+      layerSource.insert(QStringLiteral("kind"), QStringLiteral("basepack"));
+      layerSource.insert(QStringLiteral("dataset"), spec.dataset);
+      QJsonObject definition;
+      definition.insert(QStringLiteral("id"),
+                        QStringLiteral("pack:%1:terrain").arg(spec.dataset));
+      definition.insert(QStringLiteral("origin"), QStringLiteral("catalogue"));
+      definition.insert(QStringLiteral("type"), QStringLiteral("elevation"));
+      definition.insert(QStringLiteral("name"), spec.layerName);
+      definition.insert(QStringLiteral("source"), layerSource);
+      definition.insert(QStringLiteral("style"),
+                        QJsonObject{{QStringLiteral("exaggeration"), 1}});
+      m_manifest.layers.append(definition);
+    }
     return true;
+  }
+
+  /** A VRT mosaic of @p spec's members in @p zip, in GDAL's memory. */
+  QString mosaic(const ElevationSpec& spec, const QString& zip)
+  {
+    std::vector<QByteArray> paths;
+    paths.reserve(spec.members.size());
+    for (const QString& member : spec.members) {
+      paths.push_back((zip + QLatin1Char('/') + member).toUtf8());
+    }
+    std::vector<const char*> names;
+    names.reserve(paths.size());
+    for (const QByteArray& path : paths) {
+      names.push_back(path.constData());
+    }
+    const QByteArray target =
+        QStringLiteral("/vsimem/%1.vrt").arg(spec.dataset).toUtf8();
+    int failed = 0;
+    GDALDatasetH vrt =
+        GDALBuildVRT(target.constData(), static_cast<int>(names.size()),
+                     nullptr, names.data(), nullptr, &failed);
+    if (vrt == nullptr || failed != 0) {
+      fail(m_error, QStringLiteral("Cannot mosaic the DEM's files: %1")
+                        .arg(QString::fromUtf8(CPLGetLastErrorMsg())));
+      return QString();
+    }
+    GDALClose(vrt);
+    return QString::fromUtf8(target);
   }
 
   bool buildVmap0()

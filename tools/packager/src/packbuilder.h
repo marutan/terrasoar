@@ -136,8 +136,29 @@ struct ElevationSpec {
   int32_t maxLevel = 6;
   /** Samples along a tile's side. */
   int32_t samples = 65;
-  /** The heights' vertical datum: a geoid dataset of the pack, or empty. */
+  /**
+   * The heights' vertical datum: a geoid dataset of the pack or of the base
+   * pack ("egm2008", "egm96"), or empty.
+   */
   QString verticalDatum;
+  /** The base pack dataset it is a finer DEM of ("elevation"), or empty. */
+  QString replaces;
+  /**
+   * For a DEM of the pack's own: the name of the elevation layer the
+   * manifest offers on it (`pack:<dataset>:terrain`); empty for none.
+   */
+  QString layerName;
+  /** Shallowest level stored (a regional DEM's region is its whole tiles). */
+  int32_t minLevel = 0;
+  /** The region, degrees of longitude from pole to pole. */
+  double westDeg = -180.0;
+  double eastDeg = 180.0;
+  /**
+   * The source's files making one DEM, inside its zip (GEBCO's eight
+   * GeoTIFF tiles), mosaicked as a GDAL VRT; empty for a source that is
+   * the DEM itself.
+   */
+  std::vector<QString> members;
 };
 
 /** A geoid grid of the pack. */

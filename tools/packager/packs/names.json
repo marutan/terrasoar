@@ -10,6 +10,54 @@
   "reservedBytes": 0,
   "sources": [
     {
+      "id": "gns-populated-places",
+      "file": "gns-Populated_Places-2026-09-03.zip",
+      "url": "https://geonames.nga.mil/geonames/GNSData/fc_files/Populated_Places.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gns-feature-classes-2026-09-03/gns-Populated_Places-2026-09-03.zip",
+      "sha256": "d5d35d2afe119b8b46ab2c3c30e3d78dc68ecd121d9b53a419fd594986495819",
+      "name": "GEOnet Names Server, feature class Populated_Places (NGA)",
+      "version": "2026-09-03",
+      "notices": [
+        "disclaimer.txt"
+      ]
+    },
+    {
+      "id": "gns-hypsographic",
+      "file": "gns-Hypsographic-2026-09-03.zip",
+      "url": "https://geonames.nga.mil/geonames/GNSData/fc_files/Hypsographic.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gns-feature-classes-2026-09-03/gns-Hypsographic-2026-09-03.zip",
+      "sha256": "d395834fb3c03525a7a5b1c78466d68e902b4eb38d675b56b5582bbc5a10d090",
+      "name": "GEOnet Names Server, feature class Hypsographic (NGA)",
+      "version": "2026-09-03",
+      "notices": [
+        "disclaimer.txt"
+      ]
+    },
+    {
+      "id": "gns-hydrographic",
+      "file": "gns-Hydrographic-2026-09-03.zip",
+      "url": "https://geonames.nga.mil/geonames/GNSData/fc_files/Hydrographic.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gns-feature-classes-2026-09-03/gns-Hydrographic-2026-09-03.zip",
+      "sha256": "604f68abbf40cdab2bd01a4bea36af136ebf5802368fd169e07e474a6d983ac8",
+      "name": "GEOnet Names Server, feature class Hydrographic (NGA)",
+      "version": "2026-09-03",
+      "notices": [
+        "disclaimer.txt"
+      ]
+    },
+    {
+      "id": "gns-undersea",
+      "file": "gns-Undersea-2026-09-03.zip",
+      "url": "https://geonames.nga.mil/geonames/GNSData/fc_files/Undersea.zip",
+      "mirror": "https://github.com/marutan/terrasoar-packs-sources/releases/download/gns-feature-classes-2026-09-03/gns-Undersea-2026-09-03.zip",
+      "sha256": "91e2389673e3e621d29c4b4d16327e8b2dca5ffd71ed6e39f2be7116c9681ebe",
+      "name": "GEOnet Names Server, feature class Undersea (NGA)",
+      "version": "2026-09-03",
+      "notices": [
+        "disclaimer.txt"
+      ]
+    },
+    {
       "id": "gnis",
       "file": "DomesticNames_National_Text-2026-11-02.zip",
       "url": "https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/DomesticNames/DomesticNames_National_Text.zip",
@@ -40,6 +88,510 @@
       }
     ],
     "classes": [
+      {
+        "source": "gns-populated-places",
+        "member": "Populated_Places.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd = 'PPLC'",
+        "table": "world_capitals",
+        "minLevel": 2,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-populated-places",
+        "member": "Populated_Places.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd = 'PPLA'",
+        "table": "admin_seats",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-populated-places",
+        "member": "Populated_Places.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') AND display LIKE '%9%'",
+        "table": "places_major",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-populated-places",
+        "member": "Populated_Places.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') AND display LIKE '%7%' AND display NOT LIKE '%9%'",
+        "table": "places",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-populated-places",
+        "member": "Populated_Places.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') AND display LIKE '%5%' AND display NOT LIKE '%7%'",
+        "table": "places_minor",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd = 'MTS' AND display LIKE '%5%'",
+        "table": "ranges",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('MT', 'PK', 'VLC') AND display LIKE '%9%'",
+        "table": "mountains_major",
+        "minLevel": 5,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('MT', 'PK', 'VLC') AND display LIKE '%7%' AND display NOT LIKE '%9%'",
+        "table": "mountains",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('MT', 'PK', 'VLC') AND display LIKE '%5%' AND display NOT LIKE '%7%'",
+        "table": "mountains_minor",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('ISL', 'ISLS') AND display LIKE '%7%'",
+        "table": "islands_major",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('ISL', 'ISLS') AND display LIKE '%5%' AND display NOT LIKE '%7%'",
+        "table": "islands",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hypsographic",
+        "member": "Hypsographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('CAPE', 'PEN') AND display LIKE '%5%'",
+        "table": "capes",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hydrographic",
+        "member": "Hydrographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('SEA', 'GULF', 'BAY', 'STRT') AND display LIKE '%7%'",
+        "table": "seas",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hydrographic",
+        "member": "Hydrographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('SEA', 'GULF', 'BAY', 'STRT') AND display LIKE '%5%' AND display NOT LIKE '%7%'",
+        "table": "bays",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hydrographic",
+        "member": "Hydrographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('LK', 'LKS', 'RSV', 'LGN') AND display LIKE '%7%'",
+        "table": "lakes_major",
+        "minLevel": 6,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hydrographic",
+        "member": "Hydrographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('LK', 'LKS', 'RSV', 'LGN') AND display LIKE '%5%' AND display NOT LIKE '%7%'",
+        "table": "lakes",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-hydrographic",
+        "member": "Hydrographic.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND desig_cd IN ('FLLS', 'GLCR') AND display LIKE '%5%'",
+        "table": "falls_glaciers",
+        "minLevel": 7,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
+      {
+        "source": "gns-undersea",
+        "member": "Undersea.txt",
+        "driver": "CSV",
+        "open": [
+          "SEPARATOR=TAB",
+          "X_POSSIBLE_NAMES=long_dd",
+          "Y_POSSIBLE_NAMES=lat_dd"
+        ],
+        "geometry": "points",
+        "where": "nt = 'N' AND 1 = 1",
+        "table": "undersea",
+        "minLevel": 4,
+        "attributes": [
+          {
+            "column": "full_name",
+            "name": "name"
+          },
+          {
+            "column": "desig_cd",
+            "name": "feature"
+          },
+          {
+            "column": "cc_ft",
+            "name": "region"
+          }
+        ]
+      },
       {
         "source": "gnis",
         "member": "Text/DomesticNames_National.txt",
@@ -365,18 +917,49 @@
         "id": "places",
         "name": "Place Names",
         "tables": [
+          "world_capitals",
+          "admin_seats",
+          "places_major",
+          "places",
+          "places_minor",
           "us_places"
         ],
         "style": {
           "outline": "#fff3e0ff",
           "pointSizePx": 3,
           "labels": "name"
-        }
+        },
+        "styleRules": [
+          {
+            "attribute": "feature",
+            "equals": "PPLC",
+            "outline": "#ffcc80ff",
+            "pointSizePx": 6
+          },
+          {
+            "attribute": "feature",
+            "equals": "PPLA",
+            "pointSizePx": 5
+          }
+        ]
       },
       {
         "id": "features",
         "name": "Feature Names (Mountains, Lakes, Islands…)",
         "tables": [
+          "ranges",
+          "mountains_major",
+          "mountains",
+          "mountains_minor",
+          "islands_major",
+          "islands",
+          "capes",
+          "seas",
+          "bays",
+          "lakes_major",
+          "lakes",
+          "falls_glaciers",
+          "undersea",
           "us_seas",
           "us_ranges",
           "us_islands",
@@ -401,6 +984,31 @@
           },
           {
             "attribute": "feature",
+            "equals": "MT",
+            "outline": "#ffe0b2ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "PK",
+            "outline": "#ffe0b2ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "VLC",
+            "outline": "#ffe0b2ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "Range",
+            "outline": "#ffe0b2ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "MTS",
+            "outline": "#ffe0b2ff"
+          },
+          {
+            "attribute": "feature",
             "equals": "Lake",
             "outline": "#90caf9ff"
           },
@@ -412,6 +1020,46 @@
           {
             "attribute": "feature",
             "equals": "Sea",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "LK",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "LKS",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "RSV",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "LGN",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "SEA",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "GULF",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "BAY",
+            "outline": "#90caf9ff"
+          },
+          {
+            "attribute": "feature",
+            "equals": "STRT",
             "outline": "#90caf9ff"
           }
         ]

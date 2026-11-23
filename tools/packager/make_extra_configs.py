@@ -627,8 +627,8 @@ GNS_RELEASE = "gns-feature-classes-" + GNS_DATE
 GNS_FILES = {
     "Populated_Places": ("20260903061713", "d5d35d2afe119b8b46ab2c3c30e3d78dc68ecd121d9b53a419fd594986495819"),
     "Hypsographic": ("20260903061805", "d395834fb3c03525a7a5b1c78466d68e902b4eb38d675b56b5582bbc5a10d090"),
-    "Hydrographic": ("20260903061628", "@@H@@"),
-    "Undersea": ("20260903061525", "@@U@@"),
+    "Hydrographic": ("20260903061628", "604f68abbf40cdab2bd01a4bea36af136ebf5802368fd169e07e474a6d983ac8"),
+    "Undersea": ("20260903061525", "91e2389673e3e621d29c4b4d16327e8b2dca5ffd71ed6e39f2be7116c9681ebe"),
 }
 # Display bands: GNS lists the scale bands a name is shown at, from 1
 # (the largest scale) up; a name shown at band 9 is shown on the smallest

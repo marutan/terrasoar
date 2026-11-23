@@ -1205,7 +1205,8 @@ private slots:
                "}")
                .object();
     QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
-    // An elevation dataset above a geoid the pack doesn't have.
+    // An elevation dataset above a geoid neither the pack nor the base pack
+    // has; the base pack's EGM2008 is known.
     json =
         QJsonDocument::fromJson(
             "{"
@@ -1215,13 +1216,18 @@ private slots:
             "\"0000000000000000000000000000000000000000000000000000000000000000"
             "\"}],"
             "\"elevation\": {\"dataset\": \"elevation\", \"source\": "
-            "\"dem\", \"verticalDatum\": \"egm2008\"}"
+            "\"dem\", \"verticalDatum\": \"osgm15\"}"
             "}")
             .object();
     QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+    QJsonObject onBase = json;
+    QJsonObject entry = onBase.value(QStringLiteral("elevation")).toObject();
+    entry.insert(QStringLiteral("verticalDatum"), QStringLiteral("egm2008"));
+    onBase.insert(QStringLiteral("elevation"), entry);
+    QVERIFY(ts::packager::PackConfig::fromJson(onBase, &error).has_value());
     json.insert(QStringLiteral("geoids"),
                 QJsonArray{QJsonObject{
-                    {QStringLiteral("dataset"), QStringLiteral("egm2008")},
+                    {QStringLiteral("dataset"), QStringLiteral("osgm15")},
                     {QStringLiteral("source"), QStringLiteral("dem")}}});
     const std::optional<ts::packager::PackConfig> config =
         ts::packager::PackConfig::fromJson(json, &error);
@@ -1545,6 +1551,110 @@ private slots:
     own.replace(0, entry);
     json.insert(QStringLiteral("imageryDatasets"), own);
     QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+  }
+
+  void regionalElevation()
+  {
+    // A DEM of the pack's own for one quarter of the world (GEBCO's
+    // regional packs): levels 1 and 2 only, the quarter's tiles only, and
+    // an elevation layer; a finer DEM in place of the base pack's instead
+    // replaces "elevation" and offers no layer.
+    const QTemporaryDir dir;
+    const QDir root(dir.path());
+    root.mkpath(QStringLiteral("sources"));
+    ts::initialiseGdal();
+    const QString tif = root.filePath(QStringLiteral("sources/dem.tif"));
+    GDALDatasetH dem =
+        GDALCreate(GDALGetDriverByName("GTiff"), tif.toUtf8().constData(), 720,
+                   360, 1, GDT_Float32, nullptr);
+    QVERIFY(dem != nullptr);
+    std::array<double, 6> transform{-180.0, 0.5, 0.0, 90.0, 0.0, -0.5};
+    GDALSetGeoTransform(dem, transform.data());
+    std::vector<float> heights(720 * 360);
+    for (std::size_t i = 0; i < heights.size(); ++i) {
+      // 10 m per degree east of 180° W.
+      heights[i] =
+          static_cast<float>((static_cast<double>(i % 720) + 0.5) * 0.5 * 10.0);
+    }
+    QCOMPARE(GDALRasterIO(GDALGetRasterBand(dem, 1), GF_Write, 0, 0, 720, 360,
+                          heights.data(), 720, 360, GDT_Float32, 0, 0),
+             CE_None);
+    GDALClose(dem);
+    const QByteArray configJson =
+        "{\"id\": \"quarter\", \"version\": \"1\","
+        "\"sizeLimitBytes\": 10000000, \"reservedBytes\": 0,"
+        "\"sources\": [{\"id\": \"dem\", \"file\": \"dem.tif\", \"url\": "
+        "\"https://e.org/dem.tif\", \"sha256\": \"00000000000000000000000000"
+        "00000000000000000000000000000000000000\"}],"
+        "\"elevation\": {\"dataset\": \"quarter\", \"source\": \"dem\", "
+        "\"name\": \"Quarter\", \"layer\": \"Quarter terrain\", "
+        "\"minLevel\": 1, \"maxLevel\": 2, "
+        "\"samples\": 9, \"region\": [0, 90]}}";
+    QString error;
+    const std::optional<ts::packager::PackConfig> config =
+        ts::packager::PackConfig::fromJson(
+            QJsonDocument::fromJson(configJson).object(), &error);
+    if (!config) {
+      QFAIL(qPrintable(error));
+    }
+    ts::packager::BuildOptions options;
+    options.sourcesDirectory = root.filePath(QStringLiteral("sources"));
+    options.configDirectory = root.path();
+    options.outputDirectory = root.filePath(QStringLiteral("pack"));
+    options.verifySources = false;
+    ts::packager::BuildReport report;
+    QVERIFY2(ts::packager::buildPack(*config, options, &report, &error),
+             qPrintable(error));
+    // Level 1: one tile (of 90°) across, two down; level 2: two by four.
+    QCOMPARE(report.elevation.tiles, 2 + 8);
+    const std::optional<ts::PackManifest> manifest =
+        ts::PackManifest::read(options.outputDirectory, &error);
+    if (!manifest) {
+      QFAIL(qPrintable(error));
+    }
+    QCOMPARE(manifest->layers.size(), 1);
+    const QJsonObject layer = manifest->layers.at(0).toObject();
+    QCOMPARE(layer.value(QLatin1String("id")).toString(),
+             QStringLiteral("pack:quarter:terrain"));
+    QCOMPARE(layer.value(QLatin1String("type")).toString(),
+             QStringLiteral("elevation"));
+    ts::SqliteElevationProvider store(
+        QDir(options.outputDirectory)
+            .filePath(QStringLiteral("quarter.sqlite")),
+        nullptr);
+    QVERIFY2(store.isValid(), qPrintable(store.errorString()));
+    // A tile of the quarter has the DEM's heights, to the metre; one
+    // outside it, or coarser than level 1, has none.
+    const ts::TileKey inside =
+        ts::TileKey::containing(2, ts::Geodetic{30.0, 50.0, 0.0});
+    const std::optional<ts::HeightTile> tile =
+        store.loadHeights(inside, notCancelled);
+    if (!tile) {
+      QFAIL("no tile in the region");
+    }
+    const ts::GeoPoint point = ts::heightSamplePoint(inside, 9, 4, 4);
+    QVERIFY(std::abs(static_cast<double>(tile->heightsM[4 * 9 + 4]) -
+                     (point.lonDeg + 180.0) * 10.0) < 1.5);
+    QVERIFY(!store.loadHeights(
+        ts::TileKey::containing(2, ts::Geodetic{30.0, -50.0, 0.0}),
+        notCancelled));
+    QVERIFY(!store.loadHeights(ts::TileKey{0, 1, 0}, notCancelled));
+
+    // Replacing and offering a layer together is refused.
+    QJsonObject json = QJsonDocument::fromJson(configJson).object();
+    QJsonObject entry = json.value(QStringLiteral("elevation")).toObject();
+    entry.insert(QStringLiteral("replaces"), QStringLiteral("elevation"));
+    json.insert(QStringLiteral("elevation"), entry);
+    QVERIFY(!ts::packager::PackConfig::fromJson(json, &error));
+    // A region that isn't whole tiles of the shallowest level fails.
+    entry.remove(QStringLiteral("replaces"));
+    entry.insert(QStringLiteral("region"), QJsonArray{0, 45});
+    json.insert(QStringLiteral("elevation"), entry);
+    const std::optional<ts::packager::PackConfig> half =
+        ts::packager::PackConfig::fromJson(json, &error);
+    QVERIFY(half.has_value());
+    options.outputDirectory = root.filePath(QStringLiteral("half"));
+    QVERIFY(!ts::packager::buildPack(*half, options, &report, &error));
   }
 
   void basePack()
