@@ -77,6 +77,11 @@
     "sourceUrl": "https://www.usgs.gov/tools/geographic-names-information-system-gnis",
     "lods": [
       {
+        "storageLevel": 0,
+        "minLevel": 0,
+        "maxLevel": 2
+      },
+      {
         "storageLevel": 3,
         "minLevel": 3,
         "maxLevel": 5
@@ -100,7 +105,7 @@
         "geometry": "points",
         "where": "nt = 'N' AND desig_cd = 'PPLC'",
         "table": "world_capitals",
-        "minLevel": 2,
+        "minLevel": 1,
         "attributes": [
           {
             "column": "full_name",

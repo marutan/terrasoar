@@ -637,7 +637,7 @@ GNS_FILES = {
 GNS_LOCAL = ("display LIKE '%5%'")
 GNS_CLASSES = [
     # file, table, first level, filter (approved names, "nt = 'N'", only)
-    ("Populated_Places", "world_capitals", 2, "desig_cd = 'PPLC'"),
+    ("Populated_Places", "world_capitals", 1, "desig_cd = 'PPLC'"),
     ("Populated_Places", "admin_seats", 4, "desig_cd = 'PPLA'"),
     ("Populated_Places", "places_major", 5,
      "desig_cd NOT IN ('PPLC', 'PPLA', 'PPLQ', 'PPLW', 'PPLH', 'PPLCH') "
@@ -714,7 +714,9 @@ def gns_classes():
 def names(out):
     """Place names: populated places and major features, GNIS for the US
     and GNS for the rest of the world."""
+    # Capitals from the whole globe on; everything else from level 3.
     lods = [
+        {"storageLevel": 0, "minLevel": 0, "maxLevel": 2},
         {"storageLevel": 3, "minLevel": 3, "maxLevel": 5},
         {"storageLevel": 6, "minLevel": 6, "maxLevel": -1},
     ]

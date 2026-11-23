@@ -42,6 +42,7 @@
 #include <gdal.h>
 #include <gdal_utils.h>
 
+#include "ts/deps/dependencies.h"
 #include "ts/packs/packmanifest.h"
 #include "ts/providers/geopackagefeatureprovider.h"
 #include "ts/providers/sqlitetileimageryprovider.h"
@@ -1045,6 +1046,7 @@ private:
   /** A VRT mosaic of @p spec's members in @p zip, in GDAL's memory. */
   QString mosaic(const ElevationSpec& spec, const QString& zip)
   {
+    ts::initialiseGdal();
     std::vector<QByteArray> paths;
     paths.reserve(spec.members.size());
     for (const QString& member : spec.members) {
