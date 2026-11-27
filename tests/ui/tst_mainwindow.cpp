@@ -5351,11 +5351,13 @@ private slots:
     QVERIFY(clock->isRunning());
     QVERIFY(QTest::qWaitFor(
         [&]() { return clock->time() > paused.addSecs(60); }, 5000));
-    // In View > Clock.
+    // In Tools > Clock.
     QMenu* menu = window.findChild<QMenu*>(QStringLiteral("clockMenu"));
-    if (menu == nullptr) {
+    QMenu* tools = window.findChild<QMenu*>(QStringLiteral("toolsMenu"));
+    if (menu == nullptr || tools == nullptr) {
       QFAIL("no clock menu");
     }
+    QVERIFY(tools->actions().contains(menu->menuAction()));
     QVERIFY(menu->actions().contains(widget->jumpAction()));
 
     // Saved with a satellite layer; reopened running at the rate.

@@ -124,7 +124,7 @@ the second too.
 - Click the **time** to jump to a date and time (Ctrl+J).
 - **Now** runs the clock in real time again.
 
-The same commands are in **View → Clock**. The tracks and markers follow
+The same commands are in **Tools → Clock**. The tracks and markers follow
 the clock, so the past and future spans move with it. Layers with times
 (see [Layers and projects](layers.md)) follow the same clock. Choosing a
 time on their time slider pauses it there.

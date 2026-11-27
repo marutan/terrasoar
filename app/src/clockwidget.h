@@ -76,7 +76,7 @@ private:
  * forward, the time (UTC; clicking it jumps to a date and time), the
  * speed (a menu of speeds, faster and slower) and Now (real time).
  *
- * Its actions are also in the View menu's Clock submenu. While the clock
+ * Its actions are also in the Tools menu's Clock submenu. While the clock
  * runs the time shown is updated a few times a second; while it is paused
  * nothing runs.
  *
