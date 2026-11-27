@@ -7,7 +7,7 @@ Soar shows them on the globe and the flat maps.
 
 ## Opening a file
 
-- **File → Open KML or KMZ…**, or
+- **Local Sources → Open KML or KMZ…**, or
 - drag files onto the window, or
 - open them from your file manager with Open With → Terra Soar.
 

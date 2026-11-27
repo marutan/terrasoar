@@ -532,7 +532,7 @@ public:
    * Asks the visible WMS layers that can be queried what they have at
    * @p point (GetFeatureInfo, at the scale of @p degreesPerPixel) and shows
    * the answers in the What Is Here window. Returns the number of layers
-   * asked; none if View → What Is Here on Click is off.
+   * asked; none if Tools → What Is Here on Click is off.
    */
   int32_t identifyAt(LonLat point, double degreesPerPixel);
 

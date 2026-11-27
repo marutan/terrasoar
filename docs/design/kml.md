@@ -258,11 +258,11 @@ Places layer of everything inside (`"deep": true`); `check` and
 
 ## In the window
 
-**Opening.** File → Open KML or KMZ…, files dropped on the window, and
-files given on the command line (as the desktop's Open With passes them:
-`.kml` and `.kmz` are associated on Linux and offered in Open With on
-Windows, without taking them from another program) all go through
-`MainWindow::openFile()`. The document becomes a collection named after
+**Opening.** Local Sources → Open KML or KMZ…, files dropped on the
+window, and files given on the command line (as the desktop's Open With
+passes them: `.kml` and `.kmz` are associated on Linux and offered in
+Open With on Windows, without taking them from another program) all go
+through `MainWindow::openFile()`. The document becomes a collection named after
 it (or its file), each Folder and Document inside a collection in order,
 and each container's placemarks one vector layer (Places) where its first
 placemark is; `visibility` 0 leaves an entry switched off. The document's

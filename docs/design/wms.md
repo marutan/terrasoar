@@ -326,8 +326,8 @@ BBOX, size, CRS, styles and dimensions, `QUERY_LAYERS`, `INFO_FORMAT`,
 
 **The window** (`app/src/featureinfowindow.*`) asks every layer at once
 through the shared network client and lists the answers as they come.
-A new click cancels the requests of the last one. View → What Is Here on
-Click turns clicking off.
+A new click cancels the requests of the last one. Tools → What Is Here
+on Click turns clicking off.
 
 ## The catalogue
 

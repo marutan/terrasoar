@@ -36,7 +36,8 @@ All notable changes to Terra Soar. The format follows
   KML and Help. Imagery and elevation files are added from Local Sources;
   WMS, WMTS, WFS and XYZ layers and web terrain from Online Sources;
   aircraft, ships and satellites from Tracks; and the elevation profile is
-  under Tools.
+  under Tools. Open KML or KMZ… is under Local Sources, and the Clock
+  and What Is Here on Click under Tools.
 
 ### Fixed
 

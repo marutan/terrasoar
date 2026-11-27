@@ -47,7 +47,7 @@ nothing at that point.
 - A layer with times is asked about the time it shows.
 - Pictures and links in a server's answer are not loaded or followed;
   only its text is shown.
-- **View → What Is Here on Click** turns it off, so clicks only move the
+- **Tools → What Is Here on Click** turns it off, so clicks only move the
   view.
 - Layers added with a version of Terra Soar before 0.0.3 don't know how
   to be asked; add them again.

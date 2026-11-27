@@ -1199,7 +1199,6 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_saveAction);
   m_fileMenu->addAction(m_saveAsAction);
   m_fileMenu->addSeparator();
-  m_fileMenu->addAction(m_openKmlAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
   m_fileMenu->addAction(m_dataPacksAction);
   m_fileMenu->addSeparator();
@@ -1222,20 +1221,6 @@ void MainWindow::createMenus()
   m_navigationCornerMenu->setObjectName(QStringLiteral("navigationCornerMenu"));
   m_navigationCornerMenu->addActions(m_navigationCornerGroup->actions());
   m_viewMenu->addAction(m_timeBar->toggleViewAction());
-  m_clockMenu = m_viewMenu->addMenu(QString());
-  m_clockMenu->setObjectName(QStringLiteral("clockMenu"));
-  m_clockMenu->addAction(m_clockWidget->playAction());
-  m_clockMenu->addAction(m_clockWidget->realTimeAction());
-  m_clockMenu->addSeparator();
-  m_clockMenu->addAction(m_clockWidget->fasterAction());
-  m_clockMenu->addAction(m_clockWidget->slowerAction());
-  m_clockMenu->addSeparator();
-  m_clockMenu->addAction(m_clockWidget->stepForwardAction());
-  m_clockMenu->addAction(m_clockWidget->stepBackAction());
-  m_clockMenu->addAction(m_clockWidget->jumpAction());
-  // The shortcuts work anywhere in the window.
-  addActions(m_clockMenu->actions());
-  m_viewMenu->addAction(m_featureInfoAction);
   m_exaggerationMenu = m_viewMenu->addMenu(QString());
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
@@ -1252,10 +1237,25 @@ void MainWindow::createMenus()
   m_toolsMenu = menuBar()->addMenu(QString());
   m_toolsMenu->setObjectName(QStringLiteral("toolsMenu"));
   m_toolsMenu->addAction(m_profileAction);
+  m_clockMenu = m_toolsMenu->addMenu(QString());
+  m_clockMenu->setObjectName(QStringLiteral("clockMenu"));
+  m_clockMenu->addAction(m_clockWidget->playAction());
+  m_clockMenu->addAction(m_clockWidget->realTimeAction());
+  m_clockMenu->addSeparator();
+  m_clockMenu->addAction(m_clockWidget->fasterAction());
+  m_clockMenu->addAction(m_clockWidget->slowerAction());
+  m_clockMenu->addSeparator();
+  m_clockMenu->addAction(m_clockWidget->stepForwardAction());
+  m_clockMenu->addAction(m_clockWidget->stepBackAction());
+  m_clockMenu->addAction(m_clockWidget->jumpAction());
+  // The shortcuts work anywhere in the window.
+  addActions(m_clockMenu->actions());
+  m_toolsMenu->addAction(m_featureInfoAction);
   m_localSourcesMenu = menuBar()->addMenu(QString());
   m_localSourcesMenu->setObjectName(QStringLiteral("localSourcesMenu"));
   m_localSourcesMenu->addAction(m_addImageryAction);
   m_localSourcesMenu->addAction(m_addElevationAction);
+  m_localSourcesMenu->addAction(m_openKmlAction);
   m_onlineSourcesMenu = menuBar()->addMenu(QString());
   m_onlineSourcesMenu->setObjectName(QStringLiteral("onlineSourcesMenu"));
   m_onlineSourcesMenu->addAction(m_addWmsAction);
@@ -1267,8 +1267,10 @@ void MainWindow::createMenus()
   m_tracksMenu->setObjectName(QStringLiteral("tracksMenu"));
   m_tracksMenu->addAction(m_importAdsbAction);
   m_tracksMenu->addAction(m_connectReceiverAction);
+  m_tracksMenu->addSeparator();
   m_tracksMenu->addAction(m_importAisAction);
   m_tracksMenu->addAction(m_addAisSourceAction);
+  m_tracksMenu->addSeparator();
   m_tracksMenu->addAction(m_addSatellitesAction);
 
   // The KML menu goes in before Help (createKmlEditing()).
