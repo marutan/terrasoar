@@ -71,6 +71,7 @@
 #include <QToolButton>
 #include <QTreeView>
 #include <QUuid>
+#include <QVector>
 #include <QWidget>
 
 #include "aboutdialog.h"
@@ -287,8 +288,9 @@ QIcon placemarkIcon(const QColor& colour)
 QIcon pathIcon(const QColor& colour)
 {
   return drawnIcon(colour, [](QPainter& painter, const QRectF& box) {
-    const QPolygonF line{at(box, 0.08, 0.85), at(box, 0.38, 0.35),
-                         at(box, 0.62, 0.65), at(box, 0.92, 0.15)};
+    const QPolygonF line(
+        QVector<QPointF>{at(box, 0.08, 0.85), at(box, 0.38, 0.35),
+                         at(box, 0.62, 0.65), at(box, 0.92, 0.15)});
     painter.drawPolyline(line);
     for (const QPointF& point : line) {
       drawVertex(painter, point);
@@ -299,8 +301,9 @@ QIcon pathIcon(const QColor& colour)
 /** The corners of the polygon the polygon and hole icons share. */
 QPolygonF polygonShape(const QRectF& box)
 {
-  return QPolygonF{at(box, 0.5, 0.05), at(box, 0.95, 0.38), at(box, 0.78, 0.92),
-                   at(box, 0.22, 0.92), at(box, 0.05, 0.38)};
+  return QPolygonF(QVector<QPointF>{at(box, 0.5, 0.05), at(box, 0.95, 0.38),
+                                    at(box, 0.78, 0.92), at(box, 0.22, 0.92),
+                                    at(box, 0.05, 0.38)});
 }
 
 /** A polygon: a pentagon, lightly filled, each corner marked. */
@@ -341,11 +344,12 @@ QIcon holeIcon(const QColor& colour)
 QIcon overlayIcon(const QColor& colour)
 {
   return drawnIcon(colour, [](QPainter& painter, const QRectF& box) {
-    const QPolygonF frame{at(box, 0.25, 0.15), at(box, 1.0, 0.15),
-                          at(box, 0.75, 0.85), at(box, 0.0, 0.85)};
+    const QPolygonF frame(
+        QVector<QPointF>{at(box, 0.25, 0.15), at(box, 1.0, 0.15),
+                         at(box, 0.75, 0.85), at(box, 0.0, 0.85)});
     painter.drawPolygon(frame);
-    const QPolygonF hill{at(box, 0.14, 0.85), at(box, 0.42, 0.42),
-                         at(box, 0.62, 0.85)};
+    const QPolygonF hill(QVector<QPointF>{
+        at(box, 0.14, 0.85), at(box, 0.42, 0.42), at(box, 0.62, 0.85)});
     painter.drawPolyline(hill);
     const qreal sun = box.width() * 0.08;
     painter.drawEllipse(at(box, 0.68, 0.38), sun, sun);
