@@ -145,6 +145,13 @@ constexpr int32_t kmlViewSettleMs = 300;
 constexpr int32_t kmlMostLinkDepth = 8;
 
 /**
+ * The most placemarks of one folder listed as entries of their own (a
+ * layer each). A folder with more has them all in one layer, Places: a
+ * layer per placemark costs its own draws on every tile in view.
+ */
+constexpr std::size_t kmlListedPlacemarks = 500;
+
+/**
  * Returns true if @p path is named like an ADS-B recording: .sbs, .avr,
  * .beast, .jsonl, a tar1090 trace, or the same compressed.
  */
@@ -1895,8 +1902,8 @@ void MainWindow::addKmlFeature(const KmlDocument& document,
       KmlStyleResolver(document).resolve(container).list.value_or(
           KmlListStyle{});
   if (container.kind == KmlFeature::Kind::Placemark) {
-    // A file of one placemark.
-    addKmlPlaces(document, featurePath, collection, 0, false);
+    // A file of one placemark: its entry, in one named after the file.
+    addKmlPlace(document, container, featurePath, collection, 0);
   } else if (list.itemType == KmlListStyle::ItemType::CheckHideChildren) {
     // Listed as one entry: everything inside in one layer.
     addKmlPlaces(document, featurePath, collection, 0, true);
@@ -1927,6 +1934,15 @@ void MainWindow::addKmlChildren(const KmlDocument& document,
                                 const QString& featurePath,
                                 const QModelIndex& collection)
 {
+  // Each placemark an entry of its own where it is, unless the folder has
+  // so many that a layer each would be slow to draw: then they are one
+  // layer (Places) where the first is.
+  const std::size_t count = static_cast<std::size_t>(
+      std::count_if(container.children.begin(), container.children.end(),
+                    [](const KmlFeature& child) {
+                      return child.kind == KmlFeature::Kind::Placemark;
+                    }));
+  const bool listed = count <= kmlListedPlacemarks;
   int32_t next = 0;
   bool placemarks = false;
   for (std::size_t i = 0; i < container.children.size(); ++i) {
@@ -1948,8 +1964,9 @@ void MainWindow::addKmlChildren(const KmlDocument& document,
       addKmlLink(document, child, childPath, collection, next++);
       break;
     case KmlFeature::Kind::Placemark:
-      // The container's placemarks, in one layer where the first is.
-      if (!placemarks) {
+      if (listed) {
+        addKmlPlace(document, child, childPath, collection, next++);
+      } else if (!placemarks) {
         placemarks = true;
         addKmlPlaces(document, featurePath, collection, next++, false);
       }
@@ -1978,6 +1995,68 @@ void MainWindow::addKmlPlaces(const KmlDocument& document,
   const QModelIndex layer = m_layers->addLayer(definition, collection, row);
   m_kmlNodes[m_layers->data(layer, LayerTreeModel::NodeIdRole).toString()] = {
       document.path, featurePath};
+}
+
+void MainWindow::addKmlPlace(const KmlDocument& document,
+                             const KmlFeature& placemark,
+                             const QString& featurePath,
+                             const QModelIndex& collection, int32_t row)
+{
+  LayerDefinition definition;
+  definition.id = QStringLiteral("kml:") +
+                  QUuid::createUuid().toString(QUuid::WithoutBraces);
+  definition.origin = LayerOrigin::User;
+  definition.type = LayerType::Vector;
+  definition.name = kmlEntryName(placemark);
+  // The placemark's path as the container: the provider draws it alone.
+  definition.source =
+      withKmlRevision(kmlLayerSource(document.path, featurePath, false));
+  VectorStyle style;
+  style.fill = QColor(255, 255, 255);
+  style.outline = QColor(255, 255, 255);
+  definition.style = style.toJson();
+  const QModelIndex layer = m_layers->addLayer(definition, collection, row);
+  m_kmlNodes[m_layers->data(layer, LayerTreeModel::NodeIdRole).toString()] = {
+      document.path, featurePath};
+  if (!placemark.visibility) {
+    m_layers->setData(layer, Qt::Unchecked, Qt::CheckStateRole);
+  }
+}
+
+QString MainWindow::kmlEntryName(const KmlFeature& feature)
+{
+  if (!feature.name.isEmpty()) {
+    return feature.name;
+  }
+  switch (feature.kind) {
+  case KmlFeature::Kind::Document:
+  case KmlFeature::Kind::Folder:
+    return tr("Folder");
+  case KmlFeature::Kind::GroundOverlay:
+    return tr("Ground overlay");
+  case KmlFeature::Kind::ScreenOverlay:
+    return tr("Screen overlay");
+  case KmlFeature::Kind::NetworkLink:
+    return tr("Network link");
+  case KmlFeature::Kind::Placemark:
+    break;
+  }
+  if (!feature.geometry) {
+    return tr("Placemark");
+  }
+  switch (feature.geometry->kind) {
+  case KmlGeometry::Kind::LineString:
+    return tr("Path");
+  case KmlGeometry::Kind::LinearRing:
+  case KmlGeometry::Kind::Polygon:
+    return tr("Polygon");
+  case KmlGeometry::Kind::Track:
+    return tr("Track");
+  case KmlGeometry::Kind::Point:
+  case KmlGeometry::Kind::MultiGeometry:
+    break;
+  }
+  return tr("Placemark");
 }
 
 void MainWindow::addKmlLink(const KmlDocument& document, const KmlFeature& link,
@@ -2198,6 +2277,13 @@ std::vector<QAction*> MainWindow::nodeActions(const QModelIndex& index,
   actions.insert(actions.end(), aircraft.begin(), aircraft.end());
   const std::vector<QAction*> vessels = vesselNodeActions(id, parent);
   actions.insert(actions.end(), vessels.begin(), vessels.end());
+  if (kmlEntryFeature(id) != nullptr) {
+    QAction* properties = new QAction(tr("Properties…"), parent);
+    properties->setObjectName(QStringLiteral("kmlEntryPropertiesAction"));
+    connect(properties, &QAction::triggered, this,
+            [this, id]() { showKmlEntryProperties(id); });
+    actions.push_back(properties);
+  }
   if (m_kmlNodes.count(id) != 0 && kmlKeyOf(id).isEmpty()) {
     QAction* edit = new QAction(tr("Edit This Document"), parent);
     edit->setObjectName(QStringLiteral("editKmlNodeAction"));

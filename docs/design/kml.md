@@ -215,8 +215,10 @@ Region or a container's is inactive, and everything under it in the tree
 (a link's document included), is left out of the stack until it is
 active again. A NetworkLink with a Region is fetched the first time its
 Region becomes active (superoverlays load level by level as the view
-comes closer). A Region on a single placemark inside a Places layer is
-not used (the layer is the unit); minAltitude places the box's sample
+comes closer). A placemark listed as an entry of its own has its own
+Region checked too; one inside a Places layer (a folder of more than
+500) is not used (the layer is the unit); minAltitude places the box's
+sample
 points, maxAltitude and the fade extents are not used.
 
 ## NetworkLinks
@@ -262,10 +264,17 @@ Places layer of everything inside (`"deep": true`); `check` and
 window, and files given on the command line (as the desktop's Open With
 passes them: `.kml` and `.kmz` are associated on Linux and offered in
 Open With on Windows, without taking them from another program) all go
-through `MainWindow::openFile()`. The document becomes a collection named after
-it (or its file), each Folder and Document inside a collection in order,
-and each container's placemarks one vector layer (Places) where its first
-placemark is; `visibility` 0 leaves an entry switched off. The document's
+through `MainWindow::openFile()`. The document becomes a collection
+named after it (or its file), each Folder and Document inside a
+collection in order, and each placemark a vector layer of its own where
+it is (`addKmlPlace()`: the layer's source has the placemark's path as
+its container, so its provider draws it alone), named after it or, with
+no name, its kind (`kmlEntryName()`: Placemark, Path, Polygon, Track).
+A container with more than 500 placemarks (`kmlListedPlacemarks`) has
+them in one vector layer, Places, where its first is: a layer each
+would cost its own draws on every tile in view. `visibility` 0 leaves an
+entry switched off; in a radio folder, each placemark's entry is one of
+the choices. The document's
 own view, if any, is flown to. The file is read on a worker thread
 (`readKmlInBackground()`): the window keeps drawing, with a busy dialog
 after half a second (100,000 placemarks take about 1.5 s to read and
@@ -413,9 +422,19 @@ with the one saved.
   KML too; pasting adds them, written anew (`kmlWithoutSource()`), and
   the styles the document hasn't; KML copied in another program pastes
   too.
+- *Properties…* in a placemark's or ground overlay's entry menu
+  (`showKmlEntryProperties()`) opens the same dialog for that element.
+  For a document opened as it is, the dialog shows the file as opened;
+  only if what it gives back writes differently (`writeKml()` of the
+  document with and without the change) does the document become the
+  editable copy (as Edit This Document) and take the change
+  (`setKmlEntryFeature()`). Elements of a document a network link
+  fetched have no Properties…. Choosing an element's entry in the tree
+  selects it (`kmlEntryChosen()`), as a click on it does.
 - Dragging an entry into another folder of the same document in the
   layer tree moves the feature (a Places entry moves all the folder's
-  placemarks); ticking and renaming entries change the document. After
+  placemarks); ticking and renaming entries change the document (a name
+  given for the entry's kind isn't taken as a rename). After
   each change the document's entries are made again from it, their
   layer sources carrying the revision (`"rev"`) so their providers and
   tiles are made again.
@@ -462,7 +481,8 @@ shapes, a folder extracted with its styles; editing: paths, inserting,
 taking and moving features, handles, moving, adding and deleting
 vertices, ground overlay corners, undo and redo with their limits.
 `tests/ui`: a
-KML opened into the layer tree, a balloon on click, Fly There, icons and
+KML opened into the layer tree (an entry per placemark, named after it
+or its kind, a folder of more than 500 as Places), a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
 is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,
 a stalk) drawn and hidden from the far side; ground overlays as imagery
@@ -470,7 +490,10 @@ layers and a screen overlay drawn and switched off; NetworkLinks to local
 files (one waiting for its Region, then hidden again), Refresh, a radio
 folder and a checkHideChildren folder (`links.kml`); a web link through a
 mock server (the view and client in its query, a failure); placemarks
-showing with the clock and a track's marker moving.
+showing with the clock and a track's marker moving, each switched on in
+its radio folder; Properties… on an entry (a file opened as it is
+edited only when something changes, undone), an entry chosen selecting
+its element, an entry named for its kind not renamed by a tick.
 
 Editing in the window (`tests/ui`): a new document with a placemark,
 path, polygon with a hole, folder and ground overlay; handles dragged,

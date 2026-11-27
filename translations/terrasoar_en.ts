@@ -3766,6 +3766,14 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <source>%1 isn't in the XYZ catalogue any more.</source>
             <translation>%1 isn't in the XYZ catalogue any more.</translation>
         </message>
+        <message>
+            <source>Track</source>
+            <translation>Track</translation>
+        </message>
+        <message>
+            <source>Properties…</source>
+            <translation>Properties…</translation>
+        </message>
     </context>
     <context>
         <name>ts::NavigationOverlay</name>

@@ -32,6 +32,7 @@
 #include <QClipboard>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QItemSelectionModel>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QKeySequence>
@@ -41,6 +42,7 @@
 #include <QMimeData>
 #include <QStatusBar>
 #include <QTimer>
+#include <QTreeView>
 #include <QUuid>
 
 #include "globeview.h"
@@ -170,6 +172,31 @@ QJsonArray withoutChildren(const QJsonArray& layers,
   return out;
 }
 
+/**
+ * Gives the feature at @p path of @p document the properties @p feature
+ * (its children kept), and the shared style @p shared its values.
+ */
+bool applyKmlProperties(KmlDocument& document, const QString& path,
+                        const KmlFeature& feature,
+                        const std::optional<KmlStyle>& shared)
+{
+  KmlFeature* target = kmlFeatureAt(document, path);
+  if (target == nullptr) {
+    return false;
+  }
+  KmlFeature updated = feature;
+  updated.children = target->children;
+  *target = std::move(updated);
+  if (shared) {
+    for (KmlStyle& style : document.root.styles) {
+      if (style.id == shared->id) {
+        style = *shared;
+      }
+    }
+  }
+  return true;
+}
+
 } // namespace
 
 void MainWindow::createKmlEditing()
@@ -260,6 +287,10 @@ void MainWindow::createKmlEditing()
   m_kmlMenu->addAction(m_kmlSaveAction);
   m_kmlMenu->addAction(m_kmlSaveAsAction);
   connect(m_kmlMenu, &QMenu::aboutToShow, this, &MainWindow::updateKmlActions);
+  // Choosing an element's entry in the layer tree selects the element.
+  connect(m_layerDock->view()->selectionModel(),
+          &QItemSelectionModel::currentChanged, this,
+          &MainWindow::kmlEntryChosen);
 
   if (m_globeView != nullptr) {
     connect(m_globeView, &GlobeView::handleMoved, this,
@@ -520,7 +551,7 @@ void MainWindow::refreshKmlDocument(const QString& key)
     if (isContainer(&shared->root)) {
       addKmlChildren(*shared, shared->root, QString(), index);
     } else if (shared->root.kind == KmlFeature::Kind::Placemark) {
-      addKmlPlaces(*shared, QString(), index, 0, false);
+      addKmlPlace(*shared, shared->root, QString(), index, 0);
     }
   }
   m_refreshingKml = wasRefreshing;
@@ -709,21 +740,7 @@ bool MainWindow::setKmlFeature(const QString& key, const QString& path,
   }
   const bool done =
       document->edit(tr("Change Properties"), [&](KmlDocument& changed) {
-        KmlFeature* target = kmlFeatureAt(changed, path);
-        if (target == nullptr) {
-          return false;
-        }
-        KmlFeature updated = feature;
-        updated.children = target->children;
-        *target = std::move(updated);
-        if (shared) {
-          for (KmlStyle& style : changed.root.styles) {
-            if (style.id == shared->id) {
-              style = *shared;
-            }
-          }
-        }
-        return true;
+        return applyKmlProperties(changed, path, feature, shared);
       });
   if (done) {
     refreshKmlDocument(key);
@@ -1087,23 +1104,129 @@ void MainWindow::showKmlProperties()
     return;
   }
   KmlPropertiesDialog dialog(
-      *feature, document->document(),
-      [this]() {
-        KmlView view;
-        if (m_globeView != nullptr) {
-          const CameraPose& pose = m_globeView->controller().camera().pose();
-          view.latDeg = pose.targetLatDeg;
-          view.lonDeg = pose.targetLonDeg;
-          view.rangeM = pose.rangeM;
-          view.headingDeg = pose.headingDeg;
-          view.tiltDeg = pose.tiltDeg;
-        }
-        return view;
-      },
+      *feature, document->document(), [this]() { return currentKmlView(); },
       this);
   if (dialog.exec() == QDialog::Accepted) {
     setKmlFeature(key, path, dialog.feature(), dialog.sharedStyle());
   }
+}
+
+KmlView MainWindow::currentKmlView() const
+{
+  KmlView view;
+  if (m_globeView != nullptr) {
+    const CameraPose& pose = m_globeView->controller().camera().pose();
+    view.latDeg = pose.targetLatDeg;
+    view.lonDeg = pose.targetLonDeg;
+    view.rangeM = pose.rangeM;
+    view.headingDeg = pose.headingDeg;
+    view.tiltDeg = pose.tiltDeg;
+  }
+  return view;
+}
+
+const KmlFeature* MainWindow::kmlEntryFeature(const QString& nodeId) const
+{
+  const std::map<QString, std::pair<QString, QString>>::const_iterator node =
+      m_kmlNodes.find(nodeId);
+  if (node == m_kmlNodes.end()) {
+    return nullptr;
+  }
+  // Only an element of the document the entry's top is: one a network
+  // link fetched can't be edited.
+  QString file;
+  for (QModelIndex up = m_layers->indexOfId(nodeId); up.isValid();
+       up = up.parent()) {
+    const std::map<QString, QString>::const_iterator root = m_kmlRoots.find(
+        m_layers->data(up, LayerTreeModel::NodeIdRole).toString());
+    if (root != m_kmlRoots.end()) {
+      file = root->second;
+    }
+  }
+  if (file != node->second.first) {
+    return nullptr;
+  }
+  const KmlEditDocument* edited = kmlEditDocument(file);
+  const std::shared_ptr<const KmlDocument> shown =
+      edited != nullptr ? edited->shared() : sharedKmlDocument(file, nullptr);
+  const KmlFeature* feature =
+      shown ? kmlFeatureAt(*shown, node->second.second) : nullptr;
+  if (feature == nullptr ||
+      (feature->kind != KmlFeature::Kind::Placemark &&
+       feature->kind != KmlFeature::Kind::GroundOverlay)) {
+    return nullptr;
+  }
+  return feature;
+}
+
+void MainWindow::kmlEntryChosen(const QModelIndex& index)
+{
+  // An element's entry of a document being edited: the element is
+  // selected, as a click on it would (its handles shown, Properties and
+  // the clipboard working on it).
+  const QString id =
+      m_layers->data(index, LayerTreeModel::NodeIdRole).toString();
+  const QString key = kmlKeyOf(id);
+  if (key.isEmpty() || kmlEntryFeature(id) == nullptr) {
+    return;
+  }
+  selectKmlFeature(key, m_kmlNodes.at(id).second);
+}
+
+void MainWindow::showKmlEntryProperties(const QString& nodeId)
+{
+  const KmlFeature* feature = kmlEntryFeature(nodeId);
+  if (feature == nullptr) {
+    return;
+  }
+  // The document the dialog shows: the one being edited, else the file as
+  // opened (kept alive while the dialog is open).
+  const QString file = m_kmlNodes.at(nodeId).first;
+  const KmlEditDocument* edited = kmlEditDocument(file);
+  const std::shared_ptr<const KmlDocument> shown =
+      edited != nullptr ? edited->shared() : sharedKmlDocument(file, nullptr);
+  if (!shown) {
+    return;
+  }
+  KmlPropertiesDialog dialog(
+      *feature, *shown, [this]() { return currentKmlView(); }, this);
+  if (dialog.exec() == QDialog::Accepted) {
+    setKmlEntryFeature(nodeId, dialog.feature(), dialog.sharedStyle());
+  }
+}
+
+bool MainWindow::setKmlEntryFeature(const QString& nodeId,
+                                    const KmlFeature& feature,
+                                    const std::optional<KmlStyle>& shared)
+{
+  if (kmlEntryFeature(nodeId) == nullptr) {
+    return false;
+  }
+  const std::pair<QString, QString> node = m_kmlNodes.at(nodeId);
+  QString key = kmlKeyOf(nodeId);
+  if (key.isEmpty()) {
+    // A file opened as it is: only if something changes does it become
+    // the editable copy, so looking at Properties changes nothing.
+    const std::shared_ptr<const KmlDocument> shown =
+        sharedKmlDocument(node.first, nullptr);
+    if (!shown) {
+      return false;
+    }
+    KmlDocument changed = *shown;
+    if (!applyKmlProperties(changed, node.second, feature, shared) ||
+        writeKml(changed) == writeKml(*shown)) {
+      return false;
+    }
+    key = editKmlDocument(nodeId);
+    if (key.isEmpty()) {
+      return false;
+    }
+  }
+  const bool done = setKmlFeature(key, node.second, feature, shared);
+  if (done) {
+    selectKmlFeature(key, node.second);
+  }
+  return done;
 }
 
 void MainWindow::kmlNodesMoved()
@@ -1307,10 +1430,12 @@ void MainWindow::syncKmlEntry(const QModelIndex& index)
   const KmlFeature* feature = kmlFeatureAt(document->document(), path);
   const bool collection =
       m_layers->data(index, LayerTreeModel::IsCollectionRole).toBool();
-  const bool overlay =
-      feature != nullptr && (feature->kind == KmlFeature::Kind::GroundOverlay ||
+  // A layer of one element (not a folder's Places): a placemark or picture.
+  const bool element =
+      feature != nullptr && (feature->kind == KmlFeature::Kind::Placemark ||
+                             feature->kind == KmlFeature::Kind::GroundOverlay ||
                              feature->kind == KmlFeature::Kind::ScreenOverlay);
-  if (feature == nullptr || (!collection && !overlay)) {
+  if (feature == nullptr || (!collection && !element)) {
     return;
   }
   const bool visible =
@@ -1323,8 +1448,10 @@ void MainWindow::syncKmlEntry(const QModelIndex& index)
       }
     });
   }
+  // The name the entry was given for its kind isn't a new name.
   const QString name = m_layers->data(index).toString();
-  if (feature->name != name && !(feature->name.isEmpty() && path.isEmpty())) {
+  if (name != kmlEntryName(*feature) &&
+      !(feature->name.isEmpty() && path.isEmpty())) {
     document->edit(tr("Rename"), [&path, &name](KmlDocument& changed) {
       KmlFeature* target = kmlFeatureAt(changed, path);
       if (target == nullptr) {
