@@ -26,6 +26,14 @@ All notable changes to Terra Soar. The format follows
 
 ### Changed
 
+- KML and KMZ files in the Layers panel: each place, path and area is
+  an entry of its own, named as in the file (or Placemark, Path or
+  Polygon), instead of one Places entry per folder; a folder of more than
+  500 still has one Places entry. Right-click an entry and choose
+  Properties… to see and change it: a file opened as it is switches to
+  editing when something changes. Choosing an entry selects the element.
+  A Region on a single placemark now applies to its entry, and a radio
+  folder's choices are its placemarks.
 - File menu items and their dialogs say what they are: Add Web Map
   Service (WMS) Layer…, Add Web Map Tile Service (WMTS) Layer…, Add Web
   Feature Service (WFS) Layer…, Import Aircraft ADS-B Data…, Connect to

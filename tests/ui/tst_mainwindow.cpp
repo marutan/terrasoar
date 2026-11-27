@@ -3085,8 +3085,9 @@ private slots:
     if (!ts::GlobeView::isOpenGlAvailable()) {
       QSKIP("No OpenGL view on this platform.");
     }
-    // A KML document in the layer tree: a collection per folder, the
-    // placemarks of each in a vector layer, visibility as written; a click
+    // A KML document in the layer tree: a collection per folder, each
+    // placemark an entry (a vector layer) of its own, named after it,
+    // visibility as written; a click
     // on a placemark shows its balloon; a folder can be flown to.
     ts::MainWindow window;
     window.show();
@@ -3106,20 +3107,30 @@ private slots:
     QCOMPARE(model->data(document).toString(), QStringLiteral("Everything"));
     QVERIFY(
         model->data(document, ts::LayerTreeModel::IsCollectionRole).toBool());
-    // Shapes (its places), Times and places (its places), the document's
-    // own placemark, two ground overlays, a screen overlay and a network
-    // link.
+    // Shapes, Times and places, two ground overlays, a screen overlay, a
+    // network link and the document's own placemark.
     QCOMPARE(model->rowCount(document), 7);
     const QModelIndex shapes = model->index(0, 0, document);
     QCOMPARE(model->data(shapes).toString(), QStringLiteral("Shapes"));
-    QCOMPARE(model->rowCount(shapes), 1);
-    const QModelIndex places = model->index(0, 0, shapes);
-    QCOMPARE(model->data(places, ts::LayerTreeModel::LayerTypeRole).toInt(),
+    QCOMPARE(model->rowCount(shapes), 5);
+    QStringList names;
+    for (int32_t i = 0; i < model->rowCount(shapes); ++i) {
+      names << model->data(model->index(i, 0, shapes)).toString();
+    }
+    QCOMPARE(names,
+             QStringList({QStringLiteral("A point"), QStringLiteral("A line"),
+                          QStringLiteral("A ring"),
+                          QStringLiteral("A polygon with a hole"),
+                          QStringLiteral("Two points and a line")}));
+    const QModelIndex point = model->index(0, 0, shapes);
+    QCOMPARE(model->data(point, ts::LayerTreeModel::LayerTypeRole).toInt(),
              static_cast<int32_t>(ts::LayerType::Vector));
-    QCOMPARE(model->layerDefinition(places)
-                 .source.value(QStringLiteral("kind"))
-                 .toString(),
+    const QJsonObject pointSource = model->layerDefinition(point).source;
+    QCOMPARE(pointSource.value(QStringLiteral("kind")).toString(),
              QStringLiteral("kml"));
+    // The placemark itself is the layer's container: it draws that alone.
+    QCOMPARE(pointSource.value(QStringLiteral("container")).toString(),
+             QStringLiteral("0.0"));
     // A click on the point: its balloon.
     QCOMPARE(window.identifyAt(ts::LonLat{-1.8904, 52.4862}, 0.001), 1);
     ts::BalloonWindow* balloon = window.balloonWindow();
@@ -3179,7 +3190,7 @@ private slots:
     const QJsonObject state = window.stateReport();
     QVERIFY(state.value(QStringLiteral("layers"))
                 .toArray()
-                .contains(QStringLiteral("Places")));
+                .contains(QStringLiteral("Pinned")));
   }
 
   void kmlHeights()
@@ -3426,6 +3437,8 @@ private slots:
       QSKIP("No OpenGL view on this platform.");
     }
     // Placemarks with times show at the clock's; a track's marker moves.
+    // They are in a radio folder: one entry on at a time, so each is
+    // switched on in turn.
     ts::MainWindow window;
     window.show();
     QVERIFY(QTest::qWaitForWindowExposed(&window));
@@ -3443,19 +3456,34 @@ private slots:
       }
       return found;
     };
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex times = model->index(1, 0, model->index(0, 0));
+    QCOMPARE(model->data(times).toString(), QStringLiteral("Times and places"));
+    const std::function<void(int32_t)> switchOn = [&](int32_t row) {
+      model->setData(model->index(row, 0, times), Qt::Checked,
+                     Qt::CheckStateRole);
+    };
+    // Only the first is on as the file opens.
+    QCOMPARE(model->data(model->index(0, 0, times), Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Checked));
+    QCOMPARE(model->data(model->index(1, 0, times), Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Unchecked));
+    view->setPose(ts::CameraPose{51.3, -0.3, 300000.0, 0.0, 0.0});
+    switchOn(1);
     window.clock()->setTime(
         QDateTime(QDate(2026, 3, 1), QTime(12, 0), QTimeZone::utc()));
     QVERIFY(QTest::qWaitFor(
         [&]() { return labels().contains(QStringLiteral("Spanned")); }));
-    QVERIFY(!labels().contains(QStringLiteral("Stamped")));
-    QVERIFY(!labels().contains(QStringLiteral("Track")));
-    // On the track's day, half way along it: its marker, the stamp not yet.
+    // Switched on but outside its span: not shown.
     window.clock()->setTime(
         QDateTime(QDate(2026, 11, 20), QTime(10, 30), QTimeZone::utc()));
     QVERIFY(QTest::qWaitFor(
+        [&]() { return !labels().contains(QStringLiteral("Spanned")); }));
+    // On the track's day, half way along it: its marker.
+    switchOn(2);
+    QVERIFY(QTest::qWaitFor(
         [&]() { return labels().contains(QStringLiteral("Track")); }));
     QVERIFY(!labels().contains(QStringLiteral("Spanned")));
-    QVERIFY(!labels().contains(QStringLiteral("Stamped")));
     double lon = 0.0;
     for (const ts::BillboardDraw& billboard : view->billboards()) {
       if (billboard.label == QLatin1String("Track")) {
@@ -3463,7 +3491,9 @@ private slots:
       }
     }
     QCOMPARE(lon, -0.75);
-    // Later: the stamp.
+    // Later: the stamp. Its Region (a small box) wants it seen close up.
+    switchOn(0);
+    view->setPose(ts::CameraPose{51.5, 0.1, 30000.0, 0.0, 0.0});
     window.clock()->setTime(
         QDateTime(QDate(2026, 11, 21), QTime(0, 0), QTimeZone::utc()));
     QVERIFY(QTest::qWaitFor(
@@ -3591,6 +3621,127 @@ private slots:
     QVERIFY(QTest::qWaitFor(
         [&]() { return view->billboards().size() == std::size_t{100000}; }));
     QCOMPARE(view->billboards().size(), std::size_t{100000});
+  }
+
+  void kmlItemEntries()
+  {
+    // Each placemark of a folder is an entry of its own, named after it
+    // (or its kind); a folder of very many has them in one Places layer.
+    // Properties… on an entry changes the element: a file opened as it is
+    // becomes the editable copy, but only if something changes.
+    QTemporaryDir directory;
+    const QString path = directory.filePath(QStringLiteral("items.kml"));
+    QString text = QStringLiteral(
+        "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+        "<name>Items</name><Folder><name>Few</name>"
+        "<Placemark><name>Alpha</name>"
+        "<Point><coordinates>1,51</coordinates></Point></Placemark>"
+        "<Placemark><LineString><coordinates>1,51 2,52</coordinates>"
+        "</LineString></Placemark>"
+        "<Placemark><visibility>0</visibility><Polygon><outerBoundaryIs>"
+        "<LinearRing><coordinates>1,51 2,51 2,52 1,51</coordinates>"
+        "</LinearRing></outerBoundaryIs></Polygon></Placemark>"
+        "</Folder><Folder><name>Many</name>");
+    for (int32_t i = 0; i < 501; ++i) {
+      text += QStringLiteral("<Placemark><Point><coordinates>%1,10"
+                             "</coordinates></Point></Placemark>")
+                  .arg(i * 0.01);
+    }
+    text += QStringLiteral("</Folder></Document></kml>");
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(text.toUtf8());
+    file.close();
+
+    ts::MainWindow window;
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    QCOMPARE(model->data(document).toString(), QStringLiteral("Items"));
+    const QModelIndex few = model->index(0, 0, document);
+    QCOMPARE(model->rowCount(few), 3);
+    QCOMPARE(model->data(model->index(0, 0, few)).toString(),
+             QStringLiteral("Alpha"));
+    QCOMPARE(model->data(model->index(1, 0, few)).toString(),
+             QStringLiteral("Path"));
+    const QModelIndex polygon = model->index(2, 0, few);
+    QCOMPARE(model->data(polygon).toString(), QStringLiteral("Polygon"));
+    // Its visibility as written.
+    QCOMPARE(model->data(polygon, Qt::CheckStateRole).toInt(),
+             static_cast<int32_t>(Qt::Unchecked));
+    const QModelIndex many = model->index(1, 0, document);
+    QCOMPARE(model->rowCount(many), 1);
+    QCOMPARE(model->data(model->index(0, 0, many)).toString(),
+             QStringLiteral("Places"));
+
+    // Properties… for an element's entry, not for a folder's.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    if (dock == nullptr) {
+      QFAIL("no layer dock");
+    }
+    const QString alphaId =
+        model->data(model->index(0, 0, few), ts::LayerTreeModel::NodeIdRole)
+            .toString();
+    QMenu* menu = dock->contextMenu(model->indexOfId(alphaId));
+    QVERIFY(menu != nullptr && menu->findChild<QAction*>(QStringLiteral(
+                                   "kmlEntryPropertiesAction")) != nullptr);
+    menu = dock->contextMenu(few);
+    QVERIFY(menu == nullptr || menu->findChild<QAction*>(QStringLiteral(
+                                   "kmlEntryPropertiesAction")) == nullptr);
+
+    // Nothing changed: the file stays as it was opened.
+    const std::optional<ts::KmlDocument> read = ts::readKmlFile(path, &error);
+    if (!read) {
+      QFAIL(qPrintable(error));
+    }
+    const ts::KmlFeature* alpha =
+        ts::kmlFeatureAt(*read, QStringLiteral("0.0"));
+    if (alpha == nullptr) {
+      QFAIL("no Alpha");
+    }
+    QVERIFY(!window.setKmlEntryFeature(alphaId, *alpha, std::nullopt));
+    menu = dock->contextMenu(model->indexOfId(alphaId));
+    QVERIFY(menu->findChild<QAction*>(QStringLiteral("editKmlNodeAction")) !=
+            nullptr);
+
+    // A new name: the document becomes the editable copy, the entry is
+    // renamed and the element selected; undo puts the name back.
+    ts::KmlFeature renamed = *alpha;
+    renamed.name = QStringLiteral("Beta");
+    QVERIFY(window.setKmlEntryFeature(alphaId, renamed, std::nullopt));
+    // The document's entries, made again from the editable copy.
+    const QModelIndex edited = model->index(0, 0);
+    const QModelIndex editedFew = model->index(0, 0, edited);
+    QCOMPARE(model->data(model->index(0, 0, editedFew)).toString(),
+             QStringLiteral("Beta"));
+    QCOMPARE(window.selectedKmlFeature(),
+             std::optional<QString>(QStringLiteral("0.0")));
+    menu = dock->contextMenu(model->index(0, 0, editedFew));
+    QVERIFY(menu->findChild<QAction*>(QStringLiteral("editKmlNodeAction")) ==
+            nullptr);
+    QVERIFY(window.undoKml());
+    QCOMPARE(
+        model->data(model->index(0, 0, model->index(0, 0, edited))).toString(),
+        QStringLiteral("Alpha"));
+
+    // Choosing an element's entry in the tree selects the element.
+    const QModelIndex path2 =
+        model->index(1, 0, model->index(0, 0, model->index(0, 0)));
+    dock->setCurrentIndex(path2);
+    QCOMPARE(window.selectedKmlFeature(),
+             std::optional<QString>(QStringLiteral("0.1")));
+    // Switching an entry named for its kind off and on doesn't rename the
+    // element to that name: no Rename to undo.
+    model->setData(path2, Qt::Unchecked, Qt::CheckStateRole);
+    model->setData(path2, Qt::Checked, Qt::CheckStateRole);
+    QAction* undo = window.findChild<QAction*>(QStringLiteral("kmlUndoAction"));
+    if (undo == nullptr) {
+      QFAIL("no Undo");
+    }
+    QVERIFY2(!undo->text().contains(QStringLiteral("Rename")),
+             qPrintable(undo->text()));
+    QCOMPARE(model->data(path2).toString(), QStringLiteral("Path"));
   }
 
   void kmlEditing()

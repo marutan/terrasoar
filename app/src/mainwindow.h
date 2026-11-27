@@ -232,6 +232,16 @@ public:
                      const KmlFeature& feature,
                      const std::optional<KmlStyle>& shared);
 
+  /**
+   * Gives the element of layer tree entry @p nodeId the properties
+   * @p feature (and @p shared its shared style's values), as Properties…
+   * in the entry's menu does. A document opened as it is becomes the
+   * editable copy first (as Edit This Document), but only if something
+   * changes. Returns false if nothing changed or it can't be changed.
+   */
+  bool setKmlEntryFeature(const QString& nodeId, const KmlFeature& feature,
+                          const std::optional<KmlStyle>& shared);
+
   /** Undoes the active document's last change. */
   bool undoKml();
 
@@ -614,6 +624,10 @@ private:
   void kmlHandleDeleted(int32_t index);
   void showKmlHandles();
   void showKmlProperties();
+  /** Properties… on a KML entry in the layer tree. */
+  void showKmlEntryProperties(const QString& nodeId);
+  /** The view as a KML view, for the Properties dialog's View tab. */
+  KmlView currentKmlView() const;
   bool saveKmlActive(bool as);
   void kmlNodesMoved();
   QJsonArray kmlProjectEntries(bool* cancelled);
@@ -683,6 +697,26 @@ private:
                       const QModelIndex& collection);
   void addKmlPlaces(const KmlDocument& document, const QString& featurePath,
                     const QModelIndex& collection, int32_t row, bool deep);
+  /**
+   * Adds @p placemark (at @p featurePath) as an entry of its own: a layer
+   * of that placemark alone, named after it.
+   */
+  void addKmlPlace(const KmlDocument& document, const KmlFeature& placemark,
+                   const QString& featurePath, const QModelIndex& collection,
+                   int32_t row);
+  /**
+   * The name of @p feature's entry in the layer tree: its own, else one
+   * for its kind (a placemark's for its geometry).
+   */
+  static QString kmlEntryName(const KmlFeature& feature);
+  /**
+   * The KML feature @p nodeId's entry shows, if it is one Properties can
+   * change: a placemark or ground overlay of an opened document's own
+   * file (not one a network link fetched).
+   */
+  const KmlFeature* kmlEntryFeature(const QString& nodeId) const;
+  /** A KML entry chosen in the layer tree: its element is selected. */
+  void kmlEntryChosen(const QModelIndex& index);
   void addKmlLink(const KmlDocument& document, const KmlFeature& link,
                   const QString& featurePath, const QModelIndex& parent,
                   int32_t row);

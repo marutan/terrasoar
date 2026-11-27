@@ -13,9 +13,12 @@ Soar shows them on the globe and the flat maps.
 
 The file appears at the top of the Layers panel as a collection named
 after its document. Each of its folders is a collection inside it, in the
-same order, and the places of each folder are a layer called **Places**.
-Tick and untick them as any layer; folders the file hides start
-unticked. If the file has its own view, Terra Soar flies there.
+same order, and each place, path and area is an entry of its own, named
+as in the file (or **Placemark**, **Path** or **Polygon** if it has no
+name). Tick and untick them as any layer; things the file hides start
+unticked. A folder with more than 500 places has them all in one entry,
+**Places**, so that it stays quick to draw. If the file has its own
+view, Terra Soar flies there.
 
 Large files (tens of thousands of places) take a moment to read; Terra
 Soar keeps going meanwhile.
@@ -78,9 +81,9 @@ own layout when it has one. Links in it open in your web browser;
 pictures from the web are not loaded. **Fly there** at the bottom takes
 you to it.
 
-Double-click a folder, a Places layer or a picture in the Layers panel
-(or right-click it and choose **Fly There**) to go to its view, or to see
-all of it. To rename it, select it and press F2.
+Double-click a folder, a place, a Places entry or a picture in the
+Layers panel (or right-click it and choose **Fly There**) to go to its
+view, or to see all of it. To rename it, select it and press F2.
 
 ## Saving
 
@@ -121,19 +124,25 @@ its points show as small squares.
 - Right-click a square to delete that point.
 - Drag a ground overlay's corners to stretch it.
 
-**KML → Properties…** (Alt+Enter) changes the selected thing's name,
+**KML → Properties…** (Alt+Enter), or **Properties…** when you
+right-click a place, path, area or ground overlay in the Layers panel,
+changes its name,
 description (in HTML, with its balloon shown as it will look), the view
 Fly There goes to (**Set from the View**), its style (icon, colours,
 line width, fill, label size: for it alone, or a **shared** style, which
 changes everything that uses it), its height (on the ground, above the
 ground or above sea level, with walls down to the ground if you like),
 when it shows (always, from a moment on, or during a period) and its own
-data fields.
+data fields. In a file you opened without choosing Edit This Document,
+Properties… shows the same; if you change something, the file is
+switched to editing first, so the change can be undone and saved.
+Choosing an entry in the Layers panel selects it, as clicking it on the
+globe does.
 
 **Cut**, **Copy**, **Paste** and **Delete** work on the selected thing;
-you can also paste KML copied in Google Earth. Drag folders in the
-Layers panel to move them into other folders. **Undo** and **Redo**
-(Ctrl+Z, Ctrl+Shift+Z) take back any change.
+you can also paste KML copied in Google Earth. Drag folders, places,
+paths and areas in the Layers panel to move them into other folders.
+**Undo** and **Redo** (Ctrl+Z, Ctrl+Shift+Z) take back any change.
 
 **KML → Save KML Document** saves it to its file (or asks where, for a
 new one); **Save KML Document As…** saves a copy, as KML or as a KMZ with
