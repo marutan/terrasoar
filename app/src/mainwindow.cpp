@@ -257,7 +257,7 @@ QPointF at(const QRectF& box, qreal fx, qreal fy)
 }
 
 /** A dot for a vertex at @p point, a little wider than the pen. */
-void drawVertex(QPainter& painter, const QPointF& point)
+void drawVertex(QPainter& painter, QPointF point)
 {
   const qreal radius = painter.pen().widthF() * 1.2;
   painter.save();
