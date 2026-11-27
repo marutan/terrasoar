@@ -9,8 +9,9 @@ when you click it.
 
 ## Adding a layer
 
-1. Choose **File → Add WFS Layer…**, or **Add Layer → WFS Layer…** at the
-   bottom of the Layers panel.
+1. Choose **Online Sources → Add Web Feature Service (WFS) Layer…**, or
+   **Add Layer → Web Feature Service (WFS) Layer…** at the bottom of the
+   Layers panel.
 2. In **Service**, pick one of the listed services, or type the address of
    any WFS, for example
    `https://service.pdok.nl/kadaster/bestuurlijkegebieden/wfs/v1_0`.

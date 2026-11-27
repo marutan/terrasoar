@@ -7,7 +7,7 @@ CelesTrak makes available by group.
 
 ## Adding satellites
 
-**File → Add Satellites…** has three tabs:
+**Tracks → Add Satellites…** has three tabs:
 
 - **CelesTrak**: one of CelesTrak's groups, such as Space stations,
   100 brightest, Weather, GPS operational, Starlink or Amateur radio.

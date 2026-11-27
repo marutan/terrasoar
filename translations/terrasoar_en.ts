@@ -298,10 +298,6 @@
     <context>
         <name>ts::AddWfsDialog</name>
         <message>
-            <source>Add WFS Layer</source>
-            <translation>Add WFS Layer</translation>
-        </message>
-        <message>
             <source>&amp;Service (choose one or type its address):</source>
             <translation>&amp;Service (choose one or type its address):</translation>
         </message>
@@ -380,13 +376,13 @@
             <source>Colour of the Features</source>
             <translation>Colour of the Features</translation>
         </message>
+        <message>
+            <source>Add Web Feature Service (WFS) Layer</source>
+            <translation>Add Web Feature Service (WFS) Layer</translation>
+        </message>
     </context>
     <context>
         <name>ts::AddWmsDialog</name>
-        <message>
-            <source>Add WMS Layer</source>
-            <translation>Add WMS Layer</translation>
-        </message>
         <message>
             <source>&amp;Service (choose one or type its address):</source>
             <translation>&amp;Service (choose one or type its address):</translation>
@@ -478,13 +474,13 @@
             <source>Its time follows the program's clock (View → Time Slider).</source>
             <translation>Its time follows the program's clock (View → Time Slider).</translation>
         </message>
+        <message>
+            <source>Add Web Map Service (WMS) Layer</source>
+            <translation>Add Web Map Service (WMS) Layer</translation>
+        </message>
     </context>
     <context>
         <name>ts::AddWmtsDialog</name>
-        <message>
-            <source>Add WMTS Layer</source>
-            <translation>Add WMTS Layer</translation>
-        </message>
         <message>
             <source>&amp;Service (choose one or type its address):</source>
             <translation>&amp;Service (choose one or type its address):</translation>
@@ -583,6 +579,10 @@
         <message>
             <source>Drawn from %1 tiles in %2, reprojected.</source>
             <translation>Drawn from %1 tiles in %2, reprojected.</translation>
+        </message>
+        <message>
+            <source>Add Web Map Tile Service (WMTS) Layer</source>
+            <translation>Add Web Map Tile Service (WMTS) Layer</translation>
         </message>
     </context>
     <context>
@@ -1209,10 +1209,6 @@
             <translation>Listen for UDP</translation>
         </message>
         <message>
-            <source>Add AIS Source</source>
-            <translation>Add AIS Source</translation>
-        </message>
-        <message>
             <source>Not recorded</source>
             <translation>Not recorded</translation>
         </message>
@@ -1277,6 +1273,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Choose a feed.</source>
             <translation>Choose a feed.</translation>
+        </message>
+        <message>
+            <source>Add Maritime AIS Source</source>
+            <translation>Add Maritime AIS Source</translation>
         </message>
     </context>
     <context>
@@ -2075,10 +2075,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
     <context>
         <name>ts::ImportAdsbDialog</name>
         <message>
-            <source>Import ADS-B Data</source>
-            <translation>Import ADS-B Data</translation>
-        </message>
-        <message>
             <source>Detect automatically</source>
             <translation>Detect automatically</translation>
         </message>
@@ -2290,6 +2286,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <source>Choose the time, address, latitude and longitude columns.</source>
             <translation>Choose the time, address, latitude and longitude columns.</translation>
         </message>
+        <message>
+            <source>Import Aircraft ADS-B Data</source>
+            <translation>Import Aircraft ADS-B Data</translation>
+        </message>
     </context>
     <context>
         <name>ts::ImportAisDialog</name>
@@ -2340,10 +2340,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>The first line names the columns</source>
             <translation>The first line names the columns</translation>
-        </message>
-        <message>
-            <source>Import AIS Data</source>
-            <translation>Import AIS Data</translation>
         </message>
         <message>
             <source>Detect automatically</source>
@@ -2416,6 +2412,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Choose the time, MMSI, latitude and longitude columns.</source>
             <translation>Choose the time, MMSI, latitude and longitude columns.</translation>
+        </message>
+        <message>
+            <source>Import Maritime AIS Data</source>
+            <translation>Import Maritime AIS Data</translation>
         </message>
     </context>
     <context>
@@ -2807,20 +2807,12 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Vector layers (shorelines, graticule) are always drawn above imagery, in their order in the tree.</translation>
         </message>
         <message>
-            <source>WMS Layer…</source>
-            <translation>WMS Layer…</translation>
-        </message>
-        <message>
             <source>Elevation File…</source>
             <translation>Elevation File…</translation>
         </message>
         <message>
             <source>Web Terrain…</source>
             <translation>Web Terrain…</translation>
-        </message>
-        <message>
-            <source>WMTS Layer…</source>
-            <translation>WMTS Layer…</translation>
         </message>
         <message>
             <source>Imagery File…</source>
@@ -2843,16 +2835,24 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>The clock's month, any year</translation>
         </message>
         <message>
-            <source>WFS Layer…</source>
-            <translation>WFS Layer…</translation>
-        </message>
-        <message>
             <source>Data Packs</source>
             <translation>Data Packs</translation>
         </message>
         <message>
             <source>All Layers</source>
             <translation>All Layers</translation>
+        </message>
+        <message>
+            <source>Web Map Service (WMS) Layer…</source>
+            <translation>Web Map Service (WMS) Layer…</translation>
+        </message>
+        <message>
+            <source>Web Map Tile Service (WMTS) Layer…</source>
+            <translation>Web Map Tile Service (WMTS) Layer…</translation>
+        </message>
+        <message>
+            <source>Web Feature Service (WFS) Layer…</source>
+            <translation>Web Feature Service (WFS) Layer…</translation>
         </message>
     </context>
     <context>
@@ -3005,10 +3005,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Pointer not on the map</translation>
         </message>
         <message>
-            <source>Add &amp;WMS Layer…</source>
-            <translation>Add &amp;WMS Layer…</translation>
-        </message>
-        <message>
             <source>Add a layer from a web map server (WMS) to the layer tree</source>
             <translation>Add a layer from a web map server (WMS) to the layer tree</translation>
         </message>
@@ -3149,10 +3145,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Read the user guide, built into the program</translation>
         </message>
         <message>
-            <source>Add W&amp;MTS Layer…</source>
-            <translation>Add W&amp;MTS Layer…</translation>
-        </message>
-        <message>
             <source>Add a layer from a web map tile server (WMTS) to the layer tree</source>
             <translation>Add a layer from a web map tile server (WMTS) to the layer tree</translation>
         </message>
@@ -3205,20 +3197,12 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Clicking the globe or the map asks WMS layers what they show there</translation>
         </message>
         <message>
-            <source>Add W&amp;FS Layer…</source>
-            <translation>Add W&amp;FS Layer…</translation>
-        </message>
-        <message>
             <source>Add features (points, lines and areas) from a web feature service (WFS) to the layer tree</source>
             <translation>Add features (points, lines and areas) from a web feature service (WFS) to the layer tree</translation>
         </message>
         <message>
             <source>Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for use without a network</source>
             <translation>Keep areas of WMS, WMTS, XYZ and WFS layers on this computer for use without a network</translation>
-        </message>
-        <message>
-            <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</source>
-            <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (File → Add WMS Layer…, Add WMTS Layer…, Add XYZ Tile Layer… or Add WFS Layer…).</translation>
         </message>
         <message>
             <source>Open &amp;KML or KMZ…</source>
@@ -3578,16 +3562,8 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Refresh Elements</translation>
         </message>
         <message>
-            <source>Import ADS-&amp;B Data…</source>
-            <translation>Import ADS-&amp;B Data…</translation>
-        </message>
-        <message>
             <source>Show aircraft from a recording of ADS-B data: SBS, raw messages, Beast, readsb JSON, traces or CSV</source>
             <translation>Show aircraft from a recording of ADS-B data: SBS, raw messages, Beast, readsb JSON, traces or CSV</translation>
-        </message>
-        <message>
-            <source>Connect to ADS-B &amp;Receiver…</source>
-            <translation>Connect to ADS-B &amp;Receiver…</translation>
         </message>
         <message>
             <source>Show aircraft live from a dump1090 or readsb receiver</source>
@@ -3653,16 +3629,8 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Connect Again</translation>
         </message>
         <message>
-            <source>Import AIS Data…</source>
-            <translation>Import AIS Data…</translation>
-        </message>
-        <message>
             <source>Show ships from a recording of AIS data: NMEA logs or CSV (NOAA MarineCadastre's and others)</source>
             <translation>Show ships from a recording of AIS data: NMEA logs or CSV (NOAA MarineCadastre's and others)</translation>
-        </message>
-        <message>
-            <source>Add AIS Source…</source>
-            <translation>Add AIS Source…</translation>
         </message>
         <message>
             <source>Show ships live from an AIS receiver or an open online feed</source>
@@ -3715,6 +3683,88 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Bottom Ri&amp;ght</source>
             <translation>Bottom Ri&amp;ght</translation>
+        </message>
+        <message>
+            <source>Import Aircraft ADS-&amp;B Data…</source>
+            <translation>Import Aircraft ADS-&amp;B Data…</translation>
+        </message>
+        <message>
+            <source>Connect to Aircraft ADS-B &amp;Receiver…</source>
+            <translation>Connect to Aircraft ADS-B &amp;Receiver…</translation>
+        </message>
+        <message>
+            <source>Import Maritime AIS Data…</source>
+            <translation>Import Maritime AIS Data…</translation>
+        </message>
+        <message>
+            <source>Add Maritime AIS Source…</source>
+            <translation>Add Maritime AIS Source…</translation>
+        </message>
+        <message>
+            <source>Add Web Map Service (&amp;WMS) Layer…</source>
+            <translation>Add Web Map Service (&amp;WMS) Layer…</translation>
+        </message>
+        <message>
+            <source>Add Web Map Tile Service (W&amp;MTS) Layer…</source>
+            <translation>Add Web Map Tile Service (W&amp;MTS) Layer…</translation>
+        </message>
+        <message>
+            <source>Add Web Feature Service (W&amp;FS) Layer…</source>
+            <translation>Add Web Feature Service (W&amp;FS) Layer…</translation>
+        </message>
+        <message>
+            <source>&amp;Tools</source>
+            <translation>&amp;Tools</translation>
+        </message>
+        <message>
+            <source>&amp;Local Sources</source>
+            <translation>&amp;Local Sources</translation>
+        </message>
+        <message>
+            <source>&amp;Online Sources</source>
+            <translation>&amp;Online Sources</translation>
+        </message>
+        <message>
+            <source>T&amp;racks</source>
+            <translation>T&amp;racks</translation>
+        </message>
+        <message>
+            <source>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (Online Sources → Add Web Map Service (WMS) Layer…, Add Web Map Tile Service (WMTS) Layer…, Add XYZ Tile Layer… or Add Web Feature Service (WFS) Layer…).</source>
+            <translation>Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept for offline use. Add one first (Online Sources → Add Web Map Service (WMS) Layer…, Add Web Map Tile Service (WMTS) Layer…, Add XYZ Tile Layer… or Add Web Feature Service (WFS) Layer…).</translation>
+        </message>
+        <message>
+            <source>Toolbar</source>
+            <translation>Toolbar</translation>
+        </message>
+        <message>
+            <source>3D</source>
+            <comment>toolbar icon: show the globe</comment>
+            <translation>3D</translation>
+        </message>
+        <message>
+            <source>2D</source>
+            <comment>toolbar icon: show the map</comment>
+            <translation>2D</translation>
+        </message>
+        <message>
+            <source>Show the 3D Globe (%1)</source>
+            <translation>Show the 3D Globe (%1)</translation>
+        </message>
+        <message>
+            <source>Show the 2D Map (%1)</source>
+            <translation>Show the 2D Map (%1)</translation>
+        </message>
+        <message>
+            <source>Quick Maps</source>
+            <translation>Quick Maps</translation>
+        </message>
+        <message>
+            <source>Add a map from the catalogues straight away, with the usual choices</source>
+            <translation>Add a map from the catalogues straight away, with the usual choices</translation>
+        </message>
+        <message>
+            <source>%1 isn't in the XYZ catalogue any more.</source>
+            <translation>%1 isn't in the XYZ catalogue any more.</translation>
         </message>
     </context>
     <context>
@@ -4652,10 +4702,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>Fetch every:</translation>
         </message>
         <message>
-            <source>Connect to ADS-B Receiver</source>
-            <translation>Connect to ADS-B Receiver</translation>
-        </message>
-        <message>
             <source>SBS-1 / BaseStation (port 30003)</source>
             <translation>SBS-1 / BaseStation (port 30003)</translation>
         </message>
@@ -4718,6 +4764,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>Enter the receiver's host name or address.</source>
             <translation>Enter the receiver's host name or address.</translation>
+        </message>
+        <message>
+            <source>Connect to Aircraft ADS-B Receiver</source>
+            <translation>Connect to Aircraft ADS-B Receiver</translation>
         </message>
     </context>
     <context>
@@ -5681,16 +5731,16 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>The server reported an error: %1</translation>
         </message>
         <message>
-            <source>This is a map service (WMS or WMTS), not a WFS: add it with Add WMS Layer or Add WMTS Layer.</source>
-            <translation>This is a map service (WMS or WMTS), not a WFS: add it with Add WMS Layer or Add WMTS Layer.</translation>
-        </message>
-        <message>
             <source>The server's answer isn't a WFS capabilities document.</source>
             <translation>The server's answer isn't a WFS capabilities document.</translation>
         </message>
         <message>
             <source>The capabilities document is damaged: %1</source>
             <translation>The capabilities document is damaged: %1</translation>
+        </message>
+        <message>
+            <source>This is a map service (WMS or WMTS), not a WFS: add it with Add Web Map Service (WMS) Layer or Add Web Map Tile Service (WMTS) Layer.</source>
+            <translation>This is a map service (WMS or WMTS), not a WFS: add it with Add Web Map Service (WMS) Layer or Add Web Map Tile Service (WMTS) Layer.</translation>
         </message>
     </context>
     <context>
@@ -5893,10 +5943,6 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
             <translation>The server sent a web page, not WMTS capabilities. Check the address.</translation>
         </message>
         <message>
-            <source>This is a WMS service, not WMTS. Add it with Add WMS Layer instead.</source>
-            <translation>This is a WMS service, not WMTS. Add it with Add WMS Layer instead.</translation>
-        </message>
-        <message>
             <source>This is not a WMTS capabilities document (it starts with &lt;%1&gt;).</source>
             <translation>This is not a WMTS capabilities document (it starts with &lt;%1&gt;).</translation>
         </message>
@@ -5907,6 +5953,10 @@ Licence: %2. Credited as "%3" while the layer is shown.</translation>
         <message>
             <source>The service describes no tile matrix sets.</source>
             <translation>The service describes no tile matrix sets.</translation>
+        </message>
+        <message>
+            <source>This is a WMS service, not WMTS. Add it with Add Web Map Service (WMS) Layer instead.</source>
+            <translation>This is a WMS service, not WMTS. Add it with Add Web Map Service (WMS) Layer instead.</translation>
         </message>
     </context>
     <context>

@@ -586,8 +586,8 @@ parseWmtsCapabilities(const QByteArray& document, QString* errorString)
     return fail(errorString,
                 QCoreApplication::translate(
                     "ts::WmtsCapabilities",
-                    "This is a WMS service, not WMTS. Add it with Add WMS "
-                    "Layer instead."));
+                    "This is a WMS service, not WMTS. Add it with Add Web Map "
+                    "Service (WMS) Layer instead."));
   }
   if (root != QLatin1String("Capabilities")) {
     return fail(errorString,

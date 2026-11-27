@@ -193,7 +193,7 @@ void AddWmtsDialog::changeEvent(QEvent* event)
 
 void AddWmtsDialog::retranslateUi()
 {
-  setWindowTitle(tr("Add WMTS Layer"));
+  setWindowTitle(tr("Add Web Map Tile Service (WMTS) Layer"));
   m_serviceLabel->setText(tr("&Service (choose one or type its address):"));
   m_connectButton->setText(tr("&Connect"));
   m_layersLabel->setText(tr("&Layers:"));

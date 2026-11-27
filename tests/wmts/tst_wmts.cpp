@@ -439,7 +439,7 @@ private slots:
     QTest::newRow("truncated")
         << QStringLiteral("truncated.xml") << QStringLiteral("not valid XML");
     QTest::newRow("wms") << QStringLiteral("../wms/terrestris-130.xml")
-                         << QStringLiteral("Add WMS Layer");
+                         << QStringLiteral("Add Web Map Service (WMS) Layer");
     QTest::newRow("empty") << QStringLiteral("missing-file")
                            << QStringLiteral("empty");
   }

@@ -26,6 +26,7 @@
 #define TS_APP_MAINWINDOW_H
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -59,6 +60,8 @@ class QEvent;
 class QLabel;
 class QMenu;
 class QTimer;
+class QToolBar;
+class QToolButton;
 
 namespace ts
 {
@@ -104,8 +107,11 @@ struct LayerStack;
  * the status bar, which shows the position under the pointer and the eye
  * height. Projects (layer tree, camera and view) are opened and saved
  * from the File menu, which also opens the offline regions (areas of WMS
- * layers kept for use without a network). The View menu changes between the 3D
- * globe and the 2D map and picks the map's projection.
+ * layers kept for use without a network). The View menu changes between the
+ * 3D globe and the 2D map and picks the map's projection. Layers are added
+ * from the Local Sources and Online Sources menus, aircraft, ships and
+ * satellites from the Tracks menu, and the Tools menu holds the elevation
+ * profile.
  *
  * All text is set in retranslateUi(), which runs again when the language
  * changes, so installing a translator at run time updates the window.
@@ -275,14 +281,14 @@ public:
   std::vector<AboutDataRow> aboutData() const;
 
   /**
-   * Opens the Add WMS Layer dialog and adds what the user chooses. With
-   * @p address, connects to it at once (tests).
+   * Opens the Add Web Map Service (WMS) Layer dialog and adds what the user
+   * chooses. With @p address, connects to it at once (tests).
    */
   void addWmsLayer(const QString& address = QString());
 
   /**
-   * Opens the Add WMTS Layer dialog and adds what the user chooses. With
-   * @p address, connects to it at once (tests).
+   * Opens the Add Web Map Tile Service (WMTS) Layer dialog and adds what the
+   * user chooses. With @p address, connects to it at once (tests).
    */
   void addWmtsLayer(const QString& address = QString());
 
@@ -290,8 +296,8 @@ public:
   void addXyzLayer();
 
   /**
-   * Opens the Add WFS Layer dialog and adds what the user chooses. With
-   * @p address, connects to it at once (tests).
+   * Opens the Add Web Feature Service (WFS) Layer dialog and adds what the
+   * user chooses. With @p address, connects to it at once (tests).
    */
   void addWfsLayer(const QString& address = QString());
 
@@ -430,10 +436,10 @@ public:
   /** Returns the aircraft of the layer tree. */
   AircraftLayers* aircraft() const { return m_aircraft; }
 
-  /** Opens the Import ADS-B Data dialog (for @p path, if given). */
+  /** Opens the Import Aircraft ADS-B Data dialog (for @p path, if given). */
   void importAdsbData(const QString& path = QString());
 
-  /** Opens the Connect to ADS-B Receiver dialog. */
+  /** Opens the Connect to Aircraft ADS-B Receiver dialog. */
   void connectAdsbReceiver();
 
   /**
@@ -471,10 +477,10 @@ public:
   /** Returns the ships of the layer tree. */
   VesselLayers* vessels() const { return m_vessels; }
 
-  /** Opens the Import AIS Data dialog (for @p path, if given). */
+  /** Opens the Import Maritime AIS Data dialog (for @p path, if given). */
   void importAisData(const QString& path = QString());
 
-  /** Opens the Add AIS Source dialog (a receiver or an open feed). */
+  /** Opens the Add Maritime AIS Source dialog (a receiver or an open feed). */
   void addAisSource();
 
   /** Adds the ship layer @p definition; returns its node id. */
@@ -576,6 +582,23 @@ private:
   QModelIndex topmostElevationLayer() const;
   void syncTerrainActions();
   void createMenus();
+  /** The toolbar under the menu bar, above the Layers panel and the view. */
+  void createToolBar();
+  /** Fills the toolbar's Quick Maps menu (mainwindowquickmaps.cpp). */
+  void createQuickMaps();
+  /**
+   * Adds Quick Maps entry @p index at once, with the choices the Add dialog
+   * would make, or says in the status bar why it can't.
+   */
+  void addQuickMap(std::size_t index);
+  /**
+   * Sets the 2D Map action's toolbar icon and tooltip to the view a click
+   * goes to: "2D" on the globe, "3D" on the map.
+   */
+  void updateMapViewIcon();
+
+  /** Draws the toolbar's icons again, in the palette's text colour. */
+  void updateToolBarIcons();
   void createKmlEditing();
   void retranslateKmlEditing();
   void updateKmlActions();
@@ -693,7 +716,17 @@ private:
   QLabel* m_noGlobeLabel = nullptr;
   QMenu* m_fileMenu = nullptr;
   QMenu* m_viewMenu = nullptr;
+  QMenu* m_toolsMenu = nullptr;
+  QMenu* m_localSourcesMenu = nullptr;
+  QMenu* m_onlineSourcesMenu = nullptr;
+  QMenu* m_tracksMenu = nullptr;
   QMenu* m_helpMenu = nullptr;
+  QToolBar* m_mainToolBar = nullptr;
+  /** The toolbar's Quick Maps button and its menu of catalogue layers. */
+  QToolButton* m_quickMapsButton = nullptr;
+  QMenu* m_quickMapsMenu = nullptr;
+  /** The toolbar's action holding the Quick Maps button. */
+  QAction* m_quickMapsAction = nullptr;
   QAction* m_quitAction = nullptr;
   QAction* m_debugOverlayAction = nullptr;
   QAction* m_resetViewAction = nullptr;

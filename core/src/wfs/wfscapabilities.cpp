@@ -293,7 +293,8 @@ QString rootProblem(const QString& root, QXmlStreamReader& reader)
     return QCoreApplication::translate(
         "ts::WfsCapabilities",
         "This is a map service (WMS or WMTS), not a WFS: add it "
-        "with Add WMS Layer or Add WMTS Layer.");
+        "with Add Web Map Service (WMS) Layer or Add Web Map Tile Service "
+        "(WMTS) Layer.");
   }
   if (root != QLatin1String("WFS_Capabilities")) {
     return QCoreApplication::translate(

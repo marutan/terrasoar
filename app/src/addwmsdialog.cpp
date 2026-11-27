@@ -231,7 +231,7 @@ void AddWmsDialog::changeEvent(QEvent* event)
 
 void AddWmsDialog::retranslateUi()
 {
-  setWindowTitle(tr("Add WMS Layer"));
+  setWindowTitle(tr("Add Web Map Service (WMS) Layer"));
   m_serviceLabel->setText(tr("&Service (choose one or type its address):"));
   m_connectButton->setText(tr("&Connect"));
   m_layersLabel->setText(tr("&Layers:"));

@@ -100,7 +100,7 @@ natural sizes are read once from the resources.
 
 `showUserGuide(from, target)` opens the guide:
 - **The main window and non-modal dialogs:** the window belongs to the top-level window above `from` (the main window), so there is one guide window for the whole program.
-- **Modal dialogs:** a modal dialog blocks input to every window that isn't its own, so from inside one (Add WMS Layer, Add Web Terrain) the guide gets a window owned by that dialog. It closes with the dialog.
+- **Modal dialogs:** a modal dialog blocks input to every window that isn't its own, so from inside one (Add Web Map Service (WMS) Layer, Add Web Terrain) the guide gets a window owned by that dialog. It closes with the dialog.
 - **The About window:** it is modal too. Its link to the guide (`AboutDialog::userGuideLink()`) closes it, and the main window then opens the guide.
 
 ### Context help
@@ -110,7 +110,7 @@ F1 in a dialog opens the guide at that dialog's section. Each dialog's
 
 | Dialog | Section |
 | --- | --- |
-| Add WMS Layer | `adding-wms-layers.md#adding-a-layer` |
+| Add Web Map Service (WMS) Layer | `adding-wms-layers.md#adding-a-layer` |
 | Add Web Terrain | `terrain.md#terrain-from-the-web` |
 | Offline Regions | `offline-use.md#managing-regions` |
 | New Offline Region | `offline-use.md#downloading-a-region` |
@@ -156,4 +156,4 @@ heading in the guide without updating the dialog fails the tests.
 `tests/ui` checks:
 - Help → User Guide (F1) and its place above About;
 - the About tab's link;
-- F1 in the Add WMS Layer and Add Web Terrain dialogs.
+- F1 in the Add Web Map Service (WMS) Layer and Add Web Terrain dialogs.

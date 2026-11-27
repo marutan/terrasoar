@@ -8,7 +8,8 @@ globe, turned to its heading, with a trail behind it if you want one.
 
 ## Importing a recording
 
-**File → Import ADS-B Data…** opens a recording. Terra Soar reads:
+**Tracks → Import Aircraft ADS-B Data…** opens a recording. Terra Soar
+reads:
 
 - **SBS-1 / BaseStation** lines (`MSG,3,…`), the format dump1090 and readsb
   send on port 30003.
@@ -63,7 +64,8 @@ Right-click the layer for **Go to the Start of the Recording** and
 
 ## A live receiver
 
-**File → Connect to ADS-B Receiver…** shows what your receiver hears now:
+**Tracks → Connect to Aircraft ADS-B Receiver…** shows what your receiver
+hears now:
 
 - **SBS** (port 30003), **raw AVR** (port 30002) or **Beast**
   (port 30005), from the receiver's address, or

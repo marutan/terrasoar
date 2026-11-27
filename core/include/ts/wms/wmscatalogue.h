@@ -20,8 +20,9 @@
 
 /**
  * @file
- * The catalogues of open WMS and WMTS services offered in the Add WMS
- * and Add WMTS dialogs (one entry type for both).
+ * The catalogues of open WMS and WMTS services offered in the Add Web Map
+ * Service (WMS) Layer and Add Web Map Tile Service (WMTS) Layer dialogs (one
+ * entry type for both).
  */
 #ifndef TS_WMS_WMSCATALOGUE_H
 #define TS_WMS_WMSCATALOGUE_H
@@ -111,7 +112,7 @@ inline constexpr int32_t wmtsCatalogueFormatVersion = 1;
  * `data/wmts-catalogue.json` on the main branch of the repository. It is
  * a file of its own, not entries in the WMS catalogue, so that programs
  * from before WMTS (which fetch that one) never offer a WMTS service in
- * their Add WMS dialog.
+ * their Add Web Map Service (WMS) Layer dialog.
  */
 inline constexpr const char* wmtsCatalogueUrl =
     "https://raw.githubusercontent.com/marutan/terrasoar/main/data/"

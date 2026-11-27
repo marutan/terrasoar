@@ -20,8 +20,8 @@
 
 /**
  * @file
- * The Import ADS-B Data dialog (a recording) and the Connect to ADS-B
- * Receiver dialog.
+ * The Import Aircraft ADS-B Data dialog (a recording) and the Connect to
+ * Aircraft ADS-B Receiver dialog.
  */
 #ifndef TS_APP_ADSBDIALOGS_H
 #define TS_APP_ADSBDIALOGS_H

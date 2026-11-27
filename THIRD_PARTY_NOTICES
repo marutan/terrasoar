@@ -128,7 +128,7 @@ These are downloaded when asked for, and kept in the cache; none is
 distributed with the program.
 
 CelesTrak (https://celestrak.org): current orbital elements of
-  satellites, by group and by catalogue number (File > Add Satellites),
+  satellites, by group and by catalogue number (Tracks > Add Satellites),
   from the US Space Force's catalogue (space-track.org). CelesTrak's data
   may be used freely; it asks to be credited. Attribution: "Orbital
   elements: CelesTrak"

@@ -52,6 +52,13 @@ class NetworkClient;
 class NetworkTicket;
 
 /**
+ * Returns the layer for @p xyz, as Add in the Add XYZ Tile Layer dialog
+ * makes it: a catalogue imagery layer with a new id, named after its
+ * title.
+ */
+LayerDefinition xyzLayerDefinition(const XyzSource& xyz);
+
+/**
  * Adds a layer from an XYZ or TMS tile service: the user picks one from
  * the catalogue, which fills in everything, or types the address template
  * (`https://…/{z}/{x}/{y}.png`) and says what the service needs: its

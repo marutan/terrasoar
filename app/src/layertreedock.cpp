@@ -213,14 +213,16 @@ void LayerTreeDock::rebuildAddLayerMenu()
             [this, definition]() { addLayer(definition); });
   }
   m_addLayerMenu->addSeparator();
-  QAction* wms = m_addLayerMenu->addAction(tr("WMS Layer…"));
+  QAction* wms = m_addLayerMenu->addAction(tr("Web Map Service (WMS) Layer…"));
   wms->setObjectName(QStringLiteral("addWmsLayerAction"));
   connect(wms, &QAction::triggered, this, &LayerTreeDock::addWmsLayerRequested);
-  QAction* wmts = m_addLayerMenu->addAction(tr("WMTS Layer…"));
+  QAction* wmts =
+      m_addLayerMenu->addAction(tr("Web Map Tile Service (WMTS) Layer…"));
   wmts->setObjectName(QStringLiteral("addWmtsLayerAction"));
   connect(wmts, &QAction::triggered, this,
           &LayerTreeDock::addWmtsLayerRequested);
-  QAction* wfs = m_addLayerMenu->addAction(tr("WFS Layer…"));
+  QAction* wfs =
+      m_addLayerMenu->addAction(tr("Web Feature Service (WFS) Layer…"));
   wfs->setObjectName(QStringLiteral("addWfsLayerAction"));
   connect(wfs, &QAction::triggered, this, &LayerTreeDock::addWfsLayerRequested);
   QAction* xyz = m_addLayerMenu->addAction(tr("XYZ Tile Layer…"));

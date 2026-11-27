@@ -121,10 +121,11 @@ with range requests, using the file's overviews when zoomed out. That
 needs a GDAL built with curl (`AddWebTerrainDialog::canReadRemoteFiles()`
 checks); GDAL caches what it reads in memory only.
 
-**Adding them.** File → Add Web Terrain… (or the layer list's add menu)
-offers the AWS Terrain Tiles (Terrarium, to zoom 15, heights above EGM96,
-with the attribution they ask for), or any tile address, encoding, deepest
-zoom, tile size, datum, name and attribution, or a GeoTIFF's address.
+**Adding them.** Online Sources → Add Web Terrain… (or the layer list's
+add menu) offers the AWS Terrain Tiles (Terrarium, to zoom 15, heights
+above EGM96, with the attribution they ask for), or any tile address,
+encoding, deepest zoom, tile size, datum, name and attribution, or a
+GeoTIFF's address.
 
 ## Hillshade on the map
 
@@ -148,7 +149,7 @@ multiplied into the colour (premultiplied, so held to its alpha).
 
 ## Elevation profiles
 
-View → Elevation Profile… opens a window and lets the user click points
+Tools → Elevation Profile… opens a window and lets the user click points
 on the globe or map (`GlobeView::RegionDrawing::Line`, finished with a
 double-click or Enter; the same keys as drawing a region). For the line,
 `computeElevationProfile()`, on a worker thread:

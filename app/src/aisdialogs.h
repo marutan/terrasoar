@@ -20,8 +20,8 @@
 
 /**
  * @file
- * The Import AIS Data dialog, the Add AIS Source dialog (a receiver or an
- * open feed) and a ship layer's properties.
+ * The Import Maritime AIS Data dialog, the Add Maritime AIS Source dialog (a
+ * receiver or an open feed) and a ship layer's properties.
  */
 #ifndef TS_APP_AISDIALOGS_H
 #define TS_APP_AISDIALOGS_H

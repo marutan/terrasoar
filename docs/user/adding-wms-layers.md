@@ -8,8 +8,9 @@ layers at the opacity you choose, and saved with your project.
 
 ## Adding a layer
 
-1. Choose **File → Add WMS Layer…**, or **Add Layer → WMS Layer…** at the
-   bottom of the Layers panel.
+1. Choose **Online Sources → Add Web Map Service (WMS) Layer…**, or **Add
+   Layer → Web Map Service (WMS) Layer…** at the bottom of the Layers
+   panel.
 2. In **Service**, pick one of the listed services, or type the address of
    any WMS server, for example `https://ows.terrestris.de/osm/service`.
    The address the server's documentation gives for "GetCapabilities"

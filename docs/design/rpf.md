@@ -8,9 +8,9 @@ the RPF products are made in are map projections of their own
 
 ## The provider
 
-`GdalImageryProvider` is the imagery layer source
-`{"kind": "file", "path": …}` (File → Add Imagery File…, or Imagery
-File… under Add Layer). GDAL opens the file:
+`GdalImageryProvider` is the imagery layer source `{"kind": "file",
+"path": …}` (Local Sources → Add Imagery File…, or Imagery File… under Add
+Layer). GDAL opens the file:
 
 - **Parts.** A file with subdatasets is all of them, drawn in the order
   GDAL lists them, later over earlier; otherwise the file is its one
