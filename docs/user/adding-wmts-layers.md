@@ -10,8 +10,9 @@ other layers at the opacity you choose, and saved with your project.
 
 ## Adding a layer
 
-1. Choose **File → Add WMTS Layer…**, or **Add Layer → WMTS Layer…** at the
-   bottom of the Layers panel.
+1. Choose **Online Sources → Add Web Map Tile Service (WMTS) Layer…**, or
+   **Add Layer → Web Map Tile Service (WMTS) Layer…** at the bottom of the
+   Layers panel.
 2. In **Service**, pick one of the listed services, or type the address of
    any WMTS server. Both kinds of address work:
    - a capabilities file, usually ending in `WMTSCapabilities.xml`, for

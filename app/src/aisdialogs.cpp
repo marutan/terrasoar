@@ -179,7 +179,7 @@ ImportAisDialog::ImportAisDialog(const QString& path, QWidget* parent)
       m_message(new QLabel(this))
 {
   setObjectName(QStringLiteral("importAisDialog"));
-  setWindowTitle(tr("Import AIS Data"));
+  setWindowTitle(tr("Import Maritime AIS Data"));
   m_path->setObjectName(QStringLiteral("aisPath"));
   m_format->setObjectName(QStringLiteral("aisFormat"));
   m_message->setWordWrap(true);
@@ -250,7 +250,7 @@ QString ImportAisDialog::fileFilter()
 void ImportAisDialog::browse()
 {
   const QString path = QFileDialog::getOpenFileName(
-      this, tr("Import AIS Data"), m_path->text(), fileFilter());
+      this, tr("Import Maritime AIS Data"), m_path->text(), fileFilter());
   if (!path.isEmpty()) {
     setPath(path);
   }
@@ -401,7 +401,7 @@ AisSourceDialog::AisSourceDialog(QWidget* parent)
       m_message(new QLabel(this))
 {
   setObjectName(QStringLiteral("aisSourceDialog"));
-  setWindowTitle(tr("Add AIS Source"));
+  setWindowTitle(tr("Add Maritime AIS Source"));
   m_tabs->setObjectName(QStringLiteral("aisSourceTabs"));
   m_host->setObjectName(QStringLiteral("aisHost"));
   m_port->setObjectName(QStringLiteral("aisPort"));

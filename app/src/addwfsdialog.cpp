@@ -175,7 +175,7 @@ void AddWfsDialog::changeEvent(QEvent* event)
 
 void AddWfsDialog::retranslateUi()
 {
-  setWindowTitle(tr("Add WFS Layer"));
+  setWindowTitle(tr("Add Web Feature Service (WFS) Layer"));
   m_serviceLabel->setText(tr("&Service (choose one or type its address):"));
   m_connectButton->setText(tr("&Connect"));
   m_typesLabel->setText(tr("&Feature types:"));

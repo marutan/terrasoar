@@ -17,11 +17,11 @@ offline and credits its sources in the view; `make basepack` downloads
 its sources and builds it (see [docs/tools/packager.md](docs/tools/packager.md)).
 View → 2D Map (Ctrl+M) unrolls the globe into a flat map in the Mercator,
 Web Mercator or Miller projection and back, with every layer intact and a
-scale bar that holds in both. File → Add WMS Layer… adds layers from any
-WMS 1.1.1 or 1.3.0 server, or from a list of open services; their tiles
-are kept on disk, so places already seen work offline (see
-[adding WMS layers](docs/user/adding-wms-layers.md)). Offline regions and
-downloadable packs come next.
+scale bar that holds in both. Online Sources → Add Web Map Service (WMS)
+Layer… adds layers from any WMS 1.1.1 or 1.3.0 server, or from a list of
+open services; their tiles are kept on disk, so places already seen work
+offline (see [adding WMS layers](docs/user/adding-wms-layers.md)).
+Offline regions and downloadable packs come next.
 
 ## Building
 

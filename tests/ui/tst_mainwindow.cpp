@@ -190,7 +190,10 @@ QList<QPair<QString, QString>> visibleTexts(QWidget& window)
   texts << qMakePair(QStringLiteral("window title"), window.windowTitle());
   const QList<QAction*> actions = window.findChildren<QAction*>();
   for (QAction* action : actions) {
-    if (action->isSeparator() || isQtInternalMenu(action->menu())) {
+    // Names that are data, not text (Quick Maps' services, as their
+    // catalogues name them), say so.
+    if (action->isSeparator() || isQtInternalMenu(action->menu()) ||
+        action->property("ts_untranslated").toBool()) {
       continue;
     }
     const QString name =
@@ -1209,7 +1212,7 @@ private slots:
 
   void elevationProfile()
   {
-    // View → Elevation Profile: draw a line, see the heights along it.
+    // Tools → Elevation Profile: draw a line, see the heights along it.
     const QTemporaryDir directory;
     const QString dem = directory.filePath(QStringLiteral("hills.tif"));
     QVERIFY(ts::test::writeFixtureDem(dem, 1500.0F));
@@ -2451,8 +2454,64 @@ private slots:
     QSignalSpy failed(&wrong, &ts::AddWmtsDialog::connectionFailed);
     wrong.connectTo(wmsServer.url(QStringLiteral("/wms")).toString());
     QVERIFY(failed.wait(5000));
-    QVERIFY2(wrong.statusText().contains(QStringLiteral("Add WMS Layer")),
+    QVERIFY2(wrong.statusText().contains(
+                 QStringLiteral("Add Web Map Service (WMS) Layer")),
              qPrintable(wrong.statusText()));
+  }
+
+  void quickMapsOpenStreetMap()
+  {
+    // Quick Maps → OpenStreetMap adds the XYZ catalogue's entry at once,
+    // as the Add XYZ Tile Layer dialog would with nothing changed.
+    QFile::remove(ts::xyzCatalogueCachePath());
+    ts::MainWindow window;
+    QToolButton* button =
+        window.findChild<QToolButton*>(QStringLiteral("quickMapsButton"));
+    QAction* osm = window.findChild<QAction*>(
+        QStringLiteral("quickMapOpenStreetMapAction"));
+    if (button == nullptr || osm == nullptr) {
+      QFAIL("Quick Maps controls missing");
+    }
+    QCOMPARE(button->text(), QStringLiteral("Quick Maps"));
+    QVERIFY(button->menu()->actions().contains(osm));
+    QCOMPARE(osm->text(), QStringLiteral("OpenStreetMap"));
+    // The layer is added where the dialog's would be, and selected.
+    ts::LayerTreeDock* dock = window.findChild<ts::LayerTreeDock*>();
+    if (dock == nullptr) {
+      QFAIL("no layer dock");
+    }
+    ts::LayerTreeModel* model = window.layerModel();
+    osm->trigger();
+    const ts::LayerDefinition added =
+        model->layerDefinition(dock->currentIndex());
+    QCOMPARE(added.name, QStringLiteral("OpenStreetMap"));
+    QCOMPARE(added.origin, ts::LayerOrigin::Catalogue);
+    QCOMPARE(added.type, ts::LayerType::Imagery);
+    QVERIFY(added.id.startsWith(QStringLiteral("xyz:")));
+    QCOMPARE(added.source.value(QStringLiteral("kind")).toString(),
+             QStringLiteral("xyz"));
+    QCOMPARE(added.source.value(QStringLiteral("template")).toString(),
+             QStringLiteral("https://tile.openstreetmap.org/{z}/{x}/{y}.png"));
+    QCOMPARE(added.source.value(QStringLiteral("maxZoom")).toInt(), 19);
+
+    // OpenTopoMap keeps its subdomains for {s}.
+    QAction* topo =
+        window.findChild<QAction*>(QStringLiteral("quickMapOpenTopoMapAction"));
+    if (topo == nullptr) {
+      QFAIL("OpenTopoMap missing");
+    }
+    QCOMPARE(topo->text(), QStringLiteral("OpenTopoMap"));
+    topo->trigger();
+    const ts::LayerDefinition topoLayer =
+        model->layerDefinition(dock->currentIndex());
+    QCOMPARE(topoLayer.name, QStringLiteral("OpenTopoMap"));
+    QCOMPARE(
+        topoLayer.source.value(QStringLiteral("template")).toString(),
+        QStringLiteral("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"));
+    QCOMPARE(topoLayer.source.value(QStringLiteral("subdomains")).toArray(),
+             QJsonArray({QStringLiteral("a"), QStringLiteral("b"),
+                         QStringLiteral("c")}));
+    QCOMPARE(topoLayer.source.value(QStringLiteral("maxZoom")).toInt(), 17);
   }
 
   void addXyzDialog()

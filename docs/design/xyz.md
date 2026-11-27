@@ -96,7 +96,13 @@ Maps entries (road map, satellite, hybrid: `mt1.google.com/vt`, added at
 the project owner's request) are Google's own tile server, not a
 published API: Google's terms allow its maps only through its own
 services. They forbid bulk downloads, and their descriptions say that
-the address is unofficial and may stop working.
+the address is unofficial and may stop working. The ESRI entries (World
+Imagery, Physical Map, Shaded Relief, Street Map, Terrain Base, Topo Map:
+`server.arcgisonline.com`, also at the project owner's request) are
+Esri's ArcGIS Online basemaps under Esri's terms of use; they forbid
+bulk downloads too. Their deepest zooms are where real tiles stop: past
+them Esri serves a "Map data not yet available" picture (Terrain Base
+goes deeper only in the United States, so it stops at 9).
 
 The network client sends Terra Soar's own User-Agent with every request,
 as OpenStreetMap's tile policy requires.
@@ -107,8 +113,8 @@ as OpenStreetMap's tile policy requires.
 addresses with `{y}`, `{-y}`, TMS and subdomains; service addresses; the
 matrices made for a source (zooms, pixel sizes, deepest level for 256 and
 512 pixels, bounds to rows and columns); JSON round trip and refused
-sources; the shipped catalogue (every entry usable, OpenStreetMap
-forbidden) and catalogue errors; against the mock XYZ server
+sources; the shipped catalogue (every entry usable; OpenStreetMap,
+Google and Esri forbidden) and catalogue errors; against the mock XYZ server
 (`tests/support/mockxyz.h`, the mock WMS's picture in Web Mercator tiles)
 each way of addressing the same tiles drawing the same picture, the disk
 cache, 404 and server errors, bounds and `minZoom`, an offline region

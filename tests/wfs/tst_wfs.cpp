@@ -226,7 +226,7 @@ private slots:
     QTest::newRow("web page")
         << QByteArray("<!DOCTYPE html><html></html>") << "web page";
     QTest::newRow("WMS") << fixture(QStringLiteral("wms/terrestris-130.xml"))
-                         << "Add WMS Layer";
+                         << "Add Web Map Service (WMS) Layer";
     QTest::newRow("exception")
         << QByteArray("<ows:ExceptionReport xmlns:ows=\"http://www.opengis.net/"
                       "ows/1.1\"><ows:Exception><ows:ExceptionText>Service "

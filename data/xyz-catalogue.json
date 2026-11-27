@@ -81,6 +81,66 @@
             "attribution": "Imagery and map data © Google",
             "terms": "https://www.google.com/help/terms_maps/",
             "allowBulkDownload": false
+        },
+        {
+            "title": "ESRI - World Imagery",
+            "template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+            "minZoom": 0,
+            "maxZoom": 19,
+            "description": "Esri's satellite and aerial imagery of the world: 15 m imagery everywhere, and 1 m or better in many places, down to 0.3 m or finer in some cities. No labels. Esri's terms of use apply (the link below); browse only: no offline regions.",
+            "attribution": "Source: Esri, Vantor, Earthstar Geographics, and the GIS User Community",
+            "terms": "https://goto.arcgisonline.com/maps/World_Imagery",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "ESRI - World Physical Map",
+            "template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}",
+            "minZoom": 0,
+            "maxZoom": 8,
+            "description": "Natural Earth's physical map of the world, its land cover and relief, from the US National Park Service, at about 1.2 km per pixel. Esri's terms of use apply (the link below); browse only: no offline regions.",
+            "attribution": "Source: US National Park Service",
+            "terms": "https://goto.arcgisonline.com/maps/World_Physical_Map",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "ESRI - World Shaded Relief",
+            "template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}",
+            "minZoom": 0,
+            "maxZoom": 13,
+            "description": "The shape of the land as grey shaded relief, from SRTM and other elevation data, made to lie under other maps. Esri's terms of use apply (the link below); browse only: no offline regions.",
+            "attribution": "© 2014 Esri",
+            "terms": "https://goto.arcgisonline.com/maps/World_Shaded_Relief",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "ESRI - World Street Map",
+            "template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+            "minZoom": 0,
+            "maxZoom": 19,
+            "description": "Esri's street map of the world: highways everywhere, and streets in most countries. Esri's terms of use apply (the link below); browse only: no offline regions.",
+            "attribution": "Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, © OpenStreetMap contributors, and the GIS User Community",
+            "terms": "https://goto.arcgisonline.com/maps/World_Street_Map",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "ESRI - World Terrain Base",
+            "template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}",
+            "minZoom": 0,
+            "maxZoom": 9,
+            "description": "A plain background of shaded relief, the sea floor and coastal waters, made to lie under other data. Esri's terms of use apply (the link below); browse only: no offline regions.",
+            "attribution": "Sources: Esri, USGS, NOAA",
+            "terms": "https://goto.arcgisonline.com/maps/World_Terrain_Base",
+            "allowBulkDownload": false
+        },
+        {
+            "title": "ESRI - World Topo Map",
+            "template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+            "minZoom": 0,
+            "maxZoom": 19,
+            "description": "Esri's topographic map of the world: boundaries, places, water, parks, roads, railways and airports over land cover and shaded relief. Esri's terms of use apply (the link below); browse only: no offline regions.",
+            "attribution": "Sources: Esri, HERE, Garmin, Intermap, increment P Corp., GEBCO, USGS, FAO, NPS, NRCAN, GeoBase, IGN, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), © OpenStreetMap contributors, and the GIS User Community",
+            "terms": "https://goto.arcgisonline.com/maps/World_Topo_Map",
+            "allowBulkDownload": false
         }
     ]
 }

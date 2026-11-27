@@ -15,6 +15,28 @@ All notable changes to Terra Soar. The format follows
   Black Marble (the Earth at night, 2012 and 2016), WDBII borders and
   rivers, OurAirports' airports, runways and navigation aids, and place
   names.
+- Esri's basemaps in the XYZ catalogue (Online Sources → Add XYZ Tile
+  Layer…): World Imagery, World Physical Map, World Shaded Relief, World
+  Street Map, World Terrain Base and World Topo Map. Esri's terms of use
+  apply; no offline regions of them.
+- A toolbar under the menus: 2D Map and Reset View, the KML drawing
+  tools, and Quick Maps, a menu that adds OpenStreetMap, OpenTopoMap,
+  Google Maps (road map, satellite, hybrid) and Esri's World Imagery,
+  Street Map and Topo Map at once, without a dialog.
+
+### Changed
+
+- File menu items and their dialogs say what they are: Add Web Map
+  Service (WMS) Layer…, Add Web Map Tile Service (WMTS) Layer…, Add Web
+  Feature Service (WFS) Layer…, Import Aircraft ADS-B Data…, Connect to
+  Aircraft ADS-B Receiver…, Import Maritime AIS Data… and Add Maritime AIS
+  Source…. Their keyboard shortcuts are unchanged. The Layers panel's
+  Add Layer menu names the web services in the same way.
+- The menus are File, View, Tools, Local Sources, Online Sources, Tracks,
+  KML and Help. Imagery and elevation files are added from Local Sources;
+  WMS, WMTS, WFS and XYZ layers and web terrain from Online Sources;
+  aircraft, ships and satellites from Tracks; and the elevation profile is
+  under Tools.
 
 ### Fixed
 

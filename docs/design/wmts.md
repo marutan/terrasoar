@@ -9,10 +9,10 @@ cache, revalidation and the offline state with WMS ([wms.md](wms.md),
 for users in [adding-wmts-layers.md](../user/adding-wmts-layers.md).
 
 Phase 10 delivers WMTS in three parts: **10a**, the engine (EPSG:4326 and
-Web Mercator tile matrix sets); **10b**, the Add WMTS Layer dialog, the
-catalogue and offline regions; and **10c**, any other CRS PROJ knows
-(national grids such as British National Grid, RD New, LAEA Europe, polar
-stereographic), reprojected on the CPU.
+Web Mercator tile matrix sets); **10b**, the Add Web Map Tile Service
+(WMTS) Layer dialog, the catalogue and offline regions; and **10c**, any
+other CRS PROJ knows (national grids such as British National Grid, RD
+New, LAEA Europe, polar stereographic), reprojected on the CPU.
 
 ## From an address to tiles
 
@@ -61,7 +61,8 @@ maximum.
 
 What isn't capabilities gives the user a sentence: an OWS
 `ExceptionReport` passes the server's message on; an HTML page says to
-check the address; a WMS document says to use Add WMS Layer instead.
+check the address; a WMS document says to use Add Web Map Service (WMS)
+Layer instead.
 
 ## CRSs and axis order
 
@@ -249,13 +250,13 @@ user's choices (`ts::WmtsChoices`, which the dialog fills in):
 
 ## The dialog
 
-`AddWmtsDialog` (in `app/`) follows Add WMS Layer
+`AddWmtsDialog` (in `app/`) follows Add Web Map Service (WMS) Layer
 ([wms.md](wms.md)):
 
 - **Service:** a catalogue entry, or any address. `wmtsCapabilitiesUrl()`
   leaves a `WMTSCapabilities.xml` (RESTful) as it is and asks a KVP
-  address for `GetCapabilities`. A WMS document says to use Add WMS Layer
-  instead.
+  address for `GetCapabilities`. A WMS document says to use Add Web Map
+  Service (WMS) Layer instead.
 - **Layers:** a flat list (WMTS has no groups), the identifier and abstract
   as the tooltip.
 - **Choices:** style (the default selected), format (PNG first),
@@ -273,8 +274,9 @@ user's choices (`ts::WmtsChoices`, which the dialog fills in):
   address the user connected to (for the catalogue's terms, see below).
 
 F1 opens [the user guide](../user/adding-wmts-layers.md#adding-a-layer).
-File → Add WMTS Layer… (Alt+M in the File menu) and Add Layer → WMTS
-Layer… in the Layers panel open it.
+Online Sources → Add Web Map Tile Service (WMTS) Layer… (Alt+M in the
+Online Sources menu) and Add Layer → Web Map Tile Service (WMTS) Layer… in
+the Layers panel open it.
 
 ## The catalogue
 
@@ -289,7 +291,8 @@ It is a **file of its own**, fetched from the repository's main branch
 built into the program as the fallback and the last fetched copy kept in
 the cache directory, as for WMS. Entries can't go into the WMS catalogue:
 programs released before WMTS fetch that file and would offer a WMTS
-service in their Add WMS dialog. Each parser refuses the other's file.
+service in their Add Web Map Service (WMS) Layer dialog. Each parser
+refuses the other's file.
 
 The shipped catalogue, with each provider's terms as they stated them on
 2026-11-18:

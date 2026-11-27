@@ -10,7 +10,8 @@ them.
 
 ## Importing a recording
 
-**File → Import AIS Data…** opens a recording. Terra Soar reads:
+**Tracks → Import Maritime AIS Data…** opens a recording. Terra Soar
+reads:
 
 - **NMEA logs**: `!AIVDM` and `!AIVDO` sentences, one a line. Messages
   sent in several sentences are put back together, and sentences with a
@@ -54,7 +55,7 @@ Right-click the layer for **Go to the Start of the Recording** and
 
 ## Live ships
 
-**File → Add AIS Source…** shows ships now, from:
+**Tracks → Add Maritime AIS Source…** shows ships now, from:
 
 - **Your receiver**: NMEA sentences over **TCP** from a host and port
   (AIS-catcher, rtl-ais, a ship's AIS on a network), or by listening for

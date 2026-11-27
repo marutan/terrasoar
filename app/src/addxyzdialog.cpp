@@ -357,15 +357,20 @@ void AddXyzDialog::accept()
   if (!xyz) {
     return;
   }
+  m_definition = xyzLayerDefinition(*xyz);
+  QDialog::accept();
+}
+
+LayerDefinition xyzLayerDefinition(const XyzSource& xyz)
+{
   LayerDefinition definition;
   definition.id = QStringLiteral("xyz:") +
                   QUuid::createUuid().toString(QUuid::WithoutBraces);
   definition.origin = LayerOrigin::Catalogue;
   definition.type = LayerType::Imagery;
-  definition.name = xyz->title;
-  definition.source = xyz->toJson();
-  m_definition = definition;
-  QDialog::accept();
+  definition.name = xyz.title;
+  definition.source = xyz.toJson();
+  return definition;
 }
 
 QString AddXyzDialog::statusText() const

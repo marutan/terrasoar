@@ -268,11 +268,12 @@ Play steps forward at the chosen interval (¼ s to 5 s per time) and stops
 at the last. A layer following the month of the year contributes the
 twelve months of the clock's year.
 
-**Choosing.** The Add WMS and Add WMTS dialogs offer, for a layer with
-times, "Follow the program's clock" (chosen at first), "The clock's
-month, any year" for monthly times, or "Always this time" with a list of
-the latest values (`app/src/timemodebox.*`). The layer's context menu in
-the Layers panel (**Time**) changes it later.
+**Choosing.** The Add Web Map Service (WMS) Layer and Add Web Map Tile
+Service (WMTS) Layer dialogs offer, for a layer with times, "Follow the
+program's clock" (chosen at first), "The clock's month, any year" for
+monthly times, or "Always this time" with a list of the latest values
+(`app/src/timemodebox.*`). The layer's context menu in the Layers panel
+(**Time**) changes it later.
 
 **Blue Marble's months.** NASA's Blue Marble exists for each month of
 2004; there is no live web service for them (NASA's NEO WMS, which had

@@ -91,7 +91,7 @@ ImportAdsbDialog::ImportAdsbDialog(const QString& path, QWidget* parent)
       m_speedUnit(new QComboBox(this)), m_message(new QLabel(this))
 {
   setObjectName(QStringLiteral("importAdsbDialog"));
-  setWindowTitle(tr("Import ADS-B Data"));
+  setWindowTitle(tr("Import Aircraft ADS-B Data"));
   m_path->setObjectName(QStringLiteral("adsbPath"));
   m_format->setObjectName(QStringLiteral("adsbFormat"));
   m_detected->setObjectName(QStringLiteral("adsbDetected"));
@@ -239,7 +239,7 @@ QString ImportAdsbDialog::fileFilter()
 void ImportAdsbDialog::browse()
 {
   const QString path = QFileDialog::getOpenFileName(
-      this, tr("Import ADS-B Data"), m_path->text(), fileFilter());
+      this, tr("Import Aircraft ADS-B Data"), m_path->text(), fileFilter());
   if (!path.isEmpty()) {
     setPath(path);
   }
@@ -438,7 +438,7 @@ ReceiverDialog::ReceiverDialog(QWidget* parent)
       m_message(new QLabel(this))
 {
   setObjectName(QStringLiteral("receiverDialog"));
-  setWindowTitle(tr("Connect to ADS-B Receiver"));
+  setWindowTitle(tr("Connect to Aircraft ADS-B Receiver"));
   m_protocol->setObjectName(QStringLiteral("receiverProtocol"));
   m_host->setObjectName(QStringLiteral("receiverHost"));
   m_port->setObjectName(QStringLiteral("receiverPort"));

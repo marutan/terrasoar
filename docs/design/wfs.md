@@ -155,5 +155,6 @@ positions, exceptions; style rules; meshing in runs with points; and the
 provider against the mock WFS (`tests/support/mockwfs.h`): levels,
 paging and its limit, GeoJSON and GML agreeing, the disk cache and
 offline use, picking polygons, lines and points, style rules on load,
-offline regions, the registry, concurrency. `tests/ui`: the Add WFS Layer
-dialog and a WFS layer loaded, drawn and picked.
+offline regions, the registry, concurrency. `tests/ui`: the Add Web
+Feature Service (WFS) Layer dialog and a WFS layer loaded, drawn and
+picked.

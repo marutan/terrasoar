@@ -42,7 +42,10 @@
 #include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QFont>
+#include <QIcon>
 #include <QInputDialog>
+#include <QItemSelectionModel>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QKeySequence>
@@ -52,6 +55,11 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QMimeData>
+#include <QPainter>
+#include <QPainterPath>
+#include <QPen>
+#include <QPixmap>
+#include <QPolygonF>
 #include <QProgressDialog>
 #include <QSettings>
 #include <QStandardPaths>
@@ -59,7 +67,11 @@
 #include <QStyle>
 #include <QThread>
 #include <QTimer>
+#include <QToolBar>
+#include <QToolButton>
+#include <QTreeView>
 #include <QUuid>
+#include <QVector>
 #include <QWidget>
 
 #include "aboutdialog.h"
@@ -172,6 +184,176 @@ bool usesCelestrak(const QJsonArray& nodes)
     }
   }
   return false;
+}
+
+/**
+ * An icon drawn by @p draw in @p colour at each toolbar size, so it is sharp
+ * at any scale and fits the style's light or dark text. @p draw is given
+ * the painter, its pen already set, and the square to draw in, inset by
+ * half the pen and a little more.
+ */
+QIcon drawnIcon(const QColor& colour,
+                const std::function<void(QPainter&, const QRectF&)>& draw)
+{
+  QIcon icon;
+  for (const int32_t size : {16, 22, 24, 32, 48, 64}) {
+    QPixmap pixmap(size, size);
+    pixmap.fill(Qt::transparent);
+    QPainter painter(&pixmap);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const qreal pen = std::max(1.0, size / 16.0);
+    painter.setPen(QPen(colour, pen));
+    const qreal inset = pen / 2.0 + size / 32.0;
+    draw(painter, QRectF(inset, inset, size - 2.0 * inset, size - 2.0 * inset));
+    painter.end();
+    icon.addPixmap(pixmap);
+  }
+  return icon;
+}
+
+/** @p text (a word or two letters) in bold in a rounded box. */
+QIcon textIcon(const QString& text, const QColor& colour)
+{
+  return drawnIcon(colour, [&text](QPainter& painter, const QRectF& box) {
+    const qreal radius = box.width() / 7.0;
+    painter.drawRoundedRect(box, radius, radius);
+    QFont font = painter.font();
+    font.setBold(true);
+    font.setPixelSize(std::max(6, static_cast<int32_t>(box.width() * 0.55)));
+    painter.setFont(font);
+    painter.drawText(box, Qt::AlignCenter, text);
+  });
+}
+
+/**
+ * A globe: its outline, the central meridian and the equator as lines,
+ * and an ellipse each for two more meridians and two parallels.
+ */
+QIcon globeIcon(const QColor& colour)
+{
+  return drawnIcon(colour, [](QPainter& painter, const QRectF& box) {
+    painter.drawEllipse(box);
+    const QPointF centre = box.center();
+    const qreal r = box.width() / 2.0;
+    painter.drawLine(QPointF(centre.x(), box.top()),
+                     QPointF(centre.x(), box.bottom()));
+    painter.drawLine(QPointF(box.left(), centre.y()),
+                     QPointF(box.right(), centre.y()));
+    // Meridians 60° either side: an ellipse half as wide as the globe.
+    painter.drawEllipse(centre, r / 2.0, r);
+    // Parallels at about 40° north and south: chords across the disc.
+    const qreal y = r * 0.62;
+    const qreal x = std::sqrt(r * r - y * y);
+    painter.drawLine(QPointF(centre.x() - x, centre.y() - y),
+                     QPointF(centre.x() + x, centre.y() - y));
+    painter.drawLine(QPointF(centre.x() - x, centre.y() + y),
+                     QPointF(centre.x() + x, centre.y() + y));
+  });
+}
+
+/** The point at fractions @p fx across and @p fy down @p box. */
+QPointF at(const QRectF& box, qreal fx, qreal fy)
+{
+  return QPointF(box.left() + fx * box.width(), box.top() + fy * box.height());
+}
+
+/** A dot for a vertex at @p point, a little wider than the pen. */
+void drawVertex(QPainter& painter, QPointF point)
+{
+  const qreal radius = painter.pen().widthF() * 1.2;
+  painter.save();
+  painter.setBrush(painter.pen().color());
+  painter.drawEllipse(point, radius, radius);
+  painter.restore();
+}
+
+/** A map pin: a teardrop pointing down, a hole in its head. */
+QIcon placemarkIcon(const QColor& colour)
+{
+  return drawnIcon(colour, [](QPainter& painter, const QRectF& box) {
+    const QPointF head = at(box, 0.5, 0.36);
+    const qreal r = box.width() * 0.3;
+    QPainterPath pin;
+    pin.moveTo(at(box, 0.5, 1.0));
+    pin.arcTo(QRectF(head.x() - r, head.y() - r, 2.0 * r, 2.0 * r), -60.0,
+              300.0);
+    pin.closeSubpath();
+    painter.drawPath(pin);
+    const qreal hole = r * 0.35;
+    painter.drawEllipse(head, hole, hole);
+  });
+}
+
+/** A path: a line through four points, each marked. */
+QIcon pathIcon(const QColor& colour)
+{
+  return drawnIcon(colour, [](QPainter& painter, const QRectF& box) {
+    const QPolygonF line(
+        QVector<QPointF>{at(box, 0.08, 0.85), at(box, 0.38, 0.35),
+                         at(box, 0.62, 0.65), at(box, 0.92, 0.15)});
+    painter.drawPolyline(line);
+    for (const QPointF& point : line) {
+      drawVertex(painter, point);
+    }
+  });
+}
+
+/** The corners of the polygon the polygon and hole icons share. */
+QPolygonF polygonShape(const QRectF& box)
+{
+  return QPolygonF(QVector<QPointF>{at(box, 0.5, 0.05), at(box, 0.95, 0.38),
+                                    at(box, 0.78, 0.92), at(box, 0.22, 0.92),
+                                    at(box, 0.05, 0.38)});
+}
+
+/** A polygon: a pentagon, lightly filled, each corner marked. */
+QIcon polygonIcon(const QColor& colour)
+{
+  return drawnIcon(colour, [&colour](QPainter& painter, const QRectF& box) {
+    QColor fill = colour;
+    fill.setAlpha(64);
+    painter.setBrush(fill);
+    const QPolygonF shape = polygonShape(box);
+    painter.drawPolygon(shape);
+    for (const QPointF& point : shape) {
+      drawVertex(painter, point);
+    }
+  });
+}
+
+/** A hole in a polygon: the pentagon filled, a square left empty. */
+QIcon holeIcon(const QColor& colour)
+{
+  return drawnIcon(colour, [&colour](QPainter& painter, const QRectF& box) {
+    QColor fill = colour;
+    fill.setAlpha(140);
+    painter.setBrush(fill);
+    QPainterPath shape;
+    shape.setFillRule(Qt::OddEvenFill);
+    shape.addPolygon(polygonShape(box));
+    shape.closeSubpath();
+    shape.addRect(QRectF(at(box, 0.32, 0.38), at(box, 0.68, 0.74)));
+    painter.drawPath(shape);
+  });
+}
+
+/**
+ * A ground overlay: a picture (a hill and the sun) laid on the ground, a
+ * slanted frame seen from above it.
+ */
+QIcon overlayIcon(const QColor& colour)
+{
+  return drawnIcon(colour, [](QPainter& painter, const QRectF& box) {
+    const QPolygonF frame(
+        QVector<QPointF>{at(box, 0.25, 0.15), at(box, 1.0, 0.15),
+                         at(box, 0.75, 0.85), at(box, 0.0, 0.85)});
+    painter.drawPolygon(frame);
+    const QPolygonF hill(QVector<QPointF>{
+        at(box, 0.14, 0.85), at(box, 0.42, 0.42), at(box, 0.62, 0.85)});
+    painter.drawPolyline(hill);
+    const qreal sun = box.width() * 0.08;
+    painter.drawEllipse(at(box, 0.68, 0.38), sun, sun);
+  });
 }
 
 } // namespace
@@ -379,6 +561,7 @@ MainWindow::MainWindow(QWidget* parent)
   createActions();
   createMenus();
   createKmlEditing();
+  createToolBar();
   retranslateUi();
 
   resize(1024, 768);
@@ -565,6 +748,8 @@ void MainWindow::createActions()
   m_resetViewAction = new QAction(this);
   m_resetViewAction->setObjectName(QStringLiteral("resetViewAction"));
   m_resetViewAction->setShortcut(QKeySequence(Qt::Key_Home));
+  // The icon is for the toolbar.
+  m_resetViewAction->setIconVisibleInMenu(false);
   if (m_globeView) {
     connect(m_resetViewAction, &QAction::triggered, m_globeView,
             &GlobeView::goHome);
@@ -580,6 +765,10 @@ void MainWindow::createActions()
   // Clang rejects the plain enums' bitwise or.
   m_mapViewAction->setShortcut(QKeySequence(static_cast<int32_t>(Qt::CTRL) |
                                             static_cast<int32_t>(Qt::Key_M)));
+  // The menu shows the tick; the icon is for the toolbar.
+  m_mapViewAction->setIconVisibleInMenu(false);
+  connect(m_mapViewAction, &QAction::toggled, this,
+          &MainWindow::updateMapViewIcon);
   m_scaleBarAction = new QAction(this);
   m_scaleBarAction->setObjectName(QStringLiteral("scaleBarAction"));
   m_scaleBarAction->setCheckable(true);
@@ -1010,19 +1199,7 @@ void MainWindow::createMenus()
   m_fileMenu->addAction(m_saveAction);
   m_fileMenu->addAction(m_saveAsAction);
   m_fileMenu->addSeparator();
-  m_fileMenu->addAction(m_addWmsAction);
-  m_fileMenu->addAction(m_addWmtsAction);
-  m_fileMenu->addAction(m_addXyzAction);
   m_fileMenu->addAction(m_openKmlAction);
-  m_fileMenu->addAction(m_addWfsAction);
-  m_fileMenu->addAction(m_addSatellitesAction);
-  m_fileMenu->addAction(m_importAdsbAction);
-  m_fileMenu->addAction(m_connectReceiverAction);
-  m_fileMenu->addAction(m_importAisAction);
-  m_fileMenu->addAction(m_addAisSourceAction);
-  m_fileMenu->addAction(m_addImageryAction);
-  m_fileMenu->addAction(m_addElevationAction);
-  m_fileMenu->addAction(m_addWebTerrainAction);
   m_fileMenu->addAction(m_offlineRegionsAction);
   m_fileMenu->addAction(m_dataPacksAction);
   m_fileMenu->addSeparator();
@@ -1063,7 +1240,6 @@ void MainWindow::createMenus()
   m_exaggerationMenu->setObjectName(QStringLiteral("exaggerationMenu"));
   m_exaggerationMenu->addActions(m_exaggerationGroup->actions());
   m_viewMenu->addAction(m_hillshadeAction);
-  m_viewMenu->addAction(m_profileAction);
   syncTerrainActions();
   m_viewMenu->addAction(m_ellipsoidalHeightsAction);
   m_viewMenu->addSeparator();
@@ -1073,6 +1249,29 @@ void MainWindow::createMenus()
   m_viewMenu->addSeparator();
   m_viewMenu->addAction(m_debugOverlayAction);
 
+  m_toolsMenu = menuBar()->addMenu(QString());
+  m_toolsMenu->setObjectName(QStringLiteral("toolsMenu"));
+  m_toolsMenu->addAction(m_profileAction);
+  m_localSourcesMenu = menuBar()->addMenu(QString());
+  m_localSourcesMenu->setObjectName(QStringLiteral("localSourcesMenu"));
+  m_localSourcesMenu->addAction(m_addImageryAction);
+  m_localSourcesMenu->addAction(m_addElevationAction);
+  m_onlineSourcesMenu = menuBar()->addMenu(QString());
+  m_onlineSourcesMenu->setObjectName(QStringLiteral("onlineSourcesMenu"));
+  m_onlineSourcesMenu->addAction(m_addWmsAction);
+  m_onlineSourcesMenu->addAction(m_addWmtsAction);
+  m_onlineSourcesMenu->addAction(m_addWfsAction);
+  m_onlineSourcesMenu->addAction(m_addXyzAction);
+  m_onlineSourcesMenu->addAction(m_addWebTerrainAction);
+  m_tracksMenu = menuBar()->addMenu(QString());
+  m_tracksMenu->setObjectName(QStringLiteral("tracksMenu"));
+  m_tracksMenu->addAction(m_importAdsbAction);
+  m_tracksMenu->addAction(m_connectReceiverAction);
+  m_tracksMenu->addAction(m_importAisAction);
+  m_tracksMenu->addAction(m_addAisSourceAction);
+  m_tracksMenu->addAction(m_addSatellitesAction);
+
+  // The KML menu goes in before Help (createKmlEditing()).
   m_helpMenu = menuBar()->addMenu(QString());
   m_helpMenu->setObjectName(QStringLiteral("helpMenu"));
   m_helpMenu->addAction(m_userGuideAction);
@@ -1080,31 +1279,89 @@ void MainWindow::createMenus()
   m_helpMenu->addAction(m_aboutAction);
 }
 
+void MainWindow::createToolBar()
+{
+  m_mainToolBar = new QToolBar(this);
+  // Named, as QMainWindow needs to save and restore it.
+  m_mainToolBar->setObjectName(QStringLiteral("mainToolBar"));
+  m_mainToolBar->setMovable(false);
+  addToolBar(Qt::TopToolBarArea, m_mainToolBar);
+  // The same action as View → 2D Map. Its icon names the view a click
+  // goes to (updateMapViewIcon()).
+  m_mainToolBar->addAction(m_mapViewAction);
+  m_mainToolBar->addAction(m_resetViewAction);
+  m_mainToolBar->addSeparator();
+  // KML drawing, as in the KML menu. That menu brings their enabled state
+  // up to date as it opens; the toolbar shows them all the time, so the
+  // layer selection updates them too (createKmlEditing() handles the
+  // other changes).
+  m_mainToolBar->addAction(m_addPlacemarkAction);
+  m_mainToolBar->addAction(m_addPathAction);
+  m_mainToolBar->addAction(m_addPolygonAction);
+  m_mainToolBar->addAction(m_addHoleAction);
+  m_mainToolBar->addAction(m_addOverlayAction);
+  // Their icons are for the toolbar, as for the others.
+  for (QAction* action :
+       {m_addPlacemarkAction, m_addPathAction, m_addPolygonAction,
+        m_addHoleAction, m_addOverlayAction}) {
+    action->setIconVisibleInMenu(false);
+  }
+  m_mainToolBar->addSeparator();
+  // Quick Maps: a menu of catalogue layers added at once with the
+  // dialogs' default choices. A tool button, not an action with a menu,
+  // as Qt 5 and Qt 6 differ there.
+  m_quickMapsMenu = new QMenu(this);
+  m_quickMapsMenu->setObjectName(QStringLiteral("quickMapsMenu"));
+  m_quickMapsButton = new QToolButton(m_mainToolBar);
+  m_quickMapsButton->setObjectName(QStringLiteral("quickMapsButton"));
+  m_quickMapsButton->setMenu(m_quickMapsMenu);
+  m_quickMapsButton->setPopupMode(QToolButton::InstantPopup);
+  // The toolbar holds the button through an action; its text is the
+  // button's, for the overflow menu and accessibility.
+  m_quickMapsAction = m_mainToolBar->addWidget(m_quickMapsButton);
+  createQuickMaps();
+  connect(m_layerDock->view()->selectionModel(),
+          &QItemSelectionModel::currentChanged, this,
+          &MainWindow::updateKmlActions);
+  updateToolBarIcons();
+}
+
 void MainWindow::retranslateUi()
 {
   setWindowTitle(programName());
   m_fileMenu->setTitle(tr("&File"));
+  m_mainToolBar->setWindowTitle(tr("Toolbar"));
+  m_quickMapsButton->setText(tr("Quick Maps"));
+  m_quickMapsMenu->setTitle(m_quickMapsButton->text());
+  m_quickMapsAction->setText(m_quickMapsButton->text());
+  m_quickMapsButton->setToolTip(
+      tr("Add a map from the catalogues straight away, with the usual "
+         "choices"));
   if (m_kmlMenu != nullptr) {
     retranslateKmlEditing();
   }
   m_viewMenu->setTitle(tr("&View"));
+  m_toolsMenu->setTitle(tr("&Tools"));
+  m_localSourcesMenu->setTitle(tr("&Local Sources"));
+  m_onlineSourcesMenu->setTitle(tr("&Online Sources"));
+  m_tracksMenu->setTitle(tr("T&racks"));
   m_clockMenu->setTitle(tr("&Clock"));
   m_addSatellitesAction->setText(tr("Add &Satellites…"));
   m_addSatellitesAction->setStatusTip(
       tr("Add satellites from CelesTrak, a TLE or OMM file, or TLEs pasted "
          "in"));
-  m_importAdsbAction->setText(tr("Import ADS-&B Data…"));
+  m_importAdsbAction->setText(tr("Import Aircraft ADS-&B Data…"));
   m_importAdsbAction->setStatusTip(
       tr("Show aircraft from a recording of ADS-B data: SBS, raw messages, "
          "Beast, readsb JSON, traces or CSV"));
-  m_connectReceiverAction->setText(tr("Connect to ADS-B &Receiver…"));
+  m_connectReceiverAction->setText(tr("Connect to Aircraft ADS-B &Receiver…"));
   m_connectReceiverAction->setStatusTip(
       tr("Show aircraft live from a dump1090 or readsb receiver"));
-  m_importAisAction->setText(tr("Import AIS Data…"));
+  m_importAisAction->setText(tr("Import Maritime AIS Data…"));
   m_importAisAction->setStatusTip(
       tr("Show ships from a recording of AIS data: NMEA logs or CSV (NOAA "
          "MarineCadastre's and others)"));
-  m_addAisSourceAction->setText(tr("Add AIS Source…"));
+  m_addAisSourceAction->setText(tr("Add Maritime AIS Source…"));
   m_addAisSourceAction->setStatusTip(
       tr("Show ships live from an AIS receiver or an open online feed"));
   m_helpMenu->setTitle(tr("&Help"));
@@ -1115,6 +1372,7 @@ void MainWindow::retranslateUi()
   m_mapViewAction->setText(tr("2D &Map"));
   m_mapViewAction->setStatusTip(
       tr("Change between the 3D globe and a flat map"));
+  updateMapViewIcon();
   m_projectionMenu->setTitle(tr("Map &Projection"));
   m_projectionSettingsAction->setText(tr("Projection &Settings…"));
   m_projectionSettingsAction->setStatusTip(
@@ -1193,17 +1451,17 @@ void MainWindow::retranslateUi()
   m_ellipsoidalHeightsAction->setStatusTip(
       tr("Show heights above the WGS 84 ellipsoid (as GNSS gives them) "
          "instead of above sea level"));
-  m_addWmsAction->setText(tr("Add &WMS Layer…"));
+  m_addWmsAction->setText(tr("Add Web Map Service (&WMS) Layer…"));
   m_addWmsAction->setStatusTip(
       tr("Add a layer from a web map server (WMS) to the layer tree"));
-  m_addWmtsAction->setText(tr("Add W&MTS Layer…"));
+  m_addWmtsAction->setText(tr("Add Web Map Tile Service (W&MTS) Layer…"));
   m_addWmtsAction->setStatusTip(
       tr("Add a layer from a web map tile server (WMTS) to the layer tree"));
   m_openKmlAction->setText(tr("Open &KML or KMZ…"));
   m_openKmlAction->setStatusTip(
       tr("Add a KML or KMZ file (from Google Earth and other programs) to "
          "the layer tree"));
-  m_addWfsAction->setText(tr("Add W&FS Layer…"));
+  m_addWfsAction->setText(tr("Add Web Feature Service (W&FS) Layer…"));
   m_addWfsAction->setStatusTip(
       tr("Add features (points, lines and areas) from a web feature service "
          "(WFS) to the layer tree"));
@@ -2717,8 +2975,9 @@ NewRegionDialog* MainWindow::newOfflineRegion()
     QMessageBox::information(
         this, tr("New Offline Region"),
         tr("Only layers from WMS, WMTS, XYZ tile and WFS servers can be kept "
-           "for offline use. Add one first (File → Add WMS Layer…, Add WMTS "
-           "Layer…, Add XYZ Tile Layer… or Add WFS Layer…)."));
+           "for offline use. Add one first (Online Sources → Add Web Map "
+           "Service (WMS) Layer…, Add Web Map Tile Service (WMTS) Layer…, "
+           "Add XYZ Tile Layer… or Add Web Feature Service (WFS) Layer…)."));
     return nullptr;
   }
   if (!m_countries && !m_countriesFile.isEmpty()) {
@@ -2863,8 +3122,37 @@ void MainWindow::changeEvent(QEvent* event)
 {
   if (event->type() == QEvent::LanguageChange) {
     retranslateUi();
+  } else if (event->type() == QEvent::PaletteChange &&
+             m_mainToolBar != nullptr) {
+    updateToolBarIcons();
   }
   QMainWindow::changeEvent(event);
+}
+
+void MainWindow::updateToolBarIcons()
+{
+  const QColor colour = palette().color(QPalette::ButtonText);
+  m_resetViewAction->setIcon(globeIcon(colour));
+  m_addPlacemarkAction->setIcon(placemarkIcon(colour));
+  m_addPathAction->setIcon(pathIcon(colour));
+  m_addPolygonAction->setIcon(polygonIcon(colour));
+  m_addHoleAction->setIcon(holeIcon(colour));
+  m_addOverlayAction->setIcon(overlayIcon(colour));
+  updateMapViewIcon();
+}
+
+void MainWindow::updateMapViewIcon()
+{
+  const bool onMap = m_mapViewAction->isChecked();
+  m_mapViewAction->setIcon(
+      textIcon(onMap ? tr("3D", "toolbar icon: show the globe")
+                     : tr("2D", "toolbar icon: show the map"),
+               palette().color(QPalette::ButtonText)));
+  const QString shortcut =
+      m_mapViewAction->shortcut().toString(QKeySequence::NativeText);
+  m_mapViewAction->setToolTip(
+      (onMap ? tr("Show the 3D Globe (%1)") : tr("Show the 2D Map (%1)"))
+          .arg(shortcut));
 }
 
 std::vector<AboutDataRow> MainWindow::aboutData() const

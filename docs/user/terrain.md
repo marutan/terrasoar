@@ -20,11 +20,11 @@ the project.
 
 ## Your own elevation models
 
-**File → Add Elevation File…** (or **Elevation File…** in the layer
-list's add menu) adds a digital elevation model: a GeoTIFF or any other
-raster GDAL reads, in latitude and longitude or a projected system such
-as UTM. Terra Soar asks what its heights are measured from, suggesting
-what the file says if it says:
+**Local Sources → Add Elevation File…** (or **Elevation File…** in the
+layer list's add menu) adds a digital elevation model: a GeoTIFF or any
+other raster GDAL reads, in latitude and longitude or a projected system
+such as UTM. Terra Soar asks what its heights are measured from,
+suggesting what the file says if it says:
 
 - **Sea level, EGM2008**: most recent global DEMs (Copernicus DEM).
 - **Sea level, EGM96**: SRTM, ALOS and older data.
@@ -46,8 +46,8 @@ them already.
 
 ## Terrain from the web
 
-**File → Add Web Terrain…** (or **Web Terrain…** in the layer list's add
-menu) adds heights from a server:
+**Online Sources → Add Web Terrain…** (or **Web Terrain…** in the layer
+list's add menu) adds heights from a server:
 
 - **Terrain Tiles (AWS Open Data)**, ready to use: free worldwide heights
   from SRTM and other sources, about 5 m to 30 m apart where they are most
@@ -78,7 +78,7 @@ project.
 
 ## Elevation profiles
 
-**View → Elevation Profile…** shows the heights along a line:
+**Tools → Elevation Profile…** shows the heights along a line:
 
 1. Click the points of the line on the globe or map; double-click or
    press Enter to finish (Backspace removes the last point, Esc cancels).

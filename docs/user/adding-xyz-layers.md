@@ -11,8 +11,8 @@ kept offline like a [WMS](adding-wms-layers.md) or
 
 ## Adding a layer
 
-1. Choose **File → Add XYZ Tile Layer…**, or **Add Layer → XYZ Tile
-   Layer…** at the bottom of the Layers panel.
+1. Choose **Online Sources → Add XYZ Tile Layer…**, or **Add Layer → XYZ
+   Tile Layer…** at the bottom of the Layers panel.
 2. In **Service**, pick one of the listed services: that fills in
    everything below, with its description and a link to its terms. Or
    leave it and fill in the fields yourself:
@@ -54,6 +54,12 @@ your own work.
 | Google Maps | Google's road map |
 | Google Maps - Satellite | Google's satellite and aerial imagery |
 | Google Maps - Hybrid | Google's imagery with roads, places and borders |
+| ESRI - World Imagery | Esri's satellite and aerial imagery, 1 m or better in many places |
+| ESRI - World Physical Map | Natural Earth's physical map: land cover and relief |
+| ESRI - World Shaded Relief | The shape of the land as grey shaded relief |
+| ESRI - World Street Map | Esri's street map |
+| ESRI - World Terrain Base | A plain background of relief and sea floor, for other data |
+| ESRI - World Topo Map | Esri's topographic map |
 
 OpenStreetMap's and OpenTopoMap's tile servers are run by volunteers on
 donated resources. Their terms allow looking at the map, not downloading
@@ -64,6 +70,10 @@ published service: Google's terms allow its maps only through Google's
 own products, so read them before using these layers, and expect the
 address to stop working without notice. Terra Soar won't keep them as
 offline regions either.
+
+The ESRI entries are Esri's ArcGIS Online basemaps. Esri's terms of use
+(linked from each one) apply to them; read them before using these
+layers in your own work. Terra Soar won't keep them as offline regions.
 
 ## Credits, saved tiles and working offline
 

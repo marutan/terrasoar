@@ -341,7 +341,7 @@ private slots:
   {
     // The catalogue that comes with the program reads; every entry credits
     // its source and links its terms; OpenStreetMap's volunteer-run tile
-    // servers and Google's unofficial one forbid bulk downloads.
+    // servers, Google's unofficial one and Esri's forbid bulk downloads.
     QFile file(QStringLiteral(TS_REPO_DATA_DIR "/xyz-catalogue.json"));
     QVERIFY(file.open(QIODevice::ReadOnly));
     const QByteArray json = file.readAll();
@@ -376,6 +376,11 @@ private slots:
     QCOMPARE(ts::bulkDownloadPolicy(
                  QUrl(QStringLiteral("https://mt1.google.com/")), services),
              ts::BulkDownloadPolicy::Forbidden);
+    // Esri's basemaps: browsing only, as their terms say.
+    QCOMPARE(
+        ts::bulkDownloadPolicy(
+            QUrl(QStringLiteral("https://server.arcgisonline.com/")), services),
+        ts::BulkDownloadPolicy::Forbidden);
 
     // Not a catalogue, another kind, a newer version; unusable entries are
     // skipped.
