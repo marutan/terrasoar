@@ -105,11 +105,34 @@ float tsAsinh(float x)
          - x2 * (35.0 / 1152.0 - x2 * (63.0 / 2816.0))))));
 }
 
+// sin() and cos() of GLSL may be out by a fixed amount whatever the
+// argument (NVIDIA's by about 4e-7), which is all of the sine of a small
+// tile's height, so small arguments use the series instead.
+float tsSinSmall(float x)
+{
+  float x2 = x * x;
+  if (x2 < 0.0625) {
+    return x * (1.0 - x2 / 6.0 * (1.0 - x2 / 20.0 * (1.0 - x2 / 42.0
+           * (1.0 - x2 / 72.0 * (1.0 - x2 / 110.0)))));
+  }
+  return sin(x);
+}
+
+float tsCosSmall(float x)
+{
+  float x2 = x * x;
+  if (x2 < 0.0625) {
+    return 1.0 - x2 / 2.0 * (1.0 - x2 / 12.0 * (1.0 - x2 / 30.0
+           * (1.0 - x2 / 56.0 * (1.0 - x2 / 90.0))));
+  }
+  return cos(x);
+}
+
 float tsCylindricalDy(float dLatRad, vec4 r0, vec4 r1)
 {
   float q = clamp(dLatRad, r0.z, r0.w) * r1.z;
-  float sinHalf = sin(0.5 * q);
-  float cosHalf = cos(0.5 * q);
+  float sinHalf = tsSinSmall(0.5 * q);
+  float cosHalf = tsCosSmall(0.5 * q);
   float dSin = 2.0 * (r0.y * cosHalf - r0.x * sinHalf) * sinHalf;
   float y = r1.w * tsAtanh(dSin / (r0.y * r0.y - r0.x * dSin));
   if (r1.y > 0.0) {

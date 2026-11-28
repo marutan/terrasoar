@@ -217,6 +217,23 @@ void main()
 }
 )";
 
+// For glslMatchesCpp()'s coarse row: sin() and cos() as some GPUs
+// compute them. NVIDIA's are out by up to about 4e-7 whatever the
+// argument, most of the sine of a small tile's height; rounded to 2^-21,
+// these are out by up to 2.4e-7.
+const char* const coarseTrigGlsl = R"(
+float tsCoarseSin(float x)
+{
+  return floor(sin(x) * 2097152.0 + 0.5) / 2097152.0;
+}
+float tsCoarseCos(float x)
+{
+  return floor(cos(x) * 2097152.0 + 0.5) / 2097152.0;
+}
+#define sin(x) tsCoarseSin(x)
+#define cos(x) tsCoarseCos(x)
+)";
+
 struct ProbeBlock {
   std::array<float, 4> r0{};
   std::array<float, 4> r1{};
@@ -354,6 +371,17 @@ expectedProbeOffset(const ts::Projection& projection, double referenceLat,
   result.allowedXM = 1e-3 + 0.01 * texelM;
   result.allowedYM = result.allowedXM;
   return result;
+}
+
+/**
+ * How much more than its usual allowance glslMatchesCpp() gives
+ * @p projection: coarse trigonometry (@p coarseTrig) leaves the
+ * projections away from the cylindrical family a little more, a fiftieth
+ * of a texel.
+ */
+double coarseTrigAllowance(const ts::Projection& projection, bool coarseTrig)
+{
+  return coarseTrig && !projection.isCylindrical() ? 2.0 : 1.0;
 }
 
 } // namespace
@@ -806,8 +834,16 @@ private slots:
     QCOMPARE(edge.r0[3], 0.0F);
   }
 
+  void glslMatchesCpp_data()
+  {
+    QTest::addColumn<bool>("coarseTrig");
+    QTest::newRow("this GPU") << false;
+    QTest::newRow("coarse sin and cos") << true;
+  }
+
   void glslMatchesCpp()
   {
+    QFETCH(bool, coarseTrig);
     // The shader's projection, read back from the GPU, against the C++
     // one: offsets from a reference point from a millionth of a degree to
     // most of the globe, for every projection and reference latitude.
@@ -818,7 +854,8 @@ private slots:
     ts::ShaderDesc shaderDesc;
     shaderDesc.label = QStringLiteral("projection probe");
     shaderDesc.vertexSource = probeVertexGlsl;
-    shaderDesc.fragmentSource = ts::projectionGlsl() + probeFragmentGlsl;
+    shaderDesc.fragmentSource = QByteArray(coarseTrig ? coarseTrigGlsl : "") +
+                                ts::projectionGlsl() + probeFragmentGlsl;
     shaderDesc.uniformBlocks = {{QByteArrayLiteral("Probe"), 0}};
     QString error;
     const std::unique_ptr<ts::ShaderProgram> shader =
@@ -888,8 +925,10 @@ private slots:
                                     dLonRad, dLatRad, span);
             const double expectedX = expected.xM;
             const double expectedY = expected.yM;
-            const double allowedX = expected.allowedXM;
-            const double allowedY = expected.allowedYM;
+            const double coarseFactor =
+                coarseTrigAllowance(projection, coarseTrig);
+            const double allowedX = coarseFactor * expected.allowedXM;
+            const double allowedY = coarseFactor * expected.allowedYM;
             const double errorX =
                 std::abs(static_cast<double>(gpu[0]) - expectedX);
             const double errorY =

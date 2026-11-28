@@ -1424,6 +1424,13 @@ private slots:
     QVERIFY(steep.pickGeodetic(400.0, 599.5).has_value());
     QVERIFY(steep.farM() > steep.mapFarLimitM());
     QVERIFY(steep.mapFarLimitM() <= ts::Camera::maximumMapFarM);
+    // Zoomed out further than maximumMapFarM, a turned map is still all
+    // within the far limit: the centre and the corners can be picked.
+    const ts::Camera far = makeMapCamera(
+        "rotated-mercator", ts::CameraPose{45.0, 0.0, 9.0e7, 40.0, 0.0});
+    QVERIFY(far.pose().rangeM > ts::Camera::maximumMapFarM);
+    QVERIFY(far.pickGeodetic(400.0, 300.0).has_value());
+    QVERIFY(far.mapFarLimitM() > 1.5 * far.pose().rangeM);
   }
 
   void tiltedMapDragsAndKeys()
