@@ -3201,7 +3201,9 @@ private slots:
     QVERIFY(!balloon->isVisible() ||
             !balloon->text().contains(QStringLiteral("P7-3")));
     model->removeNode(document);
-    QTRY_VERIFY(ts::sharedKmlDocument(path, nullptr) == nullptr);
+    QVERIFY(QTest::qWaitFor(
+        [&path]() { return ts::sharedKmlDocument(path, nullptr) == nullptr; },
+        5000));
   }
 
   void openKml()
