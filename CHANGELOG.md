@@ -7,6 +7,8 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+## [0.0.5] – 2026-11-28
+
 ### Added
 
 - New data packs with layers of their own: Natural Earth's map layers
@@ -348,7 +350,8 @@ The first public build: everything below is new.
   and the third-party notices.
 - English text throughout, ready for translation (Qt Linguist).
 
-[Unreleased]: https://github.com/marutan/terrasoar/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/marutan/terrasoar/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/marutan/terrasoar/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/marutan/terrasoar/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/marutan/terrasoar/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/marutan/terrasoar/compare/v0.0.1...v0.0.2

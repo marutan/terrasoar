@@ -509,7 +509,7 @@ bool buildElevation(const ElevationOptions& options, ElevationStats* stats,
   for (int32_t level = options.maxLevel; level >= options.minLevel; --level) {
     progress(QStringLiteral("Writing elevation level %1").arg(level));
     const int32_t firstX = static_cast<int32_t>(
-        std::lround((options.westDeg + 180.0) / (180.0 / (1 << level))));
+        std::lround((options.westDeg + 180.0) / ts::TileKey::sizeDeg(level)));
     if (!writeLevel(grid, level, firstX, options.samples, &writer, stats,
                     errorString)) {
       return false;
