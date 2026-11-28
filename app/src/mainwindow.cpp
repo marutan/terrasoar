@@ -29,6 +29,8 @@
 #include <memory>
 #include <optional>
 #include <thread>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <QAction>
@@ -111,6 +113,7 @@
 #include "ts/globe/layerstackdraws.h"
 #include "ts/kml/kmlactivity.h"
 #include "ts/kml/kmldocument.h"
+#include "ts/kml/kmledit.h"
 #include "ts/kml/kmlfeatureprovider.h"
 #include "ts/kml/kmloverlays.h"
 #include "ts/kml/kmlpresentation.h"
@@ -515,9 +518,19 @@ MainWindow::MainWindow(QWidget* parent)
           &MainWindow::updateKmlRegions);
   connect(m_layers, &QAbstractItemModel::dataChanged, this,
           [this](const QModelIndex& topLeft) { kmlCheckChanged(topLeft); });
+  // Entries removed: their documents go, once for many removed together.
+  m_kmlForgetTimer = new QTimer(this);
+  m_kmlForgetTimer->setSingleShot(true);
+  m_kmlForgetTimer->setInterval(0);
+  connect(m_kmlForgetTimer, &QTimer::timeout, this,
+          &MainWindow::forgetRemovedKmlNodes);
+  connect(m_layers, &QAbstractItemModel::rowsRemoved, m_kmlForgetTimer,
+          qOverload<>(&QTimer::start));
+  connect(m_layers, &QAbstractItemModel::modelReset, m_kmlForgetTimer,
+          qOverload<>(&QTimer::start));
   connect(m_icons, &IconCache::iconsChanged, this, [this]() {
     m_tintedIcons.clear();
-    refreshBillboards(m_layers->layerStack());
+    refreshBillboards(drawnStack());
   });
   connect(m_layerDock, &LayerTreeDock::addWmsLayerRequested, this,
           [this]() { addWmsLayer(); });
@@ -1600,8 +1613,8 @@ void MainWindow::refreshLayers()
 {
   const LayerStack tree = timedStack();
   updateTimeBar(tree);
-  // Layers with times draw the clock's.
-  const LayerStack stack = stackAtTime(tree, m_clock->time());
+  // Layers with times draw the clock's; a KML file's entries one layer.
+  const LayerStack stack = mergeKmlLayers(stackAtTime(tree, m_clock->time()));
   if (m_satellites != nullptr) {
     refreshSatelliteLayers(stack);
   }
@@ -1657,7 +1670,7 @@ void MainWindow::clockMoved()
 {
   // Only the imagery whose time changed is drawn anew: the other layers'
   // providers (and their tiles) stay.
-  const LayerStack stack = stackAtTime(timedStack(), m_clock->time());
+  const LayerStack stack = drawnStack();
   QJsonArray sources;
   for (const ImageryStackEntry& entry : stack.imagery) {
     sources.append(entry.definition.source);
@@ -1707,6 +1720,17 @@ MainWindow::kmlBoundaries(const QJsonObject& source) const
   return m_kmlBoundaries[key] = std::move(boundaries);
 }
 
+const std::vector<QDateTime>&
+MainWindow::kmlFileBoundaries(const QJsonObject& source) const
+{
+  QJsonObject file = kmlLayerSource(
+      source.value(QStringLiteral("path")).toString(), QString(), true);
+  if (source.contains(QStringLiteral("rev"))) {
+    file.insert(QStringLiteral("rev"), source.value(QStringLiteral("rev")));
+  }
+  return kmlBoundaries(file);
+}
+
 LayerStack MainWindow::timedStack() const
 {
   // Base pack layers with month variants installed (Blue Marble's months)
@@ -1721,21 +1745,29 @@ LayerStack MainWindow::timedStack() const
   }
   // KML layers whose Regions are out of sight are left out; those with
   // times show the clock's.
-  // A Region hides what is inside its feature too (a link's document).
+  // A Region hides what is inside its feature too (a link's document):
+  // the entries below each, found once.
+  std::unordered_set<QString> inactive;
+  for (const QString& id : m_kmlInactive) {
+    std::vector<QModelIndex> pending = {m_layers->indexOfId(id)};
+    while (!pending.empty()) {
+      const QModelIndex index = pending.back();
+      pending.pop_back();
+      if (!index.isValid() ||
+          !inactive
+               .insert(
+                   m_layers->data(index, LayerTreeModel::NodeIdRole).toString())
+               .second) {
+        continue;
+      }
+      for (int32_t row = 0; row < m_layers->rowCount(index); ++row) {
+        pending.push_back(m_layers->index(row, 0, index));
+      }
+    }
+  }
   const std::function<bool(const QString&)> hidden =
-      [this](const QString& nodeId) {
-        if (m_kmlInactive.empty()) {
-          return false;
-        }
-        for (QModelIndex up = m_layers->indexOfId(nodeId); up.isValid();
-             up = up.parent()) {
-          if (m_kmlInactive.count(
-                  m_layers->data(up, LayerTreeModel::NodeIdRole).toString()) !=
-              0) {
-            return true;
-          }
-        }
-        return false;
+      [&inactive](const QString& nodeId) {
+        return inactive.count(nodeId) != 0;
       };
   stack.imagery.erase(std::remove_if(stack.imagery.begin(), stack.imagery.end(),
                                      [&](const ImageryStackEntry& entry) {
@@ -1747,10 +1779,25 @@ LayerStack MainWindow::timedStack() const
                                        return hidden(entry.nodeId);
                                      }),
                       stack.vectors.end());
+  // A file without times: none of its entries has any (asked once a file).
+  std::map<std::pair<QString, double>, bool> timed;
   for (VectorStackEntry& entry : stack.vectors) {
     const QJsonObject& source = entry.definition.source;
     if (source.value(QStringLiteral("kind")).toString() !=
         QLatin1String("kml")) {
+      continue;
+    }
+    const std::pair<QString, double> file{
+        source.value(QStringLiteral("path")).toString(),
+        source.value(QStringLiteral("rev")).toDouble()};
+    const std::map<std::pair<QString, double>, bool>::iterator known =
+        timed.find(file);
+    const bool hasTimes =
+        known != timed.end()
+            ? known->second
+            : timed.emplace(file, !kmlFileBoundaries(source).empty())
+                  .first->second;
+    if (!hasTimes) {
       continue;
     }
     const std::vector<QDateTime>& boundaries = kmlBoundaries(source);
@@ -1761,6 +1808,188 @@ LayerStack MainWindow::timedStack() const
     }
   }
   return stack;
+}
+
+namespace
+{
+
+/** Returns true if @p entry is a KML layer. */
+bool isKmlEntry(const VectorStackEntry& entry)
+{
+  return entry.definition.source.value(QStringLiteral("kind")).toString() ==
+         QLatin1String("kml");
+}
+
+/** Returns true if @p a and @p b may be drawn as one KML layer. */
+bool sameKmlRun(const VectorStackEntry& a, const VectorStackEntry& b)
+{
+  const QJsonObject& x = a.definition.source;
+  const QJsonObject& y = b.definition.source;
+  return x.value(QStringLiteral("path")) == y.value(QStringLiteral("path")) &&
+         x.value(QStringLiteral("rev")) == y.value(QStringLiteral("rev")) &&
+         a.alpha == b.alpha;
+}
+
+/**
+ * Returns the end of the run of @p document's layers from @p begin in
+ * @p vectors, and in @p features each one's feature (null for a deep one):
+ * a screen overlay keeps its own layer (its entry is its own).
+ */
+std::size_t kmlRunEnd(const std::vector<VectorStackEntry>& vectors,
+                      std::size_t begin, const KmlDocument& document,
+                      std::vector<const KmlFeature*>& features)
+{
+  const std::function<bool(const VectorStackEntry&)> add =
+      [&document, &features](const VectorStackEntry& entry) {
+        const QJsonObject& source = entry.definition.source;
+        const KmlFeature* feature =
+            source.value(QStringLiteral("deep")).toBool()
+                ? nullptr
+                : kmlFeatureAt(
+                      document,
+                      source.value(QStringLiteral("container")).toString());
+        if (feature != nullptr &&
+            feature->kind == KmlFeature::Kind::ScreenOverlay) {
+          return false;
+        }
+        features.push_back(feature);
+        return true;
+      };
+  std::size_t end = begin + 1;
+  if (!add(vectors[begin])) {
+    return end;
+  }
+  while (end < vectors.size() && isKmlEntry(vectors[end]) &&
+         sameKmlRun(vectors[begin], vectors[end]) && add(vectors[end])) {
+    ++end;
+  }
+  return end;
+}
+
+/**
+ * Returns the containers among @p placemarksIn (container: how many of
+ * its placemarks are drawn) all of whose placemarks are drawn.
+ */
+std::unordered_set<QString>
+wholeContainers(const KmlDocument& document,
+                const std::unordered_map<QString, std::size_t>& placemarksIn)
+{
+  std::unordered_set<QString> whole;
+  for (const std::pair<const QString, std::size_t>& in : placemarksIn) {
+    const KmlFeature* container = kmlContainer(document, in.first);
+    if (container == nullptr) {
+      continue;
+    }
+    const std::size_t all = static_cast<std::size_t>(
+        std::count_if(container->children.begin(), container->children.end(),
+                      [](const KmlFeature& child) {
+                        return child.kind == KmlFeature::Kind::Placemark;
+                      }));
+    if (all == in.second) {
+      whole.insert(in.first);
+    }
+  }
+  return whole;
+}
+
+/**
+ * Returns the parts of the run [@p begin, @p end) of @p vectors, whose
+ * features are @p features: placemarks that are all of a container's
+ * become it, where the first of them was.
+ */
+std::vector<KmlLayerPart>
+kmlRunParts(const std::vector<VectorStackEntry>& vectors, std::size_t begin,
+            std::size_t end, const KmlDocument& document,
+            const std::vector<const KmlFeature*>& features)
+{
+  std::vector<KmlLayerPart> parts;
+  parts.reserve(end - begin);
+  // Per part: the container of its placemark (none if it isn't one).
+  std::vector<std::optional<QString>> placemarkParent;
+  placemarkParent.reserve(end - begin);
+  std::unordered_map<QString, std::size_t> placemarksIn;
+  for (std::size_t j = begin; j < end; ++j) {
+    // An entry is one part (its container, a placemark's own path).
+    const KmlFeature* feature = features[j - begin];
+    const bool placemark =
+        feature != nullptr && feature->kind == KmlFeature::Kind::Placemark;
+    for (KmlLayerPart& part : kmlLayerParts(vectors[j].definition.source)) {
+      if (placemark) {
+        const int32_t dot =
+            static_cast<int32_t>(part.container.lastIndexOf(QLatin1Char('.')));
+        const QString parent = dot < 0 ? QString() : part.container.left(dot);
+        ++placemarksIn[parent];
+        placemarkParent.emplace_back(parent);
+      } else {
+        placemarkParent.emplace_back(std::nullopt);
+      }
+      parts.push_back(std::move(part));
+    }
+  }
+  const std::unordered_set<QString> whole =
+      wholeContainers(document, placemarksIn);
+  if (whole.empty()) {
+    return parts;
+  }
+  std::vector<KmlLayerPart> compact;
+  std::unordered_set<QString> placed;
+  for (std::size_t k = 0; k < parts.size(); ++k) {
+    const std::optional<QString>& parent = placemarkParent[k];
+    if (!parent || whole.count(*parent) == 0) {
+      compact.push_back(std::move(parts[k]));
+    } else if (placed.insert(*parent).second) {
+      compact.push_back(KmlLayerPart{*parent, false});
+    }
+  }
+  return compact;
+}
+
+} // namespace
+
+LayerStack MainWindow::mergeKmlLayers(const LayerStack& stack) const
+{
+  LayerStack merged = stack;
+  merged.vectors.clear();
+  merged.vectors.reserve(stack.vectors.size());
+  std::size_t i = 0;
+  while (i < stack.vectors.size()) {
+    const VectorStackEntry& first = stack.vectors[i];
+    const QString path =
+        first.definition.source.value(QStringLiteral("path")).toString();
+    const std::shared_ptr<const KmlDocument> document =
+        isKmlEntry(first) ? sharedKmlDocument(path, nullptr) : nullptr;
+    std::vector<const KmlFeature*> features;
+    const std::size_t end =
+        document ? kmlRunEnd(stack.vectors, i, *document, features) : i + 1;
+    if (end - i == 1) {
+      merged.vectors.push_back(first);
+      i = end;
+      continue;
+    }
+    VectorStackEntry entry = first;
+    const QJsonValue rev = first.definition.source.value(QStringLiteral("rev"));
+    entry.definition.source = kmlPartsLayerSource(
+        path, kmlRunParts(stack.vectors, i, end, *document, features));
+    if (!rev.isUndefined()) {
+      entry.definition.source.insert(QStringLiteral("rev"), rev);
+    }
+    // Times: the file's, which hold each entry's.
+    const std::vector<QDateTime>& boundaries =
+        kmlFileBoundaries(first.definition.source);
+    if (!boundaries.empty()) {
+      entry.definition.source.insert(
+          QStringLiteral("at"),
+          kmlTimeKey(boundaries, m_clock->time()).toString(Qt::ISODate));
+    }
+    merged.vectors.push_back(std::move(entry));
+    i = end;
+  }
+  return merged;
+}
+
+LayerStack MainWindow::drawnStack() const
+{
+  return mergeKmlLayers(stackAtTime(timedStack(), m_clock->time()));
 }
 
 bool MainWindow::openFile(const QString& path, QString* errorString)
@@ -1821,8 +2050,11 @@ bool MainWindow::openKml(const QString& path, QString* errorString)
     return false;
   }
   addKmlFeature(*document, document->root, QString(), QModelIndex(), 0);
-  m_kmlRoots[m_layers->data(m_layers->index(0, 0), LayerTreeModel::NodeIdRole)
-                 .toString()] = absolute;
+  const QString rootId =
+      m_layers->data(m_layers->index(0, 0), LayerTreeModel::NodeIdRole)
+          .toString();
+  m_kmlRoots[rootId] = absolute;
+  m_kmlOpened[rootId] = document;
   updateKmlActions();
   if (!document->skipped.isEmpty()) {
     statusBar()->showMessage(
@@ -1879,6 +2111,8 @@ void MainWindow::addKmlFeature(const KmlDocument& document,
                                const QString& featurePath,
                                const QModelIndex& parent, int32_t row)
 {
+  // What is drawn changes once for all the entries, not once each.
+  const LayerTreeModel::StackChangeBatch batch(*m_layers);
   // A file whose feature is a link or an overlay: that alone.
   if (container.kind == KmlFeature::Kind::NetworkLink) {
     addKmlLink(document, container, featurePath, parent, row);
@@ -2126,6 +2360,7 @@ void MainWindow::kmlLinkLoaded(const QString& nodeId, const QString& path,
         m_layers->index(m_layers->rowCount(node) - 1, 0, node));
   }
   forgetRemovedKmlNodes();
+  m_kmlOpened[nodeId] = document;
   addKmlFeature(*document, document->root, QString(), node, 0);
   m_refreshingKml = wasRefreshing;
   if (flyToView && m_globeView != nullptr && document->root.view) {
@@ -2136,10 +2371,30 @@ void MainWindow::kmlLinkLoaded(const QString& nodeId, const QString& path,
 
 void MainWindow::forgetRemovedKmlNodes()
 {
+  // Every node id in one walk: looking each up would walk the tree each.
+  std::unordered_set<QString> present;
+  std::vector<QModelIndex> pending = {QModelIndex()};
+  while (!pending.empty()) {
+    const QModelIndex index = pending.back();
+    pending.pop_back();
+    const int32_t rows = m_layers->rowCount(index);
+    for (int32_t row = 0; row < rows; ++row) {
+      const QModelIndex child = m_layers->index(row, 0, index);
+      present.insert(
+          m_layers->data(child, LayerTreeModel::NodeIdRole).toString());
+      pending.push_back(child);
+    }
+  }
+  for (std::map<QString, std::shared_ptr<const KmlDocument>>::iterator opened =
+           m_kmlOpened.begin();
+       opened != m_kmlOpened.end();) {
+    opened = present.count(opened->first) != 0 ? std::next(opened)
+                                               : m_kmlOpened.erase(opened);
+  }
   for (std::map<QString, std::pair<QString, QString>>::iterator it =
            m_kmlNodes.begin();
        it != m_kmlNodes.end();) {
-    if (m_layers->indexOfId(it->first).isValid()) {
+    if (present.count(it->first) != 0) {
       ++it;
     } else {
       m_kmlRadio.erase(it->first);
@@ -2176,10 +2431,14 @@ void MainWindow::updateKmlRegions()
   const Camera& camera = m_globeView->controller().camera();
   const KmlViewParameters view = currentViewParameters();
   std::set<QString> inactive;
+  // Each document looked up once.
+  std::map<QString, std::shared_ptr<const KmlDocument>> documents;
   for (const std::pair<const QString, std::pair<QString, QString>>& node :
        m_kmlNodes) {
-    const std::shared_ptr<const KmlDocument> document =
-        sharedKmlDocument(node.second.first, nullptr);
+    std::shared_ptr<const KmlDocument>& document = documents[node.second.first];
+    if (!document) {
+      document = sharedKmlDocument(node.second.first, nullptr);
+    }
     if (!document || !kmlHasRegion(*document, node.second.second)) {
       continue;
     }
@@ -2549,7 +2808,8 @@ BillboardDraw MainWindow::billboardDraw(const KmlBillboard& billboard)
 
 bool MainWindow::showBalloonAt(LonLat point, double degreesPerPixel)
 {
-  const LayerStack stack = m_layers->layerStack();
+  // What is drawn (a file's entries one layer, Regions and times heeded).
+  const LayerStack stack = drawnStack();
   for (std::size_t i = stack.vectors.size(); i-- > 0;) {
     const LayerDefinition& definition = stack.vectors[i].definition;
     if (definition.source.value(QStringLiteral("kind")).toString() !=
@@ -2723,6 +2983,48 @@ MainWindow::localFeatureInfo(const LayerStack& stack, LonLat point,
   return local;
 }
 
+namespace
+{
+
+/** Returns the time extents of @p stack's KML layers. */
+QStringList kmlTimeExtents(const LayerStack& stack)
+{
+  QStringList extents;
+  // A file without times or tracks: none of its entries has any (asked
+  // once a file).
+  std::map<QString, std::shared_ptr<const KmlDocument>> timedFiles;
+  std::set<QString> untimedFiles;
+  for (const VectorStackEntry& entry : stack.vectors) {
+    const QJsonObject& source = entry.definition.source;
+    if (source.value(QStringLiteral("kind")).toString() !=
+        QLatin1String("kml")) {
+      continue;
+    }
+    const QString path = source.value(QStringLiteral("path")).toString();
+    if (untimedFiles.count(path) != 0) {
+      continue;
+    }
+    std::shared_ptr<const KmlDocument>& document = timedFiles[path];
+    if (!document) {
+      document = sharedKmlDocument(path, nullptr);
+      if (!document || kmlTimeExtent(*document, QString(), true).isEmpty()) {
+        timedFiles.erase(path);
+        untimedFiles.insert(path);
+        continue;
+      }
+    }
+    const QString extent = kmlTimeExtent(
+        *document, source.value(QStringLiteral("container")).toString(),
+        source.value(QStringLiteral("deep")).toBool());
+    if (!extent.isEmpty()) {
+      extents.append(extent);
+    }
+  }
+  return extents;
+}
+
+} // namespace
+
 void MainWindow::updateTimeBar(const LayerStack& stack)
 {
   // The times of the visible layers that follow the clock, joined; those
@@ -2741,24 +3043,7 @@ void MainWindow::updateTimeBar(const LayerStack& stack)
       extents.append(time->extent);
     }
   }
-  for (const VectorStackEntry& entry : stack.vectors) {
-    const QJsonObject& source = entry.definition.source;
-    if (source.value(QStringLiteral("kind")).toString() !=
-        QLatin1String("kml")) {
-      continue;
-    }
-    const std::shared_ptr<const KmlDocument> document = sharedKmlDocument(
-        source.value(QStringLiteral("path")).toString(), nullptr);
-    const QString extent =
-        document ? kmlTimeExtent(
-                       *document,
-                       source.value(QStringLiteral("container")).toString(),
-                       source.value(QStringLiteral("deep")).toBool())
-                 : QString();
-    if (!extent.isEmpty()) {
-      extents.append(extent);
-    }
-  }
+  extents.append(kmlTimeExtents(stack));
   if (m_aircraft != nullptr) {
     const QString recordings = m_aircraft->timeExtent();
     if (!recordings.isEmpty()) {
@@ -3100,6 +3385,7 @@ bool MainWindow::openProject(const QString& path, QString* errorString)
   // The KML of the project before is gone with its entries.
   m_kmlEdits.clear();
   m_kmlRoots.clear();
+  m_kmlOpened.clear();
   m_kmlNodes.clear();
   m_kmlRadio.clear();
   m_kmlSelection.reset();

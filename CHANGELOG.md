@@ -7,6 +7,16 @@ All notable changes to Terra Soar. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Opening a very large KML or KMZ file (tens of thousands of placemarks
+  in many folders) no longer locks up the program: a file of 90,000
+  placemarks opens in seconds. Switching such a file on no longer makes
+  the program quit, and it then draws smoothly: the entries of a file
+  are drawn together, and all vector layers share one set of worker
+  threads. A switched-off file is no longer read again from disk
+  whenever the view moves.
+
 ## [0.0.5] – 2026-11-28
 
 ### Added

@@ -29,7 +29,13 @@ loadFeatures(stored key) ───────► VectorMesher::build ───�
    4 or 6). Drawn tiles that share a stored tile share one load and one
    mesh.
 3. **Meshing on workers** (`VectorMesher`, one per worker thread, each with
-   its own GEOS context). See the next section.
+   its own GEOS context). See the next section. All sources share one
+   `VectorWorkerPool` (one thread fewer than the processor has, 2 to 8):
+   each source's loader keeps its own queue, most urgent first, and the
+   sources with work take turns, a tile each, so a thousand sources cost
+   a thousand queues, not two thousand threads. A loader going away
+   cancels its tiles and waits for those in progress (and their
+   callbacks); a loader made without a pool starts its own.
 4. **Upload.** Up to 8 meshes per frame, all sources together. A
    least-recently-used eviction keeps meshes under 64 MB of GPU memory.
 
@@ -210,6 +216,6 @@ views; `tests/globe` logs them):
 
 Meshing a busy high-resolution tile (a 20 000-vertex coastline with a
 lake, about 20 600 triangles) takes about 100 ms on one worker
-(`tests/vector`'s benchmark); the two workers do it while the coarser
+(`tests/vector`'s benchmark); the workers do it while the coarser
 level stays on screen. Fills are meshed even for outline-only layers, so
 a Land layer on the same source shares the mesh.

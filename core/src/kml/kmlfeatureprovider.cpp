@@ -26,6 +26,7 @@
 #include <mutex>
 #include <utility>
 
+#include <QJsonArray>
 #include <QStringList>
 
 #include "ts/kml/kmlactivity.h"
@@ -267,7 +268,7 @@ std::shared_ptr<const KmlDocument> sharedKmlDocument(const QString& path,
   }
   read->webBase = webBase;
   std::shared_ptr<const KmlDocument> document =
-      std::make_shared<const KmlDocument>(std::move(*read));
+      makeSharedKmlDocument(std::move(*read));
   const std::lock_guard<std::mutex> lock(documentsMutex());
   std::weak_ptr<const KmlDocument>& slot = documents()[path];
   // Read twice at once: one copy for all.
@@ -473,6 +474,53 @@ std::vector<Feature> kmlPlacemarkFeatures(const KmlFeature& placemark,
   return placemarkFeatures(placemark, style, nullptr);
 }
 
+QJsonObject kmlPartsLayerSource(const QString& path,
+                                const std::vector<KmlLayerPart>& parts)
+{
+  if (parts.size() == 1) {
+    return kmlLayerSource(path, parts.front().container, parts.front().deep);
+  }
+  QJsonArray containers;
+  QJsonArray deep;
+  for (const KmlLayerPart& part : parts) {
+    (part.deep ? deep : containers).append(part.container);
+  }
+  QJsonObject source;
+  source.insert(QStringLiteral("kind"), QStringLiteral("kml"));
+  source.insert(QStringLiteral("path"), path);
+  source.insert(QStringLiteral("containers"), containers);
+  if (!deep.isEmpty()) {
+    source.insert(QStringLiteral("deepContainers"), deep);
+  }
+  return source;
+}
+
+std::vector<KmlLayerPart> kmlLayerParts(const QJsonObject& source)
+{
+  std::vector<KmlLayerPart> parts;
+  if (!source.contains(QStringLiteral("containers")) &&
+      !source.contains(QStringLiteral("deepContainers"))) {
+    parts.push_back(
+        KmlLayerPart{source.value(QStringLiteral("container")).toString(),
+                     source.value(QStringLiteral("deep")).toBool()});
+    return parts;
+  }
+  const QJsonArray containers =
+      source.value(QStringLiteral("containers")).toArray();
+  const QJsonArray deep =
+      source.value(QStringLiteral("deepContainers")).toArray();
+  parts.reserve(static_cast<std::size_t>(containers.size() + deep.size()));
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < containers.size(); ++i) {
+    parts.push_back(KmlLayerPart{containers.at(i).toString(), false});
+  }
+  // NOLINTNEXTLINE(modernize-loop-convert)
+  for (int32_t i = 0; i < deep.size(); ++i) {
+    parts.push_back(KmlLayerPart{deep.at(i).toString(), true});
+  }
+  return parts;
+}
+
 namespace
 {
 
@@ -492,18 +540,39 @@ void collectTracks(const KmlGeometry& geometry,
 KmlFeatureProvider::KmlFeatureProvider(
     std::shared_ptr<const KmlDocument> document, const QString& containerPath,
     std::optional<QDateTime> at, bool deep)
-    : m_document(std::move(document)), m_containerPath(containerPath),
-      m_at(std::move(at)), m_deep(deep)
+    : KmlFeatureProvider(std::move(document),
+                         {KmlLayerPart{containerPath, deep}}, std::move(at))
 {
-  const KmlFeature* container =
-      m_document ? kmlContainer(*m_document, containerPath) : nullptr;
+}
+
+KmlFeatureProvider::KmlFeatureProvider(
+    std::shared_ptr<const KmlDocument> document,
+    std::vector<KmlLayerPart> parts, std::optional<QDateTime> at)
+    : m_document(std::move(document)), m_parts(std::move(parts)),
+      m_at(std::move(at))
+{
+  if (!m_document) {
+    return;
+  }
+  // One resolver for all the parts: each style is found once.
+  KmlStyleResolver resolver(*m_document);
+  for (const KmlLayerPart& part : m_parts) {
+    addPart(part, resolver);
+  }
+}
+
+void KmlFeatureProvider::addPart(const KmlLayerPart& part,
+                                 KmlStyleResolver& resolver)
+{
+  const KmlFeature* container = kmlContainer(*m_document, part.container);
   if (container == nullptr) {
     return;
   }
-  m_name = container->name;
-  KmlStyleResolver resolver(*m_document);
+  if (m_name.isEmpty()) {
+    m_name = container->name;
+  }
   const std::optional<KmlTime> time =
-      kmlEffectiveTime(*m_document, containerPath);
+      kmlEffectiveTime(*m_document, part.container);
   if (!shownAt(time)) {
     return;
   }
@@ -514,7 +583,7 @@ KmlFeatureProvider::KmlFeatureProvider(
   } else if (container->kind == KmlFeature::Kind::ScreenOverlay) {
     m_screens.push_back(container);
   }
-  addChildren(*container, time, resolver);
+  addChildren(*container, time, part.deep, resolver);
 }
 
 bool KmlFeatureProvider::shownAt(const std::optional<KmlTime>& time) const
@@ -524,7 +593,7 @@ bool KmlFeatureProvider::shownAt(const std::optional<KmlTime>& time) const
 
 void KmlFeatureProvider::addChildren(const KmlFeature& parent,
                                      const std::optional<KmlTime>& time,
-                                     KmlStyleResolver& resolver)
+                                     bool deep, KmlStyleResolver& resolver)
 {
   for (const KmlFeature& child : parent.children) {
     const std::optional<KmlTime> own = kmlNarrowTime(time, child.time);
@@ -533,11 +602,11 @@ void KmlFeatureProvider::addChildren(const KmlFeature& parent,
     }
     if (child.kind == KmlFeature::Kind::Placemark) {
       addPlacemark(child, resolver);
-    } else if (m_deep && child.kind == KmlFeature::Kind::ScreenOverlay) {
+    } else if (deep && child.kind == KmlFeature::Kind::ScreenOverlay) {
       m_screens.push_back(&child);
-    } else if (m_deep && (child.kind == KmlFeature::Kind::Document ||
-                          child.kind == KmlFeature::Kind::Folder)) {
-      addChildren(child, own, resolver);
+    } else if (deep && (child.kind == KmlFeature::Kind::Document ||
+                        child.kind == KmlFeature::Kind::Folder)) {
+      addChildren(child, own, deep, resolver);
     }
   }
 }
@@ -603,10 +672,15 @@ KmlFeatureProvider::trackMarkersAt(const QDateTime& clock) const
 
 QString KmlFeatureProvider::id() const
 {
-  return QStringLiteral("kml:%1|%2|%3|%4")
-      .arg(m_document ? m_document->path : QString(), m_containerPath,
+  QStringList parts;
+  for (const KmlLayerPart& part : m_parts) {
+    parts << (part.deep ? part.container + QStringLiteral("|deep")
+                        : part.container);
+  }
+  return QStringLiteral("kml:%1|%2|%3")
+      .arg(m_document ? m_document->path : QString(),
            m_at ? m_at->toString(Qt::ISODate) : QString(),
-           m_deep ? QStringLiteral("deep") : QString());
+           parts.join(QLatin1Char(',')));
 }
 
 QString KmlFeatureProvider::name() const

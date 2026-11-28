@@ -119,6 +119,7 @@
 #include "ts/globe/layerstackdraws.h"
 #include "ts/i18n/pseudotranslator.h"
 #include "ts/kml/kmledit.h"
+#include "ts/kml/kmlfeatureprovider.h"
 #include "ts/kml/kmlreader.h"
 #include "ts/kml/kmlwriter.h"
 #include "ts/layers/layertreemodel.h"
@@ -3078,6 +3079,129 @@ private slots:
       dialog.grab().save(
           QDir(shots).filePath(QStringLiteral("add-wfs-dialog.png")));
     }
+  }
+
+  void openKmlManyFolders()
+  {
+    if (!ts::GlobeView::isOpenGlAvailable()) {
+      QSKIP("No OpenGL view on this platform.");
+    }
+    // 10,000 placemarks in 400 folders, styled through a StyleMap, the
+    // document switched off: listed one by one, quickly; while the file's
+    // entry is there its document is kept (never read again because
+    // nothing of it is drawn). Switched on, the entries are drawn as one
+    // layer, each folder whose placemarks are all on one part of it.
+    constexpr int32_t folders = 400;
+    constexpr int32_t each = 25;
+    QByteArray xml = QByteArrayLiteral(
+        "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+        "<name>Many</name><visibility>0</visibility>"
+        "<Style id=\"sn\"><IconStyle><scale>1.2</scale></IconStyle></Style>"
+        "<StyleMap id=\"m\"><Pair><key>normal</key><styleUrl>#sn</styleUrl>"
+        "</Pair></StyleMap>");
+    for (int32_t f = 0; f < folders; ++f) {
+      xml += "<Folder><name>F" + QByteArray::number(f) + "</name>";
+      for (int32_t p = 0; p < each; ++p) {
+        xml += "<Placemark><name>P" + QByteArray::number(f) + '-' +
+               QByteArray::number(p) +
+               "</name><styleUrl>#m</styleUrl><Point><coordinates>" +
+               QByteArray::number(-10.0 + 0.05 * p) + ',' +
+               QByteArray::number(40.0 + 0.05 * f) +
+               "</coordinates></Point></Placemark>";
+      }
+      xml += "</Folder>";
+    }
+    xml += "</Document></kml>";
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    const QString path = directory.filePath(QStringLiteral("many.kml"));
+    {
+      QFile file(path);
+      QVERIFY(file.open(QIODevice::WriteOnly));
+      QCOMPARE(file.write(xml), static_cast<qint64>(xml.size()));
+    }
+    ts::MainWindow window;
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    ts::GlobeView* view = window.globeView();
+    if (view == nullptr) {
+      QFAIL("no view");
+    }
+    QElapsedTimer timer;
+    timer.start();
+    QString error;
+    QVERIFY2(window.openFile(path, &error), qPrintable(error));
+    const int64_t openMs = timer.restart();
+    ts::LayerTreeModel* model = window.layerModel();
+    const QModelIndex document = model->index(0, 0);
+    QCOMPARE(model->data(document).toString(), QStringLiteral("Many"));
+    QCOMPARE(model->rowCount(document), folders);
+    QCOMPARE(model->rowCount(model->index(folders - 1, 0, document)), each);
+    // Kept, though nothing draws it: there without its file.
+    QVERIFY(QFile::remove(path));
+    window.updateKmlRegions();
+    QVERIFY(ts::sharedKmlDocument(path, nullptr) != nullptr);
+    const std::function<std::vector<QJsonObject>()> kmlSources = [&window]() {
+      std::vector<QJsonObject> sources;
+      const QJsonArray& drawn = window.drawnVectorSources();
+      // NOLINTNEXTLINE(modernize-loop-convert)
+      for (int32_t i = 0; i < drawn.size(); ++i) {
+        const QJsonObject source = drawn.at(i).toObject();
+        if (source.value(QStringLiteral("kind")).toString() ==
+            QLatin1String("kml")) {
+          sources.push_back(source);
+        }
+      }
+      return sources;
+    };
+    QVERIFY(kmlSources().empty());
+    // On: one layer, a part per folder; every icon.
+    timer.restart();
+    model->setData(document, Qt::Checked, Qt::CheckStateRole);
+    const int64_t onMs = timer.restart();
+    std::vector<QJsonObject> drawn = kmlSources();
+    QCOMPARE(drawn.size(), std::size_t{1});
+    QCOMPARE(drawn.front().value(QStringLiteral("containers")).toArray().size(),
+             folders);
+    QCOMPARE(view->billboards().size(),
+             static_cast<std::size_t>(folders * each));
+    // One placemark off: its folder's others are drawn one by one.
+    const QModelIndex folder = model->index(7, 0, document);
+    model->setData(model->index(3, 0, folder), Qt::Unchecked,
+                   Qt::CheckStateRole);
+    const int64_t offMs = timer.elapsed();
+    drawn = kmlSources();
+    QCOMPARE(drawn.size(), std::size_t{1});
+    QCOMPARE(drawn.front().value(QStringLiteral("containers")).toArray().size(),
+             folders - 1 + each - 1);
+    QCOMPARE(view->billboards().size(),
+             static_cast<std::size_t>(folders * each - 1));
+    qInfo("%s", qPrintable(QStringLiteral("10,000 placemarks in 400 folders: "
+                                          "opened in %1 ms, on in %2 ms, one "
+                                          "off in %3 ms")
+                               .arg(openMs)
+                               .arg(onMs)
+                               .arg(offMs)));
+    QVERIFY2(openMs < 10000, qPrintable(QString::number(openMs)));
+    QVERIFY2(onMs < 10000, qPrintable(QString::number(onMs)));
+    QVERIFY2(offMs < 10000, qPrintable(QString::number(offMs)));
+    // A click on a placemark drawn as part of the one layer: its balloon.
+    QCOMPARE(
+        window.identifyAt(ts::LonLat{-10.0 + 0.05 * 2, 40.0 + 0.05 * 7}, 0.001),
+        1);
+    ts::BalloonWindow* balloon = window.balloonWindow();
+    if (balloon == nullptr) {
+      QFAIL("no balloon");
+    }
+    QVERIFY2(balloon->text().contains(QStringLiteral("P7-2")),
+             qPrintable(balloon->text()));
+    // The off one has none.
+    balloon->hide();
+    window.identifyAt(ts::LonLat{-10.0 + 0.05 * 3, 40.0 + 0.05 * 7}, 0.001);
+    QVERIFY(!balloon->isVisible() ||
+            !balloon->text().contains(QStringLiteral("P7-3")));
+    model->removeNode(document);
+    QTRY_VERIFY(ts::sharedKmlDocument(path, nullptr) == nullptr);
   }
 
   void openKml()

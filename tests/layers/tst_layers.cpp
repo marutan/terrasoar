@@ -320,6 +320,37 @@ private slots:
     QVERIFY(spy.count() >= 6);
   }
 
+  void stackChangesBatched()
+  {
+    // Within a batch (nested too) the stack changes once, at its end;
+    // a batch that changed nothing says nothing.
+    ts::LayerTreeModel model;
+    QSignalSpy spy(&model, &ts::LayerTreeModel::layerStackChanged);
+    {
+      const ts::LayerTreeModel::StackChangeBatch outer(model);
+      const QModelIndex collection = model.addCollection(QStringLiteral("c"));
+      {
+        const ts::LayerTreeModel::StackChangeBatch inner(model);
+        for (int32_t i = 0; i < 10; ++i) {
+          model.addLayer(imagery(QString::number(i), QStringLiteral("#ff0000")),
+                         collection, i);
+        }
+        model.setData(model.index(3, 0, collection), Qt::Unchecked,
+                      Qt::CheckStateRole);
+      }
+      QCOMPARE(spy.count(), 0);
+      QCOMPARE(model.rowCount(collection), 10);
+    }
+    QCOMPARE(spy.count(), 1);
+    QCOMPARE(model.layerStack().imagery.size(), std::size_t{9});
+    {
+      const ts::LayerTreeModel::StackChangeBatch quiet(model);
+    }
+    QCOMPARE(spy.count(), 1);
+    model.removeNode(model.index(0, 0));
+    QCOMPARE(spy.count(), 2);
+  }
+
   // --- JSON and projects
   // --------------------------------------------------------
 

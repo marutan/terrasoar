@@ -441,9 +441,8 @@ std::shared_ptr<FeatureProvider> createKmlFeatures(const QJsonObject& source,
     at = QDateTime::fromString(source.value(QStringLiteral("at")).toString(),
                                Qt::ISODate);
   }
-  return std::make_shared<KmlFeatureProvider>(
-      std::move(document), source.value(QStringLiteral("container")).toString(),
-      at, source.value(QStringLiteral("deep")).toBool());
+  return std::make_shared<KmlFeatureProvider>(std::move(document),
+                                              kmlLayerParts(source), at);
 }
 
 } // namespace

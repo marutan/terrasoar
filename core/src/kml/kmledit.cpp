@@ -529,7 +529,7 @@ bool KmlEditDocument::redo()
 
 void KmlEditDocument::publish()
 {
-  m_shared = std::make_shared<const KmlDocument>(m_document);
+  m_shared = makeSharedKmlDocument(m_document);
   registerKmlDocument(m_key, m_shared);
 }
 

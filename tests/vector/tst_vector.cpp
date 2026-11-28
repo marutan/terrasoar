@@ -446,6 +446,51 @@ private slots:
     QVERIFY(taken > 0);
     QVERIFY(provider->loads.load() >= taken);
   }
+
+  void sharedPool()
+  {
+    // A thousand loaders on one pool of two threads: each gets its tiles,
+    // taking turns; loaders going away while their tiles load, and with
+    // their turn still to come, are waited for, not left to the workers
+    // (run under ThreadSanitizer in CI).
+    const std::shared_ptr<FixtureProvider> provider =
+        std::make_shared<FixtureProvider>();
+    const std::shared_ptr<ts::VectorWorkerPool> pool =
+        std::make_shared<ts::VectorWorkerPool>(2);
+    QCOMPARE(pool->threadCount(), 2);
+    constexpr int32_t count = 1000;
+    std::atomic<int32_t> ready{0};
+    std::vector<std::unique_ptr<ts::VectorTileLoader>> loaders;
+    loaders.reserve(count);
+    for (int32_t i = 0; i < count; ++i) {
+      loaders.push_back(std::make_unique<ts::VectorTileLoader>(
+          provider, ts::VectorTileLoaderSettings{}, nullptr, pool));
+      loaders.back()->setTilesReadyCallback([&ready]() { ready.fetch_add(1); });
+      loaders.back()->setRequests(
+          {ts::TileKey{1, i % 4, 0}, ts::TileKey{1, i % 4, 1}});
+    }
+    // Every other one goes at once.
+    for (int32_t i = 0; i < count; i += 2) {
+      loaders[static_cast<std::size_t>(i)].reset();
+    }
+    std::vector<int32_t> taken(count, 0);
+    QVERIFY(QTest::qWaitFor(
+        [&]() {
+          bool all = true;
+          for (int32_t i = 1; i < count; i += 2) {
+            ts::VectorTileLoader& loader =
+                *loaders[static_cast<std::size_t>(i)];
+            taken[static_cast<std::size_t>(i)] +=
+                static_cast<int32_t>(loader.takeLoaded(8).size());
+            all = all && taken[static_cast<std::size_t>(i)] == 2 &&
+                  loader.outstanding() == 0;
+          }
+          return all;
+        },
+        30000));
+    QVERIFY(ready.load() >= count);
+    loaders.clear();
+  }
 };
 
 QTEST_GUILESS_MAIN(TestVector)

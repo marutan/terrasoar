@@ -81,6 +81,36 @@ const KmlFeature* kmlContainer(const KmlDocument& document,
 QJsonObject kmlLayerSource(const QString& path, const QString& containerPath,
                            bool deep = false);
 
+/** One part of what a KML layer shows (a container's placemarks). */
+struct KmlLayerPart {
+  /** The container's path (or a placemark's or screen overlay's own). */
+  QString container;
+  /** Everything inside, not only what is directly in it. */
+  bool deep = false;
+
+  /** Returns true if both are the same part. */
+  bool operator==(const KmlLayerPart& other) const
+  {
+    return container == other.container && deep == other.deep;
+  }
+};
+
+/**
+ * Returns the source object of a layer showing @p parts of the KML file
+ * at @p path together (one layer for many entries):
+ * `{"kind": "kml", "path": …, "containers": […], "deepContainers": […]}`,
+ * each list in @p parts' order (drawn: the containers', then the deep
+ * ones'). With one part it is kmlLayerSource()'s.
+ */
+QJsonObject kmlPartsLayerSource(const QString& path,
+                                const std::vector<KmlLayerPart>& parts);
+
+/**
+ * Returns the parts a KML layer @p source shows: its container (and
+ * deep), or its containers and deep containers.
+ */
+std::vector<KmlLayerPart> kmlLayerParts(const QJsonObject& source);
+
 /**
  * Returns @p placemark's geometry as vector features (a MultiGeometry
  * gives one per member) with its name, description and extended data as
@@ -208,9 +238,17 @@ public:
                      std::optional<QDateTime> at = std::nullopt,
                      bool deep = false);
 
-  /** Returns "kml:" and the path and container. */
+  /**
+   * Shows @p parts of @p document together, in order, as a provider for
+   * each would (one layer for many entries of a file).
+   */
+  KmlFeatureProvider(std::shared_ptr<const KmlDocument> document,
+                     std::vector<KmlLayerPart> parts,
+                     std::optional<QDateTime> at = std::nullopt);
+
+  /** Returns "kml:" and the path and containers. */
   QString id() const override;
-  /** Returns the container's name. */
+  /** Returns the (first) container's name. */
   QString name() const override;
   /** Returns TileKey's deepest level (the features are all in memory). */
   int32_t maximumLevel() const override;
@@ -272,8 +310,9 @@ public:
 
 private:
   bool shownAt(const std::optional<KmlTime>& time) const;
+  void addPart(const KmlLayerPart& part, KmlStyleResolver& resolver);
   void addChildren(const KmlFeature& parent, const std::optional<KmlTime>& time,
-                   KmlStyleResolver& resolver);
+                   bool deep, KmlStyleResolver& resolver);
   void addPlacemark(const KmlFeature& placemark, KmlStyleResolver& resolver);
 
   struct Entry {
@@ -285,14 +324,13 @@ private:
   };
 
   const std::shared_ptr<const KmlDocument> m_document;
-  const QString m_containerPath;
+  const std::vector<KmlLayerPart> m_parts;
   QString m_name;
   std::vector<Entry> m_entries;
   std::vector<KmlBillboard> m_billboards;
   std::vector<KmlRaisedShape> m_raised;
   std::vector<const KmlFeature*> m_screens;
   std::optional<QDateTime> m_at;
-  bool m_deep = false;
   /** Each track and its placemark's billboard. */
   std::vector<std::pair<const KmlGeometry*, KmlBillboard>> m_tracks;
 };

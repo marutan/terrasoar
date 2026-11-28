@@ -30,6 +30,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -464,6 +465,56 @@ struct KmlFeature {
 };
 
 /**
+ * The shared styles and style maps of a document by id, for documents
+ * that no longer change (makeSharedKmlDocument()). A copy or a moved-to
+ * index is empty: its pointers would be into the other document, which
+ * the copy's owner may change.
+ *
+ * @reentrant (read-only once built)
+ */
+class KmlStyleIndex
+{
+public:
+  KmlStyleIndex() = default;
+  /** An empty index. */
+  KmlStyleIndex(const KmlStyleIndex& /*other*/) {}
+  /** Leaves this index empty. */
+  KmlStyleIndex& operator=(const KmlStyleIndex& other)
+  {
+    if (this != &other) {
+      *this = KmlStyleIndex();
+    }
+    return *this;
+  }
+  /** An empty index. */
+  KmlStyleIndex(KmlStyleIndex&& /*other*/) noexcept {}
+  /** Leaves this index empty. */
+  KmlStyleIndex& operator=(KmlStyleIndex&& /*other*/) noexcept
+  {
+    m_built = false;
+    m_styles.clear();
+    m_styleMaps.clear();
+    return *this;
+  }
+  ~KmlStyleIndex() = default;
+
+  /** Indexes what @p root holds (the first of each id, depth first). */
+  void build(const KmlFeature& root);
+
+  /** Returns true once built. */
+  bool isBuilt() const { return m_built; }
+  /** Returns the style with @p id, or null. Only once built. */
+  const KmlStyle* style(const QString& id) const;
+  /** Returns the style map with @p id, or null. Only once built. */
+  const KmlStyleMap* styleMap(const QString& id) const;
+
+private:
+  bool m_built = false;
+  std::unordered_map<QString, const KmlStyle*> m_styles;
+  std::unordered_map<QString, const KmlStyleMap*> m_styleMaps;
+};
+
+/**
  * A KML document as read: its root feature (a Document, or a Folder or
  * Placemark at the top), where it came from, and what was skipped.
  *
@@ -501,11 +552,23 @@ struct KmlDocument {
   /** Where the text after the XML declaration starts in sourceText. */
   int64_t prologueBegin = 0;
 
+  /**
+   * Shared styles by id, for findStyle() and findStyleMap(): built by
+   * makeSharedKmlDocument(), empty in a copy (searched instead).
+   */
+  KmlStyleIndex styleIndex;
+
   /** Returns the shared style with @p id, or null. */
   const KmlStyle* findStyle(const QString& id) const;
   /** Returns the shared style map with @p id, or null. */
   const KmlStyleMap* findStyleMap(const QString& id) const;
 };
+
+/**
+ * Returns @p document as one that no longer changes, its shared styles
+ * indexed by id: for drawing, where every placemark looks its style up.
+ */
+std::shared_ptr<const KmlDocument> makeSharedKmlDocument(KmlDocument document);
 
 /** Returns @p mode's name as written in KML. */
 QString kmlAltitudeModeName(KmlAltitudeMode mode);

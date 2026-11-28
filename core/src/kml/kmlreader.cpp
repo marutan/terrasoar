@@ -1203,8 +1203,7 @@ std::optional<KmlStyle> KmlStyleResolver::styleAt(const QString& url,
           where.startsWith(QLatin1String("/vsizip/"))
               ? parseKml(readVsi(where), QFileInfo(where).path(), &error)
               : readKmlFile(where, &error);
-      external =
-          std::make_shared<const KmlDocument>(read.value_or(KmlDocument{}));
+      external = makeSharedKmlDocument(read.value_or(KmlDocument{}));
     }
     document = external.get();
   }

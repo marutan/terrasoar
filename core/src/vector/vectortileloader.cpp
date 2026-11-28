@@ -79,29 +79,22 @@ void liftMesh(VectorTileMesh& mesh, ElevationProvider& elevation, int32_t level,
 
 } // namespace
 
-VectorTileLoader::VectorTileLoader(std::shared_ptr<FeatureProvider> provider,
-                                   const VectorTileLoaderSettings& settings,
-                                   std::shared_ptr<ElevationProvider> elevation)
-    : m_provider(std::move(provider)), m_settings(settings),
-      m_elevation(std::move(elevation))
+VectorWorkerPool::VectorWorkerPool(int32_t threads,
+                                   const VectorMeshSettings& mesh)
+    : m_mesh(mesh)
 {
-  const int32_t threads = std::clamp(m_settings.threads, 1, 16);
-  m_workers.reserve(static_cast<std::size_t>(threads));
-  for (int32_t i = 0; i < threads; ++i) {
-    m_workers.emplace_back(&VectorTileLoader::work, this);
+  const int32_t count = std::clamp(threads, 1, 16);
+  m_workers.reserve(static_cast<std::size_t>(count));
+  for (int32_t i = 0; i < count; ++i) {
+    m_workers.emplace_back(&VectorWorkerPool::work, this);
   }
 }
 
-VectorTileLoader::~VectorTileLoader()
+VectorWorkerPool::~VectorWorkerPool()
 {
   {
     const std::lock_guard<std::mutex> lock(m_mutex);
     m_stopping = true;
-    m_queue.clear();
-    for (const std::pair<const TileKey, std::shared_ptr<std::atomic<bool>>>&
-             job : m_inFlight) {
-      job.second->store(true);
-    }
   }
   m_wake.notify_all();
   for (std::thread& worker : m_workers) {
@@ -109,16 +102,105 @@ VectorTileLoader::~VectorTileLoader()
   }
 }
 
+void VectorWorkerPool::schedule(VectorTileLoader* loader)
+{
+  if (!loader->m_scheduled && !loader->m_queue.empty()) {
+    loader->m_scheduled = true;
+    m_ready.push_back(loader);
+  }
+}
+
+void VectorWorkerPool::work()
+{
+  VectorMesher mesher(m_mesh);
+  for (;;) {
+    VectorTileLoader* loader = nullptr;
+    TileKey key;
+    std::shared_ptr<std::atomic<bool>> cancelled;
+    {
+      std::unique_lock<std::mutex> lock(m_mutex);
+      m_wake.wait(lock, [this]() { return m_stopping || !m_ready.empty(); });
+      if (m_stopping) {
+        return;
+      }
+      // One tile from the loader whose turn it is; it goes to the back of
+      // the turn if it has more.
+      loader = m_ready.front();
+      m_ready.pop_front();
+      key = loader->m_queue.front();
+      loader->m_queue.pop_front();
+      loader->m_scheduled = false;
+      schedule(loader);
+      cancelled = std::make_shared<std::atomic<bool>>(false);
+      loader->m_inFlight.emplace(key, cancelled);
+      ++loader->m_busy;
+    }
+
+    std::optional<VectorTileMesh> mesh = loader->load(key, *cancelled, mesher);
+
+    std::function<void()> callback;
+    {
+      const std::lock_guard<std::mutex> lock(m_mutex);
+      loader->m_inFlight.erase(key);
+      if (mesh && !cancelled->load() && !loader->m_stopping) {
+        loader->m_doneKeys.insert(key);
+        loader->m_done.push_back(std::move(*mesh));
+        callback = loader->m_callback;
+        ++loader->m_loadedCount;
+      }
+    }
+    if (callback) {
+      callback();
+    }
+    {
+      // The loader may go once this was its last job.
+      const std::lock_guard<std::mutex> lock(m_mutex);
+      if (--loader->m_busy == 0 && loader->m_stopping) {
+        m_idle.notify_all();
+      }
+    }
+  }
+}
+
+VectorTileLoader::VectorTileLoader(std::shared_ptr<FeatureProvider> provider,
+                                   const VectorTileLoaderSettings& settings,
+                                   std::shared_ptr<ElevationProvider> elevation,
+                                   std::shared_ptr<VectorWorkerPool> pool)
+    : m_provider(std::move(provider)), m_settings(settings),
+      m_elevation(std::move(elevation)),
+      m_pool(pool ? std::move(pool)
+                  : std::make_shared<VectorWorkerPool>(settings.threads,
+                                                       settings.mesh))
+{
+}
+
+VectorTileLoader::~VectorTileLoader()
+{
+  std::unique_lock<std::mutex> lock(m_pool->m_mutex);
+  m_stopping = true;
+  m_queue.clear();
+  for (const std::pair<const TileKey, std::shared_ptr<std::atomic<bool>>>& job :
+       m_inFlight) {
+    job.second->store(true);
+  }
+  if (m_scheduled) {
+    std::deque<VectorTileLoader*>& ready = m_pool->m_ready;
+    ready.erase(std::remove(ready.begin(), ready.end(), this), ready.end());
+    m_scheduled = false;
+  }
+  m_pool->m_idle.wait(lock, [this]() { return m_busy == 0; });
+}
+
 void VectorTileLoader::setTilesReadyCallback(std::function<void()> callback)
 {
-  const std::lock_guard<std::mutex> lock(m_mutex);
+  const std::lock_guard<std::mutex> lock(m_pool->m_mutex);
   m_callback = std::move(callback);
 }
 
 void VectorTileLoader::setRequests(const std::vector<TileKey>& keys)
 {
   {
-    const std::lock_guard<std::mutex> lock(m_mutex);
+    const std::lock_guard<std::mutex> lock(m_pool->m_mutex);
     std::unordered_set<TileKey, TileKeyHash> wanted;
     m_queue.clear();
     for (const TileKey& key : keys) {
@@ -133,14 +215,23 @@ void VectorTileLoader::setRequests(const std::vector<TileKey>& keys)
         job.second->store(true);
       }
     }
+    if (m_queue.empty()) {
+      if (m_scheduled) {
+        std::deque<VectorTileLoader*>& ready = m_pool->m_ready;
+        ready.erase(std::remove(ready.begin(), ready.end(), this), ready.end());
+        m_scheduled = false;
+      }
+      return;
+    }
+    m_pool->schedule(this);
   }
-  m_wake.notify_all();
+  m_pool->m_wake.notify_all();
 }
 
 std::vector<VectorTileMesh> VectorTileLoader::takeLoaded(int32_t maximum)
 {
   std::vector<VectorTileMesh> meshes;
-  const std::lock_guard<std::mutex> lock(m_mutex);
+  const std::lock_guard<std::mutex> lock(m_pool->m_mutex);
   while (!m_done.empty() && static_cast<int32_t>(meshes.size()) < maximum) {
     m_doneKeys.erase(m_done.front().key);
     meshes.push_back(std::move(m_done.front()));
@@ -151,70 +242,40 @@ std::vector<VectorTileMesh> VectorTileLoader::takeLoaded(int32_t maximum)
 
 int32_t VectorTileLoader::outstanding() const
 {
-  const std::lock_guard<std::mutex> lock(m_mutex);
+  const std::lock_guard<std::mutex> lock(m_pool->m_mutex);
   return static_cast<int32_t>(m_queue.size() + m_inFlight.size() +
                               m_done.size());
 }
 
-void VectorTileLoader::work()
+std::optional<VectorTileMesh>
+VectorTileLoader::load(TileKey key, const std::atomic<bool>& cancelled,
+                       VectorMesher& mesher) const
 {
-  VectorMesher mesher(m_settings.mesh);
-  for (;;) {
-    TileKey key;
-    std::shared_ptr<std::atomic<bool>> cancelled;
-    {
-      std::unique_lock<std::mutex> lock(m_mutex);
-      m_wake.wait(lock, [this]() { return m_stopping || !m_queue.empty(); });
-      if (m_stopping) {
-        return;
-      }
-      key = m_queue.front();
-      m_queue.pop_front();
-      cancelled = std::make_shared<std::atomic<bool>>(false);
-      m_inFlight.emplace(key, cancelled);
-    }
-
-    std::optional<VectorTileMesh> mesh;
-    const std::optional<FeatureTile> features =
-        m_provider->loadFeatures(key, *cancelled);
-    if (features) {
-      mesh = mesher.build(*features, *cancelled);
-    } else if (!cancelled->load()) {
-      // No data here: an empty mesh, so the tile counts as loaded.
-      VectorTileMesh empty;
-      empty.key = key;
-      empty.centreEcef = key.centreEcef();
-      empty.centreLonDeg = key.bounds().centreLonDeg();
-      empty.centreLatDeg = key.bounds().centreLatDeg();
-      mesh = std::move(empty);
-    }
-    if (mesh) {
-      // Keyed by the requested (stored) tile, whatever the source said.
-      mesh->key = key;
-      if (m_elevation) {
-        const int32_t level =
-            std::min(key.level + m_settings.terrainLevelsBelow,
-                     std::max(m_elevation->maximumLevel(), key.level));
-        liftMesh(*mesh, *m_elevation, level, *cancelled);
-      }
-    }
-
-    std::function<void()> callback;
-    {
-      const std::lock_guard<std::mutex> lock(m_mutex);
-      m_inFlight.erase(key);
-      if (!mesh || cancelled->load() || m_stopping) {
-        continue;
-      }
-      m_doneKeys.insert(key);
-      m_done.push_back(std::move(*mesh));
-      callback = m_callback;
-    }
-    ++m_loadedCount;
-    if (callback) {
-      callback();
+  std::optional<VectorTileMesh> mesh;
+  const std::optional<FeatureTile> features =
+      m_provider->loadFeatures(key, cancelled);
+  if (features) {
+    mesh = mesher.build(*features, cancelled);
+  } else if (!cancelled.load()) {
+    // No data here: an empty mesh, so the tile counts as loaded.
+    VectorTileMesh empty;
+    empty.key = key;
+    empty.centreEcef = key.centreEcef();
+    empty.centreLonDeg = key.bounds().centreLonDeg();
+    empty.centreLatDeg = key.bounds().centreLatDeg();
+    mesh = std::move(empty);
+  }
+  if (mesh) {
+    // Keyed by the requested (stored) tile, whatever the source said.
+    mesh->key = key;
+    if (m_elevation) {
+      const int32_t level =
+          std::min(key.level + m_settings.terrainLevelsBelow,
+                   std::max(m_elevation->maximumLevel(), key.level));
+      liftMesh(*mesh, *m_elevation, level, cancelled);
     }
   }
+  return mesh;
 }
 
 } // namespace ts

@@ -102,6 +102,11 @@ struct VectorRendererSettings {
   TileSelectionSettings selection = defaultVectorSelection();
   /** Loading and meshing. */
   VectorTileLoaderSettings loader;
+  /**
+   * Worker threads loading and meshing for all sources together; 0 for
+   * one fewer than the processor's, 2 to 8.
+   */
+  int32_t workerThreads = 0;
   /** Meshes uploaded per frame, all sources. */
   int32_t uploadsPerFrame = 8;
   /** GPU memory for meshes before the least recently used go. */
@@ -111,7 +116,8 @@ struct VectorRendererSettings {
 /**
  * Draws vector layers over the globe: each source's stored feature tiles
  * are selected for the camera like imagery tiles, loaded and meshed on
- * worker threads (VectorTileLoader), uploaded, and drawn as filled
+ * worker threads (VectorTileLoader, all on one VectorWorkerPool),
+ * uploaded, and drawn as filled
  * triangles and antialiased outline segments of a fixed width in pixels.
  *
  * Layers draw without the depth test, over everything drawn before them;
@@ -223,6 +229,8 @@ private:
   std::unique_ptr<GpuBuffer> m_uniforms;
   std::size_t m_uniformCapacity = 0;
   std::size_t m_uniformStride = 0;
+  /** The sources' workers (made with the first source; outlives them). */
+  std::shared_ptr<VectorWorkerPool> m_pool;
   std::vector<std::unique_ptr<Source>> m_sources;
   std::shared_ptr<ElevationProvider> m_elevation;
   double m_terrainMarginM = 0.0;
