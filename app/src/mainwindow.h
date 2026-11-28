@@ -390,6 +390,8 @@ public:
 
   /** Returns the globe view, or null without OpenGL (tests). */
   GlobeView* globeView() const { return m_globeView; }
+  /** Returns the sources of the vector layers drawn (for tests). */
+  const QJsonArray& drawnVectorSources() const { return m_drawnVectors; }
 
   /**
    * Returns true while the globe view is loading tiles (false without
@@ -727,12 +729,24 @@ private:
   void kmlCameraMoved();
   void kmlCheckChanged(const QModelIndex& topLeft);
   const std::vector<QDateTime>& kmlBoundaries(const QJsonObject& source) const;
+  /** Returns the times of all of the file a KML layer @p source is of. */
+  const std::vector<QDateTime>&
+  kmlFileBoundaries(const QJsonObject& source) const;
   std::vector<QAction*> flyThereActions(const QString& id, QObject* parent);
   std::optional<CameraPose> kmlNodePose(const QString& id) const;
   void addKmlOverlay(const KmlDocument& document, const KmlFeature& overlay,
                      const QString& featurePath, const QModelIndex& parent,
                      int32_t row);
   LayerStack timedStack() const;
+  /**
+   * Returns @p stack with each run of one KML file's layers (one after
+   * another, of one revision and opacity) as one layer, the screen
+   * overlays' aside: a file of 100,000 placemarks listed one by one is
+   * then drawn as one source, not 100,000.
+   */
+  LayerStack mergeKmlLayers(const LayerStack& stack) const;
+  /** Returns what is drawn now: timedStack() at the clock, merged. */
+  LayerStack drawnStack() const;
   void updateTimeBar(const LayerStack& stack);
   void applyImageryDraws(const LayerStack& stack, QStringList* errors);
   void updateLayerStatus();
@@ -808,6 +822,14 @@ private:
   std::map<QString, std::unique_ptr<KmlEditDocument>> m_kmlEdits;
   /** Each KML document's entry in the layer tree: node id → path. */
   std::map<QString, QString> m_kmlRoots;
+  /**
+   * The documents of opened files and loaded links, by the id of their
+   * entry: kept while it is, so that a file isn't read again whenever
+   * nothing of it is drawn (switched off).
+   */
+  std::map<QString, std::shared_ptr<const KmlDocument>> m_kmlOpened;
+  /** Forgets removed KML entries soon after rows go. */
+  QTimer* m_kmlForgetTimer = nullptr;
   /** The document edited last (its key). */
   QString m_kmlActive;
   /** The selected feature: document key and path. */

@@ -81,6 +81,16 @@ both halves, the short way. The features are in memory; a tile gets
 those whose extent meets it, stored at level 6 at most. All documents
 with one path share one copy (`sharedKmlDocument()`).
 
+A source can also name several parts of one file
+(`{"containers": […], "deepContainers": […]}`, `kmlPartsLayerSource()`):
+its provider shows what one provider per part would, with one style
+resolver. The main window draws a file's entries that way
+(below). A shared document (`makeSharedKmlDocument()`, which
+`sharedKmlDocument()` and an edited document's shared copy use) has its
+styles indexed by id (`KmlStyleIndex`), so a placemark's styleUrl is one
+lookup, not a search of the whole document; a copy, which may be changed,
+isn't indexed and is searched.
+
 ## Icons and labels
 
 Each point of a placemark (a MultiGeometry's too) is a
@@ -271,11 +281,31 @@ it is (`addKmlPlace()`: the layer's source has the placemark's path as
 its container, so its provider draws it alone), named after it or, with
 no name, its kind (`kmlEntryName()`: Placemark, Path, Polygon, Track).
 A container with more than 500 placemarks (`kmlListedPlacemarks`) has
-them in one vector layer, Places, where its first is: a layer each
-would cost its own draws on every tile in view. `visibility` 0 leaves an
+them in one vector layer, Places, where its first is, so the tree stays
+usable. `visibility` 0 leaves an
 entry switched off; in a radio folder, each placemark's entry is one of
 the choices. The document's
-own view, if any, is flown to. The file is read on a worker thread
+own view, if any, is flown to. The entries are added with the layer
+tree's stack changes held back (`LayerTreeModel::StackChangeBatch`), so
+what is drawn is worked out once for the file, not once an entry. The
+window keeps the documents of opened files and loaded links
+(`m_kmlOpened`) while their entries are there: `sharedKmlDocument()`
+holds only weak references, and a file switched off would otherwise be
+read again whenever something asked for it.
+
+**Drawing a file's entries.** Entries are what is listed and switched;
+they aren't each drawn. `mergeKmlLayers()` turns each run of one file's
+visible entries (one after another in the stack, of one revision and
+opacity) into one layer whose source names their parts, and a folder
+whose placemarks are all drawn becomes one part. Screen overlays keep
+their own layers. Regions and times are applied to the entries first;
+the merged layer takes the clock's time key from the whole file's
+times, which include each entry's. Drawing, icons and labels, balloons
+and picking all use this merged stack (`drawnStack()`). So a file of
+90,000 placemarks in 4,850 folders, all switched on, is one source to
+select tiles for, one provider and one loader, and opens in about 6 s;
+switching one entry rebuilds that provider (about 0.7 s at 90,000
+placemarks, 0.12 s at 10,000). The file is read on a worker thread
 (`readKmlInBackground()`): the window keeps drawing, with a busy dialog
 after half a second (100,000 placemarks take about 1.5 s to read and
 0.15 s to make into features). `sharedKmlDocument()` reads without
@@ -480,9 +510,14 @@ KMZ archives with their files, GDAL reading what is written with the same
 shapes, a folder extracted with its styles; editing: paths, inserting,
 taking and moving features, handles, moving, adding and deleting
 vertices, ground overlay corners, undo and redo with their limits.
+The shared style index (nested Documents, the first of an id, copies
+searched), and a provider of several parts showing what one each would.
 `tests/ui`: a
 KML opened into the layer tree (an entry per placemark, named after it
-or its kind, a folder of more than 500 as Places), a balloon on click, Fly There, icons and
+or its kind, a folder of more than 500 as Places), 10,000 placemarks in
+400 folders opened, switched on and one switched off within budgets, the
+document kept while switched off and gone with its entry, drawn as one
+layer of a part per folder, a balloon from it, a balloon on click, Fly There, icons and
 labels drawn (not from the far side of the Earth, not when their folder
 is off), a KMZ; raised shapes from `heights.kml` (walls, a polygon's top,
 a stalk) drawn and hidden from the far side; ground overlays as imagery

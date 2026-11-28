@@ -300,10 +300,33 @@ void LayerTreeModel::emitDataChangedBelow(const QModelIndex& index)
   }
 }
 
+LayerTreeModel::StackChangeBatch::StackChangeBatch(LayerTreeModel& model)
+    : m_model(model)
+{
+  ++m_model.m_batches;
+}
+
+LayerTreeModel::StackChangeBatch::~StackChangeBatch()
+{
+  if (--m_model.m_batches == 0 && m_model.m_stackChangeHeld) {
+    m_model.m_stackChangeHeld = false;
+    emit m_model.layerStackChanged();
+  }
+}
+
+void LayerTreeModel::stackChanged()
+{
+  if (m_batches > 0) {
+    m_stackChangeHeld = true;
+    return;
+  }
+  emit layerStackChanged();
+}
+
 void LayerTreeModel::emitSubtreeChanged(const QModelIndex& index)
 {
   emitDataChangedBelow(index);
-  emit layerStackChanged();
+  stackChanged();
 }
 
 Qt::ItemFlags LayerTreeModel::flags(const QModelIndex& index) const
@@ -388,7 +411,7 @@ QModelIndex LayerTreeModel::insertNode(std::unique_ptr<Node> node,
   parentNode->children.insert(parentNode->children.begin() + position,
                               std::move(node));
   endInsertRows();
-  emit layerStackChanged();
+  stackChanged();
   return indexOf(raw);
 }
 
@@ -423,7 +446,7 @@ bool LayerTreeModel::removeNode(const QModelIndex& index)
   beginRemoveRows(index.parent(), row, row);
   parentNode->children.erase(parentNode->children.begin() + row);
   endRemoveRows();
-  emit layerStackChanged();
+  stackChanged();
   return true;
 }
 
@@ -471,7 +494,7 @@ void LayerTreeModel::clear()
   beginResetModel();
   m_root->children.clear();
   endResetModel();
-  emit layerStackChanged();
+  stackChanged();
 }
 
 QModelIndex LayerTreeModel::indexOfId(const QString& id) const
@@ -712,7 +735,7 @@ bool LayerTreeModel::fromJson(const QJsonArray& json, QString* errorString)
   beginResetModel();
   m_root = std::move(root);
   endResetModel();
-  emit layerStackChanged();
+  stackChanged();
   return true;
 }
 

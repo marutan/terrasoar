@@ -441,6 +441,80 @@ private slots:
     QVERIFY(!resolver.resolve(missing).line);
   }
 
+  void sharedStyleIndex()
+  {
+    // A document made shared looks its styles up by id: the same ones a
+    // search finds (the first of an id, depth first, a Document's own
+    // before those inside), in nested Documents too.
+    const QByteArray xml = QByteArrayLiteral(
+        "<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>"
+        "<Style id=\"a\"><LineStyle><width>1</width></LineStyle></Style>"
+        "<Folder><Document>"
+        "<Style id=\"a\"><LineStyle><width>2</width></LineStyle></Style>"
+        "<Style id=\"b\"><LineStyle><width>3</width></LineStyle></Style>"
+        "<StyleMap id=\"m\"><Pair><key>normal</key><styleUrl>#b</styleUrl>"
+        "</Pair></StyleMap>"
+        "</Document></Folder><Document>"
+        "<Style id=\"b\"><LineStyle><width>4</width></LineStyle></Style>"
+        "</Document>"
+        "<Placemark><styleUrl>#m</styleUrl><Point><coordinates>0,0"
+        "</coordinates></Point></Placemark>"
+        "</Document></kml>");
+    QString error;
+    std::optional<ts::KmlDocument> parsed =
+        ts::parseKml(xml, QString(), &error);
+    if (!parsed) {
+      QFAIL(qPrintable(error));
+    }
+    QVERIFY(!parsed->styleIndex.isBuilt());
+    const ts::KmlDocument plain = *parsed;
+    const std::shared_ptr<const ts::KmlDocument> shared =
+        ts::makeSharedKmlDocument(std::move(*parsed));
+    QVERIFY(shared->styleIndex.isBuilt());
+    for (const ts::KmlDocument* document : {&plain, shared.get()}) {
+      const ts::KmlStyle* a = document->findStyle(QStringLiteral("a"));
+      const ts::KmlStyle* b = document->findStyle(QStringLiteral("b"));
+      if (a == nullptr || b == nullptr || !a->line || !b->line) {
+        QFAIL("styles not found");
+      }
+      QCOMPARE(a->line->width, 1.0);
+      QCOMPARE(b->line->width, 3.0);
+      QVERIFY(document->findStyleMap(QStringLiteral("m")) != nullptr);
+      QVERIFY(document->findStyle(QStringLiteral("m")) == nullptr);
+      QVERIFY(document->findStyleMap(QStringLiteral("a")) == nullptr);
+      ts::KmlStyleResolver resolver(*document);
+      const ts::KmlStyle style =
+          resolver.resolve(document->root.children.back());
+      if (!style.line) {
+        QFAIL("style map not resolved");
+      }
+      QCOMPARE(style.line->width, 3.0);
+    }
+    // A copy, which may be changed, isn't indexed: what is added is found.
+    ts::KmlDocument copy = *shared;
+    QVERIFY(!copy.styleIndex.isBuilt());
+    ts::KmlStyle added;
+    added.id = QStringLiteral("c");
+    copy.root.styles.push_back(added);
+    QVERIFY(copy.findStyle(QStringLiteral("c")) != nullptr);
+    QVERIFY(shared->findStyle(QStringLiteral("c")) == nullptr);
+    // What sharedKmlDocument() and an edited document give is indexed.
+    const std::shared_ptr<const ts::KmlDocument> read = ts::sharedKmlDocument(
+        fixture(QStringLiteral("everything.kml")), &error);
+    QVERIFY2(read && read->styleIndex.isBuilt(), qPrintable(error));
+    ts::KmlEditDocument edited(copy, QStringLiteral("kmledit:index"),
+                               QString());
+    QVERIFY(edited.shared()->styleIndex.isBuilt());
+    QVERIFY(!edited.document().styleIndex.isBuilt());
+    QVERIFY(edited.edit(QStringLiteral("Add"), [](ts::KmlDocument& document) {
+      ts::KmlStyle style;
+      style.id = QStringLiteral("d");
+      document.root.styles.push_back(style);
+      return true;
+    }));
+    QVERIFY(edited.shared()->findStyle(QStringLiteral("d")) != nullptr);
+  }
+
   void colours()
   {
     QCOMPARE(ts::kmlColor(QStringLiteral("7f00ff00")), QColor(0, 255, 0, 127));
@@ -670,6 +744,51 @@ private slots:
     }
     QCOMPARE(ts::kmlPlacemarkFeatures(*multi, ts::KmlStyle{}).size(),
              std::size_t{3});
+  }
+
+  void providerParts()
+  {
+    // A layer of many entries' parts shows what a layer each would: the
+    // placemarks named, a folder's, everything in a deep one; its source
+    // names them, and with one part is a single entry's.
+    const std::shared_ptr<const ts::KmlDocument> document =
+        ts::makeSharedKmlDocument(read(QStringLiteral("everything.kml")));
+    const std::vector<ts::KmlLayerPart> parts = {{QStringLiteral("0.0"), false},
+                                                 {QStringLiteral("0.1"), false},
+                                                 {QStringLiteral("1"), false},
+                                                 {QStringLiteral("1"), true}};
+    const QJsonObject source =
+        ts::kmlPartsLayerSource(QStringLiteral("/x.kml"), parts);
+    QCOMPARE(source.value(QStringLiteral("containers")).toArray().size(), 3);
+    QCOMPARE(source.value(QStringLiteral("deepContainers")).toArray().size(),
+             1);
+    QVERIFY(ts::kmlLayerParts(source) == parts);
+    QCOMPARE(ts::kmlPartsLayerSource(QStringLiteral("/x.kml"),
+                                     {{QStringLiteral("0.2"), true}}),
+             ts::kmlLayerSource(QStringLiteral("/x.kml"), QStringLiteral("0.2"),
+                                true));
+    QVERIFY(ts::kmlLayerParts(ts::kmlLayerSource(
+                QStringLiteral("/x.kml"), QStringLiteral("0.2"), true)) ==
+            std::vector<ts::KmlLayerPart>({{QStringLiteral("0.2"), true}}));
+    ts::KmlFeatureProvider together(document, parts);
+    std::size_t features = 0;
+    std::size_t billboards = 0;
+    std::size_t raised = 0;
+    for (const ts::KmlLayerPart& part : parts) {
+      const ts::KmlFeatureProvider alone(document, part.container, std::nullopt,
+                                         part.deep);
+      features += alone.featureCount();
+      billboards += alone.billboards().size();
+      raised += alone.raisedShapes().size();
+    }
+    QVERIFY(features > 0);
+    QCOMPARE(together.featureCount(), features);
+    QCOMPARE(together.billboards().size(), billboards);
+    QCOMPARE(together.raisedShapes().size(), raised);
+    // Its name is the first part's; its id names every part.
+    QCOMPARE(together.name(),
+             ts::KmlFeatureProvider(document, QStringLiteral("0.0")).name());
+    QVERIFY(together.id().contains(QStringLiteral("0.1,1,1|deep")));
   }
 
   void antimeridian()

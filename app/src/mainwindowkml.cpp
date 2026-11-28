@@ -1004,7 +1004,7 @@ bool MainWindow::kmlClicked(LonLat point, double degreesPerPixel)
     return false;
   }
   // A placemark of a document being edited: selected.
-  const LayerStack stack = m_layers->layerStack();
+  const LayerStack stack = drawnStack();
   for (std::size_t i = stack.vectors.size(); i-- > 0;) {
     const QJsonObject& source = stack.vectors[i].definition.source;
     const QString key = source.value(QStringLiteral("path")).toString();
@@ -1409,6 +1409,7 @@ void MainWindow::openKmlProjectEntries(const QJsonArray& entries)
       continue;
     }
     m_kmlRoots[id] = path;
+    m_kmlOpened[id] = document;
     m_kmlNodes[id] = {path, QString()};
     fillKmlEntry(node, *document);
   }

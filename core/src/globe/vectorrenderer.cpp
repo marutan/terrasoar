@@ -25,6 +25,8 @@
 #include <cstdint>
 #include <cstring>
 #include <functional>
+#include <thread>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -461,30 +463,43 @@ void VectorRenderer::setTerrainHeightMargin(double metres)
 
 void VectorRenderer::setLayers(const std::vector<VectorLayerDraw>& layers)
 {
+  // The sources kept, by provider: thousands of layers are found at once.
+  std::unordered_map<const FeatureProvider*, std::size_t> previous;
+  for (std::size_t i = 0; i < m_sources.size(); ++i) {
+    previous.emplace(m_sources[i]->provider.get(), i);
+  }
+  std::unordered_map<const FeatureProvider*, Source*> chosen;
   std::vector<std::unique_ptr<Source>> sources;
   std::vector<std::pair<Source*, VectorLayerDraw>> newLayers;
+  newLayers.reserve(layers.size());
   for (const VectorLayerDraw& draw : layers) {
     if (draw.kind != VectorLayerDraw::Kind::Features || !draw.provider) {
       newLayers.emplace_back(nullptr, draw);
       continue;
     }
-    Source* source = nullptr;
-    for (const std::unique_ptr<Source>& kept : sources) {
-      source = kept->provider == draw.provider ? kept.get() : source;
-    }
+    Source*& source = chosen[draw.provider.get()];
     if (!source) {
-      const std::vector<std::unique_ptr<Source>>::iterator existing =
-          std::find_if(m_sources.begin(), m_sources.end(),
-                       [&draw](const std::unique_ptr<Source>& s) {
-                         return s && s->provider == draw.provider;
-                       });
-      if (existing != m_sources.end()) {
-        sources.push_back(std::move(*existing));
+      const std::unordered_map<const FeatureProvider*, std::size_t>::iterator
+          existing = previous.find(draw.provider.get());
+      if (existing != previous.end()) {
+        sources.push_back(std::move(m_sources[existing->second]));
+        previous.erase(existing);
       } else {
+        if (!m_pool) {
+          const int32_t threads =
+              m_settings.workerThreads > 0
+                  ? m_settings.workerThreads
+                  : std::clamp(static_cast<int32_t>(
+                                   std::thread::hardware_concurrency()) -
+                                   1,
+                               2, 8);
+          m_pool = std::make_shared<VectorWorkerPool>(threads,
+                                                      m_settings.loader.mesh);
+        }
         std::unique_ptr<Source> created = std::make_unique<Source>();
         created->provider = draw.provider;
         created->loader = std::make_unique<VectorTileLoader>(
-            draw.provider, m_settings.loader, m_elevation);
+            draw.provider, m_settings.loader, m_elevation, m_pool);
         created->loader->setTilesReadyCallback(m_callback);
         TileSelectionSettings selection = m_settings.selection;
         selection.maximumLevel =

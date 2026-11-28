@@ -245,6 +245,27 @@ public:
   /** Returns the visible layers flattened for drawing. */
   LayerStack layerStack() const;
 
+  /**
+   * Holds layerStackChanged() back while it lives (nested: until the
+   * last ends), then emits it once if anything changed: for adding many
+   * entries at once.
+   */
+  class StackChangeBatch
+  {
+  public:
+    /** Starts holding @p model's signal back. */
+    explicit StackChangeBatch(LayerTreeModel& model);
+    StackChangeBatch(const StackChangeBatch&) = delete;
+    StackChangeBatch& operator=(const StackChangeBatch&) = delete;
+    StackChangeBatch(StackChangeBatch&&) = delete;
+    StackChangeBatch& operator=(StackChangeBatch&&) = delete;
+    /** Emits what was held back, if this is the last. */
+    ~StackChangeBatch();
+
+  private:
+    LayerTreeModel& m_model;
+  };
+
   /** Returns the tree as JSON (top to bottom). */
   QJsonArray toJson() const;
 
@@ -266,6 +287,8 @@ private:
   QModelIndex insertNode(std::unique_ptr<Node> node, const QModelIndex& parent,
                          int32_t row);
   void emitSubtreeChanged(const QModelIndex& index);
+  /** Emits layerStackChanged(), or notes it for the batch. */
+  void stackChanged();
   void emitDataChangedBelow(const QModelIndex& index);
 
   std::unique_ptr<Node> m_root;
@@ -273,6 +296,10 @@ private:
   std::map<QString, ProviderStatus> m_status;
   QIcon m_offlineIcon;
   QIcon m_errorIcon;
+  /** Open StackChangeBatch objects. */
+  int32_t m_batches = 0;
+  /** A change held back by a batch. */
+  bool m_stackChangeHeld = false;
 };
 
 } // namespace ts

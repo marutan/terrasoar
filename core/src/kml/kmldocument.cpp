@@ -60,7 +60,7 @@ bool KmlTime::contains(const QDateTime& time) const
 namespace
 {
 
-/** Applies @p visit to @p feature and everything inside it. */
+/** Returns the first item with @p id in @p feature or inside it, or null. */
 template <typename T>
 const T*
 findIn(const KmlFeature& feature, const QString& id,
@@ -82,8 +82,49 @@ findIn(const KmlFeature& feature, const QString& id,
 
 } // namespace
 
+void KmlStyleIndex::build(const KmlFeature& root)
+{
+  // Depth first, the first of an id kept: what findIn() finds.
+  m_styles.clear();
+  m_styleMaps.clear();
+  std::vector<const KmlFeature*> pending = {&root};
+  while (!pending.empty()) {
+    const KmlFeature* feature = pending.back();
+    pending.pop_back();
+    for (const KmlStyle& style : feature->styles) {
+      m_styles.emplace(style.id, &style);
+    }
+    for (const KmlStyleMap& map : feature->styleMaps) {
+      m_styleMaps.emplace(map.id, &map);
+    }
+    for (std::vector<KmlFeature>::const_reverse_iterator child =
+             feature->children.rbegin();
+         child != feature->children.rend(); ++child) {
+      pending.push_back(&*child);
+    }
+  }
+  m_built = true;
+}
+
+const KmlStyle* KmlStyleIndex::style(const QString& id) const
+{
+  const std::unordered_map<QString, const KmlStyle*>::const_iterator found =
+      m_styles.find(id);
+  return found != m_styles.end() ? found->second : nullptr;
+}
+
+const KmlStyleMap* KmlStyleIndex::styleMap(const QString& id) const
+{
+  const std::unordered_map<QString, const KmlStyleMap*>::const_iterator found =
+      m_styleMaps.find(id);
+  return found != m_styleMaps.end() ? found->second : nullptr;
+}
+
 const KmlStyle* KmlDocument::findStyle(const QString& id) const
 {
+  if (styleIndex.isBuilt()) {
+    return styleIndex.style(id);
+  }
   return findIn<KmlStyle>(
       root, id, [](const KmlFeature& f) -> const std::vector<KmlStyle>& {
         return f.styles;
@@ -92,10 +133,21 @@ const KmlStyle* KmlDocument::findStyle(const QString& id) const
 
 const KmlStyleMap* KmlDocument::findStyleMap(const QString& id) const
 {
+  if (styleIndex.isBuilt()) {
+    return styleIndex.styleMap(id);
+  }
   return findIn<KmlStyleMap>(
       root, id, [](const KmlFeature& f) -> const std::vector<KmlStyleMap>& {
         return f.styleMaps;
       });
+}
+
+std::shared_ptr<const KmlDocument> makeSharedKmlDocument(KmlDocument document)
+{
+  std::shared_ptr<KmlDocument> shared =
+      std::make_shared<KmlDocument>(std::move(document));
+  shared->styleIndex.build(shared->root);
+  return shared;
 }
 
 QString kmlSlotOf(const QString& localName)
