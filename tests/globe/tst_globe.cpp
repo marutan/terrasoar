@@ -1164,6 +1164,13 @@ private slots:
         << ts::Camera::maximumMapTiltDeg;
     QTest::newRow("morph-half-turned-tilted")
         << mercator << 0.5 << 38.0 << 26.0 << 3.0e6 << 30.0 << 40.0;
+    // Zoomed out further than a tilted map's usual far limit: a turned
+    // Rotated Mercator, a tilted Robinson, still drawn whole.
+    QTest::newRow("map-turned-far-rotated-mercator")
+        << rotated << 1.0 << 45.0 << 0.0 << 9.0e7 << 40.0 << 0.0;
+    QTest::newRow("map-tilted-far-robinson")
+        << QStringLiteral("robinson") << 1.0 << 20.0 << 0.0 << 2.0e7 << 0.0
+        << 45.0;
   }
 
   void morphGolden()

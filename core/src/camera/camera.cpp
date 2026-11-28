@@ -297,8 +297,12 @@ bool Camera::isMapTurnedOrTilted() const
 double Camera::mapFarLimitM() const
 {
   const double heightM = m_pose.rangeM * std::cos(degToRad(m_pose.tiltDeg));
-  return std::min(maximumMapFarM,
-                  std::max(mapFarEyeHeights * heightM, 2.0 * m_pose.rangeM));
+  // The cap only shortens how far a tilted map reaches: never nearer than
+  // a few ranges, or a map seen from further than the cap (zoomed out)
+  // would be cut off whole, and its corners hazed.
+  return std::min(
+      std::max(mapFarEyeHeights * heightM, 2.0 * m_pose.rangeM),
+      std::max(maximumMapFarM, mapFarMinimumRanges * m_pose.rangeM));
 }
 
 double Camera::mapReliefForTilt(double tiltDeg)

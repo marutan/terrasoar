@@ -52,6 +52,14 @@ All notable changes to Terra Soar. The format follows
 - Features of a data pack that appear only when zoomed in further than
   their stored detail were never drawn: VMAP0's airports and contour
   lines now show.
+- On some graphics cards (NVIDIA's among them), Web Mercator imagery
+  (XYZ layers such as Google Maps, and WMTS) zoomed in past about level
+  17 was drawn in distorted horizontal strips, and the finer levels never
+  looked sharper. The maps in the Mercator, Miller and Gall projections
+  were out in the same way.
+- The 2D map vanished when turned or tilted while zoomed out further than
+  about 10,000 km (as Rotated Mercator's whole map is), in every
+  projection.
 
 ## [0.0.4] – 2026-11-22
 

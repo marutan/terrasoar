@@ -223,8 +223,13 @@ public:
    * it (see mapFarLimitM()).
    */
   static constexpr double mapFarEyeHeights = 40.0;
-  /** The farthest a tilted map is drawn, metres. */
+  /** The farthest a tilted map is drawn, metres, unless the eye is so far
+   *  away that mapFarMinimumRanges ranges reach further. */
   static constexpr double maximumMapFarM = 1.0e7;
+  /** A turned or tilted map is drawn at least this many times the range
+   *  from the eye: the whole view of a map turned but not tilted, clear of
+   *  the haze (which starts at 55% of the far limit). */
+  static constexpr double mapFarMinimumRanges = 4.0;
   /** The tilt at which a tilted map's terrain is in full relief, degrees. */
   static constexpr double mapReliefFullTiltDeg = 15.0;
 
@@ -299,8 +304,9 @@ public:
   /**
    * Returns how far a tilted flat map is drawn from the eye, metres:
    * mapFarEyeHeights times the eye's height above the map, at most
-   * maximumMapFarM. Nothing is drawn, picked or asked for beyond it; a
-   * haze hides the edge.
+   * maximumMapFarM or mapFarMinimumRanges times the range, whichever is
+   * further. Nothing is drawn, picked or asked for beyond it; a haze hides
+   * the edge.
    */
   double mapFarLimitM() const;
 

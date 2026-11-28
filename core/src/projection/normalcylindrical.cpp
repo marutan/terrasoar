@@ -290,8 +290,9 @@ QByteArray GallStereographicProjection::glslSource() const
   return "\nvec2 " + glslFunction() +
          "(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)\n{\n"
          "  float h = 0.5 * clamp(dLonLatRad.y, r0.x, r0.y);\n"
-         "  float dy = 1.7071067811865475 * sin(h)\n"
-         "           / (r0.z * (r0.z * cos(h) - r0.w * sin(h)));\n"
+         "  float sinH = tsSinSmall(h);\n"
+         "  float dy = 1.7071067811865475 * sinH\n"
+         "           / (r0.z * (r0.z * tsCosSmall(h) - r0.w * sinH));\n"
          "  return 6378137.0 * vec2(0.7071067811865475 * dLonLatRad.x, dy);\n"
          "}\n";
 }
@@ -366,8 +367,9 @@ QByteArray GallPetersProjection::glslSource() const
   return "\nvec2 " + glslFunction() +
          "(vec2 dLonLatRad, vec4 r0, vec4 r1, vec4 r2, vec4 r3)\n{\n"
          "  float q = clamp(dLonLatRad.y, r0.x, r0.y);\n"
-         "  float sinHalf = sin(0.5 * q);\n"
-         "  float d = 2.0 * (r0.w * cos(0.5 * q) - r0.z * sinHalf) * sinHalf;\n"
+         "  float sinHalf = tsSinSmall(0.5 * q);\n"
+         "  float cosHalf = tsCosSmall(0.5 * q);\n"
+         "  float d = 2.0 * (r0.w * cosHalf - r0.z * sinHalf) * sinHalf;\n"
          "  float s = r0.z + d;\n"
          "  float e2 = r1.x * r1.x;\n"
          "  float first = d * (1.0 + e2 * r0.z * s)\n"
