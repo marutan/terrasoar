@@ -41,11 +41,12 @@ on:
       - tools/release/**
   workflow_dispatch:
 
-# A newer push to a pull request replaces its dry run; a tag's run is never
-# cancelled.
+# A newer dry run replaces the one before it on the same branch, whether a
+# push to a pull request or one run by hand (else the new one waits for the
+# old to finish); a tag's run is never cancelled.
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 jobs:
   version:
