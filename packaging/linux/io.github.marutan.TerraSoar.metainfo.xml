@@ -79,6 +79,17 @@
     <category>Geography</category>
   </categories>
   <releases>
+    <release version="0.0.5" date="2026-11-28">
+      <description>
+        <p>New data packs from Natural Earth, Black Marble, WDBII and
+        OurAirports; Esri's basemaps among the XYZ layers; a toolbar with
+        Quick Maps; menus regrouped by source; and each place, path and
+        area of a KML file its own entry in the Layers panel, with
+        Properties. Fixed: Web Mercator imagery drawn in strips when zoomed
+        far in on some graphics cards, and the 2D map vanishing when turned
+        or tilted while zoomed out.</p>
+      </description>
+    </release>
     <release version="0.0.4" date="2026-11-22">
       <description>
         <p>Map tiles load from the middle of the view outwards, and fewer
